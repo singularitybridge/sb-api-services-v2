@@ -6,7 +6,9 @@
   "scripts": {
     "start": "ts-node src/index.ts",
     "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon --exec ts-node src/index.ts",
+    "dev-public": "concurrently \"npm run start\" \"ngrok http --domain=sb-api.ngrok.app 3000\""
   },
   "keywords": [
     "task",
@@ -19,13 +21,16 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^16.3.1",
     "express": "^4.17.1",
+    "googleapis": "^128.0.0",
     "ts-node": "^10.2.1",
     "typescript": "^4.4.3",
     "uuid": "^8.3.2"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
-    "@types/uuid": "^9.0.7"
+    "@types/uuid": "^9.0.7",
+    "concurrently": "^8.2.2"
   }
 }
