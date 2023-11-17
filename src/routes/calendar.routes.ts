@@ -45,6 +45,13 @@ const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 router.get("/events", async (req, res) => {
   const { start, end } = req.query;
 
+  if (!Date.parse(start as string) || !Date.parse(end as string)) {
+    // print what was received
+    console.log("start: ", start);
+    return res.status(400).send("Invalid start or end date");
+  }
+
+
   // Convert the dates to JavaScript Date objects
   const startDate = new Date(`${start as string}T00:00:00`);
   const endDate = new Date(`${end as string}T23:59:59`);
@@ -89,11 +96,27 @@ router.post("/events", async (req, res) => {
 });
 
 router.put("/events/:id", async (req, res) => {
-  // Update an event
+  // Get the existing event
+  const existingEvent = await calendar.events.get({
+    calendarId: "primary",
+    eventId: req.params.id,
+  });
+
+  if (!existingEvent.data) {
+    return res.status(404).send("Event not found");
+  }
+
+  // Update the fields with the new values from the request body
+  const updatedEvent = {
+    ...existingEvent.data,
+    ...req.body,
+  };
+
+  // Update the event
   const event = await calendar.events.update({
     calendarId: "primary",
     eventId: req.params.id,
-    requestBody: req.body,
+    requestBody: updatedEvent,
   });
 
   res.json(event.data);
