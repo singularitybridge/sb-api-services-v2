@@ -9,6 +9,8 @@ import { google } from "googleapis";
 import { OAuth2Client } from "google-auth-library";
 
 const router = express.Router();
+const calendarId =
+  "0d504cdef77336818a64a4d89b331d90951ae2dcb28444de7dd4ab1de8af35d2@group.calendar.google.com";
 
 // Initialize the OAuth2 client
 const oauth2Client = new OAuth2Client(
@@ -51,14 +53,13 @@ router.get("/events", async (req, res) => {
     return res.status(400).send("Invalid start or end date");
   }
 
-
   // Convert the dates to JavaScript Date objects
   const startDate = new Date(`${start as string}T00:00:00`);
   const endDate = new Date(`${end as string}T23:59:59`);
 
   // Get the events
   const events = await calendar.events.list({
-    calendarId: "primary",
+    calendarId: calendarId,
     timeMin: startDate.toISOString(),
     timeMax: endDate.toISOString(),
     singleEvents: true,
@@ -85,10 +86,23 @@ router.get("/events", async (req, res) => {
   res.json(simplifiedEvents);
 });
 
+router.get("/calendars", async (req, res) => {
+  try {
+    const calendarList = await calendar.calendarList.list();
+    const calendars = calendarList.data.items?.map((item) => ({
+      id: item.id,
+      name: item.summary,
+    }));
+    res.json(calendars);
+  } catch (error: any) {
+    res.status(500).send((error as Error).message);
+  }
+});
+
 router.post("/events", async (req, res) => {
   // Create a new event
   const event = await calendar.events.insert({
-    calendarId: "primary",
+    calendarId: calendarId,
     requestBody: req.body,
   });
 
@@ -98,7 +112,7 @@ router.post("/events", async (req, res) => {
 router.put("/events/:id", async (req, res) => {
   // Get the existing event
   const existingEvent = await calendar.events.get({
-    calendarId: "primary",
+    calendarId: calendarId,
     eventId: req.params.id,
   });
 
@@ -114,7 +128,7 @@ router.put("/events/:id", async (req, res) => {
 
   // Update the event
   const event = await calendar.events.update({
-    calendarId: "primary",
+    calendarId: calendarId,
     eventId: req.params.id,
     requestBody: updatedEvent,
   });
@@ -125,7 +139,7 @@ router.put("/events/:id", async (req, res) => {
 router.delete("/events/:id", async (req, res) => {
   // Delete an event
   await calendar.events.delete({
-    calendarId: "primary",
+    calendarId: calendarId,
     eventId: req.params.id,
   });
 
