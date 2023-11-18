@@ -44,47 +44,120 @@ console.log("Visit this URL to authorize the application:", url);
 // Initialize the calendar client
 const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
-router.get("/events", async (req, res) => {
-  const { start, end } = req.query;
 
+const getEventsInRange = async (startDate: Date, endDate: Date) => {
+
+  endDate.setHours(23, 59, 59, 999); // Set to end of the day
+
+  try {
+    const events = await calendar.events.list({
+      calendarId: calendarId,
+      timeMin: startDate.toISOString(),
+      timeMax: endDate.toISOString(),
+      singleEvents: true,
+      orderBy: "startTime",
+    });
+
+    if (!events.data.items) {
+      return [];
+    }
+
+    const simplifiedEvents = events.data.items.map((event) => ({
+      id: event.id,
+      title: event.summary,
+      description: event.description,
+      startDate: event.start?.dateTime,
+      endDate: event.end?.dateTime,
+      googleMeetLink: event.hangoutLink,
+      guests: event.attendees?.map((attendee) => ({
+        name: attendee.displayName,
+        email: attendee.email,
+      })),
+    }));
+
+    return simplifiedEvents;
+  } catch (error) {
+    throw new Error("Error fetching events");
+  }
+};
+
+
+router.get("/events", async (req, res) => {
+
+  const { start, end } = req.query;
+  
   if (!Date.parse(start as string) || !Date.parse(end as string)) {
-    // print what was received
-    console.log("start: ", start);
     return res.status(400).send("Invalid start or end date");
   }
 
-  // Convert the dates to JavaScript Date objects
-  const startDate = new Date(`${start as string}T00:00:00`);
-  const endDate = new Date(`${end as string}T23:59:59`);
+  const startDate = new Date(start as string);
+  const endDate = new Date(end as string);
 
-  // Get the events
-  const events = await calendar.events.list({
-    calendarId: calendarId,
-    timeMin: startDate.toISOString(),
-    timeMax: endDate.toISOString(),
-    singleEvents: true,
-    orderBy: "startTime",
+  const events = await getEventsInRange(startDate, endDate);
+  res.json(events);
+
+  
+});
+
+router.get("/free-slots", async (req, res) => {
+
+  const { start, end } = req.query;
+  
+  if (!Date.parse(start as string) || !Date.parse(end as string)) {
+    return res.status(400).send("Invalid start or end date");
+  }
+  const startDate = new Date(start as string);
+  const endDate = new Date(end as string);
+  
+  const events = await getEventsInRange(startDate, endDate);
+
+  console.log('found ...');
+  console.log(events);
+
+  // Calculate free time slots
+  const freeSlots = events ? findFreeSlots(events, startDate, endDate) : [];
+
+  res.json(freeSlots);
+});
+
+const findFreeSlots = (events: any[], startDate: Date, endDate: Date) => {
+  const freeSlots = [];
+  let lastEventEnd = new Date(startDate);
+  const requiredSlotTime = 60 * 60 * 1000; // 1 hour in milliseconds
+  const startTime = new Date(startDate);
+  startTime.setHours(9, 30, 0); // Set the start time to 09:30
+
+  events.forEach(event => {
+    const eventStart = new Date(event.startDate);
+    const eventEnd = new Date(event.endDate);
+
+    if (eventStart.getTime() - lastEventEnd.getTime() >= requiredSlotTime) {
+      const slotStart = new Date(lastEventEnd);
+      const slotEnd = new Date(lastEventEnd.getTime() + requiredSlotTime);
+      if (slotStart >= startTime && slotEnd <= endDate && slotEnd.getHours() <= 17) {
+        freeSlots.push({ start: slotStart, end: slotEnd });
+      }
+    }
+
+    lastEventEnd = eventEnd;
   });
 
-  if (!events.data.items) {
-    return res.json([]);
+  // Check for a slot after the last event
+  if (endDate.getTime() - lastEventEnd.getTime() >= requiredSlotTime) {
+    const slotStart = new Date(lastEventEnd);
+    const slotEnd = new Date(lastEventEnd.getTime() + requiredSlotTime);
+    if (slotStart >= startTime && slotEnd <= endDate && slotEnd.getHours() <= 17) {
+      freeSlots.push({ start: slotStart, end: slotEnd });
+    }
   }
 
-  const simplifiedEvents = events.data.items.map((event) => ({
-    id: event.id,
-    title: event.summary,
-    description: event.description,
-    startDate: event.start?.dateTime,
-    endDate: event.end?.dateTime,
-    googleMeetLink: event.hangoutLink,
-    guests: event.attendees?.map((attendee) => ({
-      name: attendee.displayName,
-      email: attendee.email,
-    })),
+  return freeSlots.map(slot => ({
+    start: slot.start.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }),
+    end: slot.end.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' })
   }));
+}
 
-  res.json(simplifiedEvents);
-});
+
 
 router.get("/calendars", async (req, res) => {
   try {
