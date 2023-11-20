@@ -1,0 +1,5 @@
+{
+    "ignore": [
+        "./src/routes/tokens.json"
+    ]
+}
