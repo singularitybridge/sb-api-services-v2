@@ -2,8 +2,6 @@
 import { OAuth2Client } from "google-auth-library";
 import fs from "fs";
 import path from "path";
-import { cloudbilling } from "googleapis/build/src/apis/cloudbilling";
-
 
 export const oauth2Client = new OAuth2Client(
   process.env.CLIENT_ID,
