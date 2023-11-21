@@ -1,22 +1,36 @@
 import moment from "moment-timezone";
+import { IEvent } from "../Interfaces/event.interface";
 
-export interface Slot {
-  start: Date;
-  end: Date;
-  status: string;
+export enum SlotStatus {
+  Free = "free",
+  Occupied = "occupied"
 }
 
-export const generateTimeSlots = (startDate: Date, endDate: Date) => {
-  let slots = [];
-  let current = moment.tz(startDate, "Asia/Jerusalem").startOf("day").hour(9);
-  let end = moment.tz(endDate, "Asia/Jerusalem").startOf("day").hour(17);
+interface TimeSlot {
+  start: Date;
+  end: Date;
+  status: SlotStatus;
+}
+
+export const generateTimeSlots = (
+  startDate: Date,
+  endDate: Date,
+  startHour: number,
+  endHour: number
+): TimeSlot[] => {
+  let slots: TimeSlot[] = [];
+  let current = moment
+    .tz(startDate, "Asia/Jerusalem")
+    .startOf("day")
+    .hour(startHour);
+  let end = moment.tz(endDate, "Asia/Jerusalem").startOf("day").hour(endHour);
 
   while (current.isBefore(end)) {
-    if (current.hour() >= 9 && current.hour() < 17) {
+    if (current.hour() >= startHour && current.hour() < endHour) {
       let slotStart = current.toDate();
       let slotEnd = current.clone().add(1, "hour").toDate();
 
-      slots.push({ start: slotStart, end: slotEnd, status: "free" });
+      slots.push({ start: slotStart, end: slotEnd, status: SlotStatus.Free });
     }
     current.add(1, "hour");
   }
@@ -24,7 +38,7 @@ export const generateTimeSlots = (startDate: Date, endDate: Date) => {
   return slots;
 };
 
-export const markOccupiedSlots = (slots: Slot[], events: any[]) => {
+export const markOccupiedSlots = (slots: TimeSlot[], events: IEvent[]): TimeSlot[] => {
   events.forEach((event) => {
     let eventStart = moment(event.startDate);
     let eventEnd = moment(event.endDate);
@@ -34,7 +48,7 @@ export const markOccupiedSlots = (slots: Slot[], events: any[]) => {
       let slotEnd = moment(slot.end);
 
       if (slotStart.isBefore(eventEnd) && slotEnd.isAfter(eventStart)) {
-        slot.status = "occupied";
+        slot.status = SlotStatus.Occupied;
       }
     });
   });
@@ -45,20 +59,14 @@ export const markOccupiedSlots = (slots: Slot[], events: any[]) => {
 export const findFreeSlots = (
   startDate: Date,
   endDate: Date,
-  events: any[]
-) => {
-  let allSlots = generateTimeSlots(startDate, endDate);
+  events: IEvent[]
+): { start: string; end: string }[] => {
 
-  console.log(" ------------------ allSlots ------------------ ");
-  console.log(allSlots);
-
+  let allSlots = generateTimeSlots(startDate, endDate, 8, 17);
   let markedSlots = markOccupiedSlots(allSlots, events);
 
-  console.log(" ------------------ markedSlots ------------------ ");
-  console.log(markedSlots);
-
   return markedSlots
-    .filter((slot) => slot.status === "free")
+    .filter((slot) => slot.status === SlotStatus.Free)
     .map((slot) => ({
       start:
         slot.start.toLocaleDateString("en-GB", { timeZone: "Asia/Jerusalem" }) +

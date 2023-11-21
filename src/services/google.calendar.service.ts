@@ -1,7 +1,8 @@
-  import { google } from "googleapis";
+import { google } from "googleapis";
 import { OAuth2Client } from "google-auth-library";
 import fs from "fs";
 import path from "path";
+import { IEvent } from "../Interfaces/event.interface";
 
 export const oauth2Client = new OAuth2Client(
   process.env.CLIENT_ID,
@@ -25,9 +26,8 @@ export const initGoogleCalendar = () => {
 export const handleOAuth2Callback = async (code: string) => {
   const { tokens } = await oauth2Client.getToken(code);
   oauth2Client.setCredentials(tokens);
-  return tokens;  
+  return tokens;
 };
-
 
 export const generateAuthUrl = () => {
   const scopes = [
@@ -41,10 +41,12 @@ export const generateAuthUrl = () => {
   });
 
   console.log("Visit this URL to authorize the application:", url);
-  
 };
 
-export const getEventsInRange = async (startDate: Date, endDate: Date) => {
+export const getEventsInRange = async (
+  startDate: Date,
+  endDate: Date
+): Promise<IEvent[]> => {
   try {
     const events = await calendar.events.list({
       calendarId: calendarId,
@@ -58,17 +60,12 @@ export const getEventsInRange = async (startDate: Date, endDate: Date) => {
       return [];
     }
 
-    const simplifiedEvents = events.data.items.map((event) => ({
-      id: event.id,
-      title: event.summary,
-      description: event.description,
-      startDate: event.start?.dateTime,
-      endDate: event.end?.dateTime,
-      googleMeetLink: event.hangoutLink,
-      guests: event.attendees?.map((attendee) => ({
-        name: attendee.displayName,
-        email: attendee.email,
-      })),
+    const simplifiedEvents: IEvent[] = events.data.items.map((event) => ({
+      id: event.id ?? "",
+      title: event.summary ?? "",
+      description: event.description ?? "",
+      startDate: new Date(event.start?.dateTime ?? ""),
+      endDate: new Date(event.end?.dateTime ?? ""),
     }));
 
     return simplifiedEvents;

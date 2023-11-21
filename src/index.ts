@@ -13,6 +13,12 @@ app.use('/world_status', worldRouter);
 app.use('/tasks', tasksRouter);
 app.use('/calendar', calendarRouter);
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+// Export the app for testing
+export default app;
+
+// Separate the listening part to allow the app to be used in tests
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+  });
+}

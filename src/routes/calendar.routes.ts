@@ -23,6 +23,7 @@ initGoogleCalendar();
 generateAuthUrl();
 
 router.get("/events", async (req, res) => {
+  
   const { start, end } = req.query;
 
   if (!Date.parse(start as string) || !Date.parse(end as string)) {
