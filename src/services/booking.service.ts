@@ -62,7 +62,7 @@ export const findFreeSlots = (
   events: IEvent[]
 ): { start: string; end: string }[] => {
 
-  let allSlots = generateTimeSlots(startDate, endDate, 8, 17);
+  let allSlots = generateTimeSlots(startDate, endDate, 9, 17);
   let markedSlots = markOccupiedSlots(allSlots, events);
 
   return markedSlots

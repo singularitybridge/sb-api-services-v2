@@ -108,10 +108,10 @@ describe('findFreeSlots', () => {
 
     // Add your expectations here...
     // For example, you can check the number of free slots:
-    expect(freeSlots.length).toEqual(7);
+    expect(freeSlots.length).toEqual(6);
 
     // Or you can check the start and end times of the first free slot:
-    expect(freeSlots[0].start).toEqual('01/01/2022, 08:00');
-    expect(freeSlots[0].end).toEqual('01/01/2022, 09:00');
+    expect(freeSlots[0].start).toEqual('01/01/2022, 09:00');
+    expect(freeSlots[0].end).toEqual('01/01/2022, 10:00');
   });
 });
