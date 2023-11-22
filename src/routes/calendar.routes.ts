@@ -39,7 +39,7 @@ router.get("/events", async (req, res) => {
 });
 
 router.get("/free-slots", async (req, res) => {
-  const { start, end } = req.query;
+  const { start, end, duration } = req.query;
 
   if (!Date.parse(start as string) || !Date.parse(end as string)) {
     return res.status(400).send("Invalid start or end date");
@@ -50,7 +50,8 @@ router.get("/free-slots", async (req, res) => {
   endDate.setHours(23, 59, 59, 999);
 
   const events = await getEventsInRange(startDate, endDate);
-  const freeSlots = events ? findFreeSlots(startDate, endDate, events) : [];
+  const meetingDuration = duration ? parseInt(duration as string, 10) : 30;
+  const freeSlots = events ? findFreeSlots(startDate, endDate, events, 15, meetingDuration) : [];
 
   res.json(freeSlots);
 });

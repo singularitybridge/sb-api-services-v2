@@ -11,29 +11,41 @@ describe("generateTimeSlots", () => {
   it("should generate correct number of slots", () => {
     const startDate = new Date(2022, 1, 1, 8, 0, 0);
     const endDate = new Date(2022, 1, 1, 17, 0, 0);
-    const slots = generateTimeSlots(startDate, endDate, 8, 17);
-    expect(slots.length).toEqual(9);
+    const slots = generateTimeSlots(startDate, endDate, 8, 17,30);
+    expect(slots.length).toEqual(18);
   });
 
   it("should generate slots with correct start and end times", () => {
     const startDate = new Date(2022, 1, 1, 8, 0, 0);
     const endDate = new Date(2022, 1, 1, 17, 0, 0);
-    const slots = generateTimeSlots(startDate, endDate, 8, 17);
+    const slotDuration = 30; // Duration of each slot in minutes
+    const slots = generateTimeSlots(startDate, endDate, 8, 17, slotDuration);
+    
     slots.forEach((slot, index) => {
+      const expectedStartHour = 8 + Math.floor((index * slotDuration) / 60);
+      const expectedStartMinute = (index * slotDuration) % 60;
+      const expectedEndHour = 8 + Math.floor(((index + 1) * slotDuration) / 60);
+      const expectedEndMinute = ((index + 1) * slotDuration) % 60;
+  
       const expectedStart = moment
         .tz(startDate, "Asia/Jerusalem")
         .startOf("day")
-        .hour(8 + index)
+        .hour(expectedStartHour)
+        .minute(expectedStartMinute)
         .toDate();
+  
       const expectedEnd = moment
         .tz(startDate, "Asia/Jerusalem")
         .startOf("day")
-        .hour(8 + index + 1)
+        .hour(expectedEndHour)
+        .minute(expectedEndMinute)
         .toDate();
+  
       expect(slot.start).toEqual(expectedStart);
       expect(slot.end).toEqual(expectedEnd);
     });
   });
+  
 });
 
 describe("markOccupiedSlots", () => {
@@ -42,7 +54,7 @@ describe("markOccupiedSlots", () => {
     const startDate = new Date(2022, 1, 1, 8, 0, 0);
     const endDate = new Date(2022, 1, 1, 17, 0, 0);
 
-    const slots = generateTimeSlots(startDate, endDate, 8, 17);
+    const slots = generateTimeSlots(startDate, endDate, 8, 17,30);
     
     const events: IEvent[] = [
       {
@@ -104,7 +116,7 @@ describe('findFreeSlots', () => {
       },
     ];
 
-    const freeSlots = findFreeSlots(startDate, endDate, events);
+    const freeSlots = findFreeSlots(startDate, endDate, events, 15, 60);
 
     // Add your expectations here...
     // For example, you can check the number of free slots:

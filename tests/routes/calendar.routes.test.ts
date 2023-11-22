@@ -32,7 +32,7 @@ describe("GET /free-slots", () => {
       .expect(200);
 
     expect(response.body).toBeInstanceOf(Array);
-    expect(response.body).toHaveLength(6);
+    expect(response.body).toHaveLength(14);
   });
 
   it("should handle invalid dates", async () => {
