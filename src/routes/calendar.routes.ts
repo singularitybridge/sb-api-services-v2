@@ -100,13 +100,7 @@ router.get("/oauth2callback", async (req, res) => {
 
   if (code) {
     try {
-      const tokens = await handleOAuth2Callback(code as string);
-
-      fs.writeFileSync(
-        path.join(__dirname, "tokens.json"),
-        JSON.stringify(tokens)
-      );
-
+      await handleOAuth2Callback(code as string);
       res.send("Authentication successful! You can close this tab.");
     } catch (error) {
       res.send("Error retrieving access token");

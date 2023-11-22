@@ -10,24 +10,38 @@ export const oauth2Client = new OAuth2Client(
   process.env.REDIRECT_URL
 );
 
+const TOKEN_PATH = path.join(__dirname, "tokens.json"); // Token file path
+
+
 const calendarId =
   "0d504cdef77336818a64a4d89b331d90951ae2dcb28444de7dd4ab1de8af35d2@group.calendar.google.com";
 const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
 export const initGoogleCalendar = () => {
-  if (fs.existsSync(path.join(__dirname, "tokens.json"))) {
-    const tokens = JSON.parse(
-      fs.readFileSync(path.join(__dirname, "tokens.json"), "utf-8")
-    );
+  if (fs.existsSync(TOKEN_PATH)) {
+    const tokens = JSON.parse(fs.readFileSync(TOKEN_PATH, "utf-8"));
     oauth2Client.setCredentials(tokens);
+    // Automatically refresh the access token
+    oauth2Client.on('tokens', (newTokens) => {
+      if (newTokens.refresh_token) {
+        // Save the new refresh token
+        tokens.refresh_token = newTokens.refresh_token;
+      }
+      // Save the new access token
+      tokens.access_token = newTokens.access_token;
+      fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
+    });
   }
 };
+
 
 export const handleOAuth2Callback = async (code: string) => {
   const { tokens } = await oauth2Client.getToken(code);
   oauth2Client.setCredentials(tokens);
+  fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens)); // Save the tokens
   return tokens;
 };
+
 
 export const generateAuthUrl = () => {
   const scopes = [
@@ -38,6 +52,7 @@ export const generateAuthUrl = () => {
   const url = oauth2Client.generateAuthUrl({
     access_type: "offline",
     scope: scopes,
+    prompt: "consent"
   });
 
   console.log("Visit this URL to authorize the application:", url);
