@@ -3,6 +3,7 @@ dotenv.config();
 
 import fs from "fs";
 import path from "path";
+import moment from 'moment-timezone';
 
 import express from "express";
 import { findFreeSlots } from "../services/booking.service";
@@ -35,7 +36,12 @@ router.get("/events", async (req, res) => {
   endDate.setHours(23, 59, 59, 999);
 
   const events = await getEventsInRange(startDate, endDate);
-  res.json(events);
+  res.json(events.map(event => ({
+    ...event,
+    startDate: moment(event.startDate).tz("Asia/Jerusalem").format('DD/MM/YYYY, HH:mm'),
+    endDate: moment(event.endDate).tz("Asia/Jerusalem").format('DD/MM/YYYY, HH:mm'),
+    day: moment(event.startDate).tz("Asia/Jerusalem").format('dddd'),
+  })));
 });
 
 router.get("/free-slots", async (req, res) => {
