@@ -3,9 +3,14 @@ import tasksRouter from './routes/tasks.routes';
 import policyRouter from './routes/policy.routes';
 import worldRouter from './routes/world.routes';
 import calendarRouter from './routes/calendar.routes';
+import { generateAuthUrl, initGoogleCalendar } from './services/google.calendar.service';
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+initGoogleCalendar();
+generateAuthUrl();
+
 
 app.use(express.json());
 app.use('/', policyRouter);

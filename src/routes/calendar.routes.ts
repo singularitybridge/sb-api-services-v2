@@ -1,117 +1,18 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import fs from "fs";
-import path from "path";
-import moment from 'moment-timezone';
-
 import express from "express";
-import { findFreeSlots } from "../services/booking.service";
-import {
-  createEvent,
-  deleteEvent,
-  generateAuthUrl,
-  getEventsInRange,
-  handleOAuth2Callback,
-  initGoogleCalendar,
-  listCalendars,
-  updateEvent,
-} from "../services/google.calendar.service";
+import { CalendarController } from "../controllers/calendar.controller";
 
 const router = express.Router();
+const calendarController = new CalendarController();
 
-initGoogleCalendar();
-generateAuthUrl();
-
-router.get("/events", async (req, res) => {
-  
-  const { start, end } = req.query;
-
-  if (!Date.parse(start as string) || !Date.parse(end as string)) {
-    return res.status(400).send("Invalid start or end date");
-  }
-
-  const startDate = new Date(start as string);
-  const endDate = new Date(end as string);
-  endDate.setHours(23, 59, 59, 999);
-
-  const events = await getEventsInRange(startDate, endDate);
-  res.json(events.map(event => ({
-    ...event,
-    startDate: moment(event.startDate).tz("Asia/Jerusalem").format('DD/MM/YYYY, HH:mm'),
-    endDate: moment(event.endDate).tz("Asia/Jerusalem").format('DD/MM/YYYY, HH:mm'),
-    day: moment(event.startDate).tz("Asia/Jerusalem").format('dddd'),
-  })));
-});
-
-router.get("/free-slots", async (req, res) => {
-  const { start, end, duration } = req.query;
-
-  if (!Date.parse(start as string) || !Date.parse(end as string)) {
-    return res.status(400).send("Invalid start or end date");
-  }
-
-  const startDate = new Date(start as string);
-  const endDate = new Date(end as string);
-  endDate.setHours(23, 59, 59, 999);
-
-  const events = await getEventsInRange(startDate, endDate);
-  const meetingDuration = duration ? parseInt(duration as string, 10) : 30;
-  const freeSlots = events ? findFreeSlots(startDate, endDate, events, 15, meetingDuration) : [];
-
-  res.json(freeSlots);
-});
-
-router.get("/calendars", async (req, res) => {
-  try {
-    const calendars = await listCalendars();
-    res.json(calendars);
-  } catch (error: any) {
-    res.status(500).send((error as Error).message);
-  }
-});
-
-router.post("/events", async (req, res) => {
-  try {
-    const event = await createEvent(req.body);
-    res.json(event);
-  } catch (error: any) {
-    res.status(500).send((error as Error).message);
-  }
-});
-
-router.put("/events/:id", async (req, res) => {
-  try {
-    const event = await updateEvent(req.params.id, req.body);
-    res.json(event);
-  } catch (error: any) {
-    if (error.code === 404) {
-      return res.status(404).send("Event not found");
-    }
-    res.status(500).send(error.message);
-  }
-});
-
-router.delete("/events/:id", async (req, res) => {
-  try {
-    await deleteEvent(req.params.id);
-    res.send("Event deleted successfully");
-  } catch (error: any) {
-    res.status(500).send(error.message);
-  }
-});
-
-router.get("/oauth2callback", async (req, res) => {
-  const { code } = req.query;
-
-  if (code) {
-    try {
-      await handleOAuth2Callback(code as string);
-      res.send("Authentication successful! You can close this tab.");
-    } catch (error) {
-      res.send("Error retrieving access token");
-    }
-  }
-});
+router.get('/events', (req, res) => calendarController.getEvents(req, res));
+router.get("/free-slots", (req, res) => calendarController.getFreeSlots(req, res));
+router.get("/calendars", (req, res) => calendarController.getCalendars(req, res));
+router.post("/events", (req, res) => calendarController.createEvent(req, res));
+router.put("/events/:id", (req, res) => calendarController.updateEvent(req, res));
+router.delete("/events/:id", (req, res) => calendarController.deleteEvent(req, res));
+router.get("/oauth2callback", (req,res) => calendarController.handleOAuth2Callback(req, res));
 
 export default router;
