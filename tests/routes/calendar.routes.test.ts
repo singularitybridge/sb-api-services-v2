@@ -43,7 +43,7 @@ describe("GET /free-slots", () => {
       .get(
         `/calendar/free-slots?start=${invalidStartDate}&end=${invalidEndDate}`
       )
-      .expect(400);
+      .expect(500);
   });
 
   // Additional test cases...

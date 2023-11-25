@@ -1,9 +1,13 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from 'express';
-import tasksRouter from './routes/tasks.routes';
-import policyRouter from './routes/policy.routes';
-import worldRouter from './routes/world.routes';
-import calendarRouter from './routes/calendar.routes';
+import { RegisterRoutes } from './routes/routes';
 import { generateAuthUrl, initGoogleCalendar } from './services/google.calendar.service';
+import swaggerUi from 'swagger-ui-express';
+import swaggerDocument from '../build/swagger.json';
+import cors from 'cors';
+import policyRouter from './routes/policy.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -13,15 +17,24 @@ generateAuthUrl();
 
 
 app.use(express.json());
-app.use('/', policyRouter);
-app.use('/world_status', worldRouter);
-app.use('/tasks', tasksRouter);
-app.use('/calendar', calendarRouter);
+app.use(cors());
 
-// Export the app for testing
+
+// Use the generated routes
+RegisterRoutes(app);
+
+// Set up Swagger UI to serve the API documentation
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.use('/policy', policyRouter);
+
+// serve the swaggerDocument
+app.get('/swagger.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerDocument);
+});
+
 export default app;
 
-// Separate the listening part to allow the app to be used in tests
 if (process.env.NODE_ENV !== 'test') {
   app.listen(port, () => {
     console.log(`Server is running on port ${port}`);

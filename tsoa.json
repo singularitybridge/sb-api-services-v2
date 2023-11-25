@@ -4,6 +4,7 @@
   "controllerPathGlobs": ["src/controllers/*.ts"],
   "spec": {
     "outputDirectory": "build",
+    "host": "sb-api.ngrok.app",
     "specVersion": 3
   },
   "swagger": {

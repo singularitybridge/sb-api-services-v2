@@ -2,7 +2,7 @@ import express from 'express';
 
 const router = express.Router();
 
-router.get('/policy', (req, res) => {
+router.get('/', (req, res) => {
     res.send(`
     # Privacy Policy
 

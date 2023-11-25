@@ -2,7 +2,9 @@ import { google } from "googleapis";
 import { OAuth2Client } from "google-auth-library";
 import fs from "fs";
 import path from "path";
-import { IEvent } from "../Interfaces/event.interface";
+import { IEvent, IEventCreationResponse } from "../Interfaces/event.interface";
+import { ICalendar } from "../Interfaces/calendar.interface";
+import { IEventRequest } from "../Interfaces/eventRequest.interface";
 
 export const oauth2Client = new OAuth2Client(
   process.env.CLIENT_ID,
@@ -89,38 +91,50 @@ export const getEventsInRange = async (
   }
 };
 
-export const listCalendars = async () => {
+export const listCalendars = async (): Promise<ICalendar[]> => {
   try {
     const calendarList = await calendar.calendarList.list();
     return calendarList.data.items?.map((item) => ({
-      id: item.id,
-      name: item.summary,
-    }));
+      id: item.id!,
+      name: item.summary!,
+    })) || [];
   } catch (error: any) {
     throw new Error((error as Error).message);
   }
 };
 
-export const createEvent = async (eventData: any) => {
+
+export const createEvent = async (eventData: IEventRequest): Promise<IEventCreationResponse> => {
   const event = await calendar.events.insert({
     calendarId: calendarId,
     requestBody: eventData,
   });
-  return event.data;
+  return { id: event.data.id! };
 };
 
-export const updateEvent = async (eventId: string, updatedData: any) => {
-  const event = await calendar.events.update({
-    calendarId: calendarId,
-    eventId: eventId,
-    requestBody: updatedData,
-  });
-  return event.data;
+
+export const updateEvent = async (eventId: string, eventData: IEventRequest) => {
+  try {
+    await calendar.events.update({
+      calendarId: calendarId,
+      eventId: eventId,
+      requestBody: eventData,
+    });
+    return { message: "Event updated successfully" };
+  } catch (error: any) {
+    throw new Error((error as Error).message);
+  }
 };
+
 
 export const deleteEvent = async (eventId: string) => {
-  await calendar.events.delete({
-    calendarId: calendarId,
-    eventId: eventId,
-  });
+  try {
+    await calendar.events.delete({
+      calendarId: calendarId,
+      eventId: eventId,
+    });
+  } catch (error: any) {
+    throw new Error((error as Error).message);
+  }
 };
+
