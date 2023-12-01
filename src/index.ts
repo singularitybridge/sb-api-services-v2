@@ -7,7 +7,9 @@ import { generateAuthUrl, initGoogleCalendar } from './services/google.calendar.
 import swaggerUi from 'swagger-ui-express';
 import swaggerDocument from '../build/swagger.json';
 import cors from 'cors';
+
 import policyRouter from './routes/policy.routes';
+import messagingRouter from './routes/messaging.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -15,19 +17,17 @@ const port = process.env.PORT || 3000;
 initGoogleCalendar();
 generateAuthUrl();
 
-
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cors());
 
-
-// Use the generated routes
 RegisterRoutes(app);
 
-// Set up Swagger UI to serve the API documentation
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.use('/policy', policyRouter);
+app.use('/messaging',messagingRouter);
 
-// serve the swaggerDocument
+
 app.get('/swagger.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerDocument);
