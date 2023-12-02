@@ -12,7 +12,7 @@ export const oauth2Client = new OAuth2Client(
   process.env.REDIRECT_URL
 );
 
-const TOKEN_PATH = path.join(__dirname, "tokens.json"); // Token file path
+const TOKEN_PATH = path.join(__dirname, "tokens.json");
 
 
 const calendarId =

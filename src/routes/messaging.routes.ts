@@ -1,5 +1,6 @@
 import express from 'express';
 import { Twilio } from "twilio";
+import { handleUserInput } from '../services/assistant.service';
 
 const twilioClient = new Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
@@ -17,17 +18,20 @@ router.get('/sms', (req, res) => {
 
 });
 
-router.post('/sms/reply', (req, res) => {
+router.post('/sms/reply', async (req, res) => {
 
-    // print recived message
+    // print received message
     console.log(req.body);
 
     const replyTo = req.body.From; // Get the number that sent the WhatsApp message
     const messageText = req.body.Body; // Get the message text sent
-    
+
+    const response = await handleUserInput(messageText);
+    const limitedResponse = response.substring(0, 1600); // Limit response to 1600 characters
+
     twilioClient.messages
         .create({
-            body: `You said: ${messageText}`,
+            body: limitedResponse,
             from: `whatsapp:${twilioPhoneNumber}`,
             to: replyTo
         })
