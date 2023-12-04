@@ -1,49 +1,18 @@
 import OpenAI, { BadRequestError, NotFoundError } from "openai";
 import {
-  createNewThread,
-  deleteThread,
-  getMessageHistoryFormatted,
-} from "./oai.thread.service";
+  commandHandlers,
+  executeCommand,
+} from "../helpers/assistant/command.helper";
 
 export const openaiClient = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const assistantId = "asst_JP476AOSNs6UBz014j1UoDlO";
-let currentThreadId = "thread_1neUJzbv7s0rq13KOl5PxQwF";
+export const assistantId = "asst_JP476AOSNs6UBz014j1UoDlO";
+export let currentThreadId = "thread_1neUJzbv7s0rq13KOl5PxQwF";
 
-enum Commands {
-  Clear = "clear",
-  Debug = "debug",
-}
-
-const commandHandlers = new Map<string, () => Promise<string>>([
-  [
-    Commands.Clear,
-    async () => {
-      await deleteThread(currentThreadId);
-      currentThreadId = await createNewThread();
-      return `Chat history cleared, new thread id: ${currentThreadId}`;
-    },
-  ],
-  [
-    Commands.Debug,
-    async () => {
-      const messages = await openaiClient.beta.threads.messages.list(
-        currentThreadId
-      );
-      const messageHistory = getMessageHistoryFormatted(messages.data);
-      return `Current thread id: ${currentThreadId}\n\nMessage History:\n${messageHistory}`;
-    },
-  ],
-]);
-
-const executeCommand = async (command: string): Promise<string> => {
-  const handler = commandHandlers.get(command);
-  if (!handler) {
-    throw new Error(`Unknown command: ${command}`);
-  }
-  return handler();
+export const setCurrentThreadId = (id: string) => {
+  currentThreadId = id;
 };
 
 const handleError = (error: Error): string => {
@@ -67,22 +36,27 @@ const pollRunStatus = async (
   timeout: number = 10000
 ) => {
   const startTime = Date.now();
+  let lastRun;
+
   while (Date.now() - startTime < timeout) {
     const run = await openaiClient.beta.threads.runs.retrieve(threadId, runId);
     console.log(`check run id:${runId} status: ${run.status}`);
+    lastRun = run;
+
     if (run.status === "completed") {
-      return;
+      return run;
     }
+
     await new Promise((resolve) =>
       setTimeout(resolve, Math.min(500, timeout - (Date.now() - startTime)))
     );
   }
+
   throw new Error("Timeout exceeded while waiting for run to complete");
 };
 
 export const handleUserInput = async (userInput: string): Promise<string> => {
   try {
-
     const trimmedInput = userInput.trim().toLowerCase();
 
     if (commandHandlers.has(trimmedInput)) {
@@ -106,17 +80,15 @@ export const handleUserInput = async (userInput: string): Promise<string> => {
       `new run created: ${newRun.id}, for thread: ${currentThreadId}`
     );
 
-    await pollRunStatus(currentThreadId, newRun.id);
+    const completedRun = await pollRunStatus(currentThreadId, newRun.id);
+    console.log("run completed > " + completedRun.status);
 
-    // get assistant response
     const messages = await openaiClient.beta.threads.messages.list(
       currentThreadId
     );
-
     // @ts-ignore
     const response = messages.data[0].content[0].text.value;
     return response;
-
   } catch (error) {
     return handleError(error as Error);
   }
