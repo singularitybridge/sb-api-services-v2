@@ -3,16 +3,63 @@ import {
   commandHandlers,
   executeCommand,
 } from "../helpers/assistant/command.helper";
+import { logging } from "googleapis/build/src/apis/logging";
 
 export const openaiClient = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 export const assistantId = "asst_JP476AOSNs6UBz014j1UoDlO";
-export let currentThreadId = "thread_1neUJzbv7s0rq13KOl5PxQwF";
+export let currentThreadId = "thread_CaKZ99rbEnNRqLe9XArIr7eT";
 
 export const setCurrentThreadId = (id: string) => {
   currentThreadId = id;
+};
+
+type FunctionName = keyof typeof functionFactory;
+
+const functionFactory = {
+  async getEvents(args: { start: string; end: string }) {
+    console.log("called getEvents with args: ", args);
+    return "no events found";
+
+    // return [{ eventName: "Event1", date: args.start }];
+  },
+};
+
+const executeFunctionCall = async (call: any) => {
+  const functionName = call.function.name as FunctionName;
+
+  if (functionName in functionFactory) {
+    const args = JSON.parse(call.function.arguments);
+    return await functionFactory[functionName](args);
+  } else {
+    throw new Error(`Function ${functionName} not implemented in the factory`);
+  }
+};
+
+const submitToolOutputs = async (
+  threadId: string,
+  runId: string,
+  toolCalls: any[]
+) => {
+  console.log("called submitToolOutputs with args: ", toolCalls);
+
+  const outputs = await Promise.all(
+    toolCalls.map(async (call) => {
+      const output = await executeFunctionCall(call);
+      return {
+        tool_call_id: call.id,
+        output: JSON.stringify(output),
+      };
+    })
+  );
+
+  console.log("tool outputs: ", outputs);
+
+  await openaiClient.beta.threads.runs.submitToolOutputs(threadId, runId, {
+    tool_outputs: outputs,
+  });
 };
 
 const handleError = (error: Error): string => {
@@ -43,8 +90,20 @@ const pollRunStatus = async (
     console.log(`check run id:${runId} status: ${run.status}`);
     lastRun = run;
 
-    if (run.status === "completed") {
+    const completedStatuses = ["completed", "cancelled", "failed", "expired"];
+    if (completedStatuses.includes(run.status)) {
       return run;
+    }
+
+    if (
+      run.status === "requires_action" &&
+      run.required_action?.type === "submit_tool_outputs"
+    ) {
+      await submitToolOutputs(
+        threadId,
+        runId,
+        run.required_action.submit_tool_outputs.tool_calls
+      );
     }
 
     await new Promise((resolve) =>
