@@ -1,14 +1,14 @@
-export interface IEventRequest {
-    summary: string;
-    location: string;
-    description: string;
-    start: {
-      dateTime: string;
-      timeZone: string;
-    };
-    end: {
-      dateTime: string;
-      timeZone: string;
-    };
-  }
-  
+export interface IEventRequestBody {
+  summary: string;
+  location: string;
+  description: string;
+  start: {
+    dateTime: string;
+    timeZone: string;
+  };
+  end: {
+    dateTime: string;
+    timeZone: string;
+  };
+}
+

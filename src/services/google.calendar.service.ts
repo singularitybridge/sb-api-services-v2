@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import { IEvent, IEventCreationResponse } from "../Interfaces/event.interface";
 import { ICalendar } from "../Interfaces/calendar.interface";
-import { IEventRequest } from "../Interfaces/eventRequest.interface";
+import { IEventRequestBody } from "../Interfaces/eventRequest.interface";
 
 export const oauth2Client = new OAuth2Client(
   process.env.CLIENT_ID,
@@ -104,7 +104,7 @@ export const listCalendars = async (): Promise<ICalendar[]> => {
 };
 
 
-export const createEvent = async (eventData: IEventRequest): Promise<IEventCreationResponse> => {
+export const createEvent = async (eventData: IEventRequestBody): Promise<IEventCreationResponse> => {
   const event = await calendar.events.insert({
     calendarId: calendarId,
     requestBody: eventData,
@@ -113,7 +113,7 @@ export const createEvent = async (eventData: IEventRequest): Promise<IEventCreat
 };
 
 
-export const updateEvent = async (eventId: string, eventData: IEventRequest) => {
+export const updateEvent = async (eventId: string, eventData: IEventRequestBody) => {
   try {
     await calendar.events.update({
       calendarId: calendarId,

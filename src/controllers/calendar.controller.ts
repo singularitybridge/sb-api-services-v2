@@ -27,7 +27,7 @@ import {
 import { findFreeSlots } from "../services/booking.service";
 import { IEvent, IEventCreationResponse, IEventResponse, IFreeSlot } from "../Interfaces/event.interface";
 import { ICalendar } from "../Interfaces/calendar.interface";
-import { IEventRequest } from "../Interfaces/eventRequest.interface";
+import { IEventRequestBody } from "../Interfaces/eventRequest.interface";
 
 @Route("calendar")
 export class CalendarController extends Controller {
@@ -104,7 +104,7 @@ export class CalendarController extends Controller {
   @Post('events')
   @Response(500, 'Server Error')
   public async createEvent(
-    @Body() eventData: IEventRequest
+    @Body() eventData: IEventRequestBody
   ): Promise<IEventCreationResponse> {
     try {
       const response = await createEvent(eventData);
@@ -115,13 +115,13 @@ export class CalendarController extends Controller {
     }
   }
 
-
   @Put('events/{id}')
   @Response(404, 'Event not found')
   @Response(500, 'Server Error')
-  public async updateEvent(
+  public async updateEvent
+(
     @Path() id: string,
-    @Body() eventData: IEventRequest
+    @Body() eventData: IEventRequestBody
   ): Promise<{ message: string }> {
     try {
       await updateEvent(id, eventData);
