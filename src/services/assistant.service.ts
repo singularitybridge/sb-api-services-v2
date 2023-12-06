@@ -4,27 +4,61 @@ import {
   executeCommand,
 } from "../helpers/assistant/command.helper";
 import { logging } from "googleapis/build/src/apis/logging";
+import { CalendarController } from "../controllers/calendar.controller";
+import { IEventRequest } from "../Interfaces/eventRequest.interface";
 
 export const openaiClient = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 export const assistantId = "asst_JP476AOSNs6UBz014j1UoDlO";
-export let currentThreadId = "thread_CaKZ99rbEnNRqLe9XArIr7eT";
+export let currentThreadId = "thread_EJANzkCSrwA2NC1VPmp5cRK0";
 
 export const setCurrentThreadId = (id: string) => {
   currentThreadId = id;
 };
 
 type FunctionName = keyof typeof functionFactory;
+const calendarController = new CalendarController();
 
 const functionFactory = {
+  
   async getEvents(args: { start: string; end: string }) {
     console.log("called getEvents with args: ", args);
-    return "no events found";
-
-    // return [{ eventName: "Event1", date: args.start }];
+    const events = await calendarController.getEvents(args.start, args.end);
+    return events;
   },
+
+  async getFreeSlots(args: { start: string; end: string; duration: number }) {
+    console.log("called getFreeSlots with args: ", args);
+    const freeSlots = await calendarController.getFreeSlots(
+      args.start,
+      args.end,
+      args.duration
+    );
+    return freeSlots;
+  },
+
+  async createEvent(args: IEventRequest) {
+    console.log("called createEvent with args: ", args);
+    const eventCreationResponse = await calendarController.createEvent(args);
+    return eventCreationResponse;
+  },
+
+  async updateEvent(args: { id: string; eventData: IEventRequest }) {
+    console.log("called updateEvent with args: ", args);
+    const updateResponse = await calendarController.updateEvent(args.id,args.eventData);
+    return updateResponse;
+  },
+
+  async deleteEvent(args: { id: string }) {
+    console.log("called deleteEvent with args: ", args);
+    const deleteResponse = await calendarController.deleteEvent(args.id);
+    return deleteResponse;
+  },
+
+
+
 };
 
 const executeFunctionCall = async (call: any) => {
@@ -80,7 +114,7 @@ const handleError = (error: Error): string => {
 const pollRunStatus = async (
   threadId: string,
   runId: string,
-  timeout: number = 10000
+  timeout: number = 35000
 ) => {
   const startTime = Date.now();
   let lastRun;
