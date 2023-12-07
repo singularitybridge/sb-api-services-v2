@@ -10,7 +10,7 @@ export const openaiClient = new OpenAI({
 });
 
 export const assistantId = "asst_JP476AOSNs6UBz014j1UoDlO";
-export let currentThreadId = "thread_EJANzkCSrwA2NC1VPmp5cRK0";
+export let currentThreadId = "thread_qjv26iaOo65qnn3hwiUKmqmj";
 
 export const setCurrentThreadId = (id: string) => {
   currentThreadId = id;
