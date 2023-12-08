@@ -9,8 +9,11 @@ export const openaiClient = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export const assistantId = "asst_JP476AOSNs6UBz014j1UoDlO";
-export let currentThreadId = "thread_qjv26iaOo65qnn3hwiUKmqmj";
+// export const assistantId = "asst_JP476AOSNs6UBz014j1UoDlO";
+// export let currentThreadId = "thread_qjv26iaOo65qnn3hwiUKmqmj";
+
+export const assistantId = "asst_1nJFvcSr10OSs1B1tr118e1J";
+export let currentThreadId = "thread_lXMKFdhoEkyZwBcDA0KftjPU";
 
 export const setCurrentThreadId = (id: string) => {
   currentThreadId = id;
