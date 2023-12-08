@@ -1,15 +1,18 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { IIdentifier, IdentifierSchema } from './Assistant';
 
-interface IUser extends Document {
+export interface IUser extends Document {
     name: string;
-    phoneNumber: string;
+    nickname: string;
+    identifiers: IIdentifier[];
 }
 
 const UserSchema: Schema = new Schema({
     name: { type: String, required: true },
-    phoneNumber: { type: String, required: true, unique: true },
+    nickname: { type: String, required: true },
+    identifiers: { type: [IdentifierSchema], required: true },
 });
 
-const User = mongoose.model<IUser>('User', UserSchema);
+UserSchema.index({ 'identifiers.type': 1, 'identifiers.value': 1 }, { unique: true });
+export const User = mongoose.model<IUser>('User', UserSchema);
 
-export default User;

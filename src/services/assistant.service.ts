@@ -9,16 +9,6 @@ export const openaiClient = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// export const assistantId = "asst_JP476AOSNs6UBz014j1UoDlO";
-// export let currentThreadId = "thread_qjv26iaOo65qnn3hwiUKmqmj";
-
-export const assistantId = "asst_1nJFvcSr10OSs1B1tr118e1J";
-export let currentThreadId = "thread_lXMKFdhoEkyZwBcDA0KftjPU";
-
-export const setCurrentThreadId = (id: string) => {
-  currentThreadId = id;
-};
-
 
 
 const handleError = (error: Error): string => {
@@ -73,7 +63,7 @@ const pollRunStatus = async (
   throw new Error("Timeout exceeded while waiting for run to complete");
 };
 
-export const handleUserInput = async (userInput: string): Promise<string> => {
+export const handleUserInput = async (userInput: string,assistantId: string , threadId: string): Promise<string> => {
   try {
     const trimmedInput = userInput.trim().toLowerCase();
 
@@ -81,13 +71,13 @@ export const handleUserInput = async (userInput: string): Promise<string> => {
       return await executeCommand(trimmedInput);
     }
 
-    await openaiClient.beta.threads.messages.create(currentThreadId, {
+    await openaiClient.beta.threads.messages.create(threadId, {
       role: "user",
       content: userInput,
     });
 
     const newRun = await openaiClient.beta.threads.runs.create(
-      currentThreadId,
+      threadId,
       {
         assistant_id: assistantId,
         //   instructions: "additional instructions",
@@ -95,14 +85,14 @@ export const handleUserInput = async (userInput: string): Promise<string> => {
     );
 
     console.log(
-      `new run created: ${newRun.id}, for thread: ${currentThreadId}`
+      `new run created: ${newRun.id}, for thread: ${threadId}`
     );
 
-    const completedRun = await pollRunStatus(currentThreadId, newRun.id);
+    const completedRun = await pollRunStatus(threadId, newRun.id);
     console.log("run completed > " + completedRun.status);
 
     const messages = await openaiClient.beta.threads.messages.list(
-      currentThreadId
+      threadId
     );
     // @ts-ignore
     const response = messages.data[0].content[0].text.value;

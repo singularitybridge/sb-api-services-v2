@@ -1,7 +1,16 @@
 import express from "express";
 import { Twilio } from "twilio";
 import { handleUserInput } from "../services/assistant.service";
-import VoiceResponse from "twilio/lib/twiml/VoiceResponse";
+import VoiceResponse, {
+  GatherLanguage,
+  SayLanguage,
+  SayVoice,
+} from "twilio/lib/twiml/VoiceResponse";
+import { Assistant, IAssistant } from "../models/Assistant";
+import mongoose from "mongoose";
+import { User } from "../models/User";
+import { Session } from "../models/Session";
+import { createNewThread, deleteThread } from "../services/oai.thread.service";
 
 const twilioClient = new Twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -11,29 +20,88 @@ const twilioClient = new Twilio(
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 const router = express.Router();
 
-router.post("/voice", (req, res) => {
+router.post("/voice", async (req, res) => {
 
   const { firstTime } = req.query;
-  const { 
-    CallSid, 
+  const {
+    CallSid,
     CallStatus, // ringing/in-progress/completed
     From, // +972526722216
-    To // +97293762075
+    To, // +97293762075
   } = req.body;
 
   const twiml = new VoiceResponse();
-  
-  console.log(`Voice Call >> CallSid: ${CallSid}, CallStatus: ${CallStatus}, From: ${From}, To: ${To}, firstTime: ${firstTime}`);
+  const assistant = await Assistant.findOne({ "identifiers.value": To });
+  const user = await User.findOne({ "identifiers.value": From });
 
-
-  if (firstTime !== "false") {
+  if (!assistant || !user) {
+    console.log(`Voice Call >> Assistant not found for To: ${To}`);
     twiml.say(
       {
         voice: "Polly.Emma",
         language: "en-US",
       },
+      "Sorry, I couldn't find an assistant for this number."
+    );
+    res.type("text/xml");
+    res.send(twiml.toString());
+    return;
+  }
 
-      `Hello! Welcome to Dr. Anna's dental office. I'm Smile Assistant Eva, here to assist you with scheduling and managing appointments. May I have your name, please?`
+  // next, check if have an active session, if not, create one
+
+  const session = await Session.findOne({
+    userId: user._id,
+    assistantId: assistant._id,
+    active: true,
+  });
+
+  // check if call status is completed, if so, set session to inactive and delete thread
+  if (CallStatus === "completed") {
+
+    if (!session) {
+      console.log('session not found');
+      return res.status(500).send();
+    }
+
+    deleteThread(session.threadId);
+
+
+    session.active = false;
+    await session.save();
+    
+    console.log(
+      `Voice Call >> Completed session for assistant: ${assistant.name}, user: ${user.name}, threadId: ${session.threadId}`
+    );
+
+    return res.status(200).send();
+  }
+
+
+  if (!session) {
+    const threadId = await createNewThread();
+
+    const newSession = new Session({
+      threadId: threadId,
+      userId: user._id,
+      assistantId: assistant._id,
+      active: true,
+    });
+    await newSession.save();
+    console.log(
+      `Voice Call >> Created new session for assistant: ${assistant.name}, user: ${user.name}, threadId: ${threadId}`
+    );
+  }
+
+  console.log(`assistant: ${assistant.name}, user: ${user.name}`);
+
+  if (firstTime !== "false") {
+    twiml.say(
+      {
+        voice: assistant.voice as SayVoice,
+        language: assistant.language as SayLanguage,
+      },
+      assistant.introMessage.replace("[Name]", user.name)
     );
   }
 
@@ -41,7 +109,7 @@ router.post("/voice", (req, res) => {
     speechTimeout: "auto", // Automatically determine the end of user speech
     speechModel: "experimental_conversations", // Use the conversation-based speech recognition model
     input: ["speech"],
-    language: "en-US",
+    language: assistant.language as GatherLanguage,
     enhanced: true,
     action: "/messaging/voice-response", // Send the collected input to /respond
   });
@@ -52,21 +120,60 @@ router.post("/voice", (req, res) => {
 });
 
 router.post("/voice-response", async (req, res) => {
-
-  const { 
-    CallSid, 
+  const {
+    CallSid,
     CallStatus, // ringing/in-progress/completed
     From, // +972526722216
     To, // +97293762075
     SpeechResult,
-    Confidence
+    Confidence,
   } = req.body;
 
-  console.log(`Voice Response >> CallSid: ${CallSid}, CallStatus: ${CallStatus}, From: ${From}, To: ${To}, SpeechResult: ${SpeechResult}, Confidence: ${Confidence}`);
+  console.log(
+    `Voice Response >> CallSid: ${CallSid}, CallStatus: ${CallStatus}, From: ${From}, To: ${To}, SpeechResult: ${SpeechResult}, Confidence: ${Confidence}`
+  );
 
   const twiml = new VoiceResponse();
-  
-  const response = await handleUserInput(SpeechResult);
+  const assistant = await Assistant.findOne({ "identifiers.value": To });
+  const user = await User.findOne({ "identifiers.value": From });
+
+  if (!assistant || !user) {
+    console.log(`Voice Call >> Assistant not found for To: ${To}`);
+    twiml.say(
+      {
+        voice: "Polly.Emma",
+        language: "en-US",
+      },
+      "Sorry, I couldn't find an assistant for this number."
+    );
+    res.type("text/xml");
+    res.send(twiml.toString());
+    return;
+  }
+
+
+  const session = await Session.findOne({
+    userId: user._id,
+    assistantId: assistant._id,
+    active: true,
+  });
+
+  if (!session) {
+    console.log(`Voice Response >> Session not found for assistant: ${assistant.name}, user: ${user.name}`);
+    twiml.say(
+      {
+        voice: "Polly.Emma",
+        language: "en-US",
+      },
+      "Sorry, I couldn't find an active session for this number."
+    );
+    res.type("text/xml");
+    res.send(twiml.toString());
+    return;
+  }
+
+
+  const response = await handleUserInput(SpeechResult, session.assistantId, session.threadId);
   const limitedResponse = response.substring(0, 1200); // Limit response to 1600 characters
 
   twiml.say(limitedResponse);
@@ -81,20 +188,64 @@ router.get("/sms", (req, res) => {
 });
 
 router.post("/sms/reply", async (req, res) => {
+
+  const {
+    CallSid,
+    CallStatus, // ringing/in-progress/completed
+    From, // +972526722216
+    To, // +97293762075
+    SpeechResult,
+    Confidence,
+    Body
+  } = req.body;
+
+
+  // const replyTo = req.body.From; // Get the number that sent the WhatsApp message
+  // const messageText = req.body.Body; // Get the message text sent
+
+  
+  const assistant = await Assistant.findOne({ "identifiers.value": To });
+  const user = await User.findOne({ "identifiers.value": From });
+
+  if (!assistant || !user) {
+    console.log(`Voice Call >> Assistant not found for To: ${To}`);
+    return res.status(500).send();
+  }
+
+  let session = await Session.findOne({
+    userId: user._id,
+    assistantId: assistant._id,
+    active: true,
+  });
+
+  if (!session) {
+    const threadId = await createNewThread();
+
+    session = new Session({
+      threadId: threadId,
+      userId: user._id,
+      assistantId: assistant._id,
+      active: true,
+    });
+    await session.save();
+    console.log(
+      `Voice Call >> Created new session for assistant: ${assistant.name}, user: ${user.name}, threadId: ${threadId}`
+    );
+  }
+
+
   // print received message
   console.log(req.body);
 
-  const replyTo = req.body.From; // Get the number that sent the WhatsApp message
-  const messageText = req.body.Body; // Get the message text sent
 
-  const response = await handleUserInput(messageText);
+  const response = await handleUserInput(Body, session.assistantId, session.threadId);
   const limitedResponse = response.substring(0, 1600); // Limit response to 1600 characters
 
   twilioClient.messages
     .create({
       body: limitedResponse,
       from: `whatsapp:${twilioPhoneNumber}`,
-      to: replyTo,
+      to: From,
     })
     .then((message) => console.log(message.sid));
 });
