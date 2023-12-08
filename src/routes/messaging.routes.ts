@@ -1,4 +1,4 @@
-import express from "express";
+import express, { NextFunction } from "express";
 import { Twilio } from "twilio";
 import { handleUserInput } from "../services/assistant.service";
 import VoiceResponse, {
@@ -7,7 +7,6 @@ import VoiceResponse, {
   SayVoice,
 } from "twilio/lib/twiml/VoiceResponse";
 import { Assistant, IAssistant } from "../models/Assistant";
-import mongoose from "mongoose";
 import { User } from "../models/User";
 import { Session } from "../models/Session";
 import { createNewThread, deleteThread } from "../services/oai.thread.service";
@@ -20,11 +19,39 @@ const twilioClient = new Twilio(
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 const router = express.Router();
 
-router.post("/voice", async (req, res) => {
 
+// const extractEntities = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+//   const { From, To } = req.body;
+
+//   const assistant = await Assistant.findOne({ "identifiers.value": To });
+//   const user = await User.findOne({ "identifiers.value": From });
+
+//   if (!assistant || !user) {
+//     return res.status(404).send("Assistant or User not found.");
+//   }
+
+//   const session = await Session.findOne({
+//     userId: user._id,
+//     assistantId: assistant.assistantId,
+//     active: true,
+//   });
+
+//   if (!session) {
+//     return res.status(404).send("Session not found.");
+//   }
+
+//   // Attach the extracted entities to the request object
+//   req.assistant = assistant;
+//   req.user = user;
+//   req.session = session;
+
+//   next();
+// }
+
+
+router.post("/voice", async (req, res) => {
   const { firstTime } = req.query;
   const {
-    CallSid,
     CallStatus, // ringing/in-progress/completed
     From, // +972526722216
     To, // +97293762075
@@ -52,24 +79,22 @@ router.post("/voice", async (req, res) => {
 
   const session = await Session.findOne({
     userId: user._id,
-    assistantId: assistant._id,
+    assistantId: assistant.assistantId,
     active: true,
   });
 
   // check if call status is completed, if so, set session to inactive and delete thread
   if (CallStatus === "completed") {
-
     if (!session) {
-      console.log('session not found');
+      console.log("session not found");
       return res.status(500).send();
     }
 
     deleteThread(session.threadId);
 
-
     session.active = false;
     await session.save();
-    
+
     console.log(
       `Voice Call >> Completed session for assistant: ${assistant.name}, user: ${user.name}, threadId: ${session.threadId}`
     );
@@ -77,14 +102,13 @@ router.post("/voice", async (req, res) => {
     return res.status(200).send();
   }
 
-
   if (!session) {
     const threadId = await createNewThread();
 
     const newSession = new Session({
       threadId: threadId,
       userId: user._id,
-      assistantId: assistant._id,
+      assistantId: assistant.assistantId,
       active: true,
     });
     await newSession.save();
@@ -151,15 +175,16 @@ router.post("/voice-response", async (req, res) => {
     return;
   }
 
-
   const session = await Session.findOne({
     userId: user._id,
-    assistantId: assistant._id,
+    assistantId: assistant.assistantId,
     active: true,
   });
 
   if (!session) {
-    console.log(`Voice Response >> Session not found for assistant: ${assistant.name}, user: ${user.name}`);
+    console.log(
+      `Voice Response >> Session not found for assistant: ${assistant.name}, user: ${user.name}`
+    );
     twiml.say(
       {
         voice: "Polly.Emma",
@@ -172,8 +197,11 @@ router.post("/voice-response", async (req, res) => {
     return;
   }
 
-
-  const response = await handleUserInput(SpeechResult, session.assistantId, session.threadId);
+  const response = await handleUserInput(
+    SpeechResult,
+    session.assistantId,
+    session.threadId
+  );
   const limitedResponse = response.substring(0, 1200); // Limit response to 1600 characters
 
   twiml.say(limitedResponse);
@@ -188,7 +216,6 @@ router.get("/sms", (req, res) => {
 });
 
 router.post("/sms/reply", async (req, res) => {
-
   const {
     CallSid,
     CallStatus, // ringing/in-progress/completed
@@ -196,14 +223,12 @@ router.post("/sms/reply", async (req, res) => {
     To, // +97293762075
     SpeechResult,
     Confidence,
-    Body
+    Body,
   } = req.body;
-
 
   // const replyTo = req.body.From; // Get the number that sent the WhatsApp message
   // const messageText = req.body.Body; // Get the message text sent
 
-  
   const assistant = await Assistant.findOne({ "identifiers.value": To });
   const user = await User.findOne({ "identifiers.value": From });
 
@@ -214,7 +239,7 @@ router.post("/sms/reply", async (req, res) => {
 
   let session = await Session.findOne({
     userId: user._id,
-    assistantId: assistant._id,
+    assistantId: assistant.assistantId,
     active: true,
   });
 
@@ -224,7 +249,7 @@ router.post("/sms/reply", async (req, res) => {
     session = new Session({
       threadId: threadId,
       userId: user._id,
-      assistantId: assistant._id,
+      assistantId: assistant.assistantId,
       active: true,
     });
     await session.save();
@@ -233,12 +258,14 @@ router.post("/sms/reply", async (req, res) => {
     );
   }
 
-
   // print received message
   console.log(req.body);
 
-
-  const response = await handleUserInput(Body, session.assistantId, session.threadId);
+  const response = await handleUserInput(
+    Body,
+    session.assistantId,
+    session.threadId
+  );
   const limitedResponse = response.substring(0, 1600); // Limit response to 1600 characters
 
   twilioClient.messages
