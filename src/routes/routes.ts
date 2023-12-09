@@ -3,22 +3,16 @@
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { Controller, ValidationService, FieldErrors, ValidateError, TsoaRoute, HttpStatusCodeLiteral, TsoaResponse, fetchMiddlewares } from '@tsoa/runtime';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+import { CalendarController } from './../controllers/calendar.controller';
+// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AssistantController } from './../controllers/assistant.controller';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-import { CalendarController } from './../controllers/calendar.controller';
+import { AudioController } from './../controllers/audio.controller';
 import type { RequestHandler, Router } from 'express';
 
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 
 const models: TsoaRoute.Models = {
-    "HandleUserInputRequest": {
-        "dataType": "refObject",
-        "properties": {
-            "userInput": {"dataType":"string","required":true},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "IEventResponse": {
         "dataType": "refObject",
         "properties": {
@@ -61,7 +55,7 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "IEventRequest": {
+    "IEventRequestBody": {
         "dataType": "refObject",
         "properties": {
             "summary": {"dataType":"string","required":true},
@@ -69,6 +63,24 @@ const models: TsoaRoute.Models = {
             "description": {"dataType":"string","required":true},
             "start": {"dataType":"nestedObjectLiteral","nestedProperties":{"timeZone":{"dataType":"string","required":true},"dateTime":{"dataType":"string","required":true}},"required":true},
             "end": {"dataType":"nestedObjectLiteral","nestedProperties":{"timeZone":{"dataType":"string","required":true},"dateTime":{"dataType":"string","required":true}},"required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "HandleUserInputRequest": {
+        "dataType": "refObject",
+        "properties": {
+            "userInput": {"dataType":"string","required":true},
+            "assistantId": {"dataType":"string","required":true},
+            "threadId": {"dataType":"string","required":true},
+        },
+        "additionalProperties": false,
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "GenerateAudioRequest": {
+        "dataType": "refObject",
+        "properties": {
+            "text": {"dataType":"string","required":true},
         },
         "additionalProperties": false,
     },
@@ -83,31 +95,6 @@ export function RegisterRoutes(app: Router) {
     //  NOTE: If you do not see routes for all of your controllers in this file, then you might not have informed tsoa of where to look
     //      Please look into the "controllerPathGlobs" config option described in the readme: https://github.com/lukeautry/tsoa
     // ###########################################################################################################
-        app.post('/assistant/user-input',
-            ...(fetchMiddlewares<RequestHandler>(AssistantController)),
-            ...(fetchMiddlewares<RequestHandler>(AssistantController.prototype.handleUserInput)),
-
-            function AssistantController_handleUserInput(request: any, response: any, next: any) {
-            const args = {
-                    requestBody: {"in":"body","name":"requestBody","required":true,"ref":"HandleUserInputRequest"},
-            };
-
-            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-
-            let validatedArgs: any[] = [];
-            try {
-                validatedArgs = getValidatedArgs(args, request, response);
-
-                const controller = new AssistantController();
-
-
-              const promise = controller.handleUserInput.apply(controller, validatedArgs as any);
-              promiseHandler(controller, promise, response, undefined, next);
-            } catch (err) {
-                return next(err);
-            }
-        });
-        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         app.get('/calendar/events',
             ...(fetchMiddlewares<RequestHandler>(CalendarController)),
             ...(fetchMiddlewares<RequestHandler>(CalendarController.prototype.getEvents)),
@@ -191,7 +178,7 @@ export function RegisterRoutes(app: Router) {
 
             function CalendarController_createEvent(request: any, response: any, next: any) {
             const args = {
-                    eventData: {"in":"body","name":"eventData","required":true,"ref":"IEventRequest"},
+                    eventData: {"in":"body","name":"eventData","required":true,"ref":"IEventRequestBody"},
             };
 
             // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
@@ -217,7 +204,7 @@ export function RegisterRoutes(app: Router) {
             function CalendarController_updateEvent(request: any, response: any, next: any) {
             const args = {
                     id: {"in":"path","name":"id","required":true,"dataType":"string"},
-                    eventData: {"in":"body","name":"eventData","required":true,"ref":"IEventRequest"},
+                    eventData: {"in":"body","name":"eventData","required":true,"ref":"IEventRequestBody"},
             };
 
             // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
@@ -280,6 +267,56 @@ export function RegisterRoutes(app: Router) {
 
 
               const promise = controller.handleOAuth2Callback.apply(controller, validatedArgs as any);
+              promiseHandler(controller, promise, response, undefined, next);
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        app.post('/assistant/user-input',
+            ...(fetchMiddlewares<RequestHandler>(AssistantController)),
+            ...(fetchMiddlewares<RequestHandler>(AssistantController.prototype.handleUserInput)),
+
+            function AssistantController_handleUserInput(request: any, response: any, next: any) {
+            const args = {
+                    requestBody: {"in":"body","name":"requestBody","required":true,"ref":"HandleUserInputRequest"},
+            };
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = getValidatedArgs(args, request, response);
+
+                const controller = new AssistantController();
+
+
+              const promise = controller.handleUserInput.apply(controller, validatedArgs as any);
+              promiseHandler(controller, promise, response, undefined, next);
+            } catch (err) {
+                return next(err);
+            }
+        });
+        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+        app.post('/audio/generate',
+            ...(fetchMiddlewares<RequestHandler>(AudioController)),
+            ...(fetchMiddlewares<RequestHandler>(AudioController.prototype.generateAudio)),
+
+            function AudioController_generateAudio(request: any, response: any, next: any) {
+            const args = {
+                    requestBody: {"in":"body","name":"requestBody","required":true,"ref":"GenerateAudioRequest"},
+            };
+
+            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+
+            let validatedArgs: any[] = [];
+            try {
+                validatedArgs = getValidatedArgs(args, request, response);
+
+                const controller = new AudioController();
+
+
+              const promise = controller.generateAudio.apply(controller, validatedArgs as any);
               promiseHandler(controller, promise, response, undefined, next);
             } catch (err) {
                 return next(err);

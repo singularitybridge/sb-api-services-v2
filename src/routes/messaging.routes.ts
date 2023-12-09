@@ -7,9 +7,11 @@ import VoiceResponse, {
   SayVoice,
 } from "twilio/lib/twiml/VoiceResponse";
 import { Assistant, IAssistant } from "../models/Assistant";
-import { User } from "../models/User";
-import { Session } from "../models/Session";
+import { IUser, User } from "../models/User";
+import { ISession, Session } from "../models/Session";
 import { createNewThread, deleteThread } from "../services/oai.thread.service";
+import { Request } from "express";
+import { generateAudio } from "../services/11labs.service";
 
 const twilioClient = new Twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -19,34 +21,18 @@ const twilioClient = new Twilio(
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 const router = express.Router();
 
+router.get("/test", async (req, res) => {
+  generateAudio("Hello, my name is Adam");
+  res.send("ok");
+});
+  
 
-// const extractEntities = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-//   const { From, To } = req.body;
-
-//   const assistant = await Assistant.findOne({ "identifiers.value": To });
-//   const user = await User.findOne({ "identifiers.value": From });
-
-//   if (!assistant || !user) {
-//     return res.status(404).send("Assistant or User not found.");
-//   }
-
-//   const session = await Session.findOne({
-//     userId: user._id,
-//     assistantId: assistant.assistantId,
-//     active: true,
-//   });
-
-//   if (!session) {
-//     return res.status(404).send("Session not found.");
-//   }
-
-//   // Attach the extracted entities to the request object
-//   req.assistant = assistant;
-//   req.user = user;
-//   req.session = session;
-
-//   next();
-// }
+// lets generatea route to serve the audio file saved in the files folder
+router.get("/audio/:filename", async (req, res) => {
+  const { filename } = req.params;
+  const filePath = `./files/${filename}`;
+  res.download(filePath);
+});
 
 
 router.post("/voice", async (req, res) => {
@@ -77,7 +63,7 @@ router.post("/voice", async (req, res) => {
 
   // next, check if have an active session, if not, create one
 
-  const session = await Session.findOne({
+  let session = await Session.findOne({
     userId: user._id,
     assistantId: assistant.assistantId,
     active: true,
@@ -105,13 +91,13 @@ router.post("/voice", async (req, res) => {
   if (!session) {
     const threadId = await createNewThread();
 
-    const newSession = new Session({
+    session = new Session({
       threadId: threadId,
       userId: user._id,
       assistantId: assistant.assistantId,
       active: true,
     });
-    await newSession.save();
+    await session.save();
     console.log(
       `Voice Call >> Created new session for assistant: ${assistant.name}, user: ${user.name}, threadId: ${threadId}`
     );
@@ -120,13 +106,22 @@ router.post("/voice", async (req, res) => {
   console.log(`assistant: ${assistant.name}, user: ${user.name}`);
 
   if (firstTime !== "false") {
-    twiml.say(
-      {
-        voice: assistant.voice as SayVoice,
-        language: assistant.language as SayLanguage,
-      },
-      assistant.introMessage.replace("[Name]", user.name)
+
+
+    const response = await handleUserInput(
+      `this is a conversation with ${user.name}, start with greeting the user`,
+      session.assistantId,
+      session.threadId
     );
+    const limitedResponse = response.substring(0, 1200); // Limit response to 1600 characters
+
+    // generate intro message
+    const filename = await generateAudio(limitedResponse);
+    const fileUrl = `https://sb-api.ngrok.app/messaging/audio/${filename}`;
+
+    console.log('audio file url', fileUrl); 
+    twiml.play(fileUrl);
+
   }
 
   twiml.gather({
@@ -204,11 +199,16 @@ router.post("/voice-response", async (req, res) => {
   );
   const limitedResponse = response.substring(0, 1200); // Limit response to 1600 characters
 
-  twiml.say(limitedResponse);
-  twiml.redirect("/messaging/voice?firstTime=false");
 
+  const filename = await generateAudio(limitedResponse);
+  const fileUrl = `https://sb-api.ngrok.app/messaging/audio/${filename}`;
+  console.log('audio file url', fileUrl);
+  twiml.play(fileUrl);
+
+  twiml.redirect("/messaging/voice?firstTime=false");
   res.type("text/xml");
   res.send(twiml.toString());
+
 });
 
 router.get("/sms", (req, res) => {
@@ -225,9 +225,6 @@ router.post("/sms/reply", async (req, res) => {
     Confidence,
     Body,
   } = req.body;
-
-  // const replyTo = req.body.From; // Get the number that sent the WhatsApp message
-  // const messageText = req.body.Body; // Get the message text sent
 
   const assistant = await Assistant.findOne({ "identifiers.value": To });
   const user = await User.findOne({ "identifiers.value": From });

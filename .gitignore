@@ -16,3 +16,6 @@ yarn-error.log*
 
 # ignore tokens.json
 tokens.json
+
+# ignore the files folder
+files/

@@ -6,18 +6,6 @@
 		"requestBodies": {},
 		"responses": {},
 		"schemas": {
-			"HandleUserInputRequest": {
-				"properties": {
-					"userInput": {
-						"type": "string"
-					}
-				},
-				"required": [
-					"userInput"
-				],
-				"type": "object",
-				"additionalProperties": false
-			},
 			"IEventResponse": {
 				"properties": {
 					"id": {
@@ -108,7 +96,7 @@
 				"type": "object",
 				"additionalProperties": false
 			},
-			"IEventRequest": {
+			"IEventRequestBody": {
 				"properties": {
 					"summary": {
 						"type": "string"
@@ -159,6 +147,38 @@
 				],
 				"type": "object",
 				"additionalProperties": false
+			},
+			"HandleUserInputRequest": {
+				"properties": {
+					"userInput": {
+						"type": "string"
+					},
+					"assistantId": {
+						"type": "string"
+					},
+					"threadId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"userInput",
+					"assistantId",
+					"threadId"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"GenerateAudioRequest": {
+				"properties": {
+					"text": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"text"
+				],
+				"type": "object",
+				"additionalProperties": false
 			}
 		},
 		"securitySchemes": {}
@@ -174,35 +194,6 @@
 	},
 	"openapi": "3.0.0",
 	"paths": {
-		"/assistant/user-input": {
-			"post": {
-				"operationId": "HandleUserInput",
-				"responses": {
-					"200": {
-						"description": "Ok",
-						"content": {
-							"application/json": {
-								"schema": {
-									"type": "string"
-								}
-							}
-						}
-					}
-				},
-				"security": [],
-				"parameters": [],
-				"requestBody": {
-					"required": true,
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/HandleUserInputRequest"
-							}
-						}
-					}
-				}
-			}
-		},
 		"/calendar/events": {
 			"get": {
 				"operationId": "GetEvents",
@@ -268,7 +259,7 @@
 					"content": {
 						"application/json": {
 							"schema": {
-								"$ref": "#/components/schemas/IEventRequest"
+								"$ref": "#/components/schemas/IEventRequestBody"
 							}
 						}
 					}
@@ -396,7 +387,7 @@
 					"content": {
 						"application/json": {
 							"schema": {
-								"$ref": "#/components/schemas/IEventRequest"
+								"$ref": "#/components/schemas/IEventRequestBody"
 							}
 						}
 					}
@@ -478,6 +469,92 @@
 						"in": "query",
 						"name": "code",
 						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/assistant/user-input": {
+			"post": {
+				"operationId": "HandleUserInput",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					}
+				},
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/HandleUserInputRequest"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/audio/generate": {
+			"post": {
+				"operationId": "GenerateAudio",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					}
+				},
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/GenerateAudioRequest"
+							}
+						}
+					}
+				}
+			}
+		},
+		"/audio/{id}": {
+			"get": {
+				"operationId": "GetAudio",
+				"responses": {
+					"200": {
+						"description": "Ok",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "string"
+								}
+							}
+						}
+					}
+				},
+				"security": [],
+				"parameters": [
+					{
+						"in": "path",
+						"name": "id",
+						"required": true,
 						"schema": {
 							"type": "string"
 						}
