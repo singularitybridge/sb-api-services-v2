@@ -1,6 +1,3 @@
-// google api key AIzaSyCmCIWBPBwiYiwHa0KoiL892ucEhRy8hZ8
-// output by twilio speech recognition : And Okay, why don't tell me a bit more about how it's going well was in the lounge? Well, it was, you know, a big on and stuff like that. They can make a decision. Thank.
-
 import axios from "axios";
 import FormData from "form-data";
 import speech from "@google-cloud/speech";

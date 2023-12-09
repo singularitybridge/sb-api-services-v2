@@ -12,6 +12,10 @@ import { ISession, Session } from "../models/Session";
 import { createNewThread, deleteThread } from "../services/oai.thread.service";
 import { Request } from "express";
 import { generateAudio } from "../services/11labs.service";
+import {
+  transcribeAudio,
+  transcribeAudioGoogle,
+} from "../services/speech.recognition.service";
 
 const twilioClient = new Twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -22,10 +26,15 @@ const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 const router = express.Router();
 
 router.get("/test", async (req, res) => {
-  generateAudio("Hello, my name is Adam");
-  res.send("ok");
+  const audioURL =
+    "https://api.twilio.com/2010-04-01/Accounts/ACac8672e7717c6e9d7238a577e13e72d0/Recordings/RE0a3ff37605235d4492f6d0ac530e9fd5";
+  // const googleResult = await transcribeAudioGoogle(audioURL);
+  const oaiWhipserResult = await transcribeAudio(audioURL);
+  res.send({
+    // googleResult,
+    oaiWhipserResult,
+  });
 });
-  
 
 // lets generatea route to serve the audio file saved in the files folder
 router.get("/audio/:filename", async (req, res) => {
@@ -33,7 +42,6 @@ router.get("/audio/:filename", async (req, res) => {
   const filePath = `./files/${filename}`;
   res.download(filePath);
 });
-
 
 router.post("/voice", async (req, res) => {
   const { firstTime } = req.query;
@@ -77,14 +85,12 @@ router.post("/voice", async (req, res) => {
     }
 
     deleteThread(session.threadId);
-
     session.active = false;
     await session.save();
 
     console.log(
       `Voice Call >> Completed session for assistant: ${assistant.name}, user: ${user.name}, threadId: ${session.threadId}`
     );
-
     return res.status(200).send();
   }
 
@@ -106,8 +112,6 @@ router.post("/voice", async (req, res) => {
   console.log(`assistant: ${assistant.name}, user: ${user.name}`);
 
   if (firstTime !== "false") {
-
-
     const response = await handleUserInput(
       `this is a conversation with ${user.name}, start with greeting the user`,
       session.assistantId,
@@ -118,38 +122,37 @@ router.post("/voice", async (req, res) => {
     // generate intro message
     const filename = await generateAudio(limitedResponse);
     const fileUrl = `https://sb-api.ngrok.app/messaging/audio/${filename}`;
-
-    console.log('audio file url', fileUrl); 
+    console.log("audio file url", fileUrl);
     twiml.play(fileUrl);
-
   }
 
-  twiml.gather({
-    speechTimeout: "auto", // Automatically determine the end of user speech
-    speechModel: "experimental_conversations", // Use the conversation-based speech recognition model
-    input: ["speech"],
-    language: assistant.language as GatherLanguage,
-    enhanced: true,
-    action: "/messaging/voice-response", // Send the collected input to /respond
+  twiml.record({
+    action: "/messaging/voice-recording", // Send the recording to /voice-recording
+    method: "POST",
+    maxLength: 20, // Maximum length of recording in seconds
+    finishOnKey: "star", // End the recording when the user presses *
+    timeout: 2, // If the user is silent for 3 seconds, end the recording
+    playBeep: true, // Play a beep before beginning the recording
   });
-
-  twiml.redirect("/messaging/voice?firstTime=false");
+  // twiml.redirect("/messaging/voice?firstTime=false");
   res.type("text/xml");
   res.send(twiml.toString());
 });
 
-router.post("/voice-response", async (req, res) => {
+router.post("/voice-recording", async (req, res) => {
   const {
     CallSid,
     CallStatus, // ringing/in-progress/completed
     From, // +972526722216
     To, // +97293762075
-    SpeechResult,
-    Confidence,
+    // SpeechResult,
+    RecordingUrl,
   } = req.body;
 
+  const SpeechResult = await transcribeAudio(RecordingUrl);
+
   console.log(
-    `Voice Response >> CallSid: ${CallSid}, CallStatus: ${CallStatus}, From: ${From}, To: ${To}, SpeechResult: ${SpeechResult}, Confidence: ${Confidence}`
+    `Voice Response >> CallSid: ${CallSid}, CallStatus: ${CallStatus}, From: ${From}, To: ${To}, SpeechResult: ${SpeechResult}`
   );
 
   const twiml = new VoiceResponse();
@@ -199,16 +202,14 @@ router.post("/voice-response", async (req, res) => {
   );
   const limitedResponse = response.substring(0, 1200); // Limit response to 1600 characters
 
-
   const filename = await generateAudio(limitedResponse);
   const fileUrl = `https://sb-api.ngrok.app/messaging/audio/${filename}`;
-  console.log('audio file url', fileUrl);
+  console.log("audio file url", fileUrl);
   twiml.play(fileUrl);
 
   twiml.redirect("/messaging/voice?firstTime=false");
   res.type("text/xml");
   res.send(twiml.toString());
-
 });
 
 router.get("/sms", (req, res) => {
