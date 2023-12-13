@@ -19,10 +19,11 @@ import swaggerDocument from "../build/swagger.json";
 import cors from "cors";
 
 import policyRouter from "./routes/policy.routes";
-import messagingRouter from "./routes/messaging.routes";
 
 import ttsRouter from "./routes/tts.routes"; // Import the missing ttsRouter module
 import sttRouter from "./routes/stt.routes"; // Import the missing sttRouter module
+import { twilioVoiceRouter } from "./routes/twilio/voice.routes";
+import { twilioMessagingRouter } from "./routes/twilio/messaging.routes";
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -40,6 +41,9 @@ app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.use("/policy", policyRouter);
 
 // app.use("/messaging", messagingRouter);
+
+app.use('/twilio/voice', twilioVoiceRouter);
+app.use('/twilio/messaging', twilioMessagingRouter);
 
 app.use('/tts', ttsRouter);
 app.use('/stt', sttRouter);
