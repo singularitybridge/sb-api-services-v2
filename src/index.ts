@@ -20,7 +20,9 @@ import cors from "cors";
 
 import policyRouter from "./routes/policy.routes";
 import messagingRouter from "./routes/messaging.routes";
+
 import ttsRouter from "./routes/tts.routes"; // Import the missing ttsRouter module
+import sttRouter from "./routes/stt.routes"; // Import the missing sttRouter module
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -36,8 +38,12 @@ RegisterRoutes(app);
 
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.use("/policy", policyRouter);
+
 // app.use("/messaging", messagingRouter);
+
 app.use('/tts', ttsRouter);
+app.use('/stt', sttRouter);
+
 app.get("/swagger.json", (req, res) => {
   res.setHeader("Content-Type", "application/json");
   res.send(swaggerDocument);
