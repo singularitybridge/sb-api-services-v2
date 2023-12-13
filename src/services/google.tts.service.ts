@@ -5,12 +5,14 @@ const textToSpeechClient = new textToSpeech.TextToSpeechClient();
 
 export async function synthesizeText(
   text: string,
+  voiceLanguageCode: string = 'en-US',
+  voiceName: string = 'en-US-Wavenet-A',
 ): Promise<SaveToFileResponse> {
   const request = {
     input: { text },
     voice: {
-      languageCode: 'en-US',
-      name: 'en-US-Wavenet-A', // Choose desired voice from list
+      languageCode: voiceLanguageCode,
+      name: voiceName, // Choose desired voice from list
     },
     audioConfig: { audioEncoding: 'MP3' as const },
   };

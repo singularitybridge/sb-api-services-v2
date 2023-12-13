@@ -1,8 +1,4 @@
 import axios from 'axios';
-import { v4 as uuidv4 } from 'uuid';
-import fs from 'fs';
-import stream from 'stream';
-import { promisify } from 'util';
 import { saveToFile } from '../utils/file.upload.util';
 
 export const generatedFilesBaseURL = 'https://sb-api.ngrok.app/tts/files';

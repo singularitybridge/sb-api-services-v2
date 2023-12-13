@@ -11,16 +11,15 @@ router.get("/files/:filename", async (req, res) => {
 });
 
 router.post("/generate/11labs", async (req, res) => {
-  const { text } = req.body;
-  const filename = await generateAudio(text);
-  res.send(filename);
+  const { text, voiceId, modelId } = req.body;
+  const fileInfo = await generateAudio(text, voiceId, modelId);
+  res.send(fileInfo);
 });
 
 router.post("/generate/google", async (req, res) => {
-  const { text } = req.body;
-  const audioBuffer = await synthesizeText(text);
-  res.send(audioBuffer);
-  // You can then save the audioBuffer to a file and send the filename as response
+  const { text, voiceLanguageCode, voiceName } = req.body;
+  const fileInfo = await synthesizeText(text, voiceLanguageCode, voiceName);
+  res.send(fileInfo);  
 });
 
 
