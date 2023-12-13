@@ -1,11 +1,6 @@
 import express, { NextFunction } from 'express';
 import { Twilio } from 'twilio';
 import { handleUserInput } from '../../services/assistant.service';
-import VoiceResponse, {
-  GatherLanguage,
-  SayLanguage,
-  SayVoice,
-} from 'twilio/lib/twiml/VoiceResponse';
 import { Assistant, IAssistant } from '../../models/Assistant';
 import { IUser, User } from '../../models/User';
 import { ISession, Session } from '../../models/Session';
@@ -13,56 +8,30 @@ import {
   createNewThread,
   deleteThread,
 } from '../../services/oai.thread.service';
-import { Request } from 'express';
 import { generateAudio } from '../../services/11labs.service';
-
-import { file } from 'googleapis/build/src/apis/file';
 import { transcribeAudioWhisper } from '../../services/speech.recognition.service';
+import VoiceResponse from 'twilio/lib/twiml/VoiceResponse';
 
-const twilioClient = new Twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN,
-);
-
-const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 const twilioVoiceRouter = express.Router();
 const waitingSoundTick =
   'https://red-labradoodle-6369.twil.io/assets/tick1.wav';
 
-// lets generatea route to serve the audio file saved in the files folder
-
-twilioVoiceRouter.post('/', async (req, res) => {
-  const { firstTime } = req.query;
-  const {
-    CallStatus, // ringing/in-progress/completed
-    From, // +972526722216
-    To, // +97293762075
-  } = req.body;
-
-  /// log request
-  console.log('-----------------------------------');
-  console.log(`/voice`, req.body, req.query);
-  console.log('-----------------------------------');
-
+const handleVoiceRequest = async (
+  firstTime: boolean,
+  callStatus: 'ringing' | 'in-progress' | 'completed',
+  from: string,
+  to: string,
+): Promise<{ callActive: boolean; response: string }> => {
   const twiml = new VoiceResponse();
-  const assistant = await Assistant.findOne({ 'identifiers.value': To });
-  const user = await User.findOne({ 'identifiers.value': From });
+  const assistant = await Assistant.findOne({ 'identifiers.value': to });
+  const user = await User.findOne({ 'identifiers.value': from });
 
   if (!assistant || !user) {
-    console.log(`Voice Call >> Assistant not found for To: ${To}`);
-    twiml.say(
-      {
-        voice: 'Polly.Emma',
-        language: 'en-US',
-      },
-      "Sorry, I couldn't find an assistant for this number.",
+    twiml.play(
+      'https://red-labradoodle-6369.twil.io/assets/agent-not-found.mp3',
     );
-    res.type('text/xml');
-    res.send(twiml.toString());
-    return;
+    return twiml.toString();
   }
-
-  // next, check if have an active session, if not, create one
 
   let session = await Session.findOne({
     userId: user._id,
@@ -70,21 +39,18 @@ twilioVoiceRouter.post('/', async (req, res) => {
     active: true,
   });
 
-  // check if call status is completed, if so, set session to inactive and delete thread
-  if (CallStatus === 'completed') {
+  if (callStatus === 'completed') {
     if (!session) {
-      console.log('session not found');
-      return res.status(500).send();
+      throw new Error('Session not found');
     }
-
     deleteThread(session.threadId);
     session.active = false;
     await session.save();
 
-    console.log(
-      `Voice Call >> Completed session for assistant: ${assistant.name}, user: ${user.name}, threadId: ${session.threadId}`,
-    );
-    return res.status(200).send();
+    return {
+      callActive: false,
+      response: twiml.toString(),
+    };
   }
 
   if (!session) {
@@ -97,16 +63,9 @@ twilioVoiceRouter.post('/', async (req, res) => {
       active: true,
     });
     await session.save();
-    console.log(
-      `Voice Call >> Created new session for assistant: ${assistant.name}, user: ${user.name}, threadId: ${threadId}`,
-    );
   }
 
-  console.log(
-    `assistant: ${assistant.name}, user: ${user.name}, session: ${session._id}`,
-  );
-
-  if (firstTime !== 'false') {
+  if (firstTime !== false) {
     const response = await handleUserInput(
       `this is a conversation with ${user.name}, start with greeting the user`,
       session.assistantId,
@@ -127,47 +86,30 @@ twilioVoiceRouter.post('/', async (req, res) => {
     timeout: 2, // If the user is silent for 3 seconds, end the recording
     playBeep: true, // Play a beep before beginning the recording
   });
-  // twiml.redirect("/messaging/voice?firstTime=false");
-  res.type('text/xml');
-  res.send(twiml.toString());
-});
 
-twilioVoiceRouter.post('/recording', async (req, res) => {
-  const {
-    CallSid,
-    CallStatus, // ringing/in-progress/completed
-    From, // +972526722216
-    To, // +97293762075
-    // SpeechResult,
-    RecordingUrl,
-  } = req.body;
+  return {
+    callActive: true,
+    response: twiml.toString(),
+  };
+};
 
-  console.log('-----------------------------------');
-  console.log(`/voice-recording`, req.body, req.query);
-  console.log('-----------------------------------');
-
-  const SpeechResult = await transcribeAudioWhisper(RecordingUrl);
-
-  console.log(
-    `Voice Response >> CallSid: ${CallSid}, CallStatus: ${CallStatus}, From: ${From}, To: ${To}, SpeechResult: ${SpeechResult}`,
-  );
+const handleVoiceRecordingRequest = async (
+  from: string,
+  to: string,
+  recordingUrl: string,
+) => {
+  const SpeechResult = await transcribeAudioWhisper(recordingUrl);
 
   const twiml = new VoiceResponse();
-  const assistant = await Assistant.findOne({ 'identifiers.value': To });
-  const user = await User.findOne({ 'identifiers.value': From });
+  const assistant = await Assistant.findOne({ 'identifiers.value': to });
+  const user = await User.findOne({ 'identifiers.value': from });
 
   if (!assistant || !user) {
-    console.log(`Voice Call >> Assistant not found for To: ${To}`);
-    twiml.say(
-      {
-        voice: 'Polly.Emma',
-        language: 'en-US',
-      },
-      "Sorry, I couldn't find an assistant for this number.",
+    twiml.play(
+      'https://red-labradoodle-6369.twil.io/assets/agent-not-found.mp3',
     );
-    res.type('text/xml');
-    res.send(twiml.toString());
-    return;
+
+    return twiml.toString();
   }
 
   const session = await Session.findOne({
@@ -177,19 +119,10 @@ twilioVoiceRouter.post('/recording', async (req, res) => {
   });
 
   if (!session) {
-    console.log(
-      `Voice Response >> Session not found for assistant: ${assistant.name}, user: ${user.name}`,
+    twiml.play(
+      'https://red-labradoodle-6369.twil.io/assets/session-not-found.mp3',
     );
-    twiml.say(
-      {
-        voice: 'Polly.Emma',
-        language: 'en-US',
-      },
-      "Sorry, I couldn't find an active session for this number.",
-    );
-    res.type('text/xml');
-    res.send(twiml.toString());
-    return;
+    return twiml.toString();
   }
 
   const response = await handleUserInput(
@@ -197,14 +130,39 @@ twilioVoiceRouter.post('/recording', async (req, res) => {
     session.assistantId,
     session.threadId,
   );
+
   const limitedResponse = response.substring(0, 1200); // Limit response to 1600 characters
-
   const audioResponse = await generateAudio(limitedResponse);
-  twiml.play(audioResponse?.path);
 
+  twiml.play(audioResponse?.path);
   twiml.redirect('/twilio/voice?firstTime=false');
+  return twiml.toString();
+};
+
+
+twilioVoiceRouter.post('/', async (req, res) => {
+
+  const { firstTime } = req.query;
+  const { CallStatus, From, To } = req.body;
+
+  const { response, callActive } = await handleVoiceRequest(
+    firstTime !== 'false',
+    CallStatus,
+    From,
+    To,
+  );
+
   res.type('text/xml');
-  res.send(twiml.toString());
+  res.send(response);
+});
+
+twilioVoiceRouter.post('/recording', async (req, res) => {
+
+  const { CallSid, CallStatus, From, To, RecordingUrl } = req.body;
+  const response = await handleVoiceRecordingRequest(From, To, RecordingUrl);
+
+  res.type('text/xml');
+  res.send(response);
 });
 
 export { twilioVoiceRouter };
