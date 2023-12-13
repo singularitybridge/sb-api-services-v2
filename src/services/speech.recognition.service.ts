@@ -2,7 +2,7 @@ import axios from "axios";
 import FormData from "form-data";
 import speech from "@google-cloud/speech";
 
-export const transcribeAudio = async (audioURL: string) => {
+export const transcribeAudioWhisper = async (audioURL: string) => {
   try {
     const audioResponse = await axios({
       method: "get",

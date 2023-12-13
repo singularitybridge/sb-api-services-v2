@@ -6,8 +6,6 @@ import { Controller, ValidationService, FieldErrors, ValidateError, TsoaRoute, H
 import { CalendarController } from './../controllers/calendar.controller';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { AssistantController } from './../controllers/assistant.controller';
-// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-import { AudioController } from './../controllers/audio.controller';
 import type { RequestHandler, Router } from 'express';
 
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
@@ -73,14 +71,6 @@ const models: TsoaRoute.Models = {
             "userInput": {"dataType":"string","required":true},
             "assistantId": {"dataType":"string","required":true},
             "threadId": {"dataType":"string","required":true},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "GenerateAudioRequest": {
-        "dataType": "refObject",
-        "properties": {
-            "text": {"dataType":"string","required":true},
         },
         "additionalProperties": false,
     },
@@ -292,31 +282,6 @@ export function RegisterRoutes(app: Router) {
 
 
               const promise = controller.handleUserInput.apply(controller, validatedArgs as any);
-              promiseHandler(controller, promise, response, undefined, next);
-            } catch (err) {
-                return next(err);
-            }
-        });
-        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-        app.post('/audio/generate',
-            ...(fetchMiddlewares<RequestHandler>(AudioController)),
-            ...(fetchMiddlewares<RequestHandler>(AudioController.prototype.generateAudio)),
-
-            function AudioController_generateAudio(request: any, response: any, next: any) {
-            const args = {
-                    requestBody: {"in":"body","name":"requestBody","required":true,"ref":"GenerateAudioRequest"},
-            };
-
-            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-
-            let validatedArgs: any[] = [];
-            try {
-                validatedArgs = getValidatedArgs(args, request, response);
-
-                const controller = new AudioController();
-
-
-              const promise = controller.generateAudio.apply(controller, validatedArgs as any);
               promiseHandler(controller, promise, response, undefined, next);
             } catch (err) {
                 return next(err);

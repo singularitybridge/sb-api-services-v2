@@ -167,18 +167,6 @@
 				],
 				"type": "object",
 				"additionalProperties": false
-			},
-			"GenerateAudioRequest": {
-				"properties": {
-					"text": {
-						"type": "string"
-					}
-				},
-				"required": [
-					"text"
-				],
-				"type": "object",
-				"additionalProperties": false
 			}
 		},
 		"securitySchemes": {}
@@ -503,63 +491,6 @@
 						}
 					}
 				}
-			}
-		},
-		"/audio/generate": {
-			"post": {
-				"operationId": "GenerateAudio",
-				"responses": {
-					"200": {
-						"description": "Ok",
-						"content": {
-							"application/json": {
-								"schema": {
-									"type": "string"
-								}
-							}
-						}
-					}
-				},
-				"security": [],
-				"parameters": [],
-				"requestBody": {
-					"required": true,
-					"content": {
-						"application/json": {
-							"schema": {
-								"$ref": "#/components/schemas/GenerateAudioRequest"
-							}
-						}
-					}
-				}
-			}
-		},
-		"/audio/{id}": {
-			"get": {
-				"operationId": "GetAudio",
-				"responses": {
-					"200": {
-						"description": "Ok",
-						"content": {
-							"application/json": {
-								"schema": {
-									"type": "string"
-								}
-							}
-						}
-					}
-				},
-				"security": [],
-				"parameters": [
-					{
-						"in": "path",
-						"name": "id",
-						"required": true,
-						"schema": {
-							"type": "string"
-						}
-					}
-				]
 			}
 		}
 	},

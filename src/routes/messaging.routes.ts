@@ -16,6 +16,7 @@ import {
   transcribeAudio,
   transcribeAudioGoogle,
 } from "../services/speech.recognition.service";
+import { file } from "googleapis/build/src/apis/file";
 
 const twilioClient = new Twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -24,32 +25,25 @@ const twilioClient = new Twilio(
 
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 const router = express.Router();
+const waitingSoundTick = "https://red-labradoodle-6369.twil.io/assets/tick1.wav";
 
-router.get("/test", async (req, res) => {
-  const audioURL =
-    "https://api.twilio.com/2010-04-01/Accounts/ACac8672e7717c6e9d7238a577e13e72d0/Recordings/RE0a3ff37605235d4492f6d0ac530e9fd5";
-  // const googleResult = await transcribeAudioGoogle(audioURL);
-  const oaiWhipserResult = await transcribeAudio(audioURL);
-  res.send({
-    // googleResult,
-    oaiWhipserResult,
-  });
-});
 
 // lets generatea route to serve the audio file saved in the files folder
-router.get("/audio/:filename", async (req, res) => {
-  const { filename } = req.params;
-  const filePath = `./files/${filename}`;
-  res.download(filePath);
-});
+
 
 router.post("/voice", async (req, res) => {
+  
   const { firstTime } = req.query;
   const {
     CallStatus, // ringing/in-progress/completed
     From, // +972526722216
     To, // +97293762075
   } = req.body;
+
+  /// log request
+  console.log('-----------------------------------')
+  console.log(`/voice`, req.body, req.query);
+  console.log('-----------------------------------');
 
   const twiml = new VoiceResponse();
   const assistant = await Assistant.findOne({ "identifiers.value": To });
@@ -109,7 +103,7 @@ router.post("/voice", async (req, res) => {
     );
   }
 
-  console.log(`assistant: ${assistant.name}, user: ${user.name}`);
+  console.log(`assistant: ${assistant.name}, user: ${user.name}, session: ${session._id}`);
 
   if (firstTime !== "false") {
     const response = await handleUserInput(
@@ -130,7 +124,7 @@ router.post("/voice", async (req, res) => {
     action: "/messaging/voice-recording", // Send the recording to /voice-recording
     method: "POST",
     maxLength: 20, // Maximum length of recording in seconds
-    finishOnKey: "star", // End the recording when the user presses *
+    finishOnKey: "#", // End the recording when the user presses *
     timeout: 2, // If the user is silent for 3 seconds, end the recording
     playBeep: true, // Play a beep before beginning the recording
   });
@@ -148,6 +142,11 @@ router.post("/voice-recording", async (req, res) => {
     // SpeechResult,
     RecordingUrl,
   } = req.body;
+
+
+  console.log('-----------------------------------')
+  console.log(`/voice-recording`, req.body, req.query);
+  console.log('-----------------------------------');  
 
   const SpeechResult = await transcribeAudio(RecordingUrl);
 
