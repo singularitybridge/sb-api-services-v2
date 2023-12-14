@@ -1,38 +1,32 @@
-
-import express from 'express';
-
-const router = express.Router();
-
-router.get('/', (req, res) => {
+export const getCurrentTimeAndDay = () => {
   const date = new Date();
   const time = date.toLocaleTimeString();
   const month = date.getMonth();
-  let season = '';
+  let season = "";
+
   if (month >= 2 && month <= 4) {
-    season = 'spring';
+    season = "spring";
   } else if (month >= 5 && month <= 7) {
-    season = 'summer';
+    season = "summer";
   } else if (month >= 8 && month <= 10) {
-    season = 'autumn';
+    season = "autumn";
   } else {
-    season = 'winter';
+    season = "winter";
   }
   const hour = date.getHours();
-  let dayStatus = '';
+  let dayStatus = "";
   if (hour >= 5 && hour <= 11) {
-    dayStatus = 'morning';
+    dayStatus = "morning";
   } else if (hour >= 12 && hour <= 16) {
-    dayStatus = 'afternoon';
+    dayStatus = "afternoon";
   } else if (hour >= 17 && hour <= 19) {
-    dayStatus = 'evening';
+    dayStatus = "evening";
   } else {
-    dayStatus = 'night';
+    dayStatus = "night";
   }
-  res.json({
+  return {
     time,
     season,
     dayStatus,
-  });
-});
-
-export default router;
+  };
+};
