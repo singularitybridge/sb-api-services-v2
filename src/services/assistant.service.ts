@@ -29,7 +29,7 @@ const handleError = (error: Error): string => {
 const pollRunStatus = async (
   threadId: string,
   runId: string,
-  timeout: number = 35000
+  timeout: number = 45000
 ) => {
   const startTime = Date.now();
   let lastRun;

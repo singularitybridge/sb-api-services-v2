@@ -58,7 +58,7 @@ export const handleVoiceRequest = async (
 
   if (firstTime !== false) {
     const response = await handleUserInput(
-      `this is a conversation with ${user.name}, start with greeting the user`,
+      `this is a conversation with ${user.name}, start with greeting the user. today is december 14, 2023`,
       session.assistantId,
       session.threadId,
     );
