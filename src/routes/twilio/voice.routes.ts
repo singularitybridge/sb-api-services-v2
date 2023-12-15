@@ -74,13 +74,9 @@ twilioVoiceRouter.post('/recording', async (req, res) => {
   const { CallSid, CallStatus, From, To, RecordingUrl } = req.body; 
   const job = await agendaClient.now('processVoiceRecording', { CallSid, CallStatus, From, To, RecordingUrl });
   const twiml = new VoiceResponse();
-
-  
   
   twiml.redirect(`/twilio/voice/wait?job=${job.attrs._id}`);
-
   console.log(`record, redirect to /twilio/voice/wait?job=${job.attrs._id}`);
-
   res.type('text/xml');
   res.send(twiml.toString());
 

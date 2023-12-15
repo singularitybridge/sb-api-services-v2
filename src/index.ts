@@ -1,8 +1,8 @@
 import dotenv from 'dotenv';
+dotenv.config();
+
 import mongoose from 'mongoose';
 import { startAgenda } from './services/agenda/agenda.service';
-
-dotenv.config();
 
 mongoose
   .connect(process.env.MONGODB_URI as string)
@@ -26,8 +26,11 @@ import policyRouter from './routes/policy.routes';
 
 import ttsRouter from './routes/tts.routes'; // Import the missing ttsRouter module
 import sttRouter from './routes/stt.routes'; // Import the missing sttRouter module
+
 import { twilioVoiceRouter } from './routes/twilio/voice.routes';
 import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
+import { agendaRouter } from './routes/agenda.routes';
+import {assistantRouter} from './routes/assistant.routes';
 
 
 const app = express();
@@ -52,6 +55,8 @@ app.use('/twilio/messaging', twilioMessagingRouter);
 
 app.use('/tts', ttsRouter);
 app.use('/stt', sttRouter);
+app.use('/agenda', agendaRouter);
+app.use('/assistant', assistantRouter);
 
 app.get('/swagger.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');

@@ -4,8 +4,6 @@
 import { Controller, ValidationService, FieldErrors, ValidateError, TsoaRoute, HttpStatusCodeLiteral, TsoaResponse, fetchMiddlewares } from '@tsoa/runtime';
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
 import { CalendarController } from './../controllers/calendar.controller';
-// WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-import { AssistantController } from './../controllers/assistant.controller';
 import type { RequestHandler, Router } from 'express';
 
 // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
@@ -61,16 +59,6 @@ const models: TsoaRoute.Models = {
             "description": {"dataType":"string","required":true},
             "start": {"dataType":"nestedObjectLiteral","nestedProperties":{"timeZone":{"dataType":"string","required":true},"dateTime":{"dataType":"string","required":true}},"required":true},
             "end": {"dataType":"nestedObjectLiteral","nestedProperties":{"timeZone":{"dataType":"string","required":true},"dateTime":{"dataType":"string","required":true}},"required":true},
-        },
-        "additionalProperties": false,
-    },
-    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-    "HandleUserInputRequest": {
-        "dataType": "refObject",
-        "properties": {
-            "userInput": {"dataType":"string","required":true},
-            "assistantId": {"dataType":"string","required":true},
-            "threadId": {"dataType":"string","required":true},
         },
         "additionalProperties": false,
     },
@@ -257,31 +245,6 @@ export function RegisterRoutes(app: Router) {
 
 
               const promise = controller.handleOAuth2Callback.apply(controller, validatedArgs as any);
-              promiseHandler(controller, promise, response, undefined, next);
-            } catch (err) {
-                return next(err);
-            }
-        });
-        // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-        app.post('/assistant/user-input',
-            ...(fetchMiddlewares<RequestHandler>(AssistantController)),
-            ...(fetchMiddlewares<RequestHandler>(AssistantController.prototype.handleUserInput)),
-
-            function AssistantController_handleUserInput(request: any, response: any, next: any) {
-            const args = {
-                    requestBody: {"in":"body","name":"requestBody","required":true,"ref":"HandleUserInputRequest"},
-            };
-
-            // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
-
-            let validatedArgs: any[] = [];
-            try {
-                validatedArgs = getValidatedArgs(args, request, response);
-
-                const controller = new AssistantController();
-
-
-              const promise = controller.handleUserInput.apply(controller, validatedArgs as any);
               promiseHandler(controller, promise, response, undefined, next);
             } catch (err) {
                 return next(err);
