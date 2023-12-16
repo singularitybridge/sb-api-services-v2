@@ -1,11 +1,39 @@
-import VoiceResponse from "twilio/lib/twiml/VoiceResponse";
-import { Assistant } from "../../models/Assistant";
-import { Session } from "../../models/Session";
-import { User } from "../../models/User";
-import { generateAudio } from "../11labs.service";
-import { handleUserInput } from "../assistant.service";
-import { deleteThread, createNewThread } from "../oai.thread.service";
-import { transcribeAudioWhisper } from "../speech.recognition.service";
+import VoiceResponse from 'twilio/lib/twiml/VoiceResponse';
+import { Assistant } from '../../models/Assistant';
+import { Session } from '../../models/Session';
+import { User } from '../../models/User';
+import { generateAudio } from '../11labs.service';
+import { handleUserInput } from '../assistant.service';
+import { deleteThread, createNewThread } from '../oai.thread.service';
+import { transcribeAudioWhisper } from '../speech.recognition.service';
+
+export const handleVoiceCallEnded = async (
+  from: string,
+  to: string,
+): Promise<boolean> => {
+
+  const assistant = await Assistant.findOne({ 'identifiers.value': to });
+  const user = await User.findOne({ 'identifiers.value': from });
+
+  if (!assistant || !user) return false;
+
+  const session = await Session.findOne({
+    userId: user._id,
+    assistantId: assistant.assistantId,
+    active: true,
+  });
+
+  if (!session) return false;
+
+  deleteThread(session.threadId);
+  session.active = false;
+  await session.save();
+
+  console.log(`call ended, assistant: ${assistant.name}, user: ${user.name}`);
+
+
+  return true;
+};
 
 export const handleVoiceRequest = async (
   firstTime: boolean,
@@ -29,20 +57,6 @@ export const handleVoiceRequest = async (
     assistantId: assistant.assistantId,
     active: true,
   });
-
-  if (callStatus === 'completed') {
-    if (!session) {
-      throw new Error('Session not found');
-    }
-    deleteThread(session.threadId);
-    session.active = false;
-    await session.save();
-
-    return {
-      callActive: false,
-      response: twiml.toString(),
-    };
-  }
 
   if (!session) {
     const threadId = await createNewThread();

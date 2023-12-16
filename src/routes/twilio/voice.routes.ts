@@ -1,5 +1,6 @@
 import express, { NextFunction } from 'express';
 import {
+  handleVoiceCallEnded,
   handleVoiceRecordingRequest,
   handleVoiceRequest,
 } from '../../services/twilio/voice.service';
@@ -26,41 +27,41 @@ twilioVoiceRouter.post('/', async (req, res) => {
   res.send(response);
 });
 
-twilioVoiceRouter.post('/wait', async (req, res) => {
+twilioVoiceRouter.post('/status', async (req, res) => {
 
+  const { CallStatus, From, To } = req.body;
+
+  if (CallStatus === 'completed') {
+    await handleVoiceCallEnded(From, To);
+  }
+  
+  res.status(200).send('OK');
+  
+});
+
+twilioVoiceRouter.post('/wait', async (req, res) => {
   const jobId = req.query.job as string;
   console.log(`wait, jobId: ${jobId}`);
-
-  // Retrieve the job using the job ID
   const jobs = await agendaClient.jobs({ _id: new ObjectId(jobId) });
-
-  console.log('jobs found', jobs[0].attrs.data);
 
   if (jobs && jobs.length > 0) {
     const job = jobs[0];
-    // Using type assertion to access properties
-    const isJobFinished = (job.attrs as any).lastFinishedAt;
-    const jobData = (job.attrs as any).data;
+    const jobData = job.attrs.data;
 
-    if (isJobFinished) {
+    if (jobData.result) {
       console.log('job finished', jobData.result);
       const response = jobData.result;
-
       res.type('text/xml');
       res.send(response);
     } else {
-      // Wait and play tick sound
       await new Promise((resolve) => setTimeout(resolve, 2000));
-
       const twiml = new VoiceResponse();
       twiml.play(waitingSoundTick);
       twiml.redirect(`/twilio/voice/wait?job=${jobId}`);
-
       res.type('text/xml'); 
       res.send(twiml.toString());
     }
   } else {
-    // Handle case where the job is not found
     res.status(404).send('Job not found');
   }
 });

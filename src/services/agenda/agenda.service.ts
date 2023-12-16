@@ -50,16 +50,18 @@ export const getJob = async (jobId: string) => {
 agendaClient.define('processVoiceRecording', async (job: Job, done) => {
   try {
     console.log('job started', job.attrs._id, job.attrs.data);
-
     const { CallStatus, From, To, RecordingUrl } = job.attrs.data;
     const response = await handleVoiceRecordingRequest(From, To, RecordingUrl);
-
     job.attrs.data.result = response;
     await job.save();
+    done(); 
   } catch (error) {
     console.log('job error', error);
-    done();
+    done(); 
   }
 });
+
+
+
 
 export { agendaClient };
