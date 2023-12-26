@@ -1,7 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IIdentifier {
-    type: string;
+    key: string;
     value: string;
 }
 
@@ -13,10 +13,12 @@ export interface IAssistant extends Document {
     voice: string;
     language: string;
     identifiers: IIdentifier[];
+    llmModel: string;
+    llmPrompt: string;    
 }
 
 export const IdentifierSchema: Schema = new Schema({
-    type: { type: String, required: true },
+    key: { type: String, required: true },
     value: { type: String, required: true },
 });
 
@@ -28,6 +30,8 @@ const AssistantSchema: Schema = new Schema({
     voice: { type: String, required: true },
     language: { type: String, required: true },
     identifiers: { type: [IdentifierSchema], required: true },
+    llmModel: { type: String, required: false },
+    llmPrompt: { type: String, required: false }
 });
 
 AssistantSchema.index({ 'identifiers.type': 1, 'identifiers.value': 1 }, { unique: true });

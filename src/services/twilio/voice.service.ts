@@ -6,6 +6,7 @@ import { generateAudio } from '../11labs.service';
 import { handleUserInput } from '../assistant.service';
 import { deleteThread, createNewThread } from '../oai.thread.service';
 import { transcribeAudioWhisper } from '../speech.recognition.service';
+import { getCurrentTimeAndDay } from '../context.service';
 
 export const handleVoiceCallEnded = async (
   from: string,
@@ -72,7 +73,7 @@ export const handleVoiceRequest = async (
 
   if (firstTime !== false) {
     const response = await handleUserInput(
-      `this is a conversation with ${user.name}, start with greeting the user. today is december 14, 2023`,
+      `this is a conversation with ${user.name}, start with greeting the user. ${getCurrentTimeAndDay()}`,
       session.assistantId,
       session.threadId,
     );
