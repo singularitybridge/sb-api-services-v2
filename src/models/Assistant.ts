@@ -23,7 +23,7 @@ export const IdentifierSchema: Schema = new Schema({
 });
 
 const AssistantSchema: Schema = new Schema({
-    assistantId: { type: String, required: true },
+    assistantId: { type: String, required: false },
     name: { type: String, required: true },
     description: { type: String, required: true },
     introMessage: { type: String, required: true },
