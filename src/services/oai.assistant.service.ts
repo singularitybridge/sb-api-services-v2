@@ -14,6 +14,8 @@ export const getAssistantById = async (assistantId: string) => {
 
 export const updateAssistantById = async (
   assistantId: string,
+  name: string,
+  description: string,
   model: string,
   instructions: string,
 //   name: string,
@@ -23,7 +25,8 @@ export const updateAssistantById = async (
     assistantId,
     {
       instructions,
-    //   name,
+      name,
+      description,
     //   tools: [{ type: 'retrieval' }],
       model,
     //   file_ids,
