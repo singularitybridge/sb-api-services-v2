@@ -23,17 +23,25 @@ assistantRouter.get('/:id', async (req, res) => {
 });
 
 assistantRouter.put('/:id', async (req, res) => {
+
   const { id } = req.params;
   const assistantData = req.body;
-  
+
   const assistant = await Assistant.findByIdAndUpdate(id, assistantData, {
     new: true,
     upsert: true,
   });
+
+  await updateAssistantById(
+    assistant.assistantId,
+    assistant.name,
+    assistant.description,
+    assistant.llmModel,
+    assistant.llmPrompt,
+  );
   
-  await updateAssistantById(assistant.assistantId, assistant.llmModel, assistant.llmPrompt);
   res.send(assistant);
-  
+
 });
 
 assistantRouter.post('/', async (req, res) => {
@@ -44,18 +52,14 @@ assistantRouter.post('/', async (req, res) => {
     res.send(newAssistant);
   } catch (err) {
     if (err instanceof Error && 'code' in err && err.code === 11000) {
-      res
-        .status(400)
-        .send({
-          message:
-            'Duplicate key error: an assistant with this phone number already exists.',
-        });
+      res.status(400).send({
+        message:
+          'Duplicate key error: an assistant with this phone number already exists.',
+      });
     } else {
-      res
-        .status(500)
-        .send({
-          message: 'An error occurred while trying to create the assistant.',
-        });
+      res.status(500).send({
+        message: 'An error occurred while trying to create the assistant.',
+      });
     }
   }
 });
