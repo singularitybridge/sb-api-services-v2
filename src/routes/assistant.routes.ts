@@ -7,8 +7,21 @@ import {
   deleteAssistantById,
   updateAssistantById,
 } from '../services/oai.assistant.service';
+import { createNewThread, deleteThread } from '../services/oai.thread.service';
 
 const assistantRouter = express.Router();
+
+
+assistantRouter.post('/thread', async (req, res) => {  
+  const newThread = await createNewThread();
+  res.send(newThread);
+});
+
+assistantRouter.delete('/thread/:id', async (req, res) => {
+  const { id } = req.params;
+  await deleteThread(id);
+  res.send({ message: 'Thread deleted successfully' });
+});
 
 assistantRouter.post('/user-input', async (req, res) => {
   const { userInput, assistantId, threadId } = req.body;
