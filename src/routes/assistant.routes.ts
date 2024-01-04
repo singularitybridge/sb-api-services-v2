@@ -7,10 +7,15 @@ import {
   deleteAssistantById,
   updateAssistantById,
 } from '../services/oai.assistant.service';
-import { createNewThread, deleteThread } from '../services/oai.thread.service';
+import { createNewThread, deleteThread, getMessageHistory, getMessageHistoryFormatted } from '../services/oai.thread.service';
 
 const assistantRouter = express.Router();
 
+assistantRouter.get('/thread/:id/messages', async (req, res) => {
+  const { id } = req.params;
+  const messages = await getMessageHistory(id);
+  res.send(messages);
+});
 
 assistantRouter.post('/thread', async (req, res) => {  
   const newThread = await createNewThread();
