@@ -9,6 +9,12 @@ export const deleteThread = async (threadId: string): Promise<void> => {
   await openaiClient.beta.threads.del(threadId);
 };
 
+export const getMessageHistory = async (threadId: string): Promise<any[]> => {
+  const messages = await openaiClient.beta.threads.messages.list(threadId);
+  return messages.data;
+}
+
+
 export const getMessageHistoryFormatted = (messages: any[]): string => {
   let formattedMessages = '';
 
