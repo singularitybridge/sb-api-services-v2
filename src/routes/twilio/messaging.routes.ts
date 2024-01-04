@@ -1,11 +1,6 @@
 import express, { NextFunction } from "express";
 import { Twilio } from "twilio";
 import { handleUserInput } from "../../services/assistant.service";
-import VoiceResponse, {
-  GatherLanguage,
-  SayLanguage,
-  SayVoice,
-} from "twilio/lib/twiml/VoiceResponse";
 import { Assistant, IAssistant } from "../../models/Assistant";
 import { IUser, User } from "../../models/User";
 import { ISession, Session } from "../../models/Session";
