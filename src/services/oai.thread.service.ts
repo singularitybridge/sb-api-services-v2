@@ -6,10 +6,14 @@ export const createNewThread = async (): Promise<string> => {
 };
 
 export const deleteThread = async (threadId: string): Promise<void> => {
-  await openaiClient.beta.threads.del(threadId);
+  try {
+    await openaiClient.beta.threads.del(threadId);
+  } catch (error) {
+    console.log('Thread not found');
+  }
 };
 
-export const getMessageHistory = async (threadId: string): Promise<any[]> => {
+export const getMessages = async (threadId: string): Promise<any[]> => {
   const messages = await openaiClient.beta.threads.messages.list(threadId);
   return messages.data;
 }

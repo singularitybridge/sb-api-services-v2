@@ -31,6 +31,7 @@ import { twilioVoiceRouter } from './routes/twilio/voice.routes';
 import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
 import { agendaRouter } from './routes/agenda.routes';
 import {assistantRouter} from './routes/assistant.routes';
+import { sessionRouter } from './routes/session.routes';
 
 
 const app = express();
@@ -55,6 +56,7 @@ app.use('/twilio/messaging', twilioMessagingRouter);
 
 app.use('/tts', ttsRouter);
 app.use('/stt', sttRouter);
+app.use('/session', sessionRouter);
 app.use('/agenda', agendaRouter);
 app.use('/assistant', assistantRouter);
 
