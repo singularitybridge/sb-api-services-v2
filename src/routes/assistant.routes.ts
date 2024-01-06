@@ -1,19 +1,19 @@
 import express from 'express';
 import { getJob, getJobs, rerunJob } from '../services/agenda/agenda.service';
-import { handleUserInput } from '../services/assistant.service';
+import { handleSessionMessage, handleUserInput } from '../services/assistant.service';
 import { Assistant } from '../models/Assistant';
 import {
   createAssistant,
   deleteAssistantById,
   updateAssistantById,
 } from '../services/oai.assistant.service';
-import { createNewThread, deleteThread, getMessageHistory, getMessageHistoryFormatted } from '../services/oai.thread.service';
+import { createNewThread, deleteThread, getMessages, getMessageHistoryFormatted } from '../services/oai.thread.service';
 
 const assistantRouter = express.Router();
 
 assistantRouter.get('/thread/:id/messages', async (req, res) => {
   const { id } = req.params;
-  const messages = await getMessageHistory(id);
+  const messages = await getMessages(id);
   res.send(messages);
 });
 
@@ -29,8 +29,8 @@ assistantRouter.delete('/thread/:id', async (req, res) => {
 });
 
 assistantRouter.post('/user-input', async (req, res) => {
-  const { userInput, assistantId, threadId } = req.body;
-  const response = await handleUserInput(userInput, assistantId, threadId);
+  const { userInput, assistantId, userId } = req.body;
+  const response = await handleSessionMessage(userInput, assistantId, userId);
   res.send(response);
 });
 
