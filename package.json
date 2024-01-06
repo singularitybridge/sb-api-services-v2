@@ -34,7 +34,7 @@
     "moment": "^2.29.4",
     "moment-timezone": "^0.5.43",
     "mongoose": "^8.0.2",
-    "openai": "^4.20.1",
+    "openai": "^4.24.1",
     "swagger-ui-express": "^5.0.0",
     "ts-node": "^10.2.1",
     "tsoa": "^5.1.1",
