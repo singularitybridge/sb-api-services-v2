@@ -123,18 +123,6 @@ export const handleSessionMessage = async (
   const assistant = await Assistant.findOne({ assistantId: assistantId });
   const messageCount = (await getMessages(threadId)).length;
 
-  if (messageCount === 0 && assistant?.introMessage) {
-    console.log('add intro message ...');
-    // add the intro message to the thread
-    await openaiClient.beta.threads.messages.create(session.threadId, {
-      role: 'user',
-      content: assistant.introMessage,
-    });
-  }
-
-  /// handle user input and return response
-
-  console.log('submit user input', userInput, threadId);
 
   await openaiClient.beta.threads.messages.create(threadId, {
     role: 'user',
@@ -145,10 +133,8 @@ export const handleSessionMessage = async (
 
   const newRun = await openaiClient.beta.threads.runs.create(threadId, {
     assistant_id: assistantId,
-    // instructions: "additional instructions",
+    additional_instructions: messageCount === 0 ? assistant?.introMessage : undefined  
   });
-
-  console.log(`new run created: ${newRun.id}, for thread: ${threadId}`);
 
   const completedRun = await pollRunStatus(threadId, newRun.id);
   console.log('run completed > ' + completedRun.status);
