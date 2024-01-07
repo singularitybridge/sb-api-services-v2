@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { endSession, getSessionMessages } from '../services/assistant.service';
+import { endSession, endSessionByAssistantAndUserId, getSessionMessages, getSessionMessagesByAssistantAndUserId } from '../services/assistant.service';
 import { Session } from '../models/Session';
 
 const sessionRouter = Router();
@@ -14,6 +14,15 @@ sessionRouter.delete('/:id', async (req: Request, res: Response) => {
   }
 });
 
+sessionRouter.delete('/end/:assistantId/:userId', async (req: Request, res: Response) => {
+  const { assistantId, userId } = req.params;
+  try {
+    await endSessionByAssistantAndUserId(assistantId, userId);
+    res.status(200).send({ message: 'Session ended successfully' });
+  } catch (error) {
+    res.status(500).send({ error: 'Error ending session' });
+  }
+});
 
 sessionRouter.get('/', async (req: Request, res: Response) => {
   try {
@@ -39,6 +48,16 @@ sessionRouter.get('/:id/messages', async (req: Request, res: Response) => {
   try {
     const messages = await getSessionMessages(id);
     res.status(200).send({ messages });
+  } catch (error) {
+    res.status(500).send({ error: 'Error getting session messages' });
+  }
+});
+
+sessionRouter.get('/messages/:assistantId/:userId', async (req: Request, res: Response) => {
+  const { assistantId, userId } = req.params;
+  try {
+    const messages = await getSessionMessagesByAssistantAndUserId(assistantId, userId);
+    res.status(200).send( messages);
   } catch (error) {
     res.status(500).send({ error: 'Error getting session messages' });
   }
