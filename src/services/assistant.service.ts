@@ -60,6 +60,24 @@ const pollRunStatus = async (
   throw new Error('Timeout exceeded while waiting for run to complete');
 };
 
+export const endSessionByAssistantAndUserId = async (assistantId: string, userId: string) => {
+  const session = await Session.findOne({ assistantId, userId, active: true });
+
+  if (!session) {
+    throw new Error('Active session not found for given assistant and user id');
+  }
+
+  deleteThread(session.threadId);
+  session.active = false;
+  await session.save();
+
+  console.log(
+    `session ended, assistant: ${session.assistantId}, user: ${session.userId}`,
+  );
+
+  return true;
+}
+
 export const endSession = async (sessionId: string) => {
   const session = await Session.findById(sessionId);
 
@@ -84,6 +102,15 @@ export async function getSessionMessages(sessionId: string) {
 
   const messages = await getMessages(session.threadId);
   return messages;
+}
+
+export async function getSessionMessagesByAssistantAndUserId(assistantId: string, userId: string) {
+  const session = await Session.findOne({ assistantId, userId, active: true });
+  if (!session) {
+    return [];
+  }
+
+  return getSessionMessages(session._id);
 }
 
 export const handleSessionMessage = async (
