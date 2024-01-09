@@ -1,11 +1,30 @@
 import { IEventRequestBody } from "../../Interfaces/eventRequest.interface";
 import { CalendarController } from "../../controllers/calendar.controller";
 import { openaiClient } from "../../services/assistant.service";
+import { publishMessage } from "../../services/pusher.service";
 
 type FunctionName = keyof typeof functionFactory;
 const calendarController = new CalendarController();
 
 const functionFactory = {
+
+  async createNewAssistant(args: { name: string; description: string; prompt: string }) {
+    
+    console.log("called createNewAssistant with args: ", args);
+
+    publishMessage('sb', 'createNewAssistant', {
+      name: args.name,
+      description: args.description,
+      prompt: args.prompt,
+    })
+
+    return {      
+      succes: true,
+      description: 'created new assistant',      
+    };
+    
+  },
+
   async getEvents(args: { start: string; end: string }) {
     console.log("called getEvents with args: ", args);
     const events = await calendarController.getEvents(args.start, args.end);
