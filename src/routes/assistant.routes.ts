@@ -34,6 +34,13 @@ assistantRouter.post('/user-input', async (req, res) => {
   res.send(response);
 });
 
+assistantRouter.post('/user-input/thread', async (req, res) => {
+  
+  const { userInput, assistantId, threadId } = req.body;
+  const response = await handleUserInput(userInput, assistantId, threadId);
+  res.send(response);
+});
+
 assistantRouter.get('/', async (req, res) => {
   const assistants = await Assistant.find({});
   res.send(assistants);
