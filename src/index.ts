@@ -32,6 +32,8 @@ import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
 import { agendaRouter } from './routes/agenda.routes';
 import {assistantRouter} from './routes/assistant.routes';
 import { sessionRouter } from './routes/session.routes';
+import { companyRouter } from './routes/company.routes';
+import { userRouter } from './routes/user.routes';
 
 
 const app = express();
@@ -59,6 +61,8 @@ app.use('/stt', sttRouter);
 app.use('/session', sessionRouter);
 app.use('/agenda', agendaRouter);
 app.use('/assistant', assistantRouter);
+app.use('/company', companyRouter);
+app.use('/user', userRouter);
 
 app.get('/swagger.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');

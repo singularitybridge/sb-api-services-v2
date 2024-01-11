@@ -15,6 +15,7 @@ export interface IAssistant extends Document {
     identifiers: IIdentifier[];
     llmModel: string;
     llmPrompt: string;    
+    companyId: string;
 }
 
 export const IdentifierSchema: Schema = new Schema({
@@ -31,7 +32,8 @@ const AssistantSchema: Schema = new Schema({
     language: { type: String, required: true },
     identifiers: { type: [IdentifierSchema], required: true },
     llmModel: { type: String, required: false },
-    llmPrompt: { type: String, required: false }
+    llmPrompt: { type: String, required: false },
+    companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
 });
 
 AssistantSchema.index({ 'identifiers.type': 1, 'identifiers.value': 1 }, { unique: true });
