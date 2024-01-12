@@ -1,0 +1,25 @@
+import mongoose, { Document, Schema } from 'mongoose';
+
+export interface IInbox extends Document {
+  sessionId: mongoose.Schema.Types.ObjectId;
+  message: string;
+  creatd: Date;
+}
+
+const InboxSchema: Schema = new Schema({
+  sessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Session',
+    required: true,
+  },
+  message: {
+    type: String,
+    required: true,
+  },
+  creatd: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+export const Inbox = mongoose.model<IInbox>('Inbox', InboxSchema);
