@@ -6,8 +6,22 @@ import {
   getSessionMessagesByAssistantAndUserId,
 } from '../services/assistant.service';
 import { Session } from '../models/Session';
+import { getSessionOrCreate } from '../services/session.service';
 
 const sessionRouter = Router();
+
+sessionRouter.post('/', async (req, res) => {
+  try {
+      const { userId, companyId, assistantId } = req.body;
+      const session = await getSessionOrCreate(userId, companyId, assistantId);
+      res.status(200).json(session);
+  } catch (error) {
+      console.log(error);
+      res.status(500).json({ message: "Error handling session", error });
+  }
+});
+
+
 
 sessionRouter.delete('/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -46,7 +60,7 @@ sessionRouter.get('/friendly', async (req, res) => {
     const sessions = await Session.aggregate([
       {
         $lookup: {
-          from: 'users', // Join with the users collection
+          from: 'users', 
           localField: 'userId',
           foreignField: '_id',
           as: 'userDetails'
@@ -57,21 +71,37 @@ sessionRouter.get('/friendly', async (req, res) => {
       },
       {
         $lookup: {
-          from: 'assistants', // Join with the assistants collection
+          from: 'assistants',
           localField: 'assistantId',
-          foreignField: 'assistantId',
+          foreignField: '_id',
           as: 'assistantDetails'
         }
       },
       {
         $unwind: '$assistantDetails'
       },
+
+      {
+        $lookup: {
+          from: 'companies', 
+          localField: 'companyId',
+          foreignField: '_id',
+          as: 'companyDetails'
+        }
+      },
+      {
+        $unwind: '$companyDetails'
+      },
+
+
       {
         $project: {
           assistantId: 1,
           userId: 1,
-          assistantName: '$userDetails.name', // Include the user's name
-          userName: '$assistantDetails.name', // Include the assistant's name
+          companyId: 1,
+          userName: '$userDetails.name',
+          assistantName: '$assistantDetails.name',
+          companyName: '$companyDetails.name',
           threadId: 1,
           active: 1,
           // __v: 1
@@ -119,7 +149,8 @@ sessionRouter.get(
       );
       res.status(200).send(messages);
     } catch (error) {
-      res.status(500).send({ error: 'Error getting session messages' });
+      console.log(error);
+      res.status(500).send({ error: 'Error getting session/assistant messages' });
     }
   },
 );

@@ -10,7 +10,7 @@ export interface ISession extends Document {
 
 export const SessionSchema: Schema = new Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    assistantId: { type: String, required: true },
+    assistantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Assistant' },
     threadId: { type: String, required: true },
     active: { type: Boolean, required: true },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
