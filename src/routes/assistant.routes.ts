@@ -46,6 +46,12 @@ assistantRouter.get('/', async (req, res) => {
   res.send(assistants);
 });
 
+assistantRouter.get('/company/:id', async (req, res) => {
+  const { id } = req.params;
+  const assistants = await Assistant.find({ companyId: id });
+  res.send(assistants);
+});
+
 assistantRouter.get('/:id', async (req, res) => {
   const assistant = await Assistant.findById(req.params.id);
   res.send(assistant);
