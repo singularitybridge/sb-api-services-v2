@@ -7,21 +7,20 @@ import {
 } from '../services/assistant.service';
 import { Session } from '../models/Session';
 import { getSessionOrCreate } from '../services/session.service';
+import mongoose from 'mongoose';
 
 const sessionRouter = Router();
 
 sessionRouter.post('/', async (req, res) => {
   try {
-      const { userId, companyId, assistantId } = req.body;
-      const session = await getSessionOrCreate(userId, companyId, assistantId);
-      res.status(200).json(session);
+    const { userId, companyId, assistantId } = req.body;
+    const session = await getSessionOrCreate(userId, companyId, assistantId);
+    res.status(200).json(session);
   } catch (error) {
-      console.log(error);
-      res.status(500).json({ message: "Error handling session", error });
+    console.log(error);
+    res.status(500).json({ message: 'Error handling session', error });
   }
 });
-
-
 
 sessionRouter.delete('/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -55,44 +54,51 @@ sessionRouter.get('/', async (req: Request, res: Response) => {
   }
 });
 
-sessionRouter.get('/friendly', async (req, res) => {
+sessionRouter.get('/friendly/:companyId', async (req, res) => {
   try {
+    const { companyId } = req.params;
+
     const sessions = await Session.aggregate([
       {
-        $lookup: {
-          from: 'users', 
-          localField: 'userId',
-          foreignField: '_id',
-          as: 'userDetails'
-        }
+        $match: {
+          companyId: new mongoose.Types.ObjectId(companyId),
+          active: true,
+        },
       },
       {
-        $unwind: '$userDetails'
+        $lookup: {
+          from: 'users',
+          localField: 'userId',
+          foreignField: '_id',
+          as: 'userDetails',
+        },
+      },
+      {
+        $unwind: '$userDetails',
       },
       {
         $lookup: {
           from: 'assistants',
           localField: 'assistantId',
           foreignField: '_id',
-          as: 'assistantDetails'
-        }
+          as: 'assistantDetails',
+        },
       },
       {
-        $unwind: '$assistantDetails'
+        $unwind: '$assistantDetails',
       },
 
       {
         $lookup: {
-          from: 'companies', 
+          from: 'companies',
           localField: 'companyId',
           foreignField: '_id',
-          as: 'companyDetails'
-        }
+          as: 'companyDetails',
+        },
       },
       {
-        $unwind: '$companyDetails'
+        $unwind: '$companyDetails',
       },
-
 
       {
         $project: {
@@ -105,18 +111,15 @@ sessionRouter.get('/friendly', async (req, res) => {
           threadId: 1,
           active: 1,
           // __v: 1
-        }
-      }
+        },
+      },
     ]);
 
     res.status(200).send(sessions);
-  } catch (error) {    
+  } catch (error) {
     res.status(500).send({ error: 'Error getting sessions' });
   }
 });
-
-
-
 
 sessionRouter.get('/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -150,7 +153,9 @@ sessionRouter.get(
       res.status(200).send(messages);
     } catch (error) {
       console.log(error);
-      res.status(500).send({ error: 'Error getting session/assistant messages' });
+      res
+        .status(500)
+        .send({ error: 'Error getting session/assistant messages' });
     }
   },
 );
