@@ -29,8 +29,8 @@ assistantRouter.delete('/thread/:id', async (req, res) => {
 });
 
 assistantRouter.post('/user-input', async (req, res) => {
-  const { userInput, assistantId, userId } = req.body;
-  const response = await handleSessionMessage(userInput, assistantId, userId);
+  const { userInput, companyId, userId } = req.body;
+  const response = await handleSessionMessage(userInput, companyId, userId);
   res.send(response);
 });
 
