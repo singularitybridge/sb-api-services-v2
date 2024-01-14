@@ -1,15 +1,35 @@
 import { Router, Request, Response } from 'express';
 import {
   endSession,
-  endSessionByAssistantAndUserId,
+  endSessionByCompanyAndUserId,
   getSessionMessages,
-  getSessionMessagesByAssistantAndUserId,
+  getSessionMessagesByCompanyAndUserId,
 } from '../services/assistant.service';
 import { Session } from '../models/Session';
-import { getSessionOrCreate } from '../services/session.service';
+import {
+  getSessionOrCreate,
+  sessionFriendlyAggreationQuery,
+} from '../services/session.service';
 import mongoose from 'mongoose';
 
 const sessionRouter = Router();
+
+sessionRouter.put('/:id', async (req, res) => {
+  const { id } = req.params;
+  const sessionData = req.body;
+  try {
+    const session = await Session.findById(id);
+    if (session) {
+      session.assistantId = sessionData.assistantId;
+      await session.save();
+      res.status(200).send({ message: 'Session updated successfully' });
+    } else {
+      res.status(404).send({ error: 'Session not found' });
+    }
+  } catch (error) {
+    res.status(500).send({ error: 'Error updating session' });
+  }
+});
 
 sessionRouter.post('/', async (req, res) => {
   try {
@@ -33,11 +53,11 @@ sessionRouter.delete('/:id', async (req: Request, res: Response) => {
 });
 
 sessionRouter.delete(
-  '/end/:assistantId/:userId',
+  '/end/:companyId/:userId',
   async (req: Request, res: Response) => {
-    const { assistantId, userId } = req.params;
+    const { companyId, userId } = req.params;
     try {
-      await endSessionByAssistantAndUserId(assistantId, userId);
+      await endSessionByCompanyAndUserId(companyId, userId);
       res.status(200).send({ message: 'Session ended successfully' });
     } catch (error) {
       res.status(500).send({ error: 'Error ending session' });
@@ -65,54 +85,7 @@ sessionRouter.get('/friendly/:companyId', async (req, res) => {
           active: true,
         },
       },
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'userId',
-          foreignField: '_id',
-          as: 'userDetails',
-        },
-      },
-      {
-        $unwind: '$userDetails',
-      },
-      {
-        $lookup: {
-          from: 'assistants',
-          localField: 'assistantId',
-          foreignField: '_id',
-          as: 'assistantDetails',
-        },
-      },
-      {
-        $unwind: '$assistantDetails',
-      },
-
-      {
-        $lookup: {
-          from: 'companies',
-          localField: 'companyId',
-          foreignField: '_id',
-          as: 'companyDetails',
-        },
-      },
-      {
-        $unwind: '$companyDetails',
-      },
-
-      {
-        $project: {
-          assistantId: 1,
-          userId: 1,
-          companyId: 1,
-          userName: '$userDetails.name',
-          assistantName: '$assistantDetails.name',
-          companyName: '$companyDetails.name',
-          threadId: 1,
-          active: 1,
-          // __v: 1
-        },
-      },
+      ...sessionFriendlyAggreationQuery,
     ]);
 
     res.status(200).send(sessions);
@@ -122,10 +95,26 @@ sessionRouter.get('/friendly/:companyId', async (req, res) => {
 });
 
 sessionRouter.get('/:id', async (req: Request, res: Response) => {
-  const { id } = req.params;
   try {
-    const session = await Session.findById(id);
-    res.status(200).send({ session });
+    const { id } = req.params;
+
+    const sessions = await Session.aggregate([
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(id),
+        },
+      },
+      ...sessionFriendlyAggreationQuery,
+    ]);
+
+    // Check if a session was found
+    if (sessions.length === 0) {
+      return res.status(404).send({ error: 'Session not found' });
+    }
+
+    // Return the first session object instead of an array
+    const session = sessions[0];
+    res.status(200).send(session);
   } catch (error) {
     res.status(500).send({ error: 'Error getting session' });
   }
@@ -142,12 +131,12 @@ sessionRouter.get('/:id/messages', async (req: Request, res: Response) => {
 });
 
 sessionRouter.get(
-  '/messages/:assistantId/:userId',
+  '/messages/:companyId/:userId',
   async (req: Request, res: Response) => {
-    const { assistantId, userId } = req.params;
+    const { companyId, userId } = req.params;
     try {
-      const messages = await getSessionMessagesByAssistantAndUserId(
-        assistantId,
+      const messages = await getSessionMessagesByCompanyAndUserId(
+        companyId,
         userId,
       );
       res.status(200).send(messages);
