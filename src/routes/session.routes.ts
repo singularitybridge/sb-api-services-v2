@@ -94,6 +94,36 @@ sessionRouter.get('/friendly/:companyId', async (req, res) => {
   }
 });
 
+// get session by company and user id
+sessionRouter.get('/:companyId/:userId', async (req: Request, res: Response) => {
+    const { companyId, userId } = req.params;
+    try {
+      const sessions = await Session.aggregate([
+        {
+          $match: {
+            companyId: new mongoose.Types.ObjectId(companyId),
+            userId: new mongoose.Types.ObjectId(userId),
+            active: true,
+          },
+        },
+        ...sessionFriendlyAggreationQuery,
+      ]);
+
+      // Check if a session was found
+      if (sessions.length === 0) {
+        return res.status(404).send({ error: 'Session not found' });
+      }
+
+      // Return the first session object instead of an array
+      const session = sessions[0];
+      res.status(200).send(session);
+    } catch (error) {
+      res.status(500).send({ error: 'Error getting session' });
+    }
+    
+  },
+);
+
 sessionRouter.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
