@@ -3,7 +3,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IInbox extends Document {
   sessionId: mongoose.Schema.Types.ObjectId;
   message: string;
-  creatd: Date;
+  created: Date;
 }
 
 const InboxSchema: Schema = new Schema({
@@ -16,7 +16,7 @@ const InboxSchema: Schema = new Schema({
     type: String,
     required: true,
   },
-  creatd: {
+  created: {
     type: Date,
     default: Date.now,
   },
