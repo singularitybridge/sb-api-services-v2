@@ -31,10 +31,10 @@ const functionFactory = {
       console.error('Error sending message to inbox:', error);
 
       // Check if the error is due to an invalid session ID
-      if ((error as any).name === 'ValidationError' && (error as any).errors && (error as any).errors.sessionId) {
+      if ((error as any).name === 'CastError' && (error as any).path === '_id') {
         return {
           success: false,
-          description: 'Session ID not found or invalid. Please ask the user for a valid session ID.',
+          description: 'Invalid session ID. Could you please share your session ID?',
         };
       }
   
