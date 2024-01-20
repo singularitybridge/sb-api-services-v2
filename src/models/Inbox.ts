@@ -1,8 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IInbox extends Document {
-  sessionId: mongoose.Schema.Types.ObjectId;
-  // as assistant may change during a session, we need to store the assistantId
+  sessionId: mongoose.Schema.Types.ObjectId;  
   assistantId: mongoose.Schema.Types.ObjectId;
   message: string;
   created: Date;
