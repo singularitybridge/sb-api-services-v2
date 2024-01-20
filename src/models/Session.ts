@@ -6,6 +6,7 @@ export interface ISession extends Document {
     threadId: string;
     active: boolean;
     companyId: string;
+    createdAt: Date;
 }
 
 export const SessionSchema: Schema = new Schema({
@@ -14,7 +15,10 @@ export const SessionSchema: Schema = new Schema({
     threadId: { type: String, required: true },
     active: { type: Boolean, required: true },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
+    createdAt: { type: Date, default: Date.now },
 });
 
+// SessionSchema.index({ companyId: 1, userId: 1 }, { unique: true });
+SessionSchema.index({ companyId: 1, userId: 1 }, { unique: true, partialFilterExpression: { active: true } });
 export const Session = mongoose.model<ISession>('Session', SessionSchema);
 

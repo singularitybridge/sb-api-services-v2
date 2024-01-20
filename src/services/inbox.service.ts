@@ -26,12 +26,13 @@ export const addMessageToInbox = async (inboxInput: IInboxInput) => {
 };
 
 export const getInboxMessages = async (companyId: string) => {
-  const aggregationPipeline = [
+  const sessionIds = (await Session.find({ companyId }).select('_id createdAt').lean()).map(s => s._id);
+  console.log("Session IDs: ", sessionIds);
+
+  const aggregationPipeline: any[] = [
     {
       $match: {
-        sessionId: {
-          $in: (await Session.find({ companyId }).select('_id').lean()).map(s => s._id)
-        }
+        sessionId: { $in: sessionIds }
       }
     },
     {
@@ -43,6 +44,13 @@ export const getInboxMessages = async (companyId: string) => {
       }
     },
     { $unwind: '$sessionInfo' },
+    { $sort: { 'createdAt': 1 } },
+    // filter for active sessions only
+    {
+      $match: {
+        'sessionInfo.active': true
+      }
+    },
     {
       $lookup: {
         from: 'users',
@@ -55,15 +63,16 @@ export const getInboxMessages = async (companyId: string) => {
     {
       $lookup: {
         from: 'assistants',
-        localField: 'sessionInfo.assistantId',
+        localField: 'assistantId',
         foreignField: '_id',
         as: 'assistantInfo'
       }
     },
-    { $unwind: '$assistantInfo' },
+    { $unwind: { path: '$assistantInfo', preserveNullAndEmptyArrays: true } },
     {
       $group: {
         _id: '$sessionId',
+        createdAt: { $first: '$sessionInfo.createdAt' },
         messages: {
           $push: {
             _id: '$_id',
@@ -72,11 +81,12 @@ export const getInboxMessages = async (companyId: string) => {
             userName: '$userInfo.name',
             sessionActive: '$sessionInfo.active',
             assistantName: '$assistantInfo.name',
-            assistantId: '$assistantInfo._id'
+            assistantId: '$assistantId'
           }
         }
       }
     },
+    { $sort: { 'createdAt': -1 } },
     {
       $project: {
         _id: 0,
@@ -86,8 +96,13 @@ export const getInboxMessages = async (companyId: string) => {
     }
   ];
 
-  return Inbox.aggregate(aggregationPipeline);
+  const result = await Inbox.aggregate(aggregationPipeline);
+  return result;
 };
+
+
+
+
 
 
 export const getInboxMessage = async (id: string) => {
