@@ -21,6 +21,7 @@ const functionFactory = {
       await addMessageToInbox({
         sessionId: args.sessionId,
         message: args.message,
+        type: 'human_agent_request',
       });
       console.log(`Message sent to inbox: ${args.message}, sessionId: ${args.sessionId}`);
       return {
