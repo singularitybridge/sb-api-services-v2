@@ -8,6 +8,7 @@ import mongoose from 'mongoose';
 interface IInboxInput {
   message: string;
   sessionId: string;
+  type: 'human_agent_request' | 'human_agent_response' | 'notification';
 }
 
 export const addMessageToInbox = async (inboxInput: IInboxInput) => {
@@ -20,14 +21,16 @@ export const addMessageToInbox = async (inboxInput: IInboxInput) => {
     throw new Error('Session not found');
   }
   
-  inboxMessage.assistantId = assistant._id;
+  inboxMessage.senderId = assistant._id;  
+  inboxMessage.status = 'open';
+
   return await inboxMessage.save();
 
 };
 
 export const getInboxMessages = async (companyId: string) => {
+
   const sessionIds = (await Session.find({ companyId }).select('_id createdAt').lean()).map(s => s._id);
-  console.log("Session IDs: ", sessionIds);
 
   const aggregationPipeline: any[] = [
     {
@@ -63,7 +66,7 @@ export const getInboxMessages = async (companyId: string) => {
     {
       $lookup: {
         from: 'assistants',
-        localField: 'assistantId',
+        localField: 'senderId',
         foreignField: '_id',
         as: 'assistantInfo'
       }
@@ -81,7 +84,8 @@ export const getInboxMessages = async (companyId: string) => {
             userName: '$userInfo.name',
             sessionActive: '$sessionInfo.active',
             assistantName: '$assistantInfo.name',
-            assistantId: '$assistantId'
+            senderId: '$senderId',
+            type: '$type'
           }
         }
       }
@@ -91,7 +95,8 @@ export const getInboxMessages = async (companyId: string) => {
       $project: {
         _id: 0,
         sessionId: '$_id',
-        messages: 1
+        messages: 1,
+        type: 1
       }
     }
   ];

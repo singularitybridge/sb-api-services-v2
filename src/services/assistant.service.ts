@@ -6,7 +6,7 @@ import {
   deleteThread,
   getMessages,
 } from './oai.thread.service';
-import { Assistant } from '../models/Assistant';
+import { Assistant, IAssistant } from '../models/Assistant';
 import { getSessionOrCreate } from './session.service';
 import mongoose from 'mongoose';
 
@@ -27,6 +27,12 @@ const handleError = (error: Error): string => {
   }
 
   return response;
+};
+
+const getAssistantByAssistantId = async (
+  assistantId: string,
+): Promise<IAssistant | null> => {
+  return Assistant.findOne({ assistantId });  
 };
 
 const pollRunStatus = async (
@@ -70,7 +76,6 @@ export const endSessionByCompanyAndUserId = async (
   companyId: string,
   userId: string,
 ) => {
-
   const session = await Session.findOne({
     companyId: new mongoose.Types.ObjectId(companyId),
     userId: new mongoose.Types.ObjectId(userId),
@@ -122,20 +127,31 @@ export async function getSessionMessagesByCompanyAndUserId(
   companyId: string,
   userId: string,
 ) {
-
   const session = await Session.findOne({ companyId, userId, active: true });
   if (!session) {
     return [];
   }
 
-  return getSessionMessages(session._id);
+  const messages = await getSessionMessages(session._id);
+
+  for (let message of messages) {
+
+    const assistant = await getAssistantByAssistantId(message.assistant_id);
+    if (assistant) {
+      message.assistantName = assistant.name;
+    }
+
+  }
+
+  return messages;
 }
 
 export const handleSessionMessage = async (
   userInput: string,
   companyId: string,
   userId: string,
-) => {
+  metadata?: Record<string, string>,
+): Promise<string> => {
   const session = await getSessionOrCreate(userId, companyId);
   const assistant = await Assistant.findOne({
     _id: new mongoose.Types.ObjectId(session.assistantId),
@@ -145,6 +161,7 @@ export const handleSessionMessage = async (
   await openaiClient.beta.threads.messages.create(session.threadId, {
     role: 'user',
     content: userInput,
+    metadata,
   });
 
   console.log('create new run', session.threadId, session.assistantId);
