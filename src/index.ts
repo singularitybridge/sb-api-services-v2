@@ -35,6 +35,7 @@ import { sessionRouter } from './routes/session.routes';
 import { companyRouter } from './routes/company.routes';
 import { userRouter } from './routes/user.routes';
 import { inboxRouter } from './routes/inbox.routes';
+import { actionRouter } from './routes/action.routes';
 
 
 const app = express();
@@ -65,6 +66,7 @@ app.use('/assistant', assistantRouter);
 app.use('/company', companyRouter);
 app.use('/user', userRouter);
 app.use('/inbox', inboxRouter);
+app.use('/action', actionRouter);
 
 app.get('/swagger.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
