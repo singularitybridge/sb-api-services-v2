@@ -4,6 +4,7 @@ import {
   deleteCompany,
   getCompanies,
   getCompany,
+  getDecryptedCompany,
   updateCompany,
 } from '../services/company.service';
 
@@ -22,6 +23,11 @@ companyRouter.get('/', async (req, res) => {
 
 companyRouter.get('/:id', async (req, res) => {
   const company = await getCompany(req.params.id);
+  res.json(company);
+});
+
+companyRouter.get('/decrypted/:id', async (req, res) => {
+  const company = await getDecryptedCompany(req.params.id);
   res.json(company);
 });
 

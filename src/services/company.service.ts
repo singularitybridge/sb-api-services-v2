@@ -1,7 +1,29 @@
 import { Assistant } from '../models/Assistant';
-import { Company, ICompany } from '../models/Company';
+import { Company, ICompany, IApiKey } from '../models/Company';
 import { createAssistant } from '../services/oai.assistant.service';
-import { encryptCompanyData, decryptCompanyData } from './encryption.service';
+import { encryptData, decryptData } from './encryption.service';
+
+const encryptCompanyData = (companyData: ICompany) => {
+  companyData.api_keys.forEach((apiKey: IApiKey) => {
+    const encryptedData = encryptData(apiKey.value);
+    apiKey.value = encryptedData.value;
+    apiKey.iv = encryptedData.iv;
+    apiKey.tag = encryptedData.tag;
+  });
+};
+
+const decryptCompanyData = (companyData: any) => {
+  companyData.api_keys = companyData.api_keys.map((apiKey: IApiKey) => {
+    return {
+      key: apiKey.key,
+      value: decryptData({
+        value: apiKey.value,
+        iv: apiKey.iv || ' ',
+        tag: apiKey.tag || ' ',
+      }),
+    };
+  });
+};
 
 export const createCompany = async (companyData: ICompany) => {
   try {
@@ -58,12 +80,27 @@ export const getCompany = async (id: string) => {
   }
 };
 
+export const getDecryptedCompany = async (id: string) => {
+  try {
+    const company = await Company.findById(id);
+    if (!company) {
+      throw new Error('Company not found');
+    }
+    const decryptedCompany = company.toObject();
+    decryptCompanyData(decryptedCompany);
+    return decryptedCompany;
+  } catch (error) {
+    console.error('Error retrieving decrypted company:', error);
+    throw error;
+  }
+};
+
 export const getCompanies = async () => {
   try {
     const companies = await Company.find();
     return companies.map((company) => {
       const companyData = company.toObject();
-      decryptCompanyData(companyData);
+      // decryptCompanyData(companyData);
       return companyData;
     });
   } catch (error) {
