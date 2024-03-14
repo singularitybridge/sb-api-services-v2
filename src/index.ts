@@ -30,13 +30,13 @@ import sttRouter from './routes/stt.routes'; // Import the missing sttRouter mod
 import { twilioVoiceRouter } from './routes/twilio/voice.routes';
 import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
 import { agendaRouter } from './routes/agenda.routes';
-import {assistantRouter} from './routes/assistant.routes';
+import { assistantRouter } from './routes/assistant.routes';
 import { sessionRouter } from './routes/session.routes';
 import { companyRouter } from './routes/company.routes';
 import { userRouter } from './routes/user.routes';
 import { inboxRouter } from './routes/inbox.routes';
 import { actionRouter } from './routes/action.routes';
-
+import { verificationRouter } from './routes/verification.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -67,6 +67,7 @@ app.use('/company', companyRouter);
 app.use('/user', userRouter);
 app.use('/inbox', inboxRouter);
 app.use('/action', actionRouter);
+app.use('/api', verificationRouter);
 
 app.get('/swagger.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');

@@ -1,4 +1,6 @@
+import OpenAI from 'openai';
 import { openaiClient } from './assistant.service';
+import { ApiKey } from './verification.service';
 
 export const getAssistants = async () => {
   const assistants = await openaiClient.beta.assistants.list({
@@ -53,4 +55,21 @@ export const createAssistant = async (
 export const deleteAssistantById = async (assistantId: string) => {
   const response = await openaiClient.beta.assistants.del(assistantId);
   return response.deleted;
+};
+
+export const verifyOpenAiKey = async (apiKey: ApiKey) => {
+  if (typeof apiKey !== 'string') {
+    throw new Error('Invalid API key type for OpenAI verification');
+  }
+
+  const openaiClient = new OpenAI({
+    apiKey: apiKey,
+  });
+
+  try {
+    await openaiClient.models.list();
+    return true;
+  } catch (error) {
+    return false;
+  }
 };
