@@ -78,11 +78,15 @@ assistantRouter.put('/:id', async (req, res) => {
 });
 
 assistantRouter.post('/', async (req, res) => {
+
   const assistantData = req.body;
   const newAssistant = new Assistant(assistantData);
 
   try {
+    
     await newAssistant.save();
+
+    // adjust actions to OAI assistnat format
 
     const openAIAssistant = await createAssistant(
       assistantData.name,

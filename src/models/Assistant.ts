@@ -20,7 +20,9 @@ export interface IAssistant extends Document {
   llmModel: string;
   llmPrompt: string;
   companyId: string;
+  actions: mongoose.Types.ObjectId[];
 }
+
 
 const AssistantSchema: Schema = new Schema({
   assistantId: { type: String, required: false },
@@ -32,6 +34,12 @@ const AssistantSchema: Schema = new Schema({
   llmModel: { type: String, required: false },
   llmPrompt: { type: String, required: false },
   companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
+  actions: [{ 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Action', 
+    required: false 
+  }],
+
 });
 
 export const Assistant = mongoose.model<IAssistant>(
