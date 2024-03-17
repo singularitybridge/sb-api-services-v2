@@ -27,8 +27,8 @@ import policyRouter from './routes/policy.routes';
 import ttsRouter from './routes/tts.routes'; // Import the missing ttsRouter module
 import sttRouter from './routes/stt.routes'; // Import the missing sttRouter module
 
-import { twilioVoiceRouter } from './routes/twilio/voice.routes';
-import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
+import { twilioVoiceRouter } from './routes/omni_channel/omni.twilio.voice.routes';
+import { messagingRouter } from './routes/omni_channel/omni.wa.routes';
 import { agendaRouter } from './routes/agenda.routes';
 import {assistantRouter} from './routes/assistant.routes';
 import { sessionRouter } from './routes/session.routes';
@@ -56,7 +56,7 @@ app.use('/policy', policyRouter);
 // app.use("/messaging", messagingRouter);
 
 app.use('/twilio/voice', twilioVoiceRouter);
-app.use('/twilio/messaging', twilioMessagingRouter);
+app.use('/messaging', messagingRouter);
 
 app.use('/tts', ttsRouter);
 app.use('/stt', sttRouter);
