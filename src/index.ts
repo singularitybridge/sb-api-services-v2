@@ -37,6 +37,7 @@ import { userRouter } from './routes/user.routes';
 import { inboxRouter } from './routes/inbox.routes';
 import { actionRouter } from './routes/action.routes';
 import { verificationRouter } from './routes/verification.routes';
+import { verifyToken } from './middleware/auth.middleware';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -58,13 +59,13 @@ app.use('/policy', policyRouter);
 app.use('/twilio/voice', twilioVoiceRouter);
 app.use('/twilio/messaging', twilioMessagingRouter);
 
-app.use('/tts', ttsRouter);
-app.use('/stt', sttRouter);
+app.use('/tts', verifyToken, ttsRouter);
+app.use('/stt', verifyToken, sttRouter);
 app.use('/session', sessionRouter);
 app.use('/agenda', agendaRouter);
-app.use('/assistant', assistantRouter);
+app.use('/assistant', verifyToken, assistantRouter);
 app.use('/company', companyRouter);
-app.use('/user', userRouter);
+app.use('/user', verifyToken, userRouter);
 app.use('/inbox', inboxRouter);
 app.use('/action', actionRouter);
 app.use('/api', verificationRouter);

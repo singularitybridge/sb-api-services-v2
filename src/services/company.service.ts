@@ -1,7 +1,9 @@
+import { database } from 'agenda/dist/agenda/database';
 import { Assistant } from '../models/Assistant';
-import { Company, ICompany, IApiKey } from '../models/Company';
+import { Token, Company, ICompany, IApiKey } from '../models/Company';
 import { createAssistant } from '../services/oai.assistant.service';
 import { encryptData, decryptData } from './encryption.service';
+import jwt from 'jsonwebtoken';
 
 const encryptCompanyData = (companyData: ICompany) => {
   companyData.api_keys.forEach((apiKey: IApiKey) => {
@@ -10,6 +12,13 @@ const encryptCompanyData = (companyData: ICompany) => {
     apiKey.iv = encryptedData.iv;
     apiKey.tag = encryptedData.tag;
   });
+
+  if (companyData.token?.value) {
+    const encryptedToken = encryptData(companyData.token.value);
+    companyData.token.value = encryptedToken.value;
+    companyData.token.iv = encryptedToken.iv;
+    companyData.token.tag = encryptedToken.tag;
+  }
 };
 
 const decryptCompanyData = (companyData: any) => {
@@ -23,11 +32,29 @@ const decryptCompanyData = (companyData: any) => {
       }),
     };
   });
+
+  if (companyData.token) {
+    companyData.token.value = decryptData({
+      value: companyData.token.value,
+      iv: companyData.token.iv || ' ',
+      tag: companyData.token.tag || ' ',
+    });
+  }
+};
+
+const generateToken = (companyId: string) => {
+  return jwt.sign({ companyId: companyId }, process.env.JWT_SECRET as string, {
+    expiresIn: '1d',
+  });
 };
 
 export const createCompany = async (companyData: ICompany) => {
   try {
+    const token = generateToken(companyData._id);
+    companyData.token = { value: token };
+
     encryptCompanyData(companyData);
+
     const company = new Company(companyData);
     await company.save();
 
@@ -100,7 +127,6 @@ export const getCompanies = async () => {
     const companies = await Company.find();
     return companies.map((company) => {
       const companyData = company.toObject();
-      // decryptCompanyData(companyData);
       return companyData;
     });
   } catch (error) {
@@ -115,6 +141,14 @@ export const updateCompany = async (id: string, data: ICompany) => {
     if (!company) {
       throw new Error('Company not found');
     }
+    console.log('data.token:  ' + data.token);
+
+    if (typeof data.token === 'string') {
+      data.token = { value: data.token || '' };
+    }
+
+    console.log('data.token.value:  ' + data.token?.value);
+
     encryptCompanyData(data);
     company.set(data);
     await company.save();
@@ -138,6 +172,32 @@ export const deleteCompany = async (id: string) => {
     return company;
   } catch (error) {
     console.error('Error deleting company:', error);
+    throw error;
+  }
+};
+
+export const refreshCompanyToken = async (id: string, data: ICompany) => {
+  try {
+    const company = await Company.findById(id);
+    if (!company) {
+      throw new Error('Company not found');
+    }
+
+    const newToken = generateToken(id);
+
+    if (data.token) {
+      data.token = { value: newToken };
+    }
+
+    const updatedCompanyData = (await updateCompany(
+      id,
+      data,
+    )) as unknown as ICompany;
+
+    console.log('new token generated');
+    return updatedCompanyData;
+  } catch (error) {
+    console.error('Error refreshing company token:', error);
     throw error;
   }
 };
