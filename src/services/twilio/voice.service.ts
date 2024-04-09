@@ -7,12 +7,18 @@ import { handleUserInput } from '../assistant.service';
 import { deleteThread, createNewThread } from '../oai.thread.service';
 import { transcribeAudioWhisper } from '../speech.recognition.service';
 import { getCurrentTimeAndDay } from '../context.service';
+import { Twilio } from 'twilio';
+import { ApiKey } from '../verification.service';
+
+export type TwilioKeys = {
+  accountSid: string;
+  authToken: string;
+};
 
 export const handleVoiceCallEnded = async (
   from: string,
   to: string,
 ): Promise<boolean> => {
-
   const assistant = await Assistant.findOne({ 'identifiers.value': to });
   const user = await User.findOne({ 'identifiers.value': from });
 
@@ -31,7 +37,6 @@ export const handleVoiceCallEnded = async (
   await session.save();
 
   console.log(`call ended, assistant: ${assistant.name}, user: ${user.name}`);
-
 
   return true;
 };
@@ -73,7 +78,9 @@ export const handleVoiceRequest = async (
 
   if (firstTime !== false) {
     const response = await handleUserInput(
-      `this is a conversation with ${user.name}, start with greeting the user. ${getCurrentTimeAndDay()}`,
+      `this is a conversation with ${
+        user.name
+      }, start with greeting the user. ${getCurrentTimeAndDay()}`,
       session.assistantId,
       session.threadId,
     );
@@ -143,4 +150,27 @@ export const handleVoiceRecordingRequest = async (
   twiml.play(audioResponse?.path);
   twiml.redirect('/twilio/voice?firstTime=false');
   return twiml.toString();
+};
+
+export const verifyTwilioKeys = async (keys: ApiKey): Promise<boolean> => {
+  try {
+    if (
+      typeof keys !== 'object' ||
+      !('accountSid' in keys) ||
+      !('authToken' in keys)
+    ) {
+      throw new Error('Invalid API key type for Twilio verification');
+    }
+
+    const tempTwilioClient = new Twilio(keys.accountSid, keys.authToken);
+
+    const account = await tempTwilioClient.api
+      .accounts(keys.accountSid)
+      .fetch();
+
+    return !!account;
+  } catch (error) {
+    console.error('Error verifying Twilio keys:', error);
+    return false;
+  }
 };

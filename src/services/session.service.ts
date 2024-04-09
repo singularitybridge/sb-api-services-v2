@@ -85,6 +85,8 @@ export const getSessionOrCreate = async (
       console.log('No assistantId provided, finding default assistant', {
         companyId,
       });
+      console.log("company id ------ "+companyId);
+      
       const defaultAssistant = await Assistant.findOne({ companyId });
       assistantId = defaultAssistant?._id;
     }

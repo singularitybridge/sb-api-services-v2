@@ -1,19 +1,52 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import { IIdentifier, IdentifierSchema } from './Assistant';
 
-export interface ICompany extends Document {
-    name: string;
-    description: string;
-    openai_api_key: string;
-    identifiers: IIdentifier[];
+export interface IApiKey {
+  key: string;
+  value: string;
+  iv?: string;
+  tag?: string;
 }
 
-const CompanySchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    description: { type: String },
-    openai_api_key: { type: String, required: true },
-    identifiers: { type: [IdentifierSchema], required: true },
+export interface Token {
+  value: string;
+  iv?: string;
+  tag?: string;
+}
+
+const ApiKeySchema = new Schema({
+  key: { type: String, required: true },
+  value: { type: String, required: true },
+  iv: { type: String, required: true },
+  tag: { type: String, required: true },
 });
 
-CompanySchema.index({ 'identifiers.type': 1, 'identifiers.value': 1 }, { unique: true });
+const TokenSchema = new Schema({
+  value: { type: String, required: true },
+  iv: { type: String, required: true },
+  tag: { type: String, required: true },
+});
+
+export interface ICompany extends Document {
+  [key: string]: any;
+  name: string;
+  description: string;
+  token?: Token;
+  api_keys: IApiKey[];
+  identifiers: IIdentifier[];
+}
+
+const CompanySchema = new Schema({
+  name: { type: String, required: true },
+  description: { type: String },
+  token: TokenSchema,
+  api_keys: [ApiKeySchema],
+  identifiers: { type: [IdentifierSchema], required: true },
+});
+
+CompanySchema.index(
+  { 'identifiers.type': 1, 'identifiers.value': 1 },
+  { unique: true },
+);
+
 export const Company = mongoose.model('Company', CompanySchema);

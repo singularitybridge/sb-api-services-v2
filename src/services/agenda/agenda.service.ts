@@ -3,7 +3,7 @@ import { handleVoiceRecordingRequest } from '../twilio/voice.service';
 import { ObjectId } from 'mongodb';
 
 const agendaClient = new Agenda({
-  db: { address: 'mongodb://127.0.0.1/agenda' },
+  db: { address: `${process.env.MONGODB_URI}/agenda` },
 });
 
 export const startAgenda = async () => {
