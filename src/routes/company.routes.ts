@@ -4,6 +4,8 @@ import {
   deleteCompany,
   getCompanies,
   getCompany,
+  getDecryptedCompany,
+  refreshCompanyToken,
   updateCompany,
 } from '../services/company.service';
 
@@ -22,6 +24,16 @@ companyRouter.get('/', async (req, res) => {
 
 companyRouter.get('/:id', async (req, res) => {
   const company = await getCompany(req.params.id);
+  res.json(company);
+});
+
+companyRouter.get('/decrypted/:id', async (req, res) => {
+  const company = await getDecryptedCompany(req.params.id);
+  res.json(company);
+});
+
+companyRouter.put('/refresh-token/:id', async (req, res) => {
+  const company = await refreshCompanyToken(req.params.id, req.body);
   res.json(company);
 });
 
