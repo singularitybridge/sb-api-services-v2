@@ -1,5 +1,5 @@
 # Use an official Node.js runtime as a parent image
-FROM node:18
+FROM node:18-slim
 
 # Update CA certificates
 RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
@@ -20,4 +20,4 @@ COPY . .
 EXPOSE 3000
 
 # Run the app when the container launches
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "start"]

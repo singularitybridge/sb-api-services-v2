@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import { startAgenda } from './services/agenda/agenda.service';
 
 mongoose
-  .connect(process.env.MONGODB_URI as string)
+  .connect(`${process.env.MONGODB_URI}/sb` as string)
   .then(() => {
     console.log('Successfully connected to MongoDB');
     startAgenda();
@@ -56,19 +56,19 @@ app.use('/policy', policyRouter);
 
 // app.use("/messaging", messagingRouter);
 
-app.use('/twilio/voice', twilioVoiceRouter);
-app.use('/twilio/messaging', twilioMessagingRouter);
+app.use('/twilio/voice',verifyToken, twilioVoiceRouter);
+app.use('/twilio/messaging',verifyToken, twilioMessagingRouter);
 
 app.use('/tts', verifyToken, ttsRouter);
 app.use('/stt', verifyToken, sttRouter);
-app.use('/session', sessionRouter);
-app.use('/agenda', agendaRouter);
-app.use('/assistant', assistantRouter);
+app.use('/session',verifyToken, sessionRouter);
+app.use('/agenda',verifyToken, agendaRouter);
+app.use('/assistant',verifyToken, assistantRouter);
 app.use('/company', companyRouter);
 app.use('/user', userRouter);
-app.use('/inbox', inboxRouter);
-app.use('/action', actionRouter);
-app.use('/api', verificationRouter);
+app.use('/inbox',verifyToken, inboxRouter);
+app.use('/action',verifyToken, actionRouter);
+app.use('/api',verifyToken, verificationRouter);
 
 app.get('/swagger.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
