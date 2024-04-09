@@ -7,7 +7,7 @@ export const verifyToken = (
   next: NextFunction,
 ) => {
   // Bypass token verification if the request is from admin UI's origin
-  if (req.get('origin') === 'http://localhost:5173') {
+  if (req.get('origin') === process.env.ADMIN_UI_URL) {
     return next();
   }
 
