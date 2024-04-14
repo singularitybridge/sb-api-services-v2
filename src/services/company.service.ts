@@ -43,9 +43,7 @@ const decryptCompanyData = (companyData: any) => {
 };
 
 const generateToken = (companyId: string) => {
-  return jwt.sign({ companyId: companyId }, process.env.JWT_SECRET as string, {
-    expiresIn: '1d',
-  });
+  return jwt.sign({ companyId: companyId }, process.env.JWT_SECRET as string);
 };
 
 export const createCompany = async (companyData: ICompany) => {
