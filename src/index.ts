@@ -38,6 +38,7 @@ import { inboxRouter } from './routes/inbox.routes';
 import { actionRouter } from './routes/action.routes';
 import { verificationRouter } from './routes/verification.routes';
 import { verifyToken } from './middleware/auth.middleware';
+import { googleAuthRouter } from './routes/googleAuth.routes'; 
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -69,6 +70,7 @@ app.use('/user', userRouter);
 app.use('/inbox',verifyToken, inboxRouter);
 app.use('/action',verifyToken, actionRouter);
 app.use('/api',verifyToken, verificationRouter);
+app.use('/auth/google', googleAuthRouter);
 
 app.get('/swagger.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
