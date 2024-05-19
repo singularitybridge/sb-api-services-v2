@@ -1,5 +1,5 @@
 import express from 'express';
-import { getSystemUsers, googleLogin } from '../services/googleAuth.service';
+import { googleLogin } from '../services/googleAuth.service';
 
 const systemUserRouter = express.Router();
 
@@ -11,9 +11,5 @@ systemUserRouter.post('/login', async (req, res) => {
 });
 
 
-systemUserRouter.get('/', async (req, res) => {
-  const companies = await getSystemUsers();
-  res.json(companies);
-});
-
 export { systemUserRouter as googleAuthRouter };
+
