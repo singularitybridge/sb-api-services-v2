@@ -3,7 +3,8 @@
 import { OAuth2Client } from 'google-auth-library';
 import { ISystemUser, SystemUser } from '../models/SystemUser';
 import jwt from 'jsonwebtoken';
-import { IUser } from '../models/User';
+import { IUser, User } from '../models/User';
+import { getDecryptedCompany } from './company.service';
 
 
 const JWT_SECRET: string = process.env.JWT_SECRET || '';
@@ -24,7 +25,7 @@ export const googleLogin = async (token: string) => {
             throw new Error('Invalid or incomplete ID token');
         }
 
-        let user:ISystemUser = await SystemUser.findOne({ googleId: payload['sub'] }) as ISystemUser;
+        let user: IUser = await User.findOne({ googleId: payload['sub'] }) as IUser;
 
         if (user) {
             user.name = payload['name'];
@@ -32,19 +33,35 @@ export const googleLogin = async (token: string) => {
 
         } else {
             // user does not yet exist - create a new user
-            user = new SystemUser({
+            const isAdmin = ['rivka@singularitybridge.net', 'avi@singularitybridge.net'].includes(payload['email']);
+            const role = isAdmin ? 'Admin' : 'CompanyClient';
+
+            user = new User({
                 name: payload['name'],
                 email: payload['email'],
                 googleId: payload['sub'],
-                companyId: '6641c8d2f0f26fd221e916b5' // temporary companyId of default company
+                role: role,
+                companyId: '6641c8d2f0f26fd221e916b5', // temporary companyId of default company
+                identifiers: [{ key: 'email', value: payload['email'] }],
             });
         }
         await user.save();
-        const sessionToken = jwt.sign(
-            { userId: user._id, email: user.email, companyId: user.companyId },
-            JWT_SECRET,
-            { expiresIn: '1d' } // expires in 1 day
-        );
+
+        // Retrieve the company data
+        const companyId = user.companyId;
+        const companyData = await getDecryptedCompany(companyId);
+
+        if (!companyData.token || !companyData.token.value) {
+            throw new Error('Company token not found');
+        }
+
+        const sessionToken = companyData.token.value;
+
+        // const sessionToken = jwt.sign(
+        //     { userId: user._id, email: user.email, companyId: user.companyId },
+        //     JWT_SECRET,
+        //     { expiresIn: '1d' } // expires in 1 day
+        // );
 
         return { user, sessionToken };
     } catch (error) {
@@ -52,17 +69,3 @@ export const googleLogin = async (token: string) => {
         throw error;
     }
 }
-
-
-export const getSystemUsers = async () => {
-    try {
-        const systemUsers = await SystemUser.find();
-        return systemUsers.map((systemUser) => {
-            const systemUserData = systemUser.toObject();
-            return systemUserData;
-        });
-    } catch (error) {
-        console.error('Error retrieving system users:', error);
-        throw error;
-    }
-};
