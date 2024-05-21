@@ -8,8 +8,6 @@ export const verifyToken = (
 ) => {
   // Bypass token verification if the request is from admin UI's origin
   if (req.get('origin') === process.env.ADMIN_UI_URL) {
-    console.log(' in auth middleware');
-
     return next();
   }
 
