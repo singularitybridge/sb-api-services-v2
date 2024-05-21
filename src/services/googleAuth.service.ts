@@ -66,3 +66,12 @@ export const googleLogin = async (token: string) => {
         throw error;
     }
 }
+
+
+export const verifyBetaKey = async (betaKey: string) => {
+    if (betaKey === process.env.BETA_INVITE_KEY) {
+      return true;
+    } else {
+      return false;
+    }
+  };

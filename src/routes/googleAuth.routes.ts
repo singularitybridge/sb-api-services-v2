@@ -1,15 +1,27 @@
+// File: routes/googleAuth.routes.ts
 import express from 'express';
-import { googleLogin } from '../services/googleAuth.service';
+import { googleLogin, verifyBetaKey } from '../services/googleAuth.service';
 
-const systemUserRouter = express.Router();
+const googleAuthRouter = express.Router();
 
-
-systemUserRouter.post('/login', async (req, res) => {
-  console.log('called company router');
-  const { user, sessionToken } = await googleLogin(req.body.token);
-  res.json({ user, sessionToken });
+googleAuthRouter.post('/google/login', async (req, res) => {
+  console.log('called google login route');
+  try {
+    const { user, sessionToken } = await googleLogin(req.body.token);
+    res.json({ user, sessionToken });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to login with Google' });
+  }
 });
 
+googleAuthRouter.post('/beta-key', async (req, res) => {
+  const { betaKey } = req.body;
+  try {
+    const isValid = await verifyBetaKey(betaKey);
+    res.json({ isValid });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to verify beta key' });
+  }
+});
 
-export { systemUserRouter as googleAuthRouter };
-
+export { googleAuthRouter };
