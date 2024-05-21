@@ -70,7 +70,7 @@ app.use('/user', userRouter);
 app.use('/inbox',verifyToken, inboxRouter);
 app.use('/action',verifyToken, actionRouter);
 app.use('/api',verifyToken, verificationRouter);
-app.use('/auth/google', googleAuthRouter);
+app.use('/auth', googleAuthRouter);
 
 app.get('/swagger.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
