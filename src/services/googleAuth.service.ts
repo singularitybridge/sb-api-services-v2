@@ -1,8 +1,6 @@
 // File: services/googleAuth.service.ts
 
 import { OAuth2Client } from 'google-auth-library';
-import { ISystemUser, SystemUser } from '../models/SystemUser';
-import jwt from 'jsonwebtoken';
 import { IUser, User } from '../models/User';
 import { getDecryptedCompany } from './company.service';
 
@@ -34,7 +32,7 @@ export const googleLogin = async (token: string) => {
         } else {
             // user does not yet exist - create a new user
             const isAdmin = ['rivka@singularitybridge.net', 'avi@singularitybridge.net'].includes(payload['email']);
-            const role = isAdmin ? 'Admin' : 'CompanyClient';
+            const role = isAdmin ? 'Admin' : 'CompanyUser';
 
             user = new User({
                 name: payload['name'],
@@ -55,12 +53,11 @@ export const googleLogin = async (token: string) => {
             throw new Error('Company token not found');
         }
 
-        const sessionToken = companyData.token.value;
-
+        const sessionToken = companyData.token.value; // temporaryily return company token as session token
         // const sessionToken = jwt.sign(
         //     { userId: user._id, email: user.email, companyId: user.companyId },
         //     JWT_SECRET,
-        //     { expiresIn: '1d' } // expires in 1 day
+        //     { expiresIn: '1d' }
         // );
 
         return { user, sessionToken };
