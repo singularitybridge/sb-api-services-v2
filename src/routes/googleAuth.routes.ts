@@ -7,8 +7,8 @@ const googleAuthRouter = express.Router();
 googleAuthRouter.post('/google/login', async (req, res) => {
   console.log('called google login route');
   try {
-    const { user, sessionToken } = await googleLogin(req.body.token);
-    res.json({ user, sessionToken });
+    const { user, sessionToken, isNewUser } = await googleLogin(req.body.token);
+    res.json({ user, sessionToken, isNewUser });
   } catch (error) {
     res.status(500).json({ error: 'Failed to login with Google' });
   }
