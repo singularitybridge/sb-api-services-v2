@@ -70,13 +70,14 @@ export const createCompany = async (companyData: ICompany) => {
     const newAssistant = new Assistant(defaultAssistantData);
     await newAssistant.save();
 
+    
     const openAIAssistant = await createAssistant(
       defaultAssistantData.name,
       defaultAssistantData.description,
       defaultAssistantData.llmModel,
       defaultAssistantData.llmPrompt,
     );
-
+    
     newAssistant.assistantId = openAIAssistant.id;
     await newAssistant.save();
 
