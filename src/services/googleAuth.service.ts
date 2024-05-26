@@ -108,19 +108,6 @@ export const googleLogin = async (token: string) => {
         let user: IUser = await User.findOne({ googleId: payload['sub'] }) as IUser;
 
         if (!user) {
-            // // user does not yet exist - create a new user
-            // const isAdmin = ['rivka@singularitybridge.net', 'avi@singularitybridge.net'].includes(payload['email']);
-            // const role = isAdmin ? 'Admin' : 'CompanyUser';
-
-            // user = new User({
-            //     name: payload['name'],
-            //     email: payload['email'],
-            //     googleId: payload['sub'],
-            //     role: role,
-            //     companyId: '661555f261a3f67e9c09ec8a', // temporary companyId of default company
-            //     identifiers: [{ key: 'email', value: payload['email'] }],
-            // });
-            
             isNewUser = true;
             return {user, String, isNewUser}
         }
