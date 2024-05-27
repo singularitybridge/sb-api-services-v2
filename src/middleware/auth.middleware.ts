@@ -1,3 +1,4 @@
+// file path: /src/middleware/auth.middleware.ts
 import jwt, { VerifyErrors } from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 
