@@ -46,7 +46,7 @@ const generateToken = (companyId: string) => {
   return jwt.sign({ companyId: companyId }, process.env.JWT_SECRET as string);
 };
 
-export const createCompany = async (companyData: ICompany) => {
+export const createCompany = async (apiKey: string, companyData: ICompany) => {
   try {
     const token = generateToken(companyData._id);
     companyData.token = { value: token };
@@ -70,14 +70,15 @@ export const createCompany = async (companyData: ICompany) => {
     const newAssistant = new Assistant(defaultAssistantData);
     await newAssistant.save();
 
-    
+
     const openAIAssistant = await createAssistant(
+      apiKey,
       defaultAssistantData.name,
       defaultAssistantData.description,
       defaultAssistantData.llmModel,
       defaultAssistantData.llmPrompt,
     );
-    
+
     newAssistant.assistantId = openAIAssistant.id;
     await newAssistant.save();
 

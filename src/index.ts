@@ -13,7 +13,6 @@ mongoose
   .catch((error) => console.error('Connection error', error));
 
 import express from 'express';
-import { RegisterRoutes } from './routes/routes';
 import {
   generateAuthUrl,
   initGoogleCalendar,
@@ -38,7 +37,7 @@ import { inboxRouter } from './routes/inbox.routes';
 import { actionRouter } from './routes/action.routes';
 import { verificationRouter } from './routes/verification.routes';
 import { verifyToken } from './middleware/auth.middleware';
-import { googleAuthRouter } from './routes/googleAuth.routes'; 
+import { googleAuthRouter } from './routes/googleAuth.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -50,26 +49,24 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cors());
 
-RegisterRoutes(app);
-
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.use('/policy', policyRouter);
 
 // app.use("/messaging", messagingRouter);
 
-app.use('/twilio/voice',verifyToken, twilioVoiceRouter);
-app.use('/twilio/messaging',verifyToken, twilioMessagingRouter);
+app.use('/twilio/voice', verifyToken, twilioVoiceRouter);
+app.use('/twilio/messaging', verifyToken, twilioMessagingRouter);
 
 app.use('/tts', verifyToken, ttsRouter);
 app.use('/stt', verifyToken, sttRouter);
-app.use('/session',verifyToken, sessionRouter);
-app.use('/agenda',verifyToken, agendaRouter);
-app.use('/assistant',verifyToken, assistantRouter);
+app.use('/session', verifyToken, sessionRouter);
+app.use('/agenda', verifyToken, agendaRouter);
+app.use('/assistant', verifyToken, assistantRouter);
 app.use('/company', companyRouter);
 app.use('/user', userRouter);
-app.use('/inbox',verifyToken, inboxRouter);
-app.use('/action',verifyToken, actionRouter);
-app.use('/api',verifyToken, verificationRouter);
+app.use('/inbox', verifyToken, inboxRouter);
+app.use('/action', verifyToken, actionRouter);
+app.use('/api', verifyToken, verificationRouter);
 app.use('/auth', googleAuthRouter);
 
 app.get('/swagger.json', (req, res) => {
