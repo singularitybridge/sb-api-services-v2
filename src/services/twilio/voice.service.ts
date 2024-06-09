@@ -9,6 +9,7 @@ import { transcribeAudioWhisper } from '../speech.recognition.service';
 import { getCurrentTimeAndDay } from '../context.service';
 import { Twilio } from 'twilio';
 import { ApiKey } from '../verification.service';
+import Api from 'twilio/lib/rest/Api';
 
 export type TwilioKeys = {
   accountSid: string;
@@ -16,6 +17,7 @@ export type TwilioKeys = {
 };
 
 export const handleVoiceCallEnded = async (
+  apiKey: string,
   from: string,
   to: string,
 ): Promise<boolean> => {
@@ -32,7 +34,7 @@ export const handleVoiceCallEnded = async (
 
   if (!session) return false;
 
-  deleteThread(session.threadId);
+  deleteThread(apiKey, session.threadId);
   session.active = false;
   await session.save();
 
@@ -42,6 +44,7 @@ export const handleVoiceCallEnded = async (
 };
 
 export const handleVoiceRequest = async (
+  apiKey: string,
   firstTime: boolean,
   callStatus: 'ringing' | 'in-progress' | 'completed',
   from: string,
@@ -65,7 +68,7 @@ export const handleVoiceRequest = async (
   });
 
   if (!session) {
-    const threadId = await createNewThread();
+    const threadId = await createNewThread(apiKey);
 
     session = new Session({
       threadId: threadId,
@@ -78,6 +81,7 @@ export const handleVoiceRequest = async (
 
   if (firstTime !== false) {
     const response = await handleUserInput(
+      apiKey,
       `this is a conversation with ${
         user.name
       }, start with greeting the user. ${getCurrentTimeAndDay()}`,
@@ -107,6 +111,7 @@ export const handleVoiceRequest = async (
 };
 
 export const handleVoiceRecordingRequest = async (
+  apiKey: string,
   from: string,
   to: string,
   recordingUrl: string,
@@ -139,6 +144,7 @@ export const handleVoiceRecordingRequest = async (
   }
 
   const response = await handleUserInput(
+    apiKey,
     SpeechResult,
     session.assistantId,
     session.threadId,

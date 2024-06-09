@@ -14,31 +14,36 @@ const assistantRouter = express.Router();
 
 assistantRouter.get('/thread/:id/messages', async (req, res) => {
   const { id } = req.params;
-  const messages = await getMessages(id);
+  const apiKey = req.headers['openai-api-key'] as string;
+  const messages = await getMessages(apiKey, id);
   res.send(messages);
 });
 
 assistantRouter.post('/thread', async (req, res) => {  
-  const newThread = await createNewThread();
+  const apiKey = req.headers['openai-api-key'] as string;
+  const newThread = await createNewThread(apiKey);
   res.send(newThread);
 });
 
 assistantRouter.delete('/thread/:id', async (req, res) => {
   const { id } = req.params;
-  await deleteThread(id);
+  const apiKey = req.headers['openai-api-key'] as string;
+  await deleteThread(apiKey, id);
   res.send({ message: 'Thread deleted successfully' });
 });
 
 assistantRouter.post('/user-input', async (req, res) => {
   const { userInput, companyId, userId } = req.body;
-  const response = await handleSessionMessage(userInput, companyId, userId);
+  const apiKey = req.headers['openai-api-key'] as string;
+  const response = await handleSessionMessage(apiKey, userInput, companyId, userId);
   res.send(response);
 });
 
 assistantRouter.post('/user-input/thread', async (req, res) => {
   
   const { userInput, assistantId, threadId } = req.body;
-  const response = await handleUserInput(userInput, assistantId, threadId);
+  const apiKey = req.headers['openai-api-key'] as string;
+  const response = await handleUserInput(apiKey , userInput, assistantId, threadId);
   res.send(response);
 });
 
@@ -61,6 +66,7 @@ assistantRouter.get('/:id', async (req, res) => {
 assistantRouter.put('/:id', async (req, res) => {
   const { id } = req.params;
   const assistantData = req.body;
+  const apiKey = req.headers['openai-api-key'] as string;
 
   const assistant = await Assistant.findByIdAndUpdate(id, assistantData, {
     new: true,
@@ -68,6 +74,7 @@ assistantRouter.put('/:id', async (req, res) => {
   });
 
   await updateAssistantById(
+    apiKey,
     assistant.assistantId,
     assistant.name,
     assistant.description,
@@ -81,11 +88,13 @@ assistantRouter.put('/:id', async (req, res) => {
 assistantRouter.post('/', async (req, res) => {
   const assistantData = req.body;
   const newAssistant = new Assistant(assistantData);
+  const apiKey = req.headers['openai-api-key'] as string;
 
   try {
     await newAssistant.save();
 
     const openAIAssistant = await createAssistant(
+      apiKey,
       assistantData.name,
       assistantData.description,
       assistantData.llmModel,
@@ -113,13 +122,15 @@ assistantRouter.post('/', async (req, res) => {
 
 assistantRouter.delete('/:id', async (req, res) => {
   const { id } = req.params;
+  const apiKey = req.headers['openai-api-key'] as string;
+
   const assistant = await Assistant.findById(id);
   if (!assistant) {
     return res.status(404).send({ message: 'Assistant not found' });
   }
 
   // Delete the assistant from OpenAI
-  const deleted = await deleteAssistantById(assistant.assistantId);
+  const deleted = await deleteAssistantById(apiKey, assistant.assistantId);
   if (!deleted) {
     return res.status(500).send({ message: 'Failed to delete assistant from OpenAI' });
   }
