@@ -6,12 +6,17 @@ export const createNewThread = async (apiKey:string): Promise<string> => {
   return thread.id;
 };
 
-export const deleteThread = async (apiKey:string, threadId: string): Promise<void> => {
+export const deleteThread = async (apiKey: string, threadId: string): Promise<void> => {
   try {
     const openaiClient = getOpenAIClient(apiKey);
     await openaiClient.beta.threads.del(threadId);
-  } catch (error) {
-    console.log('Thread not found');
+    console.log(`Thread ${threadId} deleted successfully.`);
+  } catch (error: any) {
+    if (error.response && error.response.status === 404) {
+      console.error('Thread not found');
+    } else {
+      console.error('An error occurred while deleting the thread:', error.message);
+    }
   }
 };
 
