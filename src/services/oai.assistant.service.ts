@@ -56,7 +56,7 @@ export const createAssistant = async (
     description,
     instructions,
     model,
-    tools: [{ type: 'retrieval' }],
+    tools: [{ type: 'file_search' }],
   });
   return assistant;
 };

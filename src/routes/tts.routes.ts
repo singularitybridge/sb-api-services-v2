@@ -25,8 +25,11 @@ router.post('/generate/google', async (req, res) => {
 });
 
 router.post('/generate/oai', async (req, res) => {
+
   const { text, voice } = req.body;
-  const fileInfo = await generateSpeech(text, voice);
+  const apiKey = req.headers['openai-api-key'] as string;
+
+  const fileInfo = await generateSpeech(apiKey, text, voice);
   res.send(fileInfo);
 });
 
