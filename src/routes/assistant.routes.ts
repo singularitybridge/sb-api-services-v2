@@ -123,10 +123,11 @@ assistantRouter.post('/', async (req, res) => {
 assistantRouter.delete('/:id', async (req, res) => {
   const { id } = req.params;
   const apiKey = req.headers['openai-api-key'] as string;
-
+  console.log("assistant id ------ "+id);
+  
   const assistant = await Assistant.findById(id);
   if (!assistant) {
-    return res.status(404).send({ message: 'Assistant not found' });
+    return res.status(404).send({ message: 'Assistant not found ---- ' });
   }
 
   // Delete the assistant from OpenAI
