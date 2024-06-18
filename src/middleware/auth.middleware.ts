@@ -11,10 +11,10 @@ export const verifyToken = async (
 ) => {
 
   // if origin is the UI, set the token to the admin token
-  if (req.get('origin') === process.env.ADMIN_UI_URL) {
-    console.log('Setting token to admin token');
-    req.headers.authorization = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb21wYW55SWQiOiI2NjE1NTVmMjYxYTNmNjdlOWMwOWVjOGEiLCJpYXQiOjE3MTcwNzM5MDN9.CPcoAyAlynh26P45M62XpRphkirkqrpR--brlar9tck';
-  }
+  // if (req.get('origin') === process.env.ADMIN_UI_URL) {
+  //   console.log('Setting token to admin token');
+  //   req.headers.authorization = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb21wYW55SWQiOiI2NjE1NTVmMjYxYTNmNjdlOWMwOWVjOGEiLCJpYXQiOjE3MTcwNzM5MDN9.CPcoAyAlynh26P45M62XpRphkirkqrpR--brlar9tck';
+  // }
 
   const authHeader = req.headers.authorization;
   console.log('Auth Header:  ' + authHeader);
