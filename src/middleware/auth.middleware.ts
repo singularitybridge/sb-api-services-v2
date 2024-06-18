@@ -13,9 +13,8 @@ export const verifyToken = async (
   // if origin is the UI, set the token to the admin token
   if (req.get('origin') === process.env.ADMIN_UI_URL) {
     console.log('Setting token to admin token');
-      req.headers.authorization = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb21wYW55SWQiOiI2NjE1NTVmMjYxYTNmNjdlOWMwOWVjOGEiLCJpYXQiOjE3MTcwNzM5MDN9.CPcoAyAlynh26P45M62XpRphkirkqrpR--brlar9tck';
+    req.headers.authorization = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb21wYW55SWQiOiI2NjE1NTVmMjYxYTNmNjdlOWMwOWVjOGEiLCJpYXQiOjE3MTcwNzM5MDN9.CPcoAyAlynh26P45M62XpRphkirkqrpR--brlar9tck';
   }
-
 
   const authHeader = req.headers.authorization;
   console.log('Auth Header:  ' + authHeader);
@@ -48,7 +47,7 @@ export const verifyToken = async (
     } catch (err) {
       console.log('Error verifying token:', err);
 
-      return res.status(403).json({ message: 'Token is not valid' });
+      return res. status(403).json({ message: 'Token is not valid' });
     }
   } else {
     console.log('No auth header found');
