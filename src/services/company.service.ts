@@ -43,22 +43,32 @@ const decryptCompanyData = (companyData: any) => {
 };
 
 const generateToken = (companyId: string) => {
-  console.log( 'generateToken:  ' + companyId);
+  console.log('generateToken:  ' + companyId);
 
   return jwt.sign({ companyId: companyId }, process.env.JWT_SECRET as string);
 };
 
 export const createCompany = async (apiKey: string, companyData: ICompany) => {
   try {
-    const token = generateToken(companyData._id);
+    let token = generateToken(companyData._id);
     companyData.token = { value: token };
     console.log('companyData.token:  ' + companyData.token.value);
-    
+
 
     encryptCompanyData(companyData);
 
     const company = new Company(companyData);
     await company.save();
+
+    const tempCompany: ICompany = company.toObject();
+    token = generateToken(company._id.toString());
+    //
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET as string) as { companyId: string };
+    console.log('decoded Token after creation:', decodedToken);
+
+    decryptCompanyData(tempCompany);
+    tempCompany.token = { value: token };
+    const updatedCompany = await updateCompany(company._id.toString(), tempCompany);
 
     const defaultAssistantData = {
       companyId: company._id,
@@ -86,10 +96,7 @@ export const createCompany = async (apiKey: string, companyData: ICompany) => {
     newAssistant.assistantId = openAIAssistant.id;
     await newAssistant.save();
 
-    const updatedCompanyData = company.toObject();
-    decryptCompanyData(updatedCompanyData);
-
-    return updatedCompanyData;
+    return updatedCompany;
   } catch (error) {
     console.error('Error creating company:', error);
     throw error;
@@ -145,13 +152,13 @@ export const updateCompany = async (id: string, data: ICompany) => {
     if (!company) {
       throw new Error('Company not found');
     }
-    console.log('data.token:  ' + data.token);
+    console.log('Company.Service ---------data.token:  ' + data.token);
 
     if (typeof data.token === 'string') {
       data.token = { value: data.token || '' };
     }
 
-    console.log('data.token.value:  ' + data.token?.value);
+    console.log('Auth.Middleware --------- data.token.value:  ' + data.token?.value);
 
     encryptCompanyData(data);
     company.set(data);

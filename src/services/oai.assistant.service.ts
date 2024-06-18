@@ -50,6 +50,8 @@ export const createAssistant = async (
   model: string,
   instructions: string,
 ) => {
+  console.log('Creating assistant');
+  
   const openaiClient = getOpenAIClient(apiKey);
   const assistant = await openaiClient.beta.assistants.create({
     name,
