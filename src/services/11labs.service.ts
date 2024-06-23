@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { saveToFile } from '../utils/file.upload.util';
+import { ApiKey } from './verification.service';
 
 export const generatedFilesBaseURL = 'https://sb-api.ngrok.app/tts/files';
 
@@ -27,7 +28,7 @@ export const generateAudio = async (
       data,
       {
         headers: {
-          'xi-api-key': '55a34e51010dc1f6ab29485805ef67eb',
+          'xi-api-key': process.env.NOTION_API_KEY,
           'Content-Type': 'application/json',
           Accept: 'audio/mpeg',
         },
@@ -38,5 +39,22 @@ export const generateAudio = async (
     return saveToFile(response.data as Buffer);
   } catch (error) {
     console.error(error);
+  }
+};
+
+export const verify11LabsKey = async (apiKey: ApiKey) => {
+  try {
+    if (typeof apiKey !== 'string') {
+      throw new Error('Invalid API key type for 11labs verification');
+    }
+    const response = await axios.get('https://api.elevenlabs.io/v1/voices', {
+      headers: {
+        'xi-api-key': apiKey,
+      },
+    });
+
+    return response.status === 200;
+  } catch (error) {
+    return false;
   }
 };

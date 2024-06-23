@@ -3,7 +3,7 @@ import { handleVoiceRecordingRequest } from '../twilio/voice.service';
 import { ObjectId } from 'mongodb';
 
 const agendaClient = new Agenda({
-  db: { address: 'mongodb://127.0.0.1/agenda' },
+  db: { address: `${process.env.MONGODB_URI}/agenda` },
 });
 
 export const startAgenda = async () => {
@@ -51,7 +51,8 @@ agendaClient.define('processVoiceRecording', async (job: Job, done) => {
   try {
     console.log('job started', job.attrs._id, job.attrs.data);
     const { CallStatus, From, To, RecordingUrl } = job.attrs.data;
-    const response = await handleVoiceRecordingRequest(From, To, RecordingUrl);
+    // add handling for api key
+    const response = await handleVoiceRecordingRequest('api-key', From, To, RecordingUrl);
     job.attrs.data.result = response;
     await job.save();
     done(); 

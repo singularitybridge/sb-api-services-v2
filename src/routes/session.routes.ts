@@ -34,7 +34,9 @@ sessionRouter.put('/:id', async (req, res) => {
 sessionRouter.post('/', async (req, res) => {
   try {
     const { userId, companyId, assistantId } = req.body;
-    const session = await getSessionOrCreate(userId, companyId, assistantId);
+    // const apiKey = req.headers['openai-api-key'] as string;
+    const apiKey = process.env.OPENAI_API_KEY as string;
+    const session = await getSessionOrCreate(apiKey, userId, companyId, assistantId);
     res.status(200).json(session);
   } catch (error) {
     console.log(error);
@@ -44,8 +46,10 @@ sessionRouter.post('/', async (req, res) => {
 
 sessionRouter.delete('/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
+  const apiKey = req.headers['openai-api-key'] as string;
+
   try {
-    await endSession(id);
+    await endSession(apiKey, id);
     res.status(200).send({ message: 'Session ended successfully' });
   } catch (error) {
     res.status(500).send({ error: 'Error ending session' });
@@ -56,8 +60,10 @@ sessionRouter.delete(
   '/end/:companyId/:userId',
   async (req: Request, res: Response) => {
     const { companyId, userId } = req.params;
+    const apiKey = req.headers['openai-api-key'] as string;
+
     try {
-      await endSessionByCompanyAndUserId(companyId, userId);
+      await endSessionByCompanyAndUserId(apiKey, companyId, userId);
       res.status(200).send({ message: 'Session ended successfully' });
     } catch (error) {
       res.status(500).send({ error: 'Error ending session' });
@@ -152,8 +158,10 @@ sessionRouter.get('/:id', async (req: Request, res: Response) => {
 
 sessionRouter.get('/:id/messages', async (req: Request, res: Response) => {
   const { id } = req.params;
+  const apiKey = req.headers['openai-api-key'] as string;
+
   try {
-    const messages = await getSessionMessages(id);
+    const messages = await getSessionMessages(apiKey, id);
     res.status(200).send({ messages });
   } catch (error) {
     res.status(500).send({ error: 'Error getting session messages' });
@@ -164,8 +172,11 @@ sessionRouter.get(
   '/messages/:companyId/:userId',
   async (req: Request, res: Response) => {
     const { companyId, userId } = req.params;
+    const apiKey = req.headers['openai-api-key'] as string;
+
     try {
       const messages = await getSessionMessagesByCompanyAndUserId(
+        apiKey,
         companyId,
         userId,
       );
