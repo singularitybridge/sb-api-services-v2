@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import { startAgenda } from './services/agenda/agenda.service';
 
 mongoose
-  .connect(process.env.MONGODB_URI as string)
+  .connect(`${process.env.MONGODB_URI}/sb` as string)
   .then(() => {
     console.log('Successfully connected to MongoDB');
     startAgenda();
@@ -13,7 +13,6 @@ mongoose
   .catch((error) => console.error('Connection error', error));
 
 import express from 'express';
-import { RegisterRoutes } from './routes/routes';
 import {
   generateAuthUrl,
   initGoogleCalendar,
@@ -30,13 +29,16 @@ import sttRouter from './routes/stt.routes'; // Import the missing sttRouter mod
 import { twilioVoiceRouter } from './routes/omni_channel/omni.twilio.voice.routes';
 import { messagingRouter } from './routes/omni_channel/omni.wa.routes';
 import { agendaRouter } from './routes/agenda.routes';
-import {assistantRouter} from './routes/assistant.routes';
+import { assistantRouter } from './routes/assistant.routes';
 import { sessionRouter } from './routes/session.routes';
 import { companyRouter } from './routes/company.routes';
 import { userRouter } from './routes/user.routes';
 import { inboxRouter } from './routes/inbox.routes';
 import { actionRouter } from './routes/action.routes';
-
+import { verificationRouter } from './routes/verification.routes';
+import { verifyToken } from './middleware/auth.middleware';
+import { googleAuthRouter } from './routes/googleAuth.routes';
+import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -48,25 +50,25 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cors());
 
-RegisterRoutes(app);
-
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.use('/policy', policyRouter);
 
 // app.use("/messaging", messagingRouter);
 
-app.use('/twilio/voice', twilioVoiceRouter);
-app.use('/messaging', messagingRouter);
+app.use('/twilio/voice', verifyToken, twilioVoiceRouter);
+app.use('/twilio/messaging', verifyToken, twilioMessagingRouter);
 
-app.use('/tts', ttsRouter);
-app.use('/stt', sttRouter);
-app.use('/session', sessionRouter);
-app.use('/agenda', agendaRouter);
-app.use('/assistant', assistantRouter);
+app.use('/tts', verifyToken, ttsRouter);
+app.use('/stt', verifyToken, sttRouter);
+app.use('/session', verifyToken, sessionRouter);
+app.use('/agenda', verifyToken, agendaRouter);
+app.use('/assistant', verifyToken, assistantRouter);
 app.use('/company', companyRouter);
 app.use('/user', userRouter);
-app.use('/inbox', inboxRouter);
-app.use('/action', actionRouter);
+app.use('/inbox', verifyToken, inboxRouter);
+app.use('/action', verifyToken, actionRouter);
+app.use('/api', verifyToken, verificationRouter);
+app.use('/auth', googleAuthRouter);
 
 app.get('/swagger.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');

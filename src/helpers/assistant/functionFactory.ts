@@ -1,7 +1,8 @@
+import OpenAI from 'openai';
 import { IEventRequestBody } from '../../Interfaces/eventRequest.interface';
 import { CalendarController } from '../../controllers/calendar.controller';
 import { Assistant } from '../../models/Assistant';
-import { openaiClient } from '../../services/assistant.service';
+import { getOpenAIClient } from '../../services/assistant.service';
 import { addMessageToInbox } from '../../services/inbox.service';
 import { publishMessage } from '../../services/pusher.service';
 
@@ -136,6 +137,7 @@ export const executeFunctionCall = async (call: any) => {
 };
 
 export const submitToolOutputs = async (
+  openaiClient: OpenAI,
   threadId: string,
   runId: string,
   toolCalls: any[],
@@ -153,7 +155,6 @@ export const submitToolOutputs = async (
   );
 
   console.log('tool outputs: ', outputs);
-
   await openaiClient.beta.threads.runs.submitToolOutputs(threadId, runId, {
     tool_outputs: outputs,
   });
