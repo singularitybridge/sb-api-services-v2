@@ -26,8 +26,8 @@ import policyRouter from './routes/policy.routes';
 import ttsRouter from './routes/tts.routes'; // Import the missing ttsRouter module
 import sttRouter from './routes/stt.routes'; // Import the missing sttRouter module
 
-import { twilioVoiceRouter } from './routes/twilio/voice.routes';
-import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
+import { twilioVoiceRouter } from './routes/omni_channel/omni.twilio.voice.routes';
+import { messagingRouter } from './routes/omni_channel/omni.wa.routes';
 import { agendaRouter } from './routes/agenda.routes';
 import { assistantRouter } from './routes/assistant.routes';
 import { sessionRouter } from './routes/session.routes';
@@ -38,6 +38,7 @@ import { actionRouter } from './routes/action.routes';
 import { verificationRouter } from './routes/verification.routes';
 import { verifyToken } from './middleware/auth.middleware';
 import { googleAuthRouter } from './routes/googleAuth.routes';
+import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
