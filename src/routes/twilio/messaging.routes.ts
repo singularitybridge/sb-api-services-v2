@@ -38,6 +38,7 @@ twilioMessagingRouter.post("/whatsapp/reply", async (req, res) => {
 
   const assistant = await Assistant.findOne({ "identifiers.value": To });
   const user = await User.findOne({ "identifiers.value": From });
+  const apiKey = req.headers['openai-api-key'] as string;
 
   if (!assistant || !user) {
     console.log(`Voice Call >> Assistant not found for To: ${To}`);
@@ -51,7 +52,7 @@ twilioMessagingRouter.post("/whatsapp/reply", async (req, res) => {
   });
 
   if (!session) {
-    const threadId = await createNewThread();
+    const threadId = await createNewThread(apiKey);
 
     session = new Session({
       threadId: threadId,
@@ -69,6 +70,7 @@ twilioMessagingRouter.post("/whatsapp/reply", async (req, res) => {
   console.log(req.body);
 
   const response = await handleUserInput(
+    apiKey,
     Body,
     session.assistantId,
     session.threadId

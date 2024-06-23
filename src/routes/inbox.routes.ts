@@ -23,6 +23,7 @@ inboxRouter.post('/reply/:sessionId', async (req, res) => {
 
   const { message } = req.body;
   const { sessionId } = req.params;
+  const apiKey = req.headers['openai-api-key'] as string;
 
 
   // step 1 - add a message (human response ) to the inbox
@@ -44,6 +45,7 @@ inboxRouter.post('/reply/:sessionId', async (req, res) => {
 
   const responseTemplate = `[human-agent-response]: ${message}. [system]: rephrase/format this resposne to match the conversation context and send it to the user.`;
   const llmResponse = await handleSessionMessage(
+    apiKey,
     responseTemplate,
     session.companyId,
     session.userId,

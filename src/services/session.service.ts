@@ -66,6 +66,7 @@ export const updateSessionAssistant = async (
 };
 
 export const getSessionOrCreate = async (
+  apiKey: string,
   userId: string,
   companyId: string,
   assistantId?: string, // Made optional
@@ -78,7 +79,7 @@ export const getSessionOrCreate = async (
       await session.save();
     }
   } else {
-    const threadId = await createNewThread();
+    const threadId = await createNewThread(apiKey);
 
     // If assistantId is not provided, find a default assistant for the company
     if (!assistantId) {

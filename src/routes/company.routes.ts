@@ -1,3 +1,4 @@
+// file path: /src/routes/company.routes.ts
 import express from 'express';
 import {
   createCompany,
@@ -12,8 +13,11 @@ import {
 const companyRouter = express.Router();
 
 companyRouter.post('/', async (req, res) => {
-  console.log('called company router');
-  const company = await createCompany(req.body);
+  // const apiKey = req.headers['openai-api-key'] as string;
+  const apiKey = process.env.OPENAI_API_KEY as string;
+  console.log('POST LOG ____ API Key:', apiKey);
+
+  const company = await createCompany(apiKey, req.body);
   res.json(company);
 });
 
