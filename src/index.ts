@@ -13,7 +13,6 @@ mongoose
   .catch((error) => console.error('Connection error', error));
 
 import express from 'express';
-import { RegisterRoutes } from './routes/routes';
 import {
   generateAuthUrl,
   initGoogleCalendar,
@@ -27,8 +26,8 @@ import policyRouter from './routes/policy.routes';
 import ttsRouter from './routes/tts.routes'; // Import the missing ttsRouter module
 import sttRouter from './routes/stt.routes'; // Import the missing sttRouter module
 
-import { twilioVoiceRouter } from './routes/twilio/voice.routes';
-import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
+import { twilioVoiceRouter } from './routes/omni_channel/omni.twilio.voice.routes';
+import { messagingRouter } from './routes/omni_channel/omni.wa.routes';
 import { agendaRouter } from './routes/agenda.routes';
 import { assistantRouter } from './routes/assistant.routes';
 import { sessionRouter } from './routes/session.routes';
@@ -38,6 +37,8 @@ import { inboxRouter } from './routes/inbox.routes';
 import { actionRouter } from './routes/action.routes';
 import { verificationRouter } from './routes/verification.routes';
 import { verifyToken } from './middleware/auth.middleware';
+import { googleAuthRouter } from './routes/googleAuth.routes';
+import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -49,26 +50,25 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cors());
 
-RegisterRoutes(app);
-
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.use('/policy', policyRouter);
 
 // app.use("/messaging", messagingRouter);
 
-app.use('/twilio/voice',verifyToken, twilioVoiceRouter);
-app.use('/twilio/messaging',verifyToken, twilioMessagingRouter);
+app.use('/twilio/voice', verifyToken, twilioVoiceRouter);
+app.use('/twilio/messaging', verifyToken, twilioMessagingRouter);
 
 app.use('/tts', verifyToken, ttsRouter);
 app.use('/stt', verifyToken, sttRouter);
-app.use('/session',verifyToken, sessionRouter);
-app.use('/agenda',verifyToken, agendaRouter);
-app.use('/assistant',verifyToken, assistantRouter);
+app.use('/session', verifyToken, sessionRouter);
+app.use('/agenda', verifyToken, agendaRouter);
+app.use('/assistant', verifyToken, assistantRouter);
 app.use('/company', companyRouter);
 app.use('/user', userRouter);
-app.use('/inbox',verifyToken, inboxRouter);
-app.use('/action',verifyToken, actionRouter);
-app.use('/api',verifyToken, verificationRouter);
+app.use('/inbox', verifyToken, inboxRouter);
+app.use('/action', verifyToken, actionRouter);
+app.use('/api', verifyToken, verificationRouter);
+app.use('/auth', googleAuthRouter);
 
 app.get('/swagger.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');

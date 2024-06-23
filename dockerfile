@@ -1,5 +1,5 @@
 # Use an official Node.js runtime as a parent image
-FROM node:18-slim
+FROM node:21-slim
 
 # Update CA certificates
 RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates

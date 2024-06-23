@@ -1,3 +1,4 @@
+// file path: /src/models/Company.ts
 import mongoose, { Document, Schema } from 'mongoose';
 import { IIdentifier, IdentifierSchema } from './Assistant';
 

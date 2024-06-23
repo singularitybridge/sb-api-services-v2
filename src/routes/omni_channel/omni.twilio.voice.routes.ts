@@ -15,8 +15,10 @@ const waitingSoundTick =
 twilioVoiceRouter.post('/', async (req, res) => {
   const { firstTime } = req.query;
   const { CallStatus, From, To } = req.body;
-
+  const apiKey = req.headers['openai-api-key'] as string;
+  
   const { response, callActive } = await handleVoiceRequest(
+    apiKey,
     firstTime !== 'false',
     CallStatus,
     From,
@@ -30,9 +32,10 @@ twilioVoiceRouter.post('/', async (req, res) => {
 twilioVoiceRouter.post('/status', async (req, res) => {
 
   const { CallStatus, From, To } = req.body;
+  const apiKey = req.headers['openai-api-key'] as string;
 
   if (CallStatus === 'completed') {
-    await handleVoiceCallEnded(From, To);
+    await handleVoiceCallEnded(apiKey, From, To);
   }
   
   res.status(200).send('OK');
