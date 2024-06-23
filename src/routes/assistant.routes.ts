@@ -86,12 +86,16 @@ assistantRouter.put('/:id', async (req, res) => {
 });
 
 assistantRouter.post('/', async (req, res) => {
+
   const assistantData = req.body;
   const newAssistant = new Assistant(assistantData);
   const apiKey = req.headers['openai-api-key'] as string;
 
   try {
+    
     await newAssistant.save();
+
+    // adjust actions to OAI assistnat format
 
     const openAIAssistant = await createAssistant(
       apiKey,
