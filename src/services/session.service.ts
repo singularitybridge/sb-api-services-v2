@@ -1,6 +1,8 @@
 import { Assistant } from '../models/Assistant';
 import { Session } from '../models/Session';
 import { createNewThread } from './oai.thread.service';
+import { User } from '../models/User';
+import { Company } from '../models/Company';
 
 
 
@@ -69,7 +71,7 @@ export const getSessionOrCreate = async (
   apiKey: string,
   userId: string,
   companyId: string,
-  assistantId?: string, // Made optional
+  assistantId?: string,
 ) => {
   let session = await Session.findOne({ userId, companyId, active: true });
 
@@ -81,18 +83,12 @@ export const getSessionOrCreate = async (
   } else {
     const threadId = await createNewThread(apiKey);
 
-    // If assistantId is not provided, find a default assistant for the company
     if (!assistantId) {
-      console.log('No assistantId provided, finding default assistant', {
-        companyId,
-      });
-      console.log("company id ------ "+companyId);
-      
+      console.log('No assistantId provided, finding default assistant', { companyId });
       const defaultAssistant = await Assistant.findOne({ companyId });
       assistantId = defaultAssistant?._id;
     }
 
-    // If an assistantId (either provided or default) is available, create the session
     if (assistantId) {
       session = new Session({
         userId,
@@ -103,10 +99,25 @@ export const getSessionOrCreate = async (
       });
       await session.save();
     } else {
-      // Handle the case where no assistantId is available
       throw new Error('No assistantId available to create a session');
     }
   }
 
-  return session;
+  // Fetch additional details
+  const user = await User.findById(userId);
+  const assistant = await Assistant.findById(session.assistantId);
+  const company = await Company.findById(companyId);
+
+  return {
+    _id: session._id,
+    userId: session.userId,
+    assistantId: session.assistantId,
+    threadId: session.threadId,
+    active: session.active,
+    companyId: session.companyId,
+    userName: user ? user.name : undefined,
+    assistantName: assistant ? assistant.name : undefined,
+    companyName: company ? company.name : undefined,
+  };
 };
+
