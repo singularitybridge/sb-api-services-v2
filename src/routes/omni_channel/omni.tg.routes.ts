@@ -131,7 +131,7 @@ messagingRouter.post('/whatsapp/reply', async (req, res) => {
   });
 
   if (!session) {
-    const threadId = await createNewThread();
+    const threadId = await createNewThread('');
 
     session = new Session({
       threadId: threadId,
@@ -149,6 +149,7 @@ messagingRouter.post('/whatsapp/reply', async (req, res) => {
   console.log(req.body);
 
   const response = await handleUserInput(
+    'openai',
     Body,
     session.assistantId,
     session.threadId,
