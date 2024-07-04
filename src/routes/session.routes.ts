@@ -34,7 +34,7 @@ sessionRouter.put('/:id', async (req, res) => {
 sessionRouter.post('/', async (req, res) => {
   try {
     const { userId, companyId, assistantId } = req.body;
-    const apiKey = process.env.OPENAI_API_KEY as string;
+    const apiKey = req.headers['openai-api-key'] as string;
     const session = await getSessionOrCreate(apiKey, userId, companyId, assistantId);
     res.status(200).json(session);
   } catch (error) {
