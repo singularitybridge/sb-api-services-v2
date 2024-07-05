@@ -116,7 +116,7 @@ export const handleVoiceRecordingRequest = async (
   to: string,
   recordingUrl: string,
 ) => {
-  const SpeechResult = await transcribeAudioWhisper(recordingUrl);
+  // const SpeechResult = await transcribeAudioWhisper(recordingUrl);
 
   const twiml = new VoiceResponse();
   const assistant = await Assistant.findOne({ 'identifiers.value': to });
@@ -145,7 +145,8 @@ export const handleVoiceRecordingRequest = async (
 
   const response = await handleUserInput(
     apiKey,
-    SpeechResult,
+    '',
+    // SpeechResult,
     session.assistantId,
     session.threadId,
   );

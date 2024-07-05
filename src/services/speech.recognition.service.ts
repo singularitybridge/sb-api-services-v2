@@ -2,26 +2,21 @@ import axios from "axios";
 import FormData from "form-data";
 import speech from "@google-cloud/speech";
 
-export const transcribeAudioWhisper = async (audioURL: string) => {
+export const transcribeAudioWhisper = async (apiKey: string, audioBuffer: Buffer, language: string = 'en') => {
   try {
-    const audioResponse = await axios({
-      method: "get",
-      url: audioURL,
-      responseType: "arraybuffer",
-    });
-
     const formData = new FormData();
-    formData.append("file", Buffer.from(audioResponse.data), {
-      filename: "audio.mp3",
+    formData.append("file", audioBuffer, {
+      filename: "audio.webm",
+      contentType: "audio/webm",
     });
     formData.append("model", "whisper-1");
-    formData.append("language", "en");
+    formData.append("language", language);
 
     const result = await axios({
       method: "post",
       url: "https://api.openai.com/v1/audio/transcriptions",
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, // Replace with your API key
+        Authorization: `Bearer ${apiKey}`,
         ...formData.getHeaders(),
       },
       data: formData,
@@ -30,10 +25,27 @@ export const transcribeAudioWhisper = async (audioURL: string) => {
     return result.data.text;
   } catch (error) {
     console.error("Error transcribing audio:", error);
+    throw error;
   }
 };
 
-export const transcribeAudioGoogle = async (audioURL: string) => {
+export const transcribeAudioWhisperFromURL = async (apiKey: string, audioURL: string, language: string = 'en') => {
+  try {
+    const audioResponse = await axios({
+      method: "get",
+      url: audioURL,
+      responseType: "arraybuffer",
+    });
+
+    const audioBuffer = Buffer.from(audioResponse.data);
+    return await transcribeAudioWhisper(apiKey, audioBuffer, language);
+  } catch (error) {
+    console.error("Error transcribing audio from URL:", error);
+    throw error;
+  }
+};
+
+export const transcribeAudioGoogle = async (audioURL: string, language: string = 'en-US') => {
   try {
     const client = new speech.SpeechClient();
 
@@ -54,7 +66,7 @@ export const transcribeAudioGoogle = async (audioURL: string) => {
       config: {
         encoding: "LINEAR16" as const,
         sampleRateHertz: 8000,
-        languageCode: "en-US",
+        languageCode: language,
         useEnhanced: true, // Use enhanced model if available
       },
     };
