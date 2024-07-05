@@ -9,8 +9,30 @@ import {
   updateAssistantById,
 } from '../services/oai.assistant.service';
 import { createNewThread, deleteThread, getMessages, getMessageHistoryFormatted } from '../services/oai.thread.service';
+import { getCompletionResponse } from '../services/oai.completion.service';
 
 const assistantRouter = express.Router();
+
+assistantRouter.post('/completion', async (req, res) => {
+  const { systemPrompt, userInput, model = "gpt-4o", temperature, maxTokens } = req.body;
+  const apiKey = req.headers['openai-api-key'] as string;
+
+  try {
+    const response = await getCompletionResponse(
+      apiKey,
+      systemPrompt,
+      userInput,
+      model,
+      temperature,
+      maxTokens
+    );
+    res.json({ content: response });
+  } catch (error) {
+    res.status(500).json({ error: 'An error occurred while processing the completion request' });
+  }
+});
+
+
 
 assistantRouter.get('/thread/:id/messages', async (req, res) => {
   const { id } = req.params;
