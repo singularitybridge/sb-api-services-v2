@@ -39,6 +39,7 @@ import { verificationRouter } from './routes/verification.routes';
 import { verifyToken } from './middleware/auth.middleware';
 import { googleAuthRouter } from './routes/googleAuth.routes';
 import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
+import { fileRouter } from './routes/file.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -63,6 +64,7 @@ app.use('/stt', verifyToken, sttRouter);
 app.use('/session', verifyToken, sessionRouter);
 app.use('/agenda', verifyToken, agendaRouter);
 app.use('/assistant', verifyToken, assistantRouter);
+app.use('/file', verifyToken, fileRouter);
 app.use('/company', companyRouter);
 app.use('/user', userRouter);
 app.use('/inbox', verifyToken, inboxRouter);
