@@ -1,0 +1,72 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        trap "echo 'FAILURE' > /workspace/build_status" EXIT
+        docker build --no-cache -t $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA . -f dockerfile
+        trap - EXIT
+    id: Build
+
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        trap "echo 'FAILURE' > /workspace/build_status" EXIT
+        docker push $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+        trap - EXIT
+    id: Push
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        trap "echo 'FAILURE' > /workspace/build_status" EXIT
+        gcloud run services update $_SERVICE_NAME --platform=managed --image=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID --region=$_DEPLOY_REGION --quiet
+        trap - EXIT
+    id: Deploy
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        if [ -f /workspace/build_status ] && grep -q 'FAILURE' /workspace/build_status; then
+          status=1
+        else
+          status=0
+        fi
+        webhook_url=$(gcloud secrets versions access latest --secret=SLACK_WEBHOOK)
+        chmod +x ./scripts/notify_slack.sh
+        ./scripts/notify_slack.sh "$status" "$webhook_url" "${BUILD_ID}" "${PROJECT_ID}" "$_BRANCH_NAME" "$_ENVIRONMENT"
+    id: Notify Slack
+    env:
+      - 'BUILD_ID=$BUILD_ID'
+      - 'PROJECT_ID=$PROJECT_ID'
+      - 'ENVIRONMENT=$_ENVIRONMENT'
+      - 'BRANCH_NAME=$_BRANCH_NAME'
+
+images:
+  - >-
+    $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+
+options:
+  substitutionOption: ALLOW_LOOSE
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _DEPLOY_REGION: europe-north1
+  _TRIGGER_ID: 81812211-73e8-41b8-85f2-55816362a5c2
+  _AR_HOSTNAME: europe-north1-docker.pkg.dev
+  _PLATFORM: managed
+  _SERVICE_NAME: sb-ui-image
+  _ENVIRONMENT: production
+  _BRANCH_NAME: main
+
+tags:
+  - gcp-cloud-build-deploy-cloud-run
+  - gcp-cloud-build-deploy-cloud-run-managed
+  - sb-ui-image

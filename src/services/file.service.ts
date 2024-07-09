@@ -1,29 +1,34 @@
-// src/services/file.service.ts
 import { OpenAI } from 'openai';
 import { File } from '../models/File';
 import { Assistant } from '../models/Assistant';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 
 export async function uploadFile(
-  file: Express.Multer.File, 
-  assistantId: string, 
-  openaiApiKey: string, 
-  title?: string, 
+  file: Express.Multer.File,
+  assistantId: string,
+  openaiApiKey: string,
+  title?: string,
   description?: string
 ) {
   const openai = new OpenAI({ apiKey: openaiApiKey });
 
   try {
-    // Create a Blob from the buffer
-    const blob = new Blob([file.buffer], { type: file.mimetype });
+    // Create a temporary file
+    const tempFilePath = path.join(os.tmpdir(), file.originalname);
     
-    // Create a File object
-    const fileObject = new File([blob], file.originalname, { type: file.mimetype });
+    // Write the buffer to the temporary file
+    fs.writeFileSync(tempFilePath, file.buffer);
 
-    // Upload file to OpenAI
+    // Upload file to OpenAI using createReadStream
     const openaiFile = await openai.files.create({
-      file: fileObject,
+      file: fs.createReadStream(tempFilePath),
       purpose: 'assistants',
     });
+
+    // Delete the temporary file
+    fs.unlinkSync(tempFilePath);
 
     // Create file document in MongoDB
     const newFile = new File({
@@ -43,12 +48,12 @@ export async function uploadFile(
       throw new Error('Assistant not found');
     }
 
-    const currentAssistant = await openai.beta.assistants.retrieve(assistant.assistantId);
-    const updatedFileIds = [...(currentAssistant.file_ids || []), openaiFile.id];
+    // const currentAssistant = await openai.beta.assistants.retrieve(assistant.assistantId);
+    // const updatedFileIds = [...(currentAssistant.files || []), openaiFile.id];
 
-    await openai.beta.assistants.update(assistant.assistantId, {
-      file_ids: updatedFileIds,
-    });
+    // await openai.beta.assistants.update(assistant.assistantId, {
+    //   file_ids: updatedFileIds,
+    // });
 
     return {
       message: 'File uploaded successfully',
