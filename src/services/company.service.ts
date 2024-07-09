@@ -62,39 +62,13 @@ export const createCompany = async (apiKey: string, companyData: ICompany) => {
 
     const tempCompany: ICompany = company.toObject();
     token = generateToken(company._id.toString());
-    //
+
     const decodedToken = jwt.verify(token, process.env.JWT_SECRET as string) as { companyId: string };
     console.log('decoded Token after creation:', decodedToken);
 
     decryptCompanyData(tempCompany);
     tempCompany.token = { value: token };
     const updatedCompany = await updateCompany(company._id.toString(), tempCompany);
-
-    const defaultAssistantData = {
-      companyId: company._id,
-      assistantId: 'default',
-      name: `${company.name} Assistant`,
-      description: `Default assistant for ${company.name}`,
-      introMessage: `Welcome to ${company.name}`,
-      voice: 'Polly.Emma',
-      language: 'en-US',
-      llmModel: 'gpt-3.5-turbo-1106',
-      llmPrompt: `This is the default assistant for ${company.name}. It was created automatically when the company was created.`,
-    };
-    const newAssistant = new Assistant(defaultAssistantData);
-    await newAssistant.save();
-
-
-    const openAIAssistant = await createAssistant(
-      apiKey,
-      defaultAssistantData.name,
-      defaultAssistantData.description,
-      defaultAssistantData.llmModel,
-      defaultAssistantData.llmPrompt,
-    );
-
-    newAssistant.assistantId = openAIAssistant.id;
-    await newAssistant.save();
 
     return updatedCompany;
   } catch (error) {
