@@ -1,3 +1,4 @@
+// File : src/services/googleAuth.service.ts
 import { OAuth2Client } from 'google-auth-library';
 import { IUser, User } from '../models/User';
 import { getDecryptedCompany } from './company.service';

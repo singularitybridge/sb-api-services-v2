@@ -1,5 +1,4 @@
-import { database } from 'agenda/dist/agenda/database';
-import { Assistant } from '../models/Assistant';
+// File: src/services/company.service.ts
 import { Token, Company, ICompany, IApiKey } from '../models/Company';
 import { createAssistant } from '../services/oai.assistant.service';
 import { encryptData, decryptData } from './encryption.service';

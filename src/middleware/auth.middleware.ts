@@ -4,6 +4,7 @@ import { Request, Response, NextFunction } from 'express';
 import { Company } from '../models/Company';
 import { decryptData } from '../services/encryption.service';
 
+
 export const verifyToken = async (
   req: Request,
   res: Response,
