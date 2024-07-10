@@ -1,4 +1,4 @@
-// File: routes/googleAuth.routes.ts
+// File: src/routes/googleAuth.routes.ts
 import express from 'express';
 import { googleLogin, verifyBetaKey } from '../services/googleAuth.service';
 

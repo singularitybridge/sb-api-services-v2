@@ -1,3 +1,4 @@
+// File: src/routes/user.routes.ts
 import express from 'express';
 import { User } from '../models/User';
 
