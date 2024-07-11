@@ -5,8 +5,8 @@ const onboardingRouter = express.Router();
 
 onboardingRouter.post('/', async (req, res) => {
   try {
-    const { user, name, description } = req.body;
-    const result = await handleOnboarding(user, name, description);
+    const { current_user, name, description } = req.body;
+    const result = await handleOnboarding(current_user, name, description);
     res.json(result);
   } catch (error) {
     console.error('Onboarding error:', error);
