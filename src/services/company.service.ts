@@ -47,7 +47,7 @@ const generateToken = (companyId: string) => {
   return jwt.sign({ companyId: companyId }, process.env.JWT_SECRET as string);
 };
 
-export const createCompany = async (apiKey: string, companyData: ICompany) => {
+export const createCompany = async ( companyData: ICompany) => {
   try {
     let token = generateToken(companyData._id);
     companyData.token = { value: token };
