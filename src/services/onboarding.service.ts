@@ -1,6 +1,6 @@
 import { IUser, User } from '../models/User';
 import { ICompany } from '../models/Company';
-import { createCompany, getDecryptedCompany, refreshCompanyToken } from './company.service';
+import { createCompany, getCompanies, getCompany, getDecryptedCompany, refreshCompanyToken } from './company.service';
 
 export const handleOnboarding = async (user: any, name: string, description: string) => {
     try {
@@ -9,7 +9,7 @@ export const handleOnboarding = async (user: any, name: string, description: str
         console.log('Received user:', user);
         console.log('Company name and description:', name, description);
 
-        
+
         // Create new company for user with default values
         const defaultCompany: ICompany = {
             name: `${name}`,
@@ -28,11 +28,13 @@ export const handleOnboarding = async (user: any, name: string, description: str
 
         
         // Create the company using the company service
-        const newCompany = await createCompany('defaultApiKey', defaultCompany as ICompany);
+        const newCompany:any = await createCompany( defaultCompany as ICompany);
         console.log('New company created:', newCompany);
-
+        console.log('New company id:', newCompany._id);
+        
         // Create new user
         const newUser = {
+            companyId: newCompany._id,
             name: user.given_name,
             email: user.email,
             googleId: user.sub,

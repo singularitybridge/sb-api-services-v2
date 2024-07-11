@@ -17,7 +17,7 @@ companyRouter.post('/', async (req, res) => {
   const apiKey = process.env.OPENAI_API_KEY as string;
   console.log('POST LOG ____ API Key:', apiKey);
 
-  const company = await createCompany(apiKey, req.body);
+  const company = await createCompany( req.body);
   res.json(company);
 });
 
