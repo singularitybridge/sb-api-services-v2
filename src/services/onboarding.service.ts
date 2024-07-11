@@ -1,14 +1,15 @@
 import { IUser, User } from '../models/User';
 import { ICompany } from '../models/Company';
 import { createCompany, getDecryptedCompany, refreshCompanyToken } from './company.service';
-import { decryptData } from './encryption.service';
 
 export const handleOnboarding = async (user: any, name: string, description: string) => {
     try {
+        
         console.log('Starting onboarding process');
         console.log('Received user:', user);
         console.log('Company name and description:', name, description);
 
+        
         // Create new company for user with default values
         const defaultCompany: ICompany = {
             name: `${name}`,
