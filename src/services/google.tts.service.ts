@@ -1,3 +1,5 @@
+/// file_path: src/services/google.tts.service.ts
+
 import textToSpeech from '@google-cloud/text-to-speech';
 import { uploadImage } from './google.storage.service';
 

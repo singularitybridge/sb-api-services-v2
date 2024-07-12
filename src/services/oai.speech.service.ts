@@ -1,3 +1,5 @@
+/// file_path: src/services/oai.speech.service.ts
+
 import { uploadImage } from './google.storage.service';
 import { getOpenAIClient } from './assistant.service';
 
