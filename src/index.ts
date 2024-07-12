@@ -19,7 +19,6 @@ import {
   initGoogleCalendar,
 } from './services/google.calendar.service';
 
-
 import cors from 'cors';
 import policyRouter from './routes/policy.routes';
 
@@ -42,7 +41,6 @@ import { authRouter } from './routes/auth.routes';
 const app = express();
 const port = process.env.PORT || 3000;
 
-
 initGoogleCalendar();
 generateAuthUrl();
 
@@ -64,7 +62,7 @@ app.use('/user', userRouter);
 app.use('/inbox', verifyTokenMiddleware, inboxRouter);
 app.use('/action', verifyTokenMiddleware, actionRouter);
 app.use('/api', verifyTokenMiddleware, verificationRouter);
-app.use('/onboarding', onboardingRouter);
+app.use('/onboarding', verifyTokenMiddleware, onboardingRouter);
 
 export default app;
 

@@ -15,6 +15,7 @@ export interface Token {
   tag?: string;
 }
 
+
 const ApiKeySchema = new Schema({
   key: { type: String, required: true },
   value: { type: String, required: true },
@@ -29,13 +30,13 @@ const TokenSchema = new Schema({
 });
 
 export interface ICompany extends Document {
-  [key: string]: any;
   name: string;
-  description: string;
+  description?: string;
   token?: Token;
   api_keys: IApiKey[];
   identifiers: IIdentifier[];
 }
+
 
 const CompanySchema = new Schema({
   name: { type: String, required: true },
