@@ -1,3 +1,4 @@
+/// file_path: src/routes/tts.routes.ts
 import express from 'express';
 import { generateAudio } from '../services/11labs.service';
 import { synthesizeText } from '../services/google.tts.service';
@@ -25,12 +26,28 @@ router.post('/generate/google', async (req, res) => {
 });
 
 router.post('/generate/oai', async (req, res) => {
-
-  const { text, voice } = req.body;
-  const apiKey = req.headers['openai-api-key'] as string;
-
-  const fileInfo = await generateSpeech(apiKey, text, voice);
-  res.send(fileInfo);
+  try {
+    console.log('Received request for /generate/oai:', req.body);
+    const { text, voice } = req.body;
+    const apiKey = req.headers['openai-api-key'] as string;
+    if (!apiKey) {
+      throw new Error('OpenAI API key is missing');
+    }
+    console.log('Calling generateSpeech...');
+    const fileInfo = await generateSpeech(apiKey, text, voice);
+    console.log('Generated speech successfully:', fileInfo);
+    res.send(fileInfo);
+  } catch (error: unknown) {
+    console.error('Error in /generate/oai route:', error);
+    
+    let errorMessage = 'An unknown error occurred';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    }
+    
+    res.status(500).send({ error: 'Internal server error', details: errorMessage });
+  }
 });
-
 export default router;
