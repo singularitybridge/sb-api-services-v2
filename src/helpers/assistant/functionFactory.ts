@@ -1,13 +1,12 @@
 import OpenAI from 'openai';
 import { IEventRequestBody } from '../../Interfaces/eventRequest.interface';
-import { CalendarController } from '../../controllers/calendar.controller';
 import { Assistant } from '../../models/Assistant';
 import { getOpenAIClient } from '../../services/assistant.service';
 import { addMessageToInbox } from '../../services/inbox.service';
 import { publishMessage } from '../../services/pusher.service';
+import { createEvent, deleteEvent, updateEvent } from '../../services/google.calendar.service';
 
 type FunctionName = keyof typeof functionFactory;
-const calendarController = new CalendarController();
 
 const functionFactory = {
   async sendMessageToInbox(args: { sessionId?: string; message: string }) {
@@ -89,29 +88,29 @@ const functionFactory = {
 
   async getEvents(args: { start: string; end: string }) {
     console.log('called getEvents with args: ', args);
-    const events = await calendarController.getEvents(args.start, args.end);
-    return events;
+    // const events = await getEvents(args.start, args.end);
+    // return events;
   },
 
   async getFreeSlots(args: { start: string; end: string; duration: number }) {
     console.log('called getFreeSlots with args: ', args);
-    const freeSlots = await calendarController.getFreeSlots(
-      args.start,
-      args.end,
-      args.duration,
-    );
-    return freeSlots;
+    // const freeSlots = await getFreeSlots(
+    //   args.start,
+    //   args.end,
+    //   args.duration,
+    // );
+    // return freeSlots;
   },
 
   async createEvent(args: IEventRequestBody) {
     console.log('called createEvent with args: ', args);
-    const eventCreationResponse = await calendarController.createEvent(args);
+    const eventCreationResponse = await createEvent(args);
     return eventCreationResponse;
   },
 
   async updateEvent(args: { id: string; eventData: IEventRequestBody }) {
     console.log('called updateEvent with args: ', args);
-    const updateResponse = await calendarController.updateEvent(
+    const updateResponse = await updateEvent(
       args.id,
       args.eventData,
     );
@@ -120,7 +119,7 @@ const functionFactory = {
 
   async deleteEvent(args: { id: string }) {
     console.log('called deleteEvent with args: ', args);
-    const deleteResponse = await calendarController.deleteEvent(args.id);
+    const deleteResponse = await deleteEvent(args.id);
     return deleteResponse;
   },
 };
