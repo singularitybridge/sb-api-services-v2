@@ -1,3 +1,4 @@
+/// file_path: src/services/onboarding.service.ts
 import { IUser, User } from '../models/User';
 import { ICompany } from '../models/Company';
 import { createCompany, getCompanies, getCompany, getDecryptedCompany, refreshCompanyToken } from './company.service';

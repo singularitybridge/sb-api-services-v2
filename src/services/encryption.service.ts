@@ -1,3 +1,4 @@
+/// file_path: src/services/encryption.service.ts
 import * as crypto from 'crypto';
 
 const algorithm = 'aes-256-gcm';

@@ -1,3 +1,4 @@
+/// file_path: src/routes/session.routes.ts
 import { Router, Request, Response } from 'express';
 import {
   endSession,
