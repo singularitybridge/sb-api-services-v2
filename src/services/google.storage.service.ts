@@ -1,9 +1,16 @@
-// src/config/storage.ts
 import { Storage } from '@google-cloud/storage';
 
-const storage = new Storage({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-});
+let storage: Storage;
+
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  // Local development: Use the specified credentials file
+  storage = new Storage({
+    keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+  });
+} else {
+  // In GCP: Use default credentials
+  storage = new Storage();
+}
 
 export const uploadImage = (file: Express.Multer.File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -20,6 +27,10 @@ export const uploadImage = (file: Express.Multer.File): Promise<string> => {
       resolve(publicUrl);
     });
 
+    blobStream.on('error', (err) => {
+      console.error('Error uploading to Cloud Storage:', err);
+      reject(err);
+    });    
 
     blobStream.end(file.buffer);
   });
