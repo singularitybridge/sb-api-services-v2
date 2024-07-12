@@ -7,28 +7,36 @@ const authRouter = express.Router();
 
 authRouter.post('/verify-token', async (req, res) => {
   try {
-    console.log('Received authorization header:', req.headers.authorization); // Log the entire authorization header
+    console.log('Received authorization header:', req.headers.authorization);
     const token = extractTokenFromHeader(req.headers.authorization);
-    console.log('Extracted token:', token); // Log the extracted token
-    const { company } = await verifyToken(token);
+    console.log('Extracted token:', token);
+    const { user, company, decryptedApiKey } = await verifyToken(token);
     
-    res.json({ 
+    const response: any = { 
       message: 'Token is valid',
+      user,
       company
-    });
+    };
+
+    if (decryptedApiKey) {
+      response.decryptedApiKey = decryptedApiKey;
+    } else {
+      response.message += ', but API key is not set';
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Token verification failed:', error);
-    res.status(401).json({ message: 'Invalid token', error: (error as any).message });
+    res.status(401).json({ message: 'Invalid token', error: (error as Error).message });
   }
 });
-
 
 
 authRouter.post('/google/login', async (req, res) => {
   console.log('called google login route');
   try {
-    const { user, sessionToken, isNewUser } = await googleLogin(req.body.token);
-    res.json({ user, sessionToken, isNewUser });
+    const { user, company, sessionToken } = await googleLogin(req.body.token);
+    res.json({ user, company, sessionToken });
   } catch (error) {
     res.status(500).json({ error: 'Failed to login with Google' });
   }
