@@ -6,7 +6,7 @@ export interface IUser extends Document {
     name: string;
     email: string;
     nickname?: string;
-    role: string;
+    role: 'Admin' | 'CompanyUser';
     identifiers: IIdentifier[];
     companyId: string;
     googleId?: string;
