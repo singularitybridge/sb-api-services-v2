@@ -2,36 +2,40 @@
 import express from 'express';
 import { generateAudio } from '../services/11labs.service';
 import { synthesizeText } from '../services/google.tts.service';
-import path from 'path';
 import { generateSpeech } from '../services/oai.speech.service';
+import { getApiKey } from '../services/api.key.service';
+import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
 const router = express.Router();
 
-router.get('/files/:filename', async (req, res) => {
-  const { filename } = req.params;
-  const filePath = path.resolve(__dirname, `../../files/${filename}`);
-  res.sendFile(filePath);
-});
 
-router.post('/generate/11labs', async (req, res) => {
+router.post('/generate/11labs', async (req: AuthenticatedRequest, res) => {
   const { text, voiceId, modelId } = req.body;
+  const apiKey = await getApiKey(req.company._id, 'elevenlabs');
+  if (apiKey === 'not set') {
+    return res.status(400).json({ error: 'ElevenLabs API key is not set' });
+  }
   const fileInfo = await generateAudio(text, voiceId, modelId);
   res.send(fileInfo);
 });
 
-router.post('/generate/google', async (req, res) => {
+router.post('/generate/google', async (req: AuthenticatedRequest, res) => {
   const { text, voiceLanguageCode, voiceName } = req.body;
+  const apiKey = await getApiKey(req.company._id, 'google');
+  if (apiKey === 'not set') {
+    return res.status(400).json({ error: 'Google API key is not set' });
+  }
   const fileInfo = await synthesizeText(text, voiceLanguageCode, voiceName);
   res.send(fileInfo);
 });
 
-router.post('/generate/oai', async (req, res) => {
+router.post('/generate/oai', async (req: AuthenticatedRequest, res) => {
   try {
     console.log('Received request for /generate/oai:', req.body);
     const { text, voice } = req.body;
-    const apiKey = req.headers['openai-api-key'] as string;
-    if (!apiKey) {
-      throw new Error('OpenAI API key is missing');
+    const apiKey = await getApiKey(req.company._id, 'openai');
+    if (apiKey === 'not set') {
+      throw new Error('OpenAI API key is not set');
     }
     console.log('Calling generateSpeech...');
     const fileInfo = await generateSpeech(apiKey, text, voice);
@@ -50,4 +54,6 @@ router.post('/generate/oai', async (req, res) => {
     res.status(500).send({ error: 'Internal server error', details: errorMessage });
   }
 });
+
+
 export default router;

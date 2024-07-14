@@ -33,7 +33,7 @@ import { userRouter } from './routes/user.routes';
 import { inboxRouter } from './routes/inbox.routes';
 import { actionRouter } from './routes/action.routes';
 import { verificationRouter } from './routes/verification.routes';
-import { verifyTokenMiddleware } from './middleware/auth.middleware';
+import { verifyAccess, verifyTokenMiddleware } from './middleware/auth.middleware';
 import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
 import { onboardingRouter } from './routes/onboarding.routes';
 import { authRouter } from './routes/auth.routes';
@@ -48,21 +48,34 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cors());
 
+// Public routes
 app.use('/auth', authRouter);
 app.use('/policy', policyRouter);
-app.use('/twilio/voice', verifyTokenMiddleware, twilioVoiceRouter);
-app.use('/twilio/messaging', verifyTokenMiddleware, twilioMessagingRouter);
+
+// Routes that only require authentication
 app.use('/tts', verifyTokenMiddleware, ttsRouter);
 app.use('/stt', verifyTokenMiddleware, sttRouter);
-app.use('/session', verifyTokenMiddleware, sessionRouter);
-app.use('/agenda', verifyTokenMiddleware, agendaRouter);
-app.use('/assistant', verifyTokenMiddleware, assistantRouter);
-app.use('/company', companyRouter);
-app.use('/user', userRouter);
-app.use('/inbox', verifyTokenMiddleware, inboxRouter);
-app.use('/action', verifyTokenMiddleware, actionRouter);
-app.use('/api', verifyTokenMiddleware, verificationRouter);
-app.use('/onboarding', verifyTokenMiddleware, onboardingRouter);
+app.use('/twilio/voice', verifyTokenMiddleware, twilioVoiceRouter);
+app.use('/twilio/messaging', verifyTokenMiddleware, twilioMessagingRouter);
+
+// Routes that require company-specific access
+app.use('/assistant', verifyTokenMiddleware, verifyAccess(), assistantRouter);
+app.use('/company', verifyTokenMiddleware, verifyAccess(), companyRouter);
+app.use('/user', verifyTokenMiddleware, verifyAccess(), userRouter);
+app.use('/inbox', verifyTokenMiddleware, verifyAccess(), inboxRouter);
+app.use('/action', verifyTokenMiddleware, verifyAccess(), actionRouter);
+app.use('/session', verifyTokenMiddleware, verifyAccess(),  sessionRouter);
+app.use('/agenda', verifyTokenMiddleware, verifyAccess(), agendaRouter);
+app.use('/api', verifyTokenMiddleware, verifyAccess(), verificationRouter);
+app.use('/onboarding', verifyTokenMiddleware, verifyAccess() , onboardingRouter);
+
+
+// Admin-only routes - to be added later
+//app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);
+
+
+
+
 
 export default app;
 
