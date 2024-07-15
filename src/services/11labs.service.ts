@@ -1,7 +1,7 @@
 /// file_path: src/services/11labs.service.ts
 import axios from 'axios';
 import { ApiKey } from './verification.service';
-import { uploadImage } from './google.storage.service';
+import { uploadFile } from './google.storage.service';
 
 export const generateAudio = async (
   apikey: string,
@@ -53,7 +53,7 @@ export const generateAudio = async (
     };
 
     // Upload the file to cloud storage
-    const publicUrl = await uploadImage(file);
+    const publicUrl = await uploadFile(file);
     return publicUrl;
 
   } catch (error) {
