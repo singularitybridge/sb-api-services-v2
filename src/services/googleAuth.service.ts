@@ -68,7 +68,7 @@ export const googleLogin = async (token: string): Promise<{ user: IUser; company
                 companyId: user.companyId 
             },
             JWT_SECRET,
-            { expiresIn: '1d' } // Adjust expiration as needed
+            { expiresIn: '7d' } // Adjust expiration as needed
         );
 
         return { user, company, sessionToken };
