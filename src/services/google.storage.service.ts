@@ -12,7 +12,7 @@ if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
   storage = new Storage();
 }
 
-export const uploadImage = (file: Express.Multer.File): Promise<string> => {
+export const uploadFile = (file: Express.Multer.File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const bucket = storage.bucket('sb-ai-experiments-files');
     const blob = bucket.file(file.originalname);

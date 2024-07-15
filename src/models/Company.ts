@@ -15,7 +15,6 @@ export interface Token {
   tag?: string;
 }
 
-
 const ApiKeySchema = new Schema({
   key: { type: String, required: true },
   value: { type: String, required: true },
@@ -34,21 +33,21 @@ export interface ICompany extends Document {
   description?: string;
   token?: Token;
   api_keys: IApiKey[];
-  identifiers: IIdentifier[];
+  identifiers?: IIdentifier[]; // Made optional
 }
-
 
 const CompanySchema = new Schema({
   name: { type: String, required: true },
   description: { type: String },
   token: TokenSchema,
   api_keys: [ApiKeySchema],
-  identifiers: { type: [IdentifierSchema], required: true },
+  identifiers: { type: [IdentifierSchema], required: false }, // Made optional
 });
 
+// Update the index to allow null values and make it sparse
 CompanySchema.index(
   { 'identifiers.type': 1, 'identifiers.value': 1 },
-  { unique: true },
+  { unique: true, sparse: true }
 );
 
 export const Company = mongoose.model('Company', CompanySchema);

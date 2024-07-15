@@ -1,7 +1,7 @@
 /// file_path: src/services/google.tts.service.ts
 
 import textToSpeech from '@google-cloud/text-to-speech';
-import { uploadImage } from './google.storage.service';
+import { uploadFile } from './google.storage.service';
 
 const textToSpeechClient = new textToSpeech.TextToSpeechClient();
 
@@ -36,7 +36,7 @@ export async function synthesizeText(
       path: '',
     };
 
-    const publicUrl = await uploadImage(file);
+    const publicUrl = await uploadFile(file);
     return publicUrl;
   } catch (error) {
     console.error('Error:', error);

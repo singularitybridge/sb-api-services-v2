@@ -12,7 +12,7 @@ const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 router.post('/transcribe/oai', 
-  validateApiKeys(['openai']), 
+  validateApiKeys(['openai']),
   upload.single('audio'), 
   async (req: AuthenticatedRequest, res) => {
     const language = req.body.language || 'en'; // Default to English if not specified

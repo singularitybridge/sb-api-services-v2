@@ -62,3 +62,11 @@ export const verifyAccess = (adminOnly: boolean = false) => {
     next();
   };
 };
+
+
+export const verifyCompanyAccess = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  if (req.user?.role !== 'Admin' && req.user?.companyId.toString() !== req.params.id) {
+    return res.status(403).json({ message: 'Access denied: Company mismatch' });
+  }
+  next();
+};

@@ -1,6 +1,5 @@
 // File: src/services/company.service.ts
-import { Token, Company, ICompany, IApiKey } from '../models/Company';
-import { createAssistant } from '../services/oai.assistant.service';
+import { Company, ICompany, IApiKey } from '../models/Company';
 import { encryptData, decryptData } from './encryption.service';
 import jwt from 'jsonwebtoken';
 
@@ -52,6 +51,11 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
     const token = generateToken();
     companyData.token = { value: token };
 
+    // If identifiers are not provided, set it to an empty array
+    if (!companyData.identifiers || companyData.identifiers.length === 0) {
+      companyData.identifiers = [];
+    }
+
     encryptCompanyData(companyData as ICompany);
 
     const company = new Company(companyData);
@@ -66,7 +70,6 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
     throw error;
   }
 };
-
 
 
 export const getCompany = async (id: string) => {

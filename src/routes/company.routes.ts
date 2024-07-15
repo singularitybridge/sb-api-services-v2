@@ -9,45 +9,44 @@ import {
   refreshCompanyToken,
   updateCompany,
 } from '../services/company.service';
+import { verifyAccess, AuthenticatedRequest, verifyCompanyAccess } from '../middleware/auth.middleware';
 
 const companyRouter = express.Router();
 
-companyRouter.post('/', async (req, res) => {
-  // const apiKey = req.headers['openai-api-key'] as string;
-  const apiKey = process.env.OPENAI_API_KEY as string;
-  console.log('POST LOG ____ API Key:', apiKey);
-
-  const company = await createCompany( req.body);
+// Admin-only routes
+companyRouter.post('/', verifyAccess(true), async (req: AuthenticatedRequest, res) => {
+  const company = await createCompany(req.body);
   res.json(company);
 });
 
-companyRouter.get('/', async (req, res) => {
+companyRouter.get('/', verifyAccess(true), async (req: AuthenticatedRequest, res) => {
   const companies = await getCompanies();
   res.json(companies);
 });
 
-companyRouter.get('/:id', async (req, res) => {
+companyRouter.delete('/:id', verifyAccess(true), async (req: AuthenticatedRequest, res) => {
+  const company = await deleteCompany(req.params.id);
+  res.json(company);
+});
+
+// Routes accessible by both admins and company users
+companyRouter.get('/:id', verifyAccess(), verifyCompanyAccess, async (req: AuthenticatedRequest, res) => {
   const company = await getCompany(req.params.id);
   res.json(company);
 });
 
-companyRouter.get('/decrypted/:id', async (req, res) => {
+companyRouter.get('/decrypted/:id', verifyAccess(), verifyCompanyAccess, async (req: AuthenticatedRequest, res) => {
   const company = await getDecryptedCompany(req.params.id);
   res.json(company);
 });
 
-companyRouter.put('/refresh-token/:id', async (req, res) => {
+companyRouter.put('/refresh-token/:id', verifyAccess(), verifyCompanyAccess, async (req: AuthenticatedRequest, res) => {
   const company = await refreshCompanyToken(req.params.id, req.body);
   res.json(company);
 });
 
-companyRouter.put('/:id', async (req, res) => {
+companyRouter.put('/:id', verifyAccess(), verifyCompanyAccess, async (req: AuthenticatedRequest, res) => {
   const company = await updateCompany(req.params.id, req.body);
-  res.json(company);
-});
-
-companyRouter.delete('/:id', async (req, res) => {
-  const company = await deleteCompany(req.params.id);
   res.json(company);
 });
 
