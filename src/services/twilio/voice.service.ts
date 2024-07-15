@@ -91,8 +91,8 @@ export const handleVoiceRequest = async (
     const limitedResponse = response.substring(0, 1200); // Limit response to 1600 characters
 
     // generate intro message
-    const audioResponse = await generateAudio(limitedResponse);
-    twiml.play(audioResponse?.path);
+    const audioResponse = await generateAudio('', limitedResponse);
+    twiml.play(audioResponse);
   }
 
   twiml.record({
@@ -152,9 +152,9 @@ export const handleVoiceRecordingRequest = async (
   );
 
   const limitedResponse = response.substring(0, 1200); // Limit response to 1600 characters
-  const audioResponse = await generateAudio(limitedResponse);
+  const audioResponse = await generateAudio('', limitedResponse);
 
-  twiml.play(audioResponse?.path);
+  twiml.play(audioResponse);
   twiml.redirect('/twilio/voice?firstTime=false');
   return twiml.toString();
 };
