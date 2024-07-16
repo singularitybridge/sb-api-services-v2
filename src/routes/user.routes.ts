@@ -1,11 +1,12 @@
 // File: src/routes/user.routes.ts
 import express from 'express';
 import { User } from '../models/User';
+import { verifyAccess, AuthenticatedRequest } from '../middleware/auth.middleware';
 
 const userRouter = express.Router();
 
-
-userRouter.get('/', async (req, res) => {
+// Get all users (admin only)
+userRouter.get('/', verifyAccess(true), async (req: AuthenticatedRequest, res) => {
   try {
     const users = await User.find({});
     res.send(users);
@@ -14,21 +15,27 @@ userRouter.get('/', async (req, res) => {
   }
 });
 
-
-userRouter.get('/:id', async (req, res) => {
+// Get user by ID (admin or same company user)
+userRouter.get('/:id', verifyAccess(), async (req: AuthenticatedRequest, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).send({ message: 'User not found' });
     }
+    
+    // Check if the requester is an admin or from the same company
+    if (req.user?.role !== 'Admin' && user.companyId.toString() !== req.user?.companyId.toString()) {
+      return res.status(403).send({ message: 'Access denied' });
+    }
+    
     res.send(user);
   } catch (error) {
     res.status(500).send({ message: `Error getting user: ${error}` });
   }
 });
 
-// Add a new user
-userRouter.post('/', async (req, res) => {
+// Add a new user (admin only)
+userRouter.post('/', verifyAccess(true), async (req: AuthenticatedRequest, res) => {
   try {
     const userData = req.body;
     const newUser = new User(userData);
@@ -39,8 +46,8 @@ userRouter.post('/', async (req, res) => {
   }
 });
 
-// Update a user
-userRouter.put('/:id', async (req, res) => {
+// Update a user (admin only)
+userRouter.put('/:id', verifyAccess(true), async (req: AuthenticatedRequest, res) => {
   const { id } = req.params;
   const userData = req.body;
 
@@ -57,8 +64,8 @@ userRouter.put('/:id', async (req, res) => {
   }
 });
 
-// Delete a user
-userRouter.delete('/:id', async (req, res) => {
+// Delete a user (admin only)
+userRouter.delete('/:id', verifyAccess(true), async (req: AuthenticatedRequest, res) => {
   try {
     const { id } = req.params;
     const user = await User.findById(id);
