@@ -18,12 +18,13 @@ import {
 } from '../services/oai.thread.service';
 import { getCompletionResponse } from '../services/oai.completion.service';
 import { getApiKey, validateApiKeys } from '../services/api.key.service';
-import { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { AuthenticatedRequest, verifyAccess } from '../middleware/auth.middleware';
 
 const assistantRouter = express.Router();
 
 assistantRouter.post(
   '/completion',
+  verifyAccess(),
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
     const {

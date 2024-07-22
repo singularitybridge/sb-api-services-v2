@@ -14,14 +14,8 @@ mongoose
   .catch((error) => console.error('Connection error', error));
 
 import express from 'express';
-import {
-  generateAuthUrl,
-  initGoogleCalendar,
-} from './services/google.calendar.service';
-
 import cors from 'cors';
 import policyRouter from './routes/policy.routes';
-
 import ttsRouter from './routes/tts.routes';
 import sttRouter from './routes/stt.routes';
 import { twilioVoiceRouter } from './routes/omni_channel/omni.twilio.voice.routes';
@@ -41,9 +35,6 @@ import { fileRouter } from './routes/file.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
-
-initGoogleCalendar();
-generateAuthUrl();
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
