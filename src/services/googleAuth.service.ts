@@ -1,14 +1,15 @@
+// File : src/services/googleAuth.service.ts
 import { OAuth2Client } from 'google-auth-library';
+import jwt from 'jsonwebtoken';
 import { IUser, User } from '../models/User';
-import { getDecryptedCompany } from './company.service';
-
+import { ICompany, Company } from '../models/Company';
+import { createCompany } from './company.service';
 
 const JWT_SECRET: string = process.env.JWT_SECRET || '';
 const CLIENT_ID: string = process.env.G_CLIENT_ID || '';
 const client = new OAuth2Client(CLIENT_ID);
 
-export const googleLogin = async (token: string) => {
-
+export const googleLogin = async (token: string): Promise<{ user: IUser; company: ICompany; sessionToken: string }> => {
     try {
         const ticket = await client.verifyIdToken({
             idToken: token,
@@ -16,45 +17,69 @@ export const googleLogin = async (token: string) => {
         });
 
         const payload = ticket.getPayload();
-        let isNewUser = false;
 
         if (!payload || !payload['sub'] || !payload['name'] || !payload['email']) {
             throw new Error('Invalid or incomplete ID token');
         }
 
-        let user: IUser = await User.findOne({ googleId: payload['sub'] }) as IUser;
+        let user: IUser | null = await User.findOne({ googleId: payload['sub'] });
+        let company: ICompany;
 
         if (!user) {
-            isNewUser = true;
-            return {user, String, isNewUser}
+            // Create a new company with minimal info
+            const defaultCompany: Partial<ICompany> = {
+                name: `${payload['name']}'s Company`,
+                description: 'New company created during Google login',
+                api_keys: [],
+                identifiers: [{ key: 'email', value: payload['email'] }],
+            };
+
+            company = await createCompany(defaultCompany);
+
+            // Create a new user
+            const newUser: Partial<IUser> = {
+                companyId: company._id,
+                name: payload['name'],
+                email: payload['email'],
+                googleId: payload['sub'],
+                role: 'CompanyUser',
+                identifiers: [{ key: 'email', value: payload['email'] }],
+            };
+
+            user = await User.create(newUser);
+        } else {
+            // Update existing user information
+            user.name = payload['name'];
+            user.email = payload['email'];
+            await user.save();
+
+            const foundCompany = await Company.findById(user.companyId);
+            if (!foundCompany) {
+                throw new Error('Company not found for existing user');
+            }
+            company = foundCompany.toObject() as ICompany;
         }
-        user.name = payload['name'];
-        user.email = payload['email'];
-        await user.save();
 
-        // Retrieve the company data
-        const companyId = user.companyId;
-        const companyData = await getDecryptedCompany(companyId);
+        // Generate a session token
+        const sessionToken = jwt.sign(
+            { 
+                userId: user._id, 
+                email: user.email, 
+                companyId: user.companyId 
+            },
+            JWT_SECRET,
+            { expiresIn: '7d' } // Adjust expiration as needed
+        );
 
-        if (!companyData.token || !companyData.token.value) {
-            throw new Error('Company token not found');
-        }
-
-        const sessionToken = companyData.token.value; // temporarily return company token as session token
-
-        // const sessionToken = jwt.sign(
-        //     { userId: user._id, email: user.email, companyId: user.companyId },
-        //     JWT_SECRET,
-        //     { expiresIn: '1d' }
-        // );
-
-        return { user, sessionToken, isNewUser };
+        return { user, company, sessionToken };
 
     } catch (error) {
         console.error('Google authentication failed:', error);
         throw error;
     }
 }
+
+
 
 export const verifyBetaKey = async (betaKey: string) => {
     if (betaKey === process.env.BETA_INVITE_KEY) {

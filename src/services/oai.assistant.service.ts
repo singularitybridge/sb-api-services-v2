@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { getOpenAIClient } from './assistant.service';
 import { ApiKey } from './verification.service';
 import Api from 'twilio/lib/rest/Api';
+import { cleanupAssistantFiles } from './file.service';
 
 export const getAssistants = async (apiKey: string) => {
   const openaiClient = getOpenAIClient(apiKey);
@@ -68,6 +69,7 @@ export const deleteAssistantById = async (
   assistantId: string
 ) => {
   const openaiClient = getOpenAIClient(apiKey);
+  await cleanupAssistantFiles(assistantId, apiKey);
   const response = await openaiClient.beta.assistants.del(assistantId);
   return response.deleted;
 };

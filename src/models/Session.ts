@@ -1,3 +1,4 @@
+/// file_path: src/models/Session.ts
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface ISession extends Document {

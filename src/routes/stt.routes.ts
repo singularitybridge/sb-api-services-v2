@@ -6,31 +6,43 @@ import {
   transcribeAudioWhisper,
   transcribeAudioWhisperFromURL,
 } from '../services/speech.recognition.service';
+import { getApiKey, validateApiKeys } from '../services/api.key.service';
+import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.post('/transcribe/oai', upload.single('audio'), async (req, res) => {
-  const apiKey = req.headers['openai-api-key'] as string;
-  const language = req.body.language || 'en'; // Default to English if not specified
+router.post('/transcribe/oai', 
+  validateApiKeys(['openai']),
+  upload.single('audio'), 
+  async (req: AuthenticatedRequest, res) => {
+    const language = req.body.language || 'en'; // Default to English if not specified
 
-  try {
-    if (req.file) {
-      // Handle file upload
-      const oaiWhisperResult = await transcribeAudioWhisper(apiKey, req.file.buffer, language);
-      res.send({ text: oaiWhisperResult });
-    } else if (req.body.audioURL) {
-      // Handle URL-based transcription
-      const oaiWhisperResult = await transcribeAudioWhisperFromURL(apiKey, req.body.audioURL, language);
-      res.send({ text: oaiWhisperResult });
-    } else {
-      res.status(400).send('No audio file uploaded or URL provided');
+    try {
+
+      const openaiApiKey = await getApiKey(req.company._id, 'openai');
+
+      if (!openaiApiKey) {
+        res.status(401).send('OpenAI API key not found');
+        return;
+      }
+
+      if (req.file) {
+        const oaiWhisperResult = await transcribeAudioWhisper(openaiApiKey, req.file.buffer, language);
+        res.send({ text: oaiWhisperResult });
+      } else if (req.body.audioURL) {
+        const oaiWhisperResult = await transcribeAudioWhisperFromURL(openaiApiKey, req.body.audioURL, language);
+        res.send({ text: oaiWhisperResult });
+      } else {
+        res.status(400).send('No audio file uploaded or URL provided');
+      }
+    } catch (error) {
+      console.error('Error in /transcribe/oai:', error);
+      res.status(500).send('Error transcribing audio');
     }
-  } catch (error) {
-    console.error('Error in /transcribe/oai:', error);
-    res.status(500).send('Error transcribing audio');
-  }
 });
+
+
 
 router.post('/transcribe/gcp', async (req, res) => {
   const { audioURL, language = 'en-US' } = req.body; // Default to English (US) if not specified

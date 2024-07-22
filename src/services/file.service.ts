@@ -4,6 +4,7 @@ import { Assistant } from '../models/Assistant';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import mongoose from 'mongoose';
 
 export async function uploadFile(
   file: Express.Multer.File,
@@ -15,22 +16,47 @@ export async function uploadFile(
   const openai = new OpenAI({ apiKey: openaiApiKey });
 
   try {
-    // Create a temporary file
+    // Check if the file is empty
+    if (file.size === 0) {
+      throw new Error('File buffer is empty. Please upload a valid file.');
+    }
+
+    // Validate the MIME type
+    const supportedMimeTypes = [
+      'c', 'cpp', 'css', 'csv', 'docx', 'gif', 'html', 'java', 'jpeg', 'jpg', 'js', 'json',
+      'md', 'pdf', 'php', 'png', 'pptx', 'py', 'rb', 'tar', 'tex', 'ts', 'txt', 'webp', 'xlsx', 'xml', 'zip'
+    ];
+    const fileExtension = path.extname(file.originalname).substring(1);
+    if (!supportedMimeTypes.includes(fileExtension)) {
+      throw new Error(`Unsupported file format: ${file.mimetype}. Supported formats are: ${supportedMimeTypes.join(', ')}`);
+    }
     const tempFilePath = path.join(os.tmpdir(), file.originalname);
-    
+
     // Write the buffer to the temporary file
     fs.writeFileSync(tempFilePath, file.buffer);
 
     // Upload file to OpenAI using createReadStream
+    console.log('Uploading file to OpenAI');
     const openaiFile = await openai.files.create({
       file: fs.createReadStream(tempFilePath),
       purpose: 'assistants',
     });
+    console.log(`File uploaded to OpenAI with ID: ${openaiFile.id}`);
+
+    // Create Vector store file
+    const vectorStoreFile = await openai.beta.vectorStores.files.create(
+      "vs_poKjJ1gAKd8Ovo0p95YxLTr0",
+      {
+        file_id: openaiFile.id,
+      }
+    );
+    console.log('Vector store file created:', vectorStoreFile);
 
     // Delete the temporary file
     fs.unlinkSync(tempFilePath);
 
     // Create file document in MongoDB
+    console.log('Creating file document in MongoDB');
     const newFile = new File({
       filename: file.originalname,
       title: title || file.originalname,
@@ -41,21 +67,26 @@ export async function uploadFile(
       assistantId,
     });
     await newFile.save();
+    console.log(`File document created with ID: ${newFile._id}`);
 
     // Attach file to OpenAI Assistant
-    const assistant = await Assistant.findOne({ assistantId });
+    console.log('Finding assistant in MongoDB');
+    const assistant = await Assistant.findOne({
+      _id: new mongoose.Types.ObjectId(assistantId),
+    });
     if (!assistant) {
+      console.error(`Assistant with ID: ${assistantId} not found in MongoDB`);
       throw new Error('Assistant not found');
     }
+    console.log(`Assistant found with ID: ${assistant.assistantId}`);
 
-    const currentAssistant = await openai.beta.assistants.retrieve(assistant.assistantId);
-    const currentFileIds = (currentAssistant as any).file_ids ?? [];
-    const updatedFileIds = [...currentFileIds, openaiFile.id];
-
-    // Use a type assertion to bypass TypeScript's property check
-    await openai.beta.assistants.update(assistant.assistantId, {
-      file_ids: updatedFileIds,
+    console.log('Updating assistant in OpenAI');
+    const updateResponse = await openai.beta.assistants.update(assistant.assistantId, {
+      tool_resources: { file_search: { vector_store_ids: [vectorStoreFile.vector_store_id] } },
+      tools: [{ type: 'file_search' }],
     } as any);
+    console.log('Assistant update response:', updateResponse);
+    console.log('Assistant updated successfully');
 
 
     return {
@@ -71,16 +102,56 @@ export async function uploadFile(
   }
 }
 
-export async function listFiles(assistantId: string) {
+
+
+export async function listAllOpenAIFiles(openaiApiKey: string) {
+  const openai = new OpenAI({ apiKey: openaiApiKey });
+
   try {
-    const files = await File.find({ assistantId });
-    return files.map((file) => ({
-      id: file._id,
-      name: file.title,
-      description: file.description,
-      created_at: file.createdAt,
-      filename: file.filename,
+    const files = await openai.files.list();
+    return files;
+  } catch (error) {
+    console.error('Error listing files:', error);
+    throw error;
+  }
+}
+
+export async function listFiles(assistantId: string, openaiApiKey: string) {
+  const openai = new OpenAI({ apiKey: openaiApiKey });
+
+  try {
+    // Fetch assistant details from MongoDB
+    const assistant = await Assistant.findOne({
+      _id: new mongoose.Types.ObjectId(assistantId),
+    });
+    if (!assistant) {
+      throw new Error('Assistant not found');
+    }
+
+    // Fetch files from MongoDB
+    const files = await File.find({ assistantId: assistant._id });
+
+    // Fetch file details from OpenAI
+    const openaiFiles = await openai.files.list();
+
+    // Combine MongoDB and OpenAI data
+    const combinedFiles = await Promise.all(files.map(async (file) => {
+      const openaiFile = openaiFiles.data.find(f => f.id === file.openaiFileId);
+
+      return {
+        id: file._id.toString(),
+        name: file.title,
+        description: file.description,
+        created_at: file.createdAt,
+        filename: file.filename,
+        openai_id: file.openaiFileId,
+        purpose: openaiFile?.purpose,
+        bytes: openaiFile?.bytes,
+        status: openaiFile?.status,
+      };
     }));
+
+    return combinedFiles;
   } catch (error) {
     console.error('Error listing files:', error);
     throw error;
@@ -91,32 +162,14 @@ export async function deleteFile(assistantId: string, fileId: string, openaiApiK
   const openai = new OpenAI({ apiKey: openaiApiKey });
 
   try {
-    const file = await File.findOne({ _id: fileId, assistantId });
+    // Find the file in MongoDB
+    const file = await File.findOne({ _id: new mongoose.Types.ObjectId(fileId) , assistantId });
     if (!file) {
       throw new Error('File not found');
     }
 
     // Delete file from OpenAI
     await openai.files.del(file.openaiFileId);
-
-    // Remove file from Assistant
-    const assistant = await Assistant.findOne({ assistantId });
-    if (assistant) {
-      const currentAssistant = await openai.beta.assistants.retrieve(assistant.assistantId);
-      const currentFileIds = (currentAssistant as any).file_ids ?? [];
-      const updatedFileIds = currentFileIds.filter((id: string) => id !== file.openaiFileId);
-
-      // Use type assertion when updating the assistant
-      await openai.beta.assistants.update(assistant.assistantId, {
-        file_ids: updatedFileIds,
-      } as any);
-
-      // Use a type assertion to bypass TypeScript's property check
-      await openai.beta.assistants.update(assistant.assistantId, {
-        file_ids: updatedFileIds,
-      } as any);
-
-    }
 
     // Delete file record from MongoDB
     await file.deleteOne();
@@ -149,74 +202,3 @@ export async function cleanupAssistantFiles(assistantId: string, openaiApiKey: s
     throw error;
   }
 }
-
-
-// import { OpenAI } from 'openai';
-// import { File } from '../models/File';
-// import { Assistant } from '../models/Assistant';
-// import fs from 'fs';
-// import os from 'os';
-// import path from 'path';
-
-// export async function uploadFile(
-//   file: Express.Multer.File,
-//   assistantId: string,
-//   openaiApiKey: string,
-//   title?: string,
-//   description?: string
-// ) {
-//   const openai = new OpenAI({ apiKey: openaiApiKey });
-
-//   try {
-//     // Create a temporary file
-//     const tempFilePath = path.join(os.tmpdir(), file.originalname);
-    
-//     // Write the buffer to the temporary file
-//     fs.writeFileSync(tempFilePath, file.buffer);
-
-//     // Upload file to OpenAI using createReadStream
-//     const openaiFile = await openai.files.create({
-//       file: fs.createReadStream(tempFilePath),
-//       purpose: 'assistants',
-//     });
-
-//     // Delete the temporary file
-//     fs.unlinkSync(tempFilePath);
-
-//     // Create file document in MongoDB
-//     const newFile = new File({
-//       filename: file.originalname,
-//       title: title || file.originalname,
-//       description: description,
-//       mimeType: file.mimetype,
-//       size: file.size,
-//       openaiFileId: openaiFile.id,
-//       assistantId,
-//     });
-//     await newFile.save();
-
-//     // Attach file to OpenAI Assistant
-//     const assistant = await Assistant.findOne({ assistantId });
-//     if (!assistant) {
-//       throw new Error('Assistant not found');
-//     }
-
-//     // const currentAssistant = await openai.beta.assistants.retrieve(assistant.assistantId);
-//     // const updatedFileIds = [...(currentAssistant.files || []), openaiFile.id];
-
-//     // await openai.beta.assistants.update(assistant.assistantId, {
-//     //   file_ids: updatedFileIds,
-//     // });
-
-//     return {
-//       message: 'File uploaded successfully',
-//       fileId: newFile._id,
-//       openaiFileId: openaiFile.id,
-//       title: newFile.title,
-//       description: newFile.description,
-//     };
-//   } catch (error) {
-//     console.error('Error in file service:', error);
-//     throw error;
-//   }
-// }

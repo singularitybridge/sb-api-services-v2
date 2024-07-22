@@ -1,3 +1,4 @@
+// File: src/services/session.service.ts
 import { Assistant } from '../models/Assistant';
 import { Session } from '../models/Session';
 import { createNewThread } from './oai.thread.service';
