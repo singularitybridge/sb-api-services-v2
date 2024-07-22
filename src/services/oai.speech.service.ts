@@ -1,4 +1,6 @@
-import { uploadImage } from './google.storage.service';
+/// file_path: src/services/oai.speech.service.ts
+
+import { uploadFile } from './google.storage.service';
 import { getOpenAIClient } from './assistant.service';
 
 export const generateSpeech = async (
@@ -30,6 +32,6 @@ export const generateSpeech = async (
     path: '',
   };
 
-  const publicUrl = await uploadImage(file);
+  const publicUrl = await uploadFile(file);
   return publicUrl;
 };
