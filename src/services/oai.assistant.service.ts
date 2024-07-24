@@ -1,8 +1,10 @@
+// file path: src/services/oai.assistant.service.ts
 import OpenAI from 'openai';
 import { getOpenAIClient } from './assistant.service';
 import { ApiKey } from './verification.service';
 import Api from 'twilio/lib/rest/Api';
 import { cleanupAssistantFiles } from './file.service';
+import { VectorStore } from '../models/VectorStore';
 
 export const getAssistants = async (apiKey: string) => {
   const openaiClient = getOpenAIClient(apiKey);
@@ -46,13 +48,15 @@ export const updateAssistantById = async (
 
 export const createAssistant = async (
   apiKey: string,
+  companyId: string,
+  assistantId: string,
   name: string,
   description: string,
   model: string,
   instructions: string,
 ) => {
   console.log('Creating assistant');
-  
+
   const openaiClient = getOpenAIClient(apiKey);
   const assistant = await openaiClient.beta.assistants.create({
     name,
@@ -61,6 +65,20 @@ export const createAssistant = async (
     model,
     tools: [{ type: 'file_search' }],
   });
+
+  // Create a new vector store
+  const vectorStore = await openaiClient.beta.vectorStores.create({
+    name: `${name} Vector Store`,
+  });
+
+  const newVectorStore = new VectorStore({
+    openaiId: vectorStore.id,
+    assistantId: assistantId,
+    companyId: companyId,
+    name: vectorStore.name,
+  });
+  await newVectorStore.save();
+
   return assistant;
 };
 
