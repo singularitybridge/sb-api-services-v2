@@ -1,3 +1,5 @@
+// file path: /src/services/file.service.ts
+
 import { OpenAI } from 'openai';
 import { File } from '../models/File';
 import { Assistant } from '../models/Assistant';
@@ -5,6 +7,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import mongoose from 'mongoose';
+import { VectorStore } from '../models/VectorStore';
 
 export async function uploadFile(
   file: Express.Multer.File,
@@ -17,7 +20,7 @@ export async function uploadFile(
 
   try {
     // Check if the file is empty
-    if (file.size === 0) {
+    if (file.size === 0) { 
       throw new Error('File buffer is empty. Please upload a valid file.');
     }
 
@@ -41,11 +44,25 @@ export async function uploadFile(
       file: fs.createReadStream(tempFilePath),
       purpose: 'assistants',
     });
-    console.log(`File uploaded to OpenAI with ID: ${openaiFile.id}`);
+
+    // Find the assistant in MongoDB
+    const assistant = await Assistant.findOne({
+      _id: new mongoose.Types.ObjectId(assistantId),
+    });
+    if (!assistant) {
+      throw new Error('Assistant not found');
+    }
+
+    // Find the associated vector store
+    const vectorStore = await VectorStore.findOne({ assistantId: assistant._id });
+    if (!vectorStore) {
+      throw new Error('Vector store not found');
+    }
+
 
     // Create Vector store file
     const vectorStoreFile = await openai.beta.vectorStores.files.create(
-      "vs_poKjJ1gAKd8Ovo0p95YxLTr0",
+      vectorStore.openaiId,
       {
         file_id: openaiFile.id,
       }
@@ -67,28 +84,14 @@ export async function uploadFile(
       assistantId,
     });
     await newFile.save();
-    console.log(`File document created with ID: ${newFile._id}`);
 
     // Attach file to OpenAI Assistant
-    console.log('Finding assistant in MongoDB');
-    const assistant = await Assistant.findOne({
-      _id: new mongoose.Types.ObjectId(assistantId),
-    });
-    if (!assistant) {
-      console.error(`Assistant with ID: ${assistantId} not found in MongoDB`);
-      throw new Error('Assistant not found');
-    }
-    console.log(`Assistant found with ID: ${assistant.assistantId}`);
-
-    console.log('Updating assistant in OpenAI');
     const updateResponse = await openai.beta.assistants.update(assistant.assistantId, {
       tool_resources: { file_search: { vector_store_ids: [vectorStoreFile.vector_store_id] } },
       tools: [{ type: 'file_search' }],
     } as any);
-    console.log('Assistant update response:', updateResponse);
+
     console.log('Assistant updated successfully');
-
-
     return {
       message: 'File uploaded successfully',
       fileId: newFile._id,
@@ -96,6 +99,7 @@ export async function uploadFile(
       title: newFile.title,
       description: newFile.description,
     };
+    
   } catch (error) {
     console.error('Error in file service:', error);
     throw error;
@@ -163,7 +167,7 @@ export async function deleteFile(assistantId: string, fileId: string, openaiApiK
 
   try {
     // Find the file in MongoDB
-    const file = await File.findOne({ _id: new mongoose.Types.ObjectId(fileId) , assistantId });
+    const file = await File.findOne({ _id: new mongoose.Types.ObjectId(fileId), assistantId });
     if (!file) {
       throw new Error('File not found');
     }
