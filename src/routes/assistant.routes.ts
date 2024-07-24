@@ -248,7 +248,7 @@ assistantRouter.delete(
     }
 
     // Delete the assistant from OpenAI
-    const deleted = await deleteAssistantById(apiKey, assistant.assistantId);
+    const deleted = await deleteAssistantById(apiKey, assistant.assistantId, id);
     if (!deleted) {
       return res
         .status(500)

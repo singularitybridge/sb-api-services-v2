@@ -84,10 +84,11 @@ export const createAssistant = async (
 
 export const deleteAssistantById = async (
   apiKey: string,
-  assistantId: string
+  assistantId: string,
+  _id: string,
 ) => {
   const openaiClient = getOpenAIClient(apiKey);
-  await cleanupAssistantFiles(assistantId, apiKey);
+  await cleanupAssistantFiles(_id, apiKey);
   const response = await openaiClient.beta.assistants.del(assistantId);
   return response.deleted;
 };

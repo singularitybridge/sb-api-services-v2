@@ -20,7 +20,7 @@ export async function uploadFile(
 
   try {
     // Check if the file is empty
-    if (file.size === 0) { 
+    if (file.size === 0) {
       throw new Error('File buffer is empty. Please upload a valid file.');
     }
 
@@ -99,7 +99,7 @@ export async function uploadFile(
       title: newFile.title,
       description: newFile.description,
     };
-    
+
   } catch (error) {
     console.error('Error in file service:', error);
     throw error;
@@ -192,13 +192,27 @@ export async function cleanupAssistantFiles(assistantId: string, openaiApiKey: s
   const openai = new OpenAI({ apiKey: openaiApiKey });
 
   try {
-    const files = await File.find({ assistantId });
-    for (const file of files) {
+    const vectorStore = await VectorStore.findOne({ assistantId });
+    if (vectorStore) {
       try {
-        await openai.files.del(file.openaiFileId);
-        await file.deleteOne();
+        // Delete the vector store from OpenAI
+        await openai.beta.vectorStores.del(vectorStore.openaiId);
+
+        // Delete the vector store document from MongoDB
+        await vectorStore.deleteOne();
+
       } catch (error) {
-        console.error(`Error deleting file ${file._id}:`, error);
+        console.error(`Error deleting vector store ${vectorStore._id}:`, error);
+      }
+
+      const files = await File.find({ assistantId });
+      for (const file of files) {
+        try {
+          await openai.files.del(file.openaiFileId);
+          await file.deleteOne();
+        } catch (error) {
+          console.error(`Error deleting file ${file._id}:`, error);
+        }
       }
     }
   } catch (error) {
