@@ -20,11 +20,9 @@ inboxRouter.post('/:sessionId', async (req, res) => {
 // lets make a reply url for a session
 
 inboxRouter.post('/reply/:sessionId', async (req, res) => {
-
   const { message } = req.body;
   const { sessionId } = req.params;
   const apiKey = req.headers['openai-api-key'] as string;
-
 
   // step 1 - add a message (human response ) to the inbox
 
@@ -33,7 +31,6 @@ inboxRouter.post('/reply/:sessionId', async (req, res) => {
     sessionId,
     type: 'human_agent_response',
   });
-
 
   // step 2 - send a response to oai chat thread
 
@@ -47,13 +44,11 @@ inboxRouter.post('/reply/:sessionId', async (req, res) => {
   const llmResponse = await handleSessionMessage(
     apiKey,
     responseTemplate,
-    session.companyId,
-    session.userId,
+    session.id,
     {
-      'message_type': 'human-agent-response',
-    }
+      message_type: 'human-agent-response',
+    },
   );
-
 
   res.json({ message: 'success' });
 });
