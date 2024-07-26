@@ -31,6 +31,7 @@ import { verifyAccess, verifyTokenMiddleware } from './middleware/auth.middlewar
 import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
 import { onboardingRouter } from './routes/onboarding.routes';
 import { authRouter } from './routes/auth.routes';
+import { errorHandler } from './middleware/errorHandler.middleware';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -63,6 +64,10 @@ app.use('/onboarding', verifyTokenMiddleware, verifyAccess() , onboardingRouter)
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);
+
+
+// error handler
+app.use(errorHandler);
 
 
 
