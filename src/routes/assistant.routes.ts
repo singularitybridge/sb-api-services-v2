@@ -18,13 +18,12 @@ import {
 } from '../services/oai.thread.service';
 import { getCompletionResponse } from '../services/oai.completion.service';
 import { getApiKey, validateApiKeys } from '../services/api.key.service';
-import { AuthenticatedRequest, verifyAccess } from '../middleware/auth.middleware';
+import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
 const assistantRouter = express.Router();
 
 assistantRouter.post(
   '/completion',
-  verifyAccess(),
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
     const {
@@ -91,14 +90,9 @@ assistantRouter.post(
   '/user-input',
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
-    const { userInput, companyId, userId } = req.body;
+    const { userInput, sessionId } = req.body;
     const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
-    const response = await handleSessionMessage(
-      apiKey,
-      userInput,
-      companyId,
-      userId,
-    );
+    const response = await handleSessionMessage(apiKey, userInput, sessionId);
     res.send(response);
   },
 );
@@ -121,25 +115,19 @@ assistantRouter.post(
 
 assistantRouter.get('/', async (req: AuthenticatedRequest, res) => {
   try {
-    if (req.user?.role === 'Admin') {
-      const assistants = await Assistant.find({});
-      res.send(assistants);
-    } else {
-      const assistants = await Assistant.find({ companyId: req.user?.companyId });
-      res.send(assistants);
-    }
+    const assistants = await Assistant.find({ companyId: req.user?.companyId });
+    res.send(assistants);
   } catch (error) {
     res.status(500).send({ message: 'Error retrieving assistants' });
   }
 });
 
-
-
 assistantRouter.get('/:id', async (req: AuthenticatedRequest, res) => {
   try {
-    const assistant = await Assistant.findOne({ 
-      _id: req.params.id, 
-      companyId: req.user?.role === 'Admin' ? { $exists: true } : req.user?.companyId 
+    const assistant = await Assistant.findOne({
+      _id: req.params.id,
+      companyId:
+        req.user?.role === 'Admin' ? { $exists: true } : req.user?.companyId,
     });
     if (!assistant) {
       return res.status(404).send({ message: 'Assistant not found' });
@@ -149,7 +137,6 @@ assistantRouter.get('/:id', async (req: AuthenticatedRequest, res) => {
     res.status(500).send({ message: 'Error retrieving assistant' });
   }
 });
-
 
 assistantRouter.put(
   '/:id',
@@ -161,16 +148,21 @@ assistantRouter.put(
       const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
 
       const assistant = await Assistant.findOneAndUpdate(
-        { 
-          _id: id, 
-          companyId: req.user?.role === 'Admin' ? { $exists: true } : req.user?.companyId 
+        {
+          _id: id,
+          companyId:
+            req.user?.role === 'Admin'
+              ? { $exists: true }
+              : req.user?.companyId,
         },
         assistantData,
-        { new: true, upsert: false }
+        { new: true, upsert: false },
       );
 
       if (!assistant) {
-        return res.status(404).send({ message: 'Assistant not found or access denied' });
+        return res
+          .status(404)
+          .send({ message: 'Assistant not found or access denied' });
       }
 
       await updateAssistantById(
@@ -186,15 +178,14 @@ assistantRouter.put(
     } catch (error) {
       res.status(500).send({ message: 'Error updating assistant' });
     }
-  }
+  },
 );
-
 
 assistantRouter.post(  '/',  validateApiKeys(['openai']),  async (req: AuthenticatedRequest, res) => {
     try {
       const assistantData = {
         ...req.body,
-        companyId: req.user?.companyId
+        companyId: req.user?.companyId,
       };
       const newAssistant = new Assistant(assistantData);
       const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
@@ -218,7 +209,8 @@ assistantRouter.post(  '/',  validateApiKeys(['openai']),  async (req: Authentic
     } catch (err) {
       if (err instanceof Error && 'code' in err && err.code === 11000) {
         res.status(400).send({
-          message: 'Duplicate key error: an assistant with this phone number already exists.',
+          message:
+            'Duplicate key error: an assistant with this phone number already exists.',
         });
       } else {
         res.status(500).send({
@@ -226,9 +218,8 @@ assistantRouter.post(  '/',  validateApiKeys(['openai']),  async (req: Authentic
         });
       }
     }
-  }
+  },
 );
-
 
 assistantRouter.delete(
   '/:id',
@@ -238,11 +229,12 @@ assistantRouter.delete(
     const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
     console.log('assistant id ------ ' + id);
 
-    const assistant = await Assistant.findOne({ 
-      _id: id, 
-      companyId: req.user?.role === 'Admin' ? { $exists: true } : req.user?.companyId 
+    const assistant = await Assistant.findOne({
+      _id: id,
+      companyId:
+        req.user?.role === 'Admin' ? { $exists: true } : req.user?.companyId,
     });
-    
+
     if (!assistant) {
       return res.status(404).send({ message: 'Assistant not found ---- ' });
     }
