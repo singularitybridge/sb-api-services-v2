@@ -1,8 +1,6 @@
 // File: src/routes/session.routes.ts
 import { Router, Response, NextFunction } from 'express';
-import {
-  getSessionMessages,
-} from '../services/assistant.service';
+import { getSessionMessages } from '../services/assistant.service';
 import { Session } from '../models/Session';
 import {
   endSession,
@@ -30,9 +28,7 @@ sessionRouter.put(
         { new: true },
       );
       if (session) {
-        res
-          .status(200)
-          .send({ message: 'Assistant updated successfully', session });
+        res.status(200).send(session);
       } else {
         res.status(404).send({ error: 'Session not found' });
       }
@@ -75,10 +71,10 @@ sessionRouter.delete(
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const { id } = req.params;
-    
+
     try {
       const apiKey = await getApiKey(req.company._id, 'openai');
-      
+
       if (!apiKey) {
         throw new BadRequestError('OpenAI API key not found');
       }
@@ -88,11 +84,8 @@ sessionRouter.delete(
     } catch (error) {
       next(error);
     }
-  }
+  },
 );
-
-
-
 
 // Get all sessions (admin only)
 sessionRouter.get('/', async (req: AuthenticatedRequest, res: Response) => {
@@ -133,9 +126,6 @@ sessionRouter.get(
     }
   },
 );
-
-
-
 
 // Get session by ID
 sessionRouter.get('/:id', async (req: AuthenticatedRequest, res: Response) => {
@@ -183,13 +173,11 @@ sessionRouter.get(
         return res.status(404).send({ error: 'Session not found' });
       }
       const messages = await getSessionMessages(apiKey ?? '', id);
-      res.status(200).send( messages );
+      res.status(200).send(messages);
     } catch (error) {
       res.status(500).send({ error: 'Error getting session messages' });
     }
   },
 );
-
-
 
 export { sessionRouter };

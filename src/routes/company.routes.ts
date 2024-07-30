@@ -10,6 +10,7 @@ import {
   updateCompany,
 } from '../services/company.service';
 import { verifyAccess, AuthenticatedRequest, verifyCompanyAccess } from '../middleware/auth.middleware';
+import { Types } from 'mongoose';
 
 const companyRouter = express.Router();
 
@@ -19,10 +20,19 @@ companyRouter.post('/', verifyAccess(true), async (req: AuthenticatedRequest, re
   res.json(company);
 });
 
-companyRouter.get('/', verifyAccess(true), async (req: AuthenticatedRequest, res) => {
-  const companies = await getCompanies();
-  res.json(companies);
+companyRouter.get('/', verifyAccess(), async (req: AuthenticatedRequest, res) => {
+  try {
+    const companyId = req.user?.role === 'Admin' ? null : req.user?.companyId;
+    const companies = await getCompanies(
+      companyId ? new Types.ObjectId(companyId) : null
+    );
+    res.json(companies);
+  } catch (error) {
+    console.error('Error retrieving companies:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
 });
+
 
 companyRouter.delete('/:id', verifyAccess(true), async (req: AuthenticatedRequest, res) => {
   const company = await deleteCompany(req.params.id);

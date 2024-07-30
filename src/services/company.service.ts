@@ -1,4 +1,5 @@
 // File: src/services/company.service.ts
+import { Types } from 'mongoose';
 import { Company, ICompany, IApiKey } from '../models/Company';
 import { encryptData, decryptData } from './encryption.service';
 import jwt from 'jsonwebtoken';
@@ -102,13 +103,17 @@ export const getDecryptedCompany = async (id: string) => {
   }
 };
 
-export const getCompanies = async () => {
+export const getCompanies = async (companyId: Types.ObjectId | null): Promise<any[]> => {
   try {
-    const companies = await Company.find();
-    return companies.map((company) => {
-      const companyData = company.toObject();
-      return companyData;
-    });
+    if (companyId === null) {
+      // If no companyId is provided (admin user), return all companies
+      const companies = await Company.find();
+      return companies.map((company) => company.toObject());
+    } else {
+      // If a companyId is provided (regular user), return only that company
+      const company = await Company.findById(companyId);
+      return company ? [company.toObject()] : [];
+    }
   } catch (error) {
     console.error('Error retrieving companies:', error);
     throw error;

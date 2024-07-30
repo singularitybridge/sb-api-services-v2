@@ -6,9 +6,9 @@ import { verifyAccess, AuthenticatedRequest } from '../middleware/auth.middlewar
 const userRouter = express.Router();
 
 // Get all users (admin only)
-userRouter.get('/', verifyAccess(true), async (req: AuthenticatedRequest, res) => {
+userRouter.get('/', verifyAccess(), async (req: AuthenticatedRequest, res) => {
   try {
-    const users = await User.find({});
+    const users = await User.find({ companyId: req.user?.companyId });
     res.send(users);
   } catch (error) {
     res.status(500).send({ message: `Error getting users: ${error}` });
