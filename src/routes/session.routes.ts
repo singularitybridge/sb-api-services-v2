@@ -2,7 +2,6 @@
 import { Router, Response, NextFunction } from 'express';
 import {
   getSessionMessages,
-  getSessionMessagesByCompanyAndUserId,
 } from '../services/assistant.service';
 import { Session } from '../models/Session';
 import {
@@ -135,42 +134,8 @@ sessionRouter.get(
   },
 );
 
-// Get session by company and user ID
-sessionRouter.get(
-  '/:companyId/:userId',
-  async (req: AuthenticatedRequest, res: Response) => {
-    const { companyId, userId } = req.params;
-    try {
-      if (
-        req.user?.role !== 'Admin' &&
-        (req.user?.companyId.toString() !== companyId ||
-          req.user?._id.toString() !== userId)
-      ) {
-        return res.status(403).send({ error: 'Access denied' });
-      }
 
-      const sessions = await Session.aggregate([
-        {
-          $match: {
-            companyId: new mongoose.Types.ObjectId(companyId),
-            userId: new mongoose.Types.ObjectId(userId),
-            active: true,
-          },
-        },
-        ...sessionFriendlyAggreationQuery,
-      ]);
 
-      if (sessions.length === 0) {
-        return res.status(404).send({ error: 'Session not found' });
-      }
-
-      const session = sessions[0];
-      res.status(200).send(session);
-    } catch (error) {
-      res.status(500).send({ error: 'Error getting session' });
-    }
-  },
-);
 
 // Get session by ID
 sessionRouter.get('/:id', async (req: AuthenticatedRequest, res: Response) => {
@@ -218,43 +183,13 @@ sessionRouter.get(
         return res.status(404).send({ error: 'Session not found' });
       }
       const messages = await getSessionMessages(apiKey ?? '', id);
-      res.status(200).send({ messages });
+      res.status(200).send( messages );
     } catch (error) {
       res.status(500).send({ error: 'Error getting session messages' });
     }
   },
 );
 
-// Get messages by company and user ID
-sessionRouter.get(
-  '/messages/:companyId/:userId',
-  validateApiKeys(['openai']),
-  async (req: AuthenticatedRequest, res: Response) => {
-    const { companyId, userId } = req.params;
-    const apiKey = await getApiKey(req.company._id, 'openai');
 
-    try {
-      if (
-        req.user?.role !== 'Admin' &&
-        (req.user?.companyId.toString() !== companyId ||
-          req.user?._id.toString() !== userId)
-      ) {
-        return res.status(403).send({ error: 'Access denied' });
-      }
-
-      const messages = await getSessionMessagesByCompanyAndUserId(
-        apiKey ?? '',
-        companyId,
-        userId,
-      );
-      res.status(200).send(messages);
-    } catch (error) {
-      console.log(error);
-      res
-        .status(500)
-        .send({ error: 'Error getting session/assistant messages' });
-    }
-  },
-);
 
 export { sessionRouter };

@@ -136,29 +136,6 @@ export async function getSessionMessages(apiKey:string, sessionId: string) {
   return messages;
 }
 
-export async function getSessionMessagesByCompanyAndUserId(
-  apiKey: string,
-  companyId: string,
-  userId: string,
-) {
-  const session = await Session.findOne({ companyId, userId, active: true });
-  if (!session) {
-    return [];
-  }
-
-  const messages = await getSessionMessages(apiKey, session._id);
-
-  for (let message of messages) {
-
-    const assistant = await getAssistantByAssistantId(message.assistant_id);
-    if (assistant) {
-      message.assistantName = assistant.name;
-    }
-
-  }
-
-  return messages;
-}
 
 export const handleSessionMessage = async (
   apiKey: string,
