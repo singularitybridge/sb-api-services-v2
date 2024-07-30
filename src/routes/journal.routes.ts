@@ -7,19 +7,18 @@ import {
   deleteJournalEntry,
 } from '../services/journal.service';
 import { AuthenticatedRequest, verifyAccess } from '../middleware/auth.middleware';
-import { validateApiKeys } from '../services/api.key.service';
 
 const journalRouter = express.Router();
 
-journalRouter.post(  '/',  verifyAccess(),  validateApiKeys(['openai']),  async (req: AuthenticatedRequest, res) => {
+journalRouter.post('/',verifyAccess(), async (req: AuthenticatedRequest, res) => {
     try {
+     
       const journalData = {
         ...req.body,
         userId: req.user?._id,
         companyId: req.company._id,
       };
-      console.log('Creating journal entry:', journalData);
-      
+     
       const newEntry = await createJournalEntry(journalData);
       res.status(201).json(newEntry);
     } catch (error) {
@@ -29,10 +28,7 @@ journalRouter.post(  '/',  verifyAccess(),  validateApiKeys(['openai']),  async 
   }
 );
 
-journalRouter.get(
-  '/',
-  verifyAccess(),
-  async (req: AuthenticatedRequest, res) => {
+journalRouter.get( '/', verifyAccess(),  async (req: AuthenticatedRequest, res) => {
     try {
       const { entryType, tags } = req.query;
       const entries = await getJournalEntries(
@@ -49,10 +45,7 @@ journalRouter.get(
   }
 );
 
-journalRouter.put(
-  '/:journalId',
-  verifyAccess(),
-  async (req: AuthenticatedRequest, res) => {
+journalRouter.put(  '/:journalId',  verifyAccess(),  async (req: AuthenticatedRequest, res) => {
     try {
       const { journalId } = req.params;
       const updatedEntry = await updateJournalEntry(journalId, req.body);
@@ -68,10 +61,7 @@ journalRouter.put(
   }
 );
 
-journalRouter.delete(
-  '/:journalId',
-  verifyAccess(),
-  async (req: AuthenticatedRequest, res) => {
+journalRouter.delete(  '/:journalId',  verifyAccess(),  async (req: AuthenticatedRequest, res) => {
     try {
       const { journalId } = req.params;
       const deleted = await deleteJournalEntry(journalId);

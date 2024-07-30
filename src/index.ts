@@ -31,6 +31,7 @@ import { verifyAccess, verifyTokenMiddleware } from './middleware/auth.middlewar
 import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
 import { onboardingRouter } from './routes/onboarding.routes';
 import { authRouter } from './routes/auth.routes';
+import { errorHandler } from './middleware/errorHandler.middleware';
 import { fileRouter } from './routes/file.routes';
 import { journalRouter } from './routes/journal.routes';
 
@@ -66,6 +67,14 @@ app.use('/onboarding', verifyTokenMiddleware, verifyAccess() , onboardingRouter)
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);
+
+
+// error handler
+app.use(errorHandler);
+
+
+
+
 
 export default app;
 
