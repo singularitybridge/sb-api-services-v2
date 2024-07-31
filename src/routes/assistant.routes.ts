@@ -181,10 +181,7 @@ assistantRouter.put(
   },
 );
 
-assistantRouter.post(
-  '/',
-  validateApiKeys(['openai']),
-  async (req: AuthenticatedRequest, res) => {
+assistantRouter.post(  '/',  validateApiKeys(['openai']),  async (req: AuthenticatedRequest, res) => {
     try {
       const assistantData = {
         ...req.body,
@@ -197,6 +194,8 @@ assistantRouter.post(
 
       const openAIAssistant = await createAssistant(
         apiKey,
+        assistantData.companyId,
+        newAssistant._id,
         assistantData.name,
         assistantData.description,
         assistantData.llmModel,
@@ -241,7 +240,7 @@ assistantRouter.delete(
     }
 
     // Delete the assistant from OpenAI
-    const deleted = await deleteAssistantById(apiKey, assistant.assistantId);
+    const deleted = await deleteAssistantById(apiKey, assistant.assistantId, id);
     if (!deleted) {
       return res
         .status(500)

@@ -1,3 +1,4 @@
+//file_path: src/models/Assistant.ts
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IIdentifier {
