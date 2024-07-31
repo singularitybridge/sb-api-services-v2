@@ -1,3 +1,4 @@
+/// file_path: src/models/Session.ts
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface ISession extends Document {
@@ -9,6 +10,12 @@ export interface ISession extends Document {
     createdAt: Date;
 }
 
+export interface ISessionExtended extends ISession {
+    userName?: string;
+    assistantName?: string;
+    companyName?: string;
+}
+
 export const SessionSchema: Schema = new Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     assistantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Assistant' },
@@ -18,7 +25,5 @@ export const SessionSchema: Schema = new Schema({
     createdAt: { type: Date, default: Date.now },
 });
 
-// SessionSchema.index({ companyId: 1, userId: 1 }, { unique: true });
 SessionSchema.index({ companyId: 1, userId: 1 }, { unique: true, partialFilterExpression: { active: true } });
 export const Session = mongoose.model<ISession>('Session', SessionSchema);
-
