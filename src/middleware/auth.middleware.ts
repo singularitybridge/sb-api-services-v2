@@ -20,8 +20,6 @@ export const verifyTokenMiddleware = async (
 
     req.user = user;
     req.company = company;
-    console.log('User:', user.name);
-    console.log('Company:', company.name);
     
     next();
   } catch (error) {
