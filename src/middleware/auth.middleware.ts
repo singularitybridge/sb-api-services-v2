@@ -1,50 +1,72 @@
-// file path: /src/services/oai.assistant.service.ts
-import jwt, { VerifyErrors } from 'jsonwebtoken';
+// src/middleware/auth.middleware.ts
 import { Request, Response, NextFunction } from 'express';
+import { extractTokenFromHeader, verifyToken } from '../services/token.service';
 import { Company } from '../models/Company';
-import { decryptData } from '../services/encryption.service';
+import { IUser } from '../models/User';
 
-export const verifyToken = async (
-  req: Request,
+export interface AuthenticatedRequest extends Request {
+  user?: IUser;
+  company?: any;
+}
+
+export const verifyTokenMiddleware = async (
+  req: AuthenticatedRequest,
   res: Response,
-  next: NextFunction,
+  next: NextFunction
 ) => {
-  const authHeader = req.headers.authorization;
-  console.log('Auth.Middleware --------- Header:  ' + authHeader);
+  try {
+    const token = extractTokenFromHeader(req.headers.authorization);
+    const { user, company } = await verifyToken(token);
 
-  if (authHeader) {
-    const token = authHeader.split(' ')[1];
+    req.user = user;
+    req.company = company;
 
-    try {
-      const decodedToken = jwt.verify(token, process.env.JWT_SECRET as string) as { companyId: string };
-      console.log('Auth.Middleware --------- decodedToken:', decodedToken);
-
-      // Find the company with the matching token
-      const company = await Company.findOne({ '_id': decodedToken.companyId });
-
-      if (!company) {
-        return res.status(403).json({ message: 'Token is not valid' });
-      }
-
-      console.log('Company found - company._id:', company._id);
-
-      const apiKey = company.api_keys[0] as any;
-      console.log('Auth.Middleware ---------API Key:', apiKey);
-      const decryptedApiKey = decryptData({ 'value': apiKey.value, 'iv': apiKey.iv, 'tag': apiKey.tag });
-      console.log('Auth.Middleware ---------Decrypted API Key:', decryptedApiKey);
-
-      req.headers['openai-api-key'] = decryptedApiKey;
-
-
-      next();
-    } catch (err) {
-      console.log('Error verifying token:', err);
-
-      return res. status(403).json({ message: 'Token is not valid' });
-    }
-  } else {
-    console.log('No auth header found');
-
-    res.status(401).json({ message: 'Authentication token is required' });
+    next();
+  } catch (error) {
+    console.error('Error verifying token:', error);
+    res.status(401).json({ message: 'Authentication token is required or invalid' });
   }
+};
+
+
+
+export const verifyAccess = (adminOnly: boolean = false) => {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    if (adminOnly && req.user.role !== 'Admin') {
+      return res.status(403).json({ message: 'Access denied: Admin only' });
+    }
+
+    if (req.user.role === 'Admin') {
+      // If it's an admin and a specific companyId is provided in the request, switch context
+      const requestedCompanyId = req.params.companyId || req.body.companyId;
+      if (requestedCompanyId) {
+        const company = await Company.findById(requestedCompanyId);
+        if (!company) {
+          return res.status(404).json({ message: 'Company not found' });
+        }
+        req.user.companyId = requestedCompanyId;
+        req.company = company;
+      }
+    } else {
+      // For CompanyUsers, ensure they can only access their own company's data
+      const requestedCompanyId = req.params.companyId || req.body.companyId;
+      if (requestedCompanyId && requestedCompanyId !== req.user.companyId.toString()) {
+        return res.status(403).json({ message: 'Access denied: Company mismatch' });
+      }
+    }
+
+    next();
+  };
+};
+
+
+export const verifyCompanyAccess = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  if (req.user?.role !== 'Admin' && req.user?.companyId.toString() !== req.params.id) {
+    return res.status(403).json({ message: 'Access denied: Company mismatch' });
+  }
+  next();
 };

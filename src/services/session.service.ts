@@ -1,8 +1,8 @@
+// File: src/services/session.service.ts
 import { Assistant } from '../models/Assistant';
 import { Session } from '../models/Session';
-import { createNewThread } from './oai.thread.service';
-
-
+import { CustomError, NotFoundError } from '../utils/errors';
+import { createNewThread, deleteThread } from './oai.thread.service';
 
 export const sessionFriendlyAggreationQuery = [
   {
@@ -52,7 +52,7 @@ export const sessionFriendlyAggreationQuery = [
       active: 1,
     },
   },
-]
+];
 
 export const updateSessionAssistant = async (
   sessionId: string,
@@ -69,44 +69,53 @@ export const getSessionOrCreate = async (
   apiKey: string,
   userId: string,
   companyId: string,
-  assistantId?: string, // Made optional
 ) => {
   let session = await Session.findOne({ userId, companyId, active: true });
 
-  if (session) {
-    if (assistantId && session.assistantId !== assistantId) {
-      session.assistantId = assistantId;
-      await session.save();
-    }
-  } else {
+  if (!session) {
     const threadId = await createNewThread(apiKey);
+    const defaultAssistant = await Assistant.findOne({ companyId });
 
-    // If assistantId is not provided, find a default assistant for the company
-    if (!assistantId) {
-      console.log('No assistantId provided, finding default assistant', {
-        companyId,
-      });
-      console.log("company id ------ "+companyId);
-      
-      const defaultAssistant = await Assistant.findOne({ companyId });
-      assistantId = defaultAssistant?._id;
+    if (!defaultAssistant) {
+      throw new Error('No default assistant available for this company');
     }
 
-    // If an assistantId (either provided or default) is available, create the session
-    if (assistantId) {
-      session = new Session({
-        userId,
-        companyId,
-        assistantId,
-        active: true,
-        threadId: threadId,
-      });
-      await session.save();
-    } else {
-      // Handle the case where no assistantId is available
-      throw new Error('No assistantId available to create a session');
-    }
+    session = new Session({
+      userId,
+      companyId,
+      assistantId: defaultAssistant._id,
+      active: true,
+      threadId: threadId,
+    });
+    await session.save();
   }
 
-  return session;
+  const assistant = await Assistant.findById(session.assistantId);
+
+  return {
+    _id: session._id,
+    assistantId: session.assistantId,
+  };
 };
+
+
+export const endSession = async (apiKey: string, sessionId: string): Promise<boolean> => {
+  const session = await Session.findOne({ _id: sessionId, active: true });
+  
+  if (!session) {
+    throw new NotFoundError('Active session');
+  }
+
+  try {
+    await deleteThread(apiKey, session.threadId);
+    session.active = false;
+    await session.save();
+
+    console.log(`Session ended, sessionId: ${sessionId}, userId: ${session.userId}`);
+    return true;
+  } catch (error: unknown) {
+    console.error('Error ending session:', error);
+    throw new CustomError('Failed to end session', 500);
+  }
+};
+
