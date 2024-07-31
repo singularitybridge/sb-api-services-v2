@@ -32,6 +32,8 @@ import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
 import { onboardingRouter } from './routes/onboarding.routes';
 import { authRouter } from './routes/auth.routes';
 import { errorHandler } from './middleware/errorHandler.middleware';
+import { fileRouter } from './routes/file.routes';
+import { journalRouter } from './routes/journal.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -54,13 +56,14 @@ app.use('/twilio/messaging', verifyTokenMiddleware, twilioMessagingRouter);
 app.use('/assistant', verifyTokenMiddleware, verifyAccess(), assistantRouter);
 app.use('/company', verifyTokenMiddleware, verifyAccess(), companyRouter);
 app.use('/user', verifyTokenMiddleware, verifyAccess(), userRouter);
+app.use('/file', verifyTokenMiddleware, verifyAccess(), fileRouter);
 app.use('/inbox', verifyTokenMiddleware, verifyAccess(), inboxRouter);
 app.use('/action', verifyTokenMiddleware, verifyAccess(), actionRouter);
 app.use('/session', verifyTokenMiddleware, verifyAccess(),  sessionRouter);
 app.use('/agenda', verifyTokenMiddleware, verifyAccess(), agendaRouter);
 app.use('/api', verifyTokenMiddleware, verifyAccess(), verificationRouter);
+app.use('/journal', verifyTokenMiddleware, verifyAccess(), journalRouter);
 app.use('/onboarding', verifyTokenMiddleware, verifyAccess() , onboardingRouter);
-
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);
