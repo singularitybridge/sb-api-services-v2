@@ -143,7 +143,7 @@ export async function listFiles(assistantId: string, openaiApiKey: string) {
       const openaiFile = openaiFiles.data.find(f => f.id === file.openaiFileId);
 
       return {
-        id: file._id.toString(),
+        fileId : file._id.toString(),
         name: file.title,
         description: file.description,
         created_at: file.createdAt,
