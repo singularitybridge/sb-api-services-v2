@@ -5,7 +5,7 @@ import { ApiKey } from './verification.service';
 import Api from 'twilio/lib/rest/Api';
 import { cleanupAssistantFiles } from './file.service';
 import { VectorStore } from '../models/VectorStore';
-import { functionFactory } from '../actions';
+import { createFunctionFactory, ActionContext } from '../actions';
 
 export const getAssistants = async (apiKey: string) => {
   const openaiClient = getOpenAIClient(apiKey);
@@ -59,6 +59,10 @@ export const createAssistant = async (
   console.log('Creating assistant');
 
   const openaiClient = getOpenAIClient(apiKey);
+
+  // Create a dummy context to generate function definitions
+  const dummyContext: ActionContext = { sessionId: 'dummy-session-id' };
+  const functionFactory = createFunctionFactory(dummyContext);
 
   // Create function definitions based on functionFactory
   const functionDefinitions = Object.entries(functionFactory).map(([funcName, funcDef]) => ({

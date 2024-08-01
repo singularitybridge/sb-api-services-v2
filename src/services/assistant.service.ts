@@ -37,6 +37,7 @@ const pollRunStatus = async (
   apiKey: string,
   threadId: string,
   runId: string,
+  sessionId: string,
   timeout: number = 45000,
 ) => {
   const startTime = Date.now();
@@ -62,6 +63,7 @@ const pollRunStatus = async (
         threadId,
         runId,
         run.required_action.submit_tool_outputs.tool_calls,
+        sessionId
       );
     }
 
@@ -117,7 +119,7 @@ export const handleSessionMessage = async (
       messageCount === 0 ? assistant?.introMessage : undefined,
   });
 
-  const completedRun = await pollRunStatus(apiKey, session.threadId, newRun.id);
+  const completedRun = await pollRunStatus(apiKey, session.threadId, newRun.id, sessionId);
   console.log('run completed > ' + completedRun.status);
 
   const messages = await openaiClient.beta.threads.messages.list(
@@ -128,35 +130,4 @@ export const handleSessionMessage = async (
   return response;
 };
 
-// to be renamed to getAssistantResponse
-export const handleUserInput = async (
-  apiKey: string,
-  userInput: string,
-  assistantId: string,
-  threadId: string,
-): Promise<string> => {
-  try {
-    const openaiClient = getOpenAIClient(apiKey);
-    await openaiClient.beta.threads.messages.create(threadId, {
-      role: 'user',
-      content: userInput,
-    });
 
-    const newRun = await openaiClient.beta.threads.runs.create(threadId, {
-      assistant_id: assistantId,
-      // instructions: "additional instructions",
-    });
-
-    console.log(`new run created: ${newRun.id}, for thread: ${threadId}`);
-
-    const completedRun = await pollRunStatus(apiKey, threadId, newRun.id);
-    console.log('run completed > ' + completedRun.status);
-
-    const messages = await openaiClient.beta.threads.messages.list(threadId);
-    // @ts-ignore
-    const response = messages.data[0].content[0].text.value;
-    return response;
-  } catch (error) {
-    return handleError(error as Error);
-  }
-};

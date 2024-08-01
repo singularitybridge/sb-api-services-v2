@@ -1,3 +1,11 @@
+/// file_path: /src/actions/types.ts
+
+
+export type ActionContext = {
+  sessionId: string;
+  // You can add more context properties here if needed
+};
+
 export type FunctionDefinition = {
     description: string;
     parameters: {

@@ -1,8 +1,8 @@
 import { IEventRequestBody } from '../Interfaces/eventRequest.interface';
 import { createEvent, deleteEvent, updateEvent } from '../services/google.calendar.service';
-import { FunctionFactory } from './types';
+import { FunctionFactory, ActionContext } from './types';
 
-export const calendarActions: FunctionFactory = {
+export const createCalendarActions = (context: ActionContext): FunctionFactory => ({
   createEvent: {
     description: 'Create a new calendar event',
     parameters: {
@@ -60,4 +60,4 @@ export const calendarActions: FunctionFactory = {
       return deleteResponse;
     },
   },
-};
+});

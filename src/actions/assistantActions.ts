@@ -1,20 +1,30 @@
+/// file_path: /src/actions/assistantActions.ts
 import { Assistant } from '../models/Assistant';
+import { Session } from '../models/Session';
 import { publishMessage } from '../services/pusher.service';
-import { FunctionFactory } from './types';
+import { ActionContext, FunctionFactory } from './types';
 
-export const assistantActions: FunctionFactory = {
+export const createAssistantActions = (context: ActionContext): FunctionFactory => ({
   getAssistants: {
-    description: 'Get a list of all assistants',
+    description: 'Get a list of all assistants for the current user\'s company',
     parameters: {
       type: 'object',
       properties: {},
       required: [],
     },
     function: async () => {
-      const assistants = await Assistant.find({}, { _id: 1, name: 1, description: 1 });
+      const session = await Session.findById(context.sessionId);
+      if (!session) {
+        throw new Error('Invalid session');
+      }
+      const assistants = await Assistant.find(
+        { companyId: session.companyId },
+        { _id: 1, name: 1, description: 1 }
+      );
       return assistants;
     },
   },
+
   setAssistant: {
     description: 'Set the current assistant',
     parameters: {
@@ -65,4 +75,5 @@ export const assistantActions: FunctionFactory = {
       };
     },
   },
-};
+});
+

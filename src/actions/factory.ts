@@ -1,16 +1,21 @@
-import { FunctionFactory } from './types';
-import { inboxActions } from './inboxActions';
-import { assistantActions } from './assistantActions';
-import { calendarActions } from './calendarActions';
+// file_path: /src/actions/factory.ts
 
-export const functionFactory: FunctionFactory = {
-  ...inboxActions,
-  ...assistantActions,
-  ...calendarActions,
-};
+import { FunctionFactory, ActionContext } from './types';
+import { createInboxActions } from './inboxActions';
+import { createAssistantActions } from './assistantActions';
+import { createCalendarActions } from './calendarActions';
 
-export const executeFunctionCall = async (call: any) => {
-  const functionName = call.function.name as keyof typeof functionFactory;
+export const createFunctionFactory = (context: ActionContext): FunctionFactory => ({
+  ...createInboxActions(context),
+  ...createAssistantActions(context),
+  ...createCalendarActions(context),
+});
+
+export const executeFunctionCall = async (call: any, sessionId: string) => {
+  const context: ActionContext = { sessionId };
+  const functionFactory = createFunctionFactory(context);
+  
+  const functionName = call.function.name as keyof FunctionFactory;
 
   if (functionName in functionFactory) {
     const args = JSON.parse(call.function.arguments);
