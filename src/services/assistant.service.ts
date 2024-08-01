@@ -1,23 +1,17 @@
 /// file_path: /src/services/oai.thread.service.ts
 import OpenAI, { BadRequestError, NotFoundError } from 'openai';
-import { submitToolOutputs } from '../helpers/assistant/functionFactory';
 import { Session } from '../models/Session';
 import {
   createNewThread,
   deleteThread,
   getMessages,
+  submitToolOutputs,
 } from './oai.thread.service';
 import { Assistant, IAssistant } from '../models/Assistant';
-import { getSessionOrCreate } from './session.service';
 import mongoose from 'mongoose';
 
-// export const openaiClient = new OpenAI({
-//   apiKey: process.env.OPENAI_API_KEY,
-// });
 
 export const getOpenAIClient = (apiKey: string) => {
-  console.log('getOpenAIClient', apiKey);
-  
   return new OpenAI({
     apiKey,
   });
@@ -37,12 +31,6 @@ const handleError = (error: Error): string => {
   }
 
   return response;
-};
-
-const getAssistantByAssistantId = async (
-  assistantId: string,
-): Promise<IAssistant | null> => {
-  return Assistant.findOne({ assistantId });
 };
 
 const pollRunStatus = async (
@@ -85,47 +73,6 @@ const pollRunStatus = async (
   throw new Error('Timeout exceeded while waiting for run to complete');
 };
 
-// export const endSessionByCompanyAndUserId = async (
-//   apiKey: string,
-//   companyId: string,
-//   userId: string,
-// ) => {
-//   const session = await Session.findOne({
-//     companyId: new mongoose.Types.ObjectId(companyId),
-//     userId: new mongoose.Types.ObjectId(userId),
-//     active: true,
-//   });
-//   const openaiClient = getOpenAIClient(apiKey);
-//   if (!session) {
-//     throw new Error('Active session not found for given assistant and user id');
-//   }
-
-//   deleteThread(apiKey, session.threadId);
-//   session.active = false;
-//   await session.save();
-
-//   console.log(
-//     `session ended, assistant: ${session.assistantId}, user: ${session.userId}`,
-//   );
-
-//   return true;
-// };
-
-// export const endSession = async (apiKey:string, sessionId: string) => {
-//   const session = await Session.findById(sessionId);
-//   const openaiClient = getOpenAIClient(apiKey);
-//   if (!session) return false;
-
-//   deleteThread(apiKey, session.threadId);
-//   session.active = false;
-//   await session.save();
-
-//   console.log(
-//     `session ended, assistant: ${session.assistantId}, user: ${session.userId}`,
-//   );
-
-//   return true;
-// };
 
 export async function getSessionMessages(apiKey:string, sessionId: string) {
   const session = await Session.findById(sessionId);

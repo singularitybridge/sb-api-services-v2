@@ -5,7 +5,7 @@ import { ApiKey } from './verification.service';
 import Api from 'twilio/lib/rest/Api';
 import { cleanupAssistantFiles } from './file.service';
 import { VectorStore } from '../models/VectorStore';
-import { functionFactory } from '../helpers/assistant/functionFactory';
+import { functionFactory } from '../actions';
 
 export const getAssistants = async (apiKey: string) => {
   const openaiClient = getOpenAIClient(apiKey);
