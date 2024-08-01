@@ -5,6 +5,7 @@ import { ApiKey } from './verification.service';
 import Api from 'twilio/lib/rest/Api';
 import { cleanupAssistantFiles } from './file.service';
 import { VectorStore } from '../models/VectorStore';
+import { functionFactory } from '../helpers/assistant/functionFactory';
 
 export const getAssistants = async (apiKey: string) => {
   const openaiClient = getOpenAIClient(apiKey);
@@ -58,12 +59,26 @@ export const createAssistant = async (
   console.log('Creating assistant');
 
   const openaiClient = getOpenAIClient(apiKey);
+
+  // Create function definitions based on functionFactory
+  const functionDefinitions = Object.entries(functionFactory).map(([funcName, funcDef]) => ({
+    type: "function" as const,
+    function: {
+      name: funcName,
+      description: funcDef.description,
+      parameters: funcDef.parameters
+    }
+  }));
+
   const assistant = await openaiClient.beta.assistants.create({
     name,
     description,
     instructions,
     model,
-    tools: [{ type: 'file_search' }],
+    tools: [
+      { type: 'file_search' },
+      ...functionDefinitions
+    ],
   });
 
   // Create a new vector store
@@ -81,6 +96,7 @@ export const createAssistant = async (
 
   return assistant;
 };
+
 
 export const deleteAssistantById = async (
   apiKey: string,

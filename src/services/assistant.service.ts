@@ -1,3 +1,4 @@
+/// file_path: /src/services/oai.thread.service.ts
 import OpenAI, { BadRequestError, NotFoundError } from 'openai';
 import { submitToolOutputs } from '../helpers/assistant/functionFactory';
 import { Session } from '../models/Session';
