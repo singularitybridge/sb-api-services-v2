@@ -1,4 +1,31 @@
+import OpenAI from 'openai';
+import { executeFunctionCall } from '../actions';
 import { getOpenAIClient } from './assistant.service';
+
+export const submitToolOutputs = async (
+  openaiClient: OpenAI,
+  threadId: string,
+  runId: string,
+  toolCalls: any[],
+) => {
+  console.log('called submitToolOutputs with args: ', toolCalls);
+
+  const outputs = await Promise.all(
+    toolCalls.map(async (call) => {
+      const output = await executeFunctionCall(call);
+      return {
+        tool_call_id: call.id,
+        output: JSON.stringify(output),
+      };
+    }),
+  );
+
+  console.log('tool outputs: ', outputs);
+  await openaiClient.beta.threads.runs.submitToolOutputs(threadId, runId, {
+    tool_outputs: outputs,
+  });
+};
+
 
 export const createNewThread = async (apiKey:string): Promise<string> => {
   const openaiClient = getOpenAIClient(apiKey);
