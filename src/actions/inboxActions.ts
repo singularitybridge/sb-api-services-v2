@@ -1,16 +1,12 @@
 import { addMessageToInbox } from '../services/inbox.service';
-import { FunctionFactory } from './types';
+import { FunctionFactory, ActionContext } from './types';
 
-export const inboxActions: FunctionFactory = {
+export const createInboxActions = (context: ActionContext): FunctionFactory => ({
   sendMessageToInbox: {
     description: 'Send a message to the inbox',
     parameters: {
       type: 'object',
       properties: {
-        sessionId: {
-          type: 'string',
-          description: 'The ID of the current session',
-        },
         message: {
           type: 'string',
           description: 'The message to send to the inbox',
@@ -18,21 +14,14 @@ export const inboxActions: FunctionFactory = {
       },
       required: ['message'],
     },
-    function: async (args: { sessionId?: string; message: string }) => {
-      if (!args.sessionId) {
-        return {
-          success: false,
-          description: 'Session ID is not provided. Please ask the user for it.',
-        };
-      }
-
+    function: async (args: { message: string }) => {
       try {
         await addMessageToInbox({
-          sessionId: args.sessionId,
+          sessionId: context.sessionId,
           message: args.message,
           type: 'human_agent_request',
         });
-        console.log(`Message sent to inbox: ${args.message}, sessionId: ${args.sessionId}`);
+        console.log(`Message sent to inbox: ${args.message}, sessionId: ${context.sessionId}`);
         return {
           success: true,
           description: 'Message sent to inbox',
@@ -42,7 +31,7 @@ export const inboxActions: FunctionFactory = {
         if ((error as any).name === 'CastError' && (error as any).path === '_id') {
           return {
             success: false,
-            description: 'Invalid session ID. Could you please share your session ID?',
+            description: 'Invalid session ID. Please contact support.',
           };
         }
         return {
@@ -52,4 +41,4 @@ export const inboxActions: FunctionFactory = {
       }
     },
   },
-};
+});
