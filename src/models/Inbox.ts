@@ -2,11 +2,12 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IInbox extends Document {
   sessionId: mongoose.Schema.Types.ObjectId;
-  senderId: mongoose.Schema.Types.ObjectId; 
+  senderId: mongoose.Schema.Types.ObjectId;
+  companyId: mongoose.Schema.Types.ObjectId;
   type: 'human_agent_request' | 'human_agent_response' | 'notification';
   status: 'open' | 'in_progress' | 'closed';
   message: string;
-  created: Date;
+  createdAt: Date;
 }
 
 const InboxSchema: Schema = new Schema({
@@ -17,7 +18,12 @@ const InboxSchema: Schema = new Schema({
   },
   senderId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'Assistant',
+    required: true,
+  },
+  companyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
     required: true,
   },
   type: {
@@ -34,7 +40,7 @@ const InboxSchema: Schema = new Schema({
     type: String,
     required: true,
   },
-  created: {
+  createdAt: {
     type: Date,
     default: Date.now,
   },

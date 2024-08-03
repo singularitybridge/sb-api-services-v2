@@ -1,7 +1,14 @@
+/// file_path: /src/actions/inboxActions.ts
+
 import { addMessageToInbox } from '../services/inbox.service';
 import { FunctionFactory, ActionContext } from './types';
 
-export const createInboxActions = (context: ActionContext): FunctionFactory => ({
+// Extend the ActionContext to include companyId if it's not already there
+interface ExtendedActionContext extends ActionContext {
+  companyId: string;
+}
+
+export const createInboxActions = (context: ExtendedActionContext): FunctionFactory => ({
   sendMessageToInbox: {
     description: 'Send a message to the inbox',
     parameters: {
@@ -20,8 +27,9 @@ export const createInboxActions = (context: ActionContext): FunctionFactory => (
           sessionId: context.sessionId,
           message: args.message,
           type: 'human_agent_request',
+          companyId: context.companyId, // Add the companyId here
         });
-        console.log(`Message sent to inbox: ${args.message}, sessionId: ${context.sessionId}`);
+        console.log(`Message sent to inbox: ${args.message}, sessionId: ${context.sessionId}, companyId: ${context.companyId}`);
         return {
           success: true,
           description: 'Message sent to inbox',
@@ -31,7 +39,7 @@ export const createInboxActions = (context: ActionContext): FunctionFactory => (
         if ((error as any).name === 'CastError' && (error as any).path === '_id') {
           return {
             success: false,
-            description: 'Invalid session ID. Please contact support.',
+            description: 'Invalid session ID or company ID. Please contact support.',
           };
         }
         return {

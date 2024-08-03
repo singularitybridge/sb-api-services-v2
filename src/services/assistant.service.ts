@@ -1,4 +1,4 @@
-/// file_path: /src/services/oai.thread.service.ts
+/// file_path: /src/services/assistant.service.ts
 import OpenAI, { BadRequestError, NotFoundError } from 'openai';
 import { Session } from '../models/Session';
 import {
@@ -10,13 +10,11 @@ import {
 import { Assistant, IAssistant } from '../models/Assistant';
 import mongoose from 'mongoose';
 
-
 export const getOpenAIClient = (apiKey: string) => {
   return new OpenAI({
     apiKey,
   });
 };
-
 
 const handleError = (error: Error): string => {
   let response = 'Something went wrong, ';
@@ -38,6 +36,7 @@ const pollRunStatus = async (
   threadId: string,
   runId: string,
   sessionId: string,
+  companyId: string,
   timeout: number = 45000,
 ) => {
   const startTime = Date.now();
@@ -63,7 +62,8 @@ const pollRunStatus = async (
         threadId,
         runId,
         run.required_action.submit_tool_outputs.tool_calls,
-        sessionId
+        sessionId,
+        companyId
       );
     }
 
@@ -75,7 +75,6 @@ const pollRunStatus = async (
   throw new Error('Timeout exceeded while waiting for run to complete');
 };
 
-
 export async function getSessionMessages(apiKey:string, sessionId: string) {
   const session = await Session.findById(sessionId);
   if (!session) {
@@ -86,14 +85,12 @@ export async function getSessionMessages(apiKey:string, sessionId: string) {
   return messages;
 }
 
-
 export const handleSessionMessage = async (
   apiKey: string,
   userInput: string,
   sessionId: string,
   metadata?: Record<string, string>,
 ): Promise<string> => {
-
   const session = await Session.findById(sessionId);
   if (!session || !session.active) {
     throw new Error('Invalid or inactive session');
@@ -102,6 +99,11 @@ export const handleSessionMessage = async (
   const assistant = await Assistant.findOne({
     _id: new mongoose.Types.ObjectId(session.assistantId),
   });
+
+  if (!assistant) {
+    throw new Error('Assistant not found');
+  }
+
   const messageCount = (await getMessages(apiKey, session.threadId)).length;
   const openaiClient = getOpenAIClient(apiKey);
 
@@ -114,12 +116,12 @@ export const handleSessionMessage = async (
   console.log('create new run', session.threadId, session.assistantId);
 
   const newRun = await openaiClient.beta.threads.runs.create(session.threadId, {
-    assistant_id: assistant?.assistantId as string,
+    assistant_id: assistant.assistantId as string,
     additional_instructions:
-      messageCount === 0 ? assistant?.introMessage : undefined,
+      messageCount === 0 ? assistant.introMessage : undefined,
   });
 
-  const completedRun = await pollRunStatus(apiKey, session.threadId, newRun.id, sessionId);
+  const completedRun = await pollRunStatus(apiKey, session.threadId, newRun.id, sessionId, session.companyId);
   console.log('run completed > ' + completedRun.status);
 
   const messages = await openaiClient.beta.threads.messages.list(
@@ -129,5 +131,3 @@ export const handleSessionMessage = async (
   const response = messages.data[0].content[0].text.value;
   return response;
 };
-
-

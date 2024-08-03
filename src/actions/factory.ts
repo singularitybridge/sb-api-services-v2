@@ -11,8 +11,8 @@ export const createFunctionFactory = (context: ActionContext): FunctionFactory =
   ...createCalendarActions(context),
 });
 
-export const executeFunctionCall = async (call: any, sessionId: string) => {
-  const context: ActionContext = { sessionId };
+export const executeFunctionCall = async (call: any, sessionId: string, companyId: string) => {
+  const context: ActionContext = { sessionId, companyId };
   const functionFactory = createFunctionFactory(context);
   
   const functionName = call.function.name as keyof FunctionFactory;
