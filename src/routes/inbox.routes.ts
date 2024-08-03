@@ -1,61 +1,82 @@
+/// file_path: src/routes/inbox.routes.ts
 import express from 'express';
-import { addMessageToInbox, getInboxMessages } from '../services/inbox.service';
+import { addMessageToInbox, getInboxMessages, updateInboxMessageStatus } from '../services/inbox.service';
 import { handleSessionMessage } from '../services/assistant.service';
 import { Session } from '../models/Session';
+import { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { getApiKey } from '../services/api.key.service';
 
 const inboxRouter = express.Router();
 
-inboxRouter.post('/:sessionId', async (req, res) => {
+// AI agent sends a message to the inbox
+inboxRouter.post('/:sessionId', async (req: AuthenticatedRequest, res) => {
   const { message } = req.body;
   const { sessionId } = req.params;
 
-  const response = await addMessageToInbox({
-    message,
-    sessionId,
-    type: 'human_agent_request',
-  });
-  res.json(response);
-});
-
-// lets make a reply url for a session
-
-inboxRouter.post('/reply/:sessionId', async (req, res) => {
-  const { message } = req.body;
-  const { sessionId } = req.params;
-  const apiKey = req.headers['openai-api-key'] as string;
-
-  // step 1 - add a message (human response ) to the inbox
-
-  await addMessageToInbox({
-    message,
-    sessionId,
-    type: 'human_agent_response',
-  });
-
-  // step 2 - send a response to oai chat thread
-
-  const session = await Session.findById(sessionId);
-
-  if (!session) {
-    return res.status(404).json({ message: 'session not found' });
+  try {
+    const response = await addMessageToInbox({
+      message,
+      sessionId,
+      type: 'human_agent_request',
+      companyId: req.company._id,
+    });
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({ message: 'Error adding message to inbox', error });
   }
-
-  const responseTemplate = `[human-agent-response]: ${message}. [system]: rephrase/format this resposne to match the conversation context and send it to the user.`;
-  const llmResponse = await handleSessionMessage(
-    apiKey,
-    responseTemplate,
-    session.id,
-    {
-      message_type: 'human-agent-response',
-    },
-  );
-
-  res.json({ message: 'success' });
 });
 
-inboxRouter.get('/:sessionId', async (req, res) => {
-  const messages = await getInboxMessages(req.params.sessionId);
-  res.json(messages);
+// Human operator replies to an inbox message
+inboxRouter.post('/reply/:sessionId', async (req: AuthenticatedRequest, res) => {
+  const { message, inboxMessageId } = req.body;
+  const { sessionId } = req.params;
+
+  try {
+    const apiKey = await getApiKey(req.company._id, 'openai');
+
+    // Add human operator response to inbox
+    await addMessageToInbox({
+      message,
+      sessionId,
+      type: 'human_agent_response',
+      companyId: req.company._id,
+    });
+
+    // Update the status of the original message
+    await updateInboxMessageStatus(inboxMessageId, 'closed');
+
+    const session = await Session.findById(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ message: 'Session not found' });
+    }
+
+    const responseTemplate = `[human-agent-response]: ${message}. [system]: Incorporate this response into your conversation with the user, maintaining context and tone.`;
+    const llmResponse = await handleSessionMessage(
+      apiKey as string,
+      responseTemplate,
+      session.id,
+      {
+        message_type: 'human-agent-response',
+      },
+    );
+
+    res.json({ message: 'Response sent successfully', llmResponse });
+  } catch (error) {
+    res.status(500).json({ message: 'Error processing reply', error });
+  }
 });
+
+// Get inbox messages for the company
+inboxRouter.get('/', async (req: AuthenticatedRequest, res) => {
+  try {
+    const messages = await getInboxMessages(req.company._id);
+    res.json(messages);
+  } catch (error) {
+    res.status(500).json({ message: 'Error retrieving inbox messages', error });
+  }
+});
+
+
 
 export { inboxRouter };

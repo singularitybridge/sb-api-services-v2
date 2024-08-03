@@ -61,7 +61,7 @@ export const createAssistant = async (
   const openaiClient = getOpenAIClient(apiKey);
 
   // Create a dummy context to generate function definitions
-  const dummyContext: ActionContext = { sessionId: 'dummy-session-id' };
+  const dummyContext: ActionContext = { sessionId: 'dummy-session-id', companyId: 'dummy-company-id' };
   const functionFactory = createFunctionFactory(dummyContext);
 
   // Create function definitions based on functionFactory
