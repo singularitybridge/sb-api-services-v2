@@ -2,7 +2,6 @@
 import express from 'express';
 import {
   handleSessionMessage,
-  handleUserInput,
 } from '../services/assistant.service';
 import { Assistant } from '../models/Assistant';
 import {
@@ -92,26 +91,19 @@ assistantRouter.post(
   async (req: AuthenticatedRequest, res) => {
     const { userInput, sessionId } = req.body;
     const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
-    const response = await handleSessionMessage(apiKey, userInput, sessionId);
-    res.send(response);
+    
+    try {
+      const response = await handleSessionMessage(apiKey, userInput, sessionId);
+      res.send(response);
+    } catch (error) {
+      console.error('Error handling session message:', error);
+      res.status(500).send('An error occurred while processing your request.');
+    }
   },
 );
 
-assistantRouter.post(
-  '/user-input/thread',
-  validateApiKeys(['openai']),
-  async (req: AuthenticatedRequest, res) => {
-    const { userInput, assistantId, threadId } = req.body;
-    const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
-    const response = await handleUserInput(
-      apiKey,
-      userInput,
-      assistantId,
-      threadId,
-    );
-    res.send(response);
-  },
-);
+
+
 
 assistantRouter.get('/', async (req: AuthenticatedRequest, res) => {
   try {
@@ -181,7 +173,10 @@ assistantRouter.put(
   },
 );
 
-assistantRouter.post(  '/',  validateApiKeys(['openai']),  async (req: AuthenticatedRequest, res) => {
+assistantRouter.post(
+  '/',
+  validateApiKeys(['openai']),
+  async (req: AuthenticatedRequest, res) => {
     try {
       const assistantData = {
         ...req.body,
@@ -240,7 +235,11 @@ assistantRouter.delete(
     }
 
     // Delete the assistant from OpenAI
-    const deleted = await deleteAssistantById(apiKey, assistant.assistantId, id);
+    const deleted = await deleteAssistantById(
+      apiKey,
+      assistant.assistantId,
+      id,
+    );
     if (!deleted) {
       return res
         .status(500)

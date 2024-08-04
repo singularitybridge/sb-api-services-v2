@@ -1,7 +1,5 @@
-import moment from 'moment';
 import { IInbox, Inbox } from '../models/Inbox';
 import { Session } from '../models/Session';
-import { User } from '../models/User';
 import { Assistant } from '../models/Assistant';
 import mongoose from 'mongoose';
 
@@ -9,34 +7,34 @@ interface IInboxInput {
   message: string;
   sessionId: string;
   type: 'human_agent_request' | 'human_agent_response' | 'notification';
+  companyId: string;
 }
 
 export const addMessageToInbox = async (inboxInput: IInboxInput) => {
-
-  const inboxMessage = new Inbox(inboxInput);
   const session = await Session.findById(inboxInput.sessionId);
-  const assistant = await Assistant.findById(session?.assistantId);
-
-  if (!assistant) {
+  if (!session) {
     throw new Error('Session not found');
   }
-  
-  inboxMessage.senderId = assistant._id;  
-  inboxMessage.status = 'open';
+
+  const assistant = await Assistant.findById(session.assistantId);
+  if (!assistant) {
+    throw new Error('Assistant not found');
+  }
+
+  const inboxMessage = new Inbox({
+    ...inboxInput,
+    senderId: assistant._id,
+    status: 'open',
+    companyId: inboxInput.companyId,
+  });
 
   return await inboxMessage.save();
-
 };
 
 export const getInboxMessages = async (companyId: string) => {
-
-  const sessionIds = (await Session.find({ companyId }).select('_id createdAt').lean()).map(s => s._id);
-
   const aggregationPipeline: any[] = [
     {
-      $match: {
-        sessionId: { $in: sessionIds }
-      }
+      $match: { companyId: new mongoose.Types.ObjectId(companyId) }
     },
     {
       $lookup: {
@@ -47,13 +45,15 @@ export const getInboxMessages = async (companyId: string) => {
       }
     },
     { $unwind: '$sessionInfo' },
-    { $sort: { 'createdAt': 1 } },
-    // filter for active sessions only
     {
-      $match: {
-        'sessionInfo.active': true
+      $lookup: {
+        from: 'assistants',
+        localField: 'senderId',
+        foreignField: '_id',
+        as: 'assistantInfo'
       }
     },
+    { $unwind: '$assistantInfo' },
     {
       $lookup: {
         from: 'users',
@@ -64,25 +64,17 @@ export const getInboxMessages = async (companyId: string) => {
     },
     { $unwind: '$userInfo' },
     {
-      $lookup: {
-        from: 'assistants',
-        localField: 'senderId',
-        foreignField: '_id',
-        as: 'assistantInfo'
-      }
-    },
-    { $unwind: { path: '$assistantInfo', preserveNullAndEmptyArrays: true } },
-    {
       $group: {
         _id: '$sessionId',
-        createdAt: { $first: '$sessionInfo.createdAt' },
+        sessionId: { $first: '$sessionId' },
+        userName: { $first: '$userInfo.name' },
+        lastMessageAt: { $max: '$createdAt' },
         messages: {
           $push: {
             _id: '$_id',
             message: '$message',
-            createdAt: { $toDate: '$created' },
-            userName: '$userInfo.name',
-            sessionActive: '$sessionInfo.active',
+            createdAt: '$createdAt',
+            sessionActive: { $literal: true }, // Assuming all sessions are active
             assistantName: '$assistantInfo.name',
             senderId: '$senderId',
             type: '$type'
@@ -90,25 +82,27 @@ export const getInboxMessages = async (companyId: string) => {
         }
       }
     },
-    { $sort: { 'createdAt': -1 } },
+    {
+      $sort: { lastMessageAt: -1 }
+    },
     {
       $project: {
         _id: 0,
-        sessionId: '$_id',
-        messages: 1,
-        type: 1
+        sessionId: 1,
+        userName: 1,
+        lastMessageAt: 1,
+        messages: 1
       }
     }
   ];
 
-  const result = await Inbox.aggregate(aggregationPipeline);
-  return result;
+  return await Inbox.aggregate(aggregationPipeline);
 };
 
 
-
-
-
+export const updateInboxMessageStatus = async (messageId: string, status: 'open' | 'in_progress' | 'closed') => {
+  return await Inbox.findByIdAndUpdate(messageId, { status }, { new: true });
+};
 
 export const getInboxMessage = async (id: string) => {
   return Inbox.findById(id);
