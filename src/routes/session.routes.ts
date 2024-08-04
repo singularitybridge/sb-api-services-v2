@@ -1,76 +1,94 @@
-import { Router, Request, Response } from 'express';
-import {
-  endSession,
-  endSessionByCompanyAndUserId,
-  getSessionMessages,
-  getSessionMessagesByCompanyAndUserId,
-} from '../services/assistant.service';
+// File: src/routes/session.routes.ts
+import { Router, Response, NextFunction } from 'express';
+import { getSessionMessages } from '../services/assistant.service';
 import { Session } from '../models/Session';
 import {
+  endSession,
   getSessionOrCreate,
   sessionFriendlyAggreationQuery,
 } from '../services/session.service';
 import mongoose from 'mongoose';
+import { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { getApiKey, validateApiKeys } from '../services/api.key.service';
+import { BadRequestError } from '../utils/errors';
 
 const sessionRouter = Router();
 
-sessionRouter.put('/:id', async (req, res) => {
-  const { id } = req.params;
-  const sessionData = req.body;
-  try {
-    const session = await Session.findById(id);
-    if (session) {
-      session.assistantId = sessionData.assistantId;
-      await session.save();
-      res.status(200).send({ message: 'Session updated successfully' });
-    } else {
-      res.status(404).send({ error: 'Session not found' });
-    }
-  } catch (error) {
-    res.status(500).send({ error: 'Error updating session' });
-  }
-});
-
-sessionRouter.post('/', async (req, res) => {
-  try {
-    const { userId, companyId, assistantId } = req.body;
-    const apiKey = req.headers['openai-api-key'] as string;
-    const session = await getSessionOrCreate(apiKey, userId, companyId, assistantId);
-    res.status(200).json(session);
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: 'Error handling session', error });
-  }
-});
-
-sessionRouter.delete('/:id', async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const apiKey = req.headers['openai-api-key'] as string;
-
-  try {
-    await endSession(apiKey, id);
-    res.status(200).send({ message: 'Session ended successfully' });
-  } catch (error) {
-    res.status(500).send({ error: 'Error ending session' });
-  }
-});
-
-sessionRouter.delete(
-  '/end/:companyId/:userId',
-  async (req: Request, res: Response) => {
-    const { companyId, userId } = req.params;
-    const apiKey = req.headers['openai-api-key'] as string;
-
+// Update session
+sessionRouter.put(
+  '/:id/assistant',
+  validateApiKeys(['openai']),
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { id } = req.params;
+    const { assistantId } = req.body;
     try {
-      await endSessionByCompanyAndUserId(apiKey, companyId, userId);
-      res.status(200).send({ message: 'Session ended successfully' });
+      const session = await Session.findOneAndUpdate(
+        { _id: id, companyId: req.user?.companyId },
+        { assistantId },
+        { new: true },
+      );
+      if (session) {
+        res.status(200).send(session);
+      } else {
+        res.status(404).send({ error: 'Session not found' });
+      }
     } catch (error) {
-      res.status(500).send({ error: 'Error ending session' });
+      res.status(500).send({ error: 'Error updating assistant' });
     }
   },
 );
 
-sessionRouter.get('/', async (req: Request, res: Response) => {
+// Create session
+sessionRouter.post(
+  '/',
+  validateApiKeys(['openai']),
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const apiKey = await getApiKey(req.company._id, 'openai');
+      const session = await getSessionOrCreate(
+        apiKey ?? '',
+        req.user?._id.toString() ?? '',
+        req.user?.companyId.toString() ?? '',
+      );
+      res.status(200).json(session);
+    } catch (error: unknown) {
+      console.error('Error handling session:', error);
+
+      if (error instanceof Error) {
+        res
+          .status(500)
+          .json({ message: 'Error handling session', error: error.message });
+      } else {
+        res.status(500).json({ message: 'An unknown error occurred' });
+      }
+    }
+  },
+);
+
+// End session
+sessionRouter.delete(
+  '/:id',
+  validateApiKeys(['openai']),
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+
+    try {
+      const apiKey = await getApiKey(req.company._id, 'openai');
+
+      if (!apiKey) {
+        throw new BadRequestError('OpenAI API key not found');
+      }
+
+      await endSession(apiKey, id);
+      res.status(200).json({ message: 'Session ended successfully' });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// Get all sessions (admin only)
+sessionRouter.get('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const sessions = await Session.find();
     res.status(200).send(sessions);
@@ -79,57 +97,38 @@ sessionRouter.get('/', async (req: Request, res: Response) => {
   }
 });
 
-sessionRouter.get('/friendly/:companyId', async (req, res) => {
-  try {
-    const { companyId } = req.params;
-
-    const sessions = await Session.aggregate([
-      {
-        $match: {
-          companyId: new mongoose.Types.ObjectId(companyId),
-          active: true,
-        },
-      },
-      ...sessionFriendlyAggreationQuery,
-    ]);
-
-    res.status(200).send(sessions);
-  } catch (error) {
-    res.status(500).send({ error: 'Error getting sessions' });
-  }
-});
-
-// get session by company and user id
-sessionRouter.get('/:companyId/:userId', async (req: Request, res: Response) => {
-    const { companyId, userId } = req.params;
+// Get friendly sessions for a company
+sessionRouter.get(
+  '/friendly/:companyId',
+  async (req: AuthenticatedRequest, res: Response) => {
     try {
+      const { companyId } = req.params;
+      if (
+        req.user?.role !== 'Admin' &&
+        req.user?.companyId.toString() !== companyId
+      ) {
+        return res.status(403).send({ error: 'Access denied' });
+      }
+
       const sessions = await Session.aggregate([
         {
           $match: {
             companyId: new mongoose.Types.ObjectId(companyId),
-            userId: new mongoose.Types.ObjectId(userId),
             active: true,
           },
         },
         ...sessionFriendlyAggreationQuery,
       ]);
 
-      // Check if a session was found
-      if (sessions.length === 0) {
-        return res.status(404).send({ error: 'Session not found' });
-      }
-
-      // Return the first session object instead of an array
-      const session = sessions[0];
-      res.status(200).send(session);
+      res.status(200).send(sessions);
     } catch (error) {
-      res.status(500).send({ error: 'Error getting session' });
+      res.status(500).send({ error: 'Error getting sessions' });
     }
-    
   },
 );
 
-sessionRouter.get('/:id', async (req: Request, res: Response) => {
+// Get session by ID
+sessionRouter.get('/:id', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -137,17 +136,19 @@ sessionRouter.get('/:id', async (req: Request, res: Response) => {
       {
         $match: {
           _id: new mongoose.Types.ObjectId(id),
+          companyId:
+            req.user?.role === 'Admin'
+              ? { $exists: true }
+              : new mongoose.Types.ObjectId(req.user?.companyId),
         },
       },
       ...sessionFriendlyAggreationQuery,
     ]);
 
-    // Check if a session was found
     if (sessions.length === 0) {
       return res.status(404).send({ error: 'Session not found' });
     }
 
-    // Return the first session object instead of an array
     const session = sessions[0];
     res.status(200).send(session);
   } catch (error) {
@@ -155,36 +156,26 @@ sessionRouter.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-sessionRouter.get('/:id/messages', async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const apiKey = req.headers['openai-api-key'] as string;
-
-  try {
-    const messages = await getSessionMessages(apiKey, id);
-    res.status(200).send({ messages });
-  } catch (error) {
-    res.status(500).send({ error: 'Error getting session messages' });
-  }
-});
-
+// Get session messages
 sessionRouter.get(
-  '/messages/:companyId/:userId',
-  async (req: Request, res: Response) => {
-    const { companyId, userId } = req.params;
-    const apiKey = req.headers['openai-api-key'] as string;
+  '/:id/messages',
+  validateApiKeys(['openai']),
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { id } = req.params;
+    const apiKey = await getApiKey(req.company._id, 'openai');
 
     try {
-      const messages = await getSessionMessagesByCompanyAndUserId(
-        apiKey,
-        companyId,
-        userId,
-      );
+      const session = await Session.findOne({
+        _id: id,
+        companyId: req.user?.companyId,
+      });
+      if (!session) {
+        return res.status(404).send({ error: 'Session not found' });
+      }
+      const messages = await getSessionMessages(apiKey ?? '', id);
       res.status(200).send(messages);
     } catch (error) {
-      console.log(error);
-      res
-        .status(500)
-        .send({ error: 'Error getting session/assistant messages' });
+      res.status(500).send({ error: 'Error getting session messages' });
     }
   },
 );

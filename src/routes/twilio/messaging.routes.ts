@@ -1,6 +1,5 @@
 import express, { NextFunction } from "express";
 import { Twilio } from "twilio";
-import { handleUserInput } from "../../services/assistant.service";
 import { Assistant, IAssistant } from "../../models/Assistant";
 import { IUser, User } from "../../models/User";
 import { ISession, Session } from "../../models/Session";
@@ -10,6 +9,7 @@ import { generateAudio } from "../../services/11labs.service";
 
 import { file } from "googleapis/build/src/apis/file";
 import { transcribeAudioWhisper } from "../../services/speech.recognition.service";
+import { handleSessionMessage } from "../../services/assistant.service";
 
 const twilioClient = new Twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -69,11 +69,10 @@ twilioMessagingRouter.post("/whatsapp/reply", async (req, res) => {
   // print received message
   console.log(req.body);
 
-  const response = await handleUserInput(
+  const response = await handleSessionMessage(
     apiKey,
     Body,
-    session.assistantId,
-    session.threadId
+    session._id // Add the sessionId argument
   );
   const limitedResponse = response.substring(0, 1600); // Limit response to 1600 characters
 

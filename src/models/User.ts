@@ -1,3 +1,4 @@
+/// file_path: src/models/User.ts
 import mongoose, { Document, Schema } from 'mongoose';
 import { IIdentifier, IdentifierSchema } from './Assistant';
 
@@ -5,7 +6,7 @@ export interface IUser extends Document {
     name: string;
     email: string;
     nickname?: string;
-    role: string;
+    role: 'Admin' | 'CompanyUser';
     identifiers: IIdentifier[];
     companyId: string;
     googleId?: string;

@@ -1,8 +1,13 @@
 // File: src/services/company.service.ts
-import { Token, Company, ICompany, IApiKey } from '../models/Company';
-import { createAssistant } from '../services/oai.assistant.service';
+import { Types } from 'mongoose';
+import { Company, ICompany, IApiKey } from '../models/Company';
 import { encryptData, decryptData } from './encryption.service';
 import jwt from 'jsonwebtoken';
+
+const generateToken = () => {
+  return jwt.sign({}, process.env.JWT_SECRET as string);
+};
+
 
 const encryptCompanyData = (companyData: ICompany) => {
   companyData.api_keys.forEach((apiKey: IApiKey) => {
@@ -41,40 +46,32 @@ const decryptCompanyData = (companyData: any) => {
   }
 };
 
-const generateToken = (companyId: string) => {
-  console.log('generateToken:  ' + companyId);
 
-  return jwt.sign({ companyId: companyId }, process.env.JWT_SECRET as string);
-};
-
-export const createCompany = async ( companyData: ICompany) => {
+export const createCompany = async (companyData: Partial<ICompany>): Promise<ICompany> => {
   try {
-    let token = generateToken(companyData._id);
+    const token = generateToken();
     companyData.token = { value: token };
-    console.log('companyData.token:  ' + companyData.token.value);
 
+    // If identifiers are not provided, set it to an empty array
+    if (!companyData.identifiers || companyData.identifiers.length === 0) {
+      companyData.identifiers = [];
+    }
 
-    encryptCompanyData(companyData);
+    encryptCompanyData(companyData as ICompany);
 
     const company = new Company(companyData);
     await company.save();
 
-    const tempCompany: ICompany = company.toObject();
-    token = generateToken(company._id.toString());
+    const createdCompany = company.toObject();
+    decryptCompanyData(createdCompany);
 
-    const decodedToken = jwt.verify(token, process.env.JWT_SECRET as string) as { companyId: string };
-    console.log('decoded Token after creation:', decodedToken);
-
-    decryptCompanyData(tempCompany);
-    tempCompany.token = { value: token };
-    const updatedCompany = await updateCompany(company._id.toString(), tempCompany);
-
-    return updatedCompany;
+    return createdCompany as unknown as ICompany;
   } catch (error) {
     console.error('Error creating company:', error);
     throw error;
   }
 };
+
 
 export const getCompany = async (id: string) => {
   try {
@@ -106,13 +103,17 @@ export const getDecryptedCompany = async (id: string) => {
   }
 };
 
-export const getCompanies = async () => {
+export const getCompanies = async (companyId: Types.ObjectId | null): Promise<any[]> => {
   try {
-    const companies = await Company.find();
-    return companies.map((company) => {
-      const companyData = company.toObject();
-      return companyData;
-    });
+    if (companyId === null) {
+      // If no companyId is provided (admin user), return all companies
+      const companies = await Company.find();
+      return companies.map((company) => company.toObject());
+    } else {
+      // If a companyId is provided (regular user), return only that company
+      const company = await Company.findById(companyId);
+      return company ? [company.toObject()] : [];
+    }
   } catch (error) {
     console.error('Error retrieving companies:', error);
     throw error;
@@ -167,7 +168,7 @@ export const refreshCompanyToken = async (id: string, data: ICompany) => {
       throw new Error('Company not found');
     }
 
-    const newToken = generateToken(id);
+    const newToken = generateToken();
 
     if (data.token) {
       data.token = { value: newToken };

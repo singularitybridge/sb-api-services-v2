@@ -1,15 +1,16 @@
+/// file_path: /src/services/twilio/voice.service.ts
 import VoiceResponse from 'twilio/lib/twiml/VoiceResponse';
 import { Assistant } from '../../models/Assistant';
 import { Session } from '../../models/Session';
 import { User } from '../../models/User';
 import { generateAudio } from '../11labs.service';
-import { handleUserInput } from '../assistant.service';
 import { deleteThread, createNewThread } from '../oai.thread.service';
 import { transcribeAudioWhisper } from '../speech.recognition.service';
 import { getCurrentTimeAndDay } from '../context.service';
 import { Twilio } from 'twilio';
 import { ApiKey } from '../verification.service';
 import Api from 'twilio/lib/rest/Api';
+import { handleSessionMessage } from '../assistant.service';
 
 export type TwilioKeys = {
   accountSid: string;
@@ -50,6 +51,7 @@ export const handleVoiceRequest = async (
   from: string,
   to: string,
 ): Promise<{ callActive: boolean; response: string }> => {
+
   const twiml = new VoiceResponse();
   const assistant = await Assistant.findOne({ 'identifiers.value': to });
   const user = await User.findOne({ 'identifiers.value': from });
@@ -80,19 +82,18 @@ export const handleVoiceRequest = async (
   }
 
   if (firstTime !== false) {
-    const response = await handleUserInput(
+    const response = await handleSessionMessage(
       apiKey,
       `this is a conversation with ${
         user.name
       }, start with greeting the user. ${getCurrentTimeAndDay()}`,
-      session.assistantId,
-      session.threadId,
+      session.id      
     );
     const limitedResponse = response.substring(0, 1200); // Limit response to 1600 characters
 
     // generate intro message
-    const audioResponse = await generateAudio(limitedResponse);
-    twiml.play(audioResponse?.path);
+    const audioResponse = await generateAudio('', limitedResponse);
+    twiml.play(audioResponse);
   }
 
   twiml.record({
@@ -116,6 +117,7 @@ export const handleVoiceRecordingRequest = async (
   to: string,
   recordingUrl: string,
 ) => {
+
   // const SpeechResult = await transcribeAudioWhisper(recordingUrl);
 
   const twiml = new VoiceResponse();
@@ -143,18 +145,17 @@ export const handleVoiceRecordingRequest = async (
     return twiml.toString();
   }
 
-  const response = await handleUserInput(
+  const response = await handleSessionMessage(
     apiKey,
-    '',
-    // SpeechResult,
-    session.assistantId,
-    session.threadId,
+    '', // or SpeechResult when uncommented
+    session._id,
   );
 
-  const limitedResponse = response.substring(0, 1200); // Limit response to 1600 characters
-  const audioResponse = await generateAudio(limitedResponse);
 
-  twiml.play(audioResponse?.path);
+  const limitedResponse = response.substring(0, 1200); // Limit response to 1600 characters
+  const audioResponse = await generateAudio('', limitedResponse);
+
+  twiml.play(audioResponse);
   twiml.redirect('/twilio/voice?firstTime=false');
   return twiml.toString();
 };

@@ -1,15 +1,14 @@
 /// file_path: src/services/11labs.service.ts
 import axios from 'axios';
-import { saveToFile } from '../utils/file.upload.util';
 import { ApiKey } from './verification.service';
-
-export const generatedFilesBaseURL = 'https://sb-api.ngrok.app/tts/files';
+import { uploadFile } from './google.storage.service';
 
 export const generateAudio = async (
+  apikey: string,
   text: string,
   voiceId: string = 'gbTBNCAEwTTleGFPK23L',
   modelId: string = 'eleven_turbo_v2',
-) => {
+): Promise<string> => {
   console.log('generateAudio ...', text);
 
   const data = {
@@ -29,17 +28,37 @@ export const generateAudio = async (
       data,
       {
         headers: {
-          'xi-api-key': process.env.NOTION_API_KEY,
+          'xi-api-key': apikey,
           'Content-Type': 'application/json',
           Accept: 'audio/mpeg',
         },
-        responseType: 'stream', // Ensure you get the data as a stream
+        responseType: 'arraybuffer', // Changed from 'stream' to 'arraybuffer'
       },
     );
 
-    return saveToFile(response.data as Buffer);
+    const buffer = Buffer.from(response.data);
+
+    // Create a mock Express.Multer.File object
+    const file: Express.Multer.File = {
+      fieldname: 'file',
+      originalname: `elevenlabs_audio_${Date.now()}.mp3`,
+      encoding: '7bit',
+      mimetype: 'audio/mpeg',
+      buffer: buffer,
+      size: buffer.length,
+      stream: null as any,
+      destination: '',
+      filename: '',
+      path: '',
+    };
+
+    // Upload the file to cloud storage
+    const publicUrl = await uploadFile(file);
+    return publicUrl;
+
   } catch (error) {
-    console.error(error);
+    console.error('Error generating audio with ElevenLabs:', error);
+    throw error;
   }
 };
 
