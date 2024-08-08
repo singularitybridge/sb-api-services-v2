@@ -7,7 +7,7 @@ export const generateSpeech = async (
   apiKey: string,
   text: string,  
   voice: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' = 'alloy',
-  model: string = 'tts-1-hd',
+  model:  'tts-1-hd' | 'tts-1' = 'tts-1-hd',
 ): Promise<string> => { // Return string instead of SaveToFileResponse
   const openaiClient = getOpenAIClient(apiKey);
   const mp3 = await openaiClient.audio.speech.create({
