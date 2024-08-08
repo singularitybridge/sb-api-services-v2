@@ -39,7 +39,7 @@ router.post(
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { text, voice } = req.body;
+      const { text, voice, textLimit } = req.body;
       const openaiApiKey = await getApiKey(req.company._id, 'openai');
 
       if (!openaiApiKey) {
@@ -47,7 +47,7 @@ router.post(
         return;
       }
 
-      const fileInfo = await generateSpeech(openaiApiKey, text, voice, 'tts-1');
+      const fileInfo = await generateSpeech(openaiApiKey, text, voice, 'tts-1', textLimit);
       res.send(fileInfo);
     } catch (error: unknown) {
       console.error('Error in /generate/oai route:', error);
