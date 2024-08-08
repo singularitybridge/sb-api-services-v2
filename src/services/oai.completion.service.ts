@@ -8,7 +8,7 @@ export const summarizeText = async (
   const systemPrompt = `You are a text summarizer. Your task is to summarize the given text to be no longer than ${maxLength} characters while preserving the most important information.`;
   const userInput = `Summarize the following text:\n\n${text}`;
 
-  return getCompletionResponse(apiKey, systemPrompt, userInput, "gpt-4", 0.7, maxLength);
+  return getCompletionResponse(apiKey, systemPrompt, userInput, "gpt-4o-mini", 0.7, maxLength);
 };
 
 export const getCompletionResponse = async (
