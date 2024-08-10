@@ -1,5 +1,16 @@
 import OpenAI from "openai";
 
+export const summarizeText = async (
+  apiKey: string,
+  text: string,
+  maxLength: number
+): Promise<string> => {
+  const systemPrompt = `You are a text summarizer. Your task is to summarize the given text to be no longer than ${maxLength} characters while preserving the most important information.`;
+  const userInput = `Summarize the following text:\n\n${text}`;
+
+  return getCompletionResponse(apiKey, systemPrompt, userInput, "gpt-4o-mini", 0.7, maxLength);
+};
+
 export const getCompletionResponse = async (
   apiKey: string,
   systemPrompt: string,
