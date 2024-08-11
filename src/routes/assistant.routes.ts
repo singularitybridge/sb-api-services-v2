@@ -223,21 +223,22 @@ assistantRouter.delete(
   async (req: AuthenticatedRequest, res) => {
     const { id } = req.params;
 
-    const assistant = await Assistant.findOne({
-      _id: id,
-      companyId:
-        req.user?.role === 'Admin' ? { $exists: true } : req.user?.companyId,
-    });
-
-    if (!assistant) {
-      return res.status(404).send({ message: 'Assistant not found' });
-    }
-
     try {
+      const assistant = await Assistant.findOne({
+        _id: id,
+        companyId:
+          req.user?.role === 'Admin' ? { $exists: true } : req.user?.companyId,
+      });
+
+      if (!assistant) {
+        return res.status(404).send({ message: 'Assistant not found' });
+      }
+
       await deleteAssistant(id, assistant.assistantId);
       res.send({ message: 'Assistant deleted successfully' });
     } catch (error) {
-      res.status(500).send({ message: 'Failed to delete assistant' });
+      console.error('Error deleting assistant:', error);
+      res.status(500).send({ message: `Failed to delete assistant: ${(error as Error).message}` });
     }
   },
 );
