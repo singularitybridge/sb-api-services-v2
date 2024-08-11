@@ -174,11 +174,16 @@ assistantRouter.put(
   },
 );
 
+import { refreshApiKeyCache } from '../services/api.key.service';
+
 assistantRouter.post(
   '/',
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
     try {
+      // Refresh the API key cache before creating the assistant
+      await refreshApiKeyCache(req.company._id.toString());
+
       const assistantData = {
         ...req.body,
         companyId: req.user?.companyId,
@@ -209,8 +214,9 @@ assistantRouter.post(
             'Duplicate key error: an assistant with this phone number already exists.',
         });
       } else {
+        console.error('Error creating assistant:', err);
         res.status(500).send({
-          message: `An error occurred while trying to create the assistant : ${err}`,
+          message: `An error occurred while trying to create the assistant: ${err}`,
         });
       }
     }

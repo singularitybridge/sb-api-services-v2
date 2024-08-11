@@ -64,6 +64,19 @@ export const invalidateApiKeyCache = (companyId: string, keyType: ApiKeyType): v
   apiKeyCache.del(cacheKey);
 };
 
+export const refreshApiKeyCache = async (companyId: string): Promise<void> => {
+  const company = await Company.findById(companyId);
+  if (!company) {
+    throw new Error('Company not found');
+  }
+
+  for (const apiKey of company.api_keys) {
+    const keyType = apiKey.key.split('_')[0] as ApiKeyType;
+    const decryptedKey = decryptData({ 'value': apiKey.value, 'iv': apiKey.iv, 'tag': apiKey.tag });
+    updateApiKeyCache(companyId, keyType, decryptedKey);
+  }
+};
+
 export const validateApiKeys = (requiredKeys: ApiKeyType[]) => {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const missingKeys: ApiKeyType[] = [];
