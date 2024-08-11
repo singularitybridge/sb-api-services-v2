@@ -1,16 +1,23 @@
 import express from 'express';
-import { handleOnboarding } from '../services/onboarding.service';
+import { getOnboardingStatus } from '../services/onboarding.service';
+import { verifyTokenMiddleware, AuthenticatedRequest } from '../middleware/auth.middleware';
 
 const onboardingRouter = express.Router();
 
-onboardingRouter.post('/', async (req, res) => {
+
+
+onboardingRouter.get('/status', verifyTokenMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
-    const { current_user, name, description } = req.body;
-    const result = await handleOnboarding(current_user, name, description);
-    res.json(result);
+    const companyId = req.company._id;
+    const onboardingStatus = await getOnboardingStatus(companyId);
+    res.json(onboardingStatus);
   } catch (error) {
-    console.error('Onboarding error:', error);
-    res.status(500).json({ error: 'Failed to complete onboarding' });
+    console.error('Error fetching onboarding status:', error);
+    if (error instanceof Error) {
+      res.status(error.name === 'NotFoundError' ? 404 : 500).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'An unexpected error occurred' });
+    }
   }
 });
 

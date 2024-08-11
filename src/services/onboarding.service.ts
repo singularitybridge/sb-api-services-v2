@@ -2,6 +2,7 @@
 import { IUser, User } from '../models/User';
 import { Company, ICompany, OnboardingStatus } from '../models/Company';
 import { Document } from 'mongoose';
+import { NotFoundError } from '../utils/errors';
 
 export const updateOnboardingStatus = (company: ICompany) => {
   if (!company.api_keys.some(key => key.key === 'openai_api_key' && key.value !== 'default_openai_key')) {
@@ -33,6 +34,19 @@ export const updateOnboardedModule = async (companyId: string, module: string) =
     return company.toObject() as ICompany;
   } catch (error) {
     console.error('Error updating onboarded module:', error);
+    throw error;
+  }
+};
+
+export const getOnboardingStatus = async (companyId: string): Promise<ICompany> => {
+  try {
+    const company = await Company.findById(companyId);
+    if (!company) {
+      throw new NotFoundError('Company not found');
+    }
+    return company.toObject() as ICompany;
+  } catch (error) {
+    console.error('Error fetching onboarding status:', error);
     throw error;
   }
 };
