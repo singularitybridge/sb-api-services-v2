@@ -77,8 +77,9 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
     encryptCompanyData(companyData as ICompany);
 
     const company = new Company(companyData);
-    await updateOnboardingStatus(company.toObject() as ICompany);
+    
     await company.save();
+    await updateOnboardingStatus(company._id.toString());
 
     const createdCompany = company.toObject();
     decryptCompanyData(createdCompany);

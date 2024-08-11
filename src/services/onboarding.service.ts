@@ -4,17 +4,30 @@ import { Company, ICompany, OnboardingStatus } from '../models/Company';
 import { Document } from 'mongoose';
 import { NotFoundError } from '../utils/errors';
 
-export const updateOnboardingStatus = (company: ICompany) => {
-  if (!company.api_keys.some(key => key.key === 'openai_api_key' && key.value !== 'default_openai_key')) {
-    company.onboardingStatus = OnboardingStatus.API_KEY_REQUIRED;
-  } else if (company.onboardedModules.length === 0) {
-    company.onboardingStatus = OnboardingStatus.READY_FOR_ASSISTANTS;
-  } else if (company.onboardedModules.includes('assistants') && company.onboardedModules.length < 3) {
-    company.onboardingStatus = OnboardingStatus.USING_BASIC_FEATURES;
-  } else if (company.onboardedModules.length >= 3 && company.onboardedModules.length < 5) {
-    company.onboardingStatus = OnboardingStatus.ADVANCED_USER;
-  } else if (company.onboardedModules.length >= 5) {
-    company.onboardingStatus = OnboardingStatus.EXPERT_USER;
+export const updateOnboardingStatus = async (companyId: string): Promise<ICompany> => {
+  try {
+    const company = await Company.findById(companyId);
+    if (!company) {
+      throw new NotFoundError('Company not found');
+    }
+
+    if (!company.api_keys.some(key => key.key === 'openai_api_key' && key.value !== 'default_openai_key')) {
+      company.onboardingStatus = OnboardingStatus.API_KEY_REQUIRED;
+    } else if (company.onboardedModules.length === 0) {
+      company.onboardingStatus = OnboardingStatus.READY_FOR_ASSISTANTS;
+    } else if (company.onboardedModules.includes('assistants') && company.onboardedModules.length < 3) {
+      company.onboardingStatus = OnboardingStatus.USING_BASIC_FEATURES;
+    } else if (company.onboardedModules.length >= 3 && company.onboardedModules.length < 5) {
+      company.onboardingStatus = OnboardingStatus.ADVANCED_USER;
+    } else if (company.onboardedModules.length >= 5) {
+      company.onboardingStatus = OnboardingStatus.EXPERT_USER;
+    }
+
+    await company.save();
+    return company.toObject() as ICompany;
+  } catch (error) {
+    console.error('Error updating onboarding status:', error);
+    throw error;
   }
 };
 
@@ -27,7 +40,7 @@ export const updateOnboardedModule = async (companyId: string, module: string) =
 
     if (!company.onboardedModules.includes(module)) {
       company.onboardedModules.push(module);
-      updateOnboardingStatus(company.toObject() as ICompany);
+      updateOnboardingStatus(companyId);
       await company.save();
     }
 
@@ -38,13 +51,16 @@ export const updateOnboardedModule = async (companyId: string, module: string) =
   }
 };
 
-export const getOnboardingStatus = async (companyId: string): Promise<ICompany> => {
+export const getOnboardingStatus = async (companyId: string): Promise<Pick<ICompany, 'onboardingStatus' | 'onboardedModules'>> => {
   try {
-    const company = await Company.findById(companyId);
+    const company = await Company.findById(companyId).select('onboardingStatus onboardedModules');
     if (!company) {
       throw new NotFoundError('Company not found');
     }
-    return company.toObject() as ICompany;
+    return {
+      onboardingStatus: company.onboardingStatus,
+      onboardedModules: company.onboardedModules
+    };
   } catch (error) {
     console.error('Error fetching onboarding status:', error);
     throw error;
