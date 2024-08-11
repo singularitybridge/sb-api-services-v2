@@ -11,6 +11,7 @@ import {
 } from '../services/company.service';
 import { verifyAccess, AuthenticatedRequest, verifyCompanyAccess } from '../middleware/auth.middleware';
 import { Types } from 'mongoose';
+import { teardownCompany } from '../services/teardown.service';
 
 const companyRouter = express.Router();
 
@@ -34,10 +35,19 @@ companyRouter.get('/', verifyAccess(), async (req: AuthenticatedRequest, res) =>
 });
 
 
-companyRouter.delete('/:id', verifyAccess(true), async (req: AuthenticatedRequest, res) => {
-  const company = await deleteCompany(req.params.id);
-  res.json(company);
+companyRouter.delete('/:id', async (req: AuthenticatedRequest, res) => {
+  
+  const { id } = req.params;
+
+  try {
+    await teardownCompany(id);
+    res.status(200).send({ message: 'Company and related data deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting company:', error);
+    res.status(500).send({ message: 'Failed to delete company and related data' });
+  }
 });
+
 
 // Routes accessible by both admins and company users
 companyRouter.get('/:id', verifyAccess(), verifyCompanyAccess, async (req: AuthenticatedRequest, res) => {

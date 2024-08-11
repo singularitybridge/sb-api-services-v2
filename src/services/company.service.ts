@@ -52,10 +52,22 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
     const token = generateToken();
     companyData.token = { value: token };
 
-    // If identifiers are not provided, set it to an empty array
-    if (!companyData.identifiers || companyData.identifiers.length === 0) {
-      companyData.identifiers = [];
-    }
+    // Always initialize identifiers as an empty array
+    companyData.identifiers = [];
+
+    // Ensure default API keys are set
+    companyData.api_keys = companyData.api_keys || [];
+
+    const defaultKeys = [
+      { key: 'openai_api_key', value: 'default_openai_key' },
+      { key: 'labs11_api_key', value: 'default_labs11_key' }
+    ];
+
+    defaultKeys.forEach(defaultKey => {
+      if (!companyData.api_keys!.some(key => key.key === defaultKey.key)) {
+        companyData.api_keys!.push(defaultKey);
+      }
+    });
 
     encryptCompanyData(companyData as ICompany);
 
