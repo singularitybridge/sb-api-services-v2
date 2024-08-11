@@ -1,6 +1,7 @@
 // file path: /src/routes/assistant.routes.ts
 import express from 'express';
 import {
+  deleteAssistant,
   handleSessionMessage,
 } from '../services/assistant.service';
 import { Assistant } from '../models/Assistant';
@@ -221,8 +222,6 @@ assistantRouter.delete(
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
     const { id } = req.params;
-    const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
-    console.log('assistant id ------ ' + id);
 
     const assistant = await Assistant.findOne({
       _id: id,
@@ -231,24 +230,15 @@ assistantRouter.delete(
     });
 
     if (!assistant) {
-      return res.status(404).send({ message: 'Assistant not found ---- ' });
+      return res.status(404).send({ message: 'Assistant not found' });
     }
 
-    // Delete the assistant from OpenAI
-    const deleted = await deleteAssistantById(
-      apiKey,
-      assistant.assistantId,
-      id,
-    );
-    if (!deleted) {
-      return res
-        .status(500)
-        .send({ message: 'Failed to delete assistant from OpenAI' });
+    try {
+      await deleteAssistant(id, assistant.assistantId);
+      res.send({ message: 'Assistant deleted successfully' });
+    } catch (error) {
+      res.status(500).send({ message: 'Failed to delete assistant' });
     }
-
-    // Delete the assistant from the local database
-    await Assistant.findByIdAndDelete(id);
-    res.send({ message: 'Assistant deleted successfully' });
   },
 );
 

@@ -9,6 +9,8 @@ import {
 } from './oai.thread.service';
 import { Assistant, IAssistant } from '../models/Assistant';
 import mongoose from 'mongoose';
+import { getApiKey } from './api.key.service';
+import { deleteAssistantById } from './oai.assistant.service';
 
 export const getOpenAIClient = (apiKey: string) => {
   return new OpenAI({
@@ -131,3 +133,16 @@ export const handleSessionMessage = async (
   const response = messages.data[0].content[0].text.value;
   return response;
 };
+
+export async function deleteAssistant(id: string, assistantId: string): Promise<void> {
+  const apiKey = await getApiKey(id, 'openai') as string;
+  
+  // Delete the assistant from OpenAI
+  const deleted = await deleteAssistantById(apiKey, assistantId, id);
+  if (!deleted) {
+    throw new Error('Failed to delete assistant from OpenAI');
+  }
+
+  // Delete the assistant from the local database
+  await Assistant.findByIdAndDelete(id);
+}
