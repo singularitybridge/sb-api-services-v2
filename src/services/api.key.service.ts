@@ -51,6 +51,10 @@ export const setApiKey = async (companyId: string, keyType: ApiKeyType, apiKey: 
   await company.save();
 
   // Update cache
+  updateApiKeyCache(companyId, keyType, apiKey);
+};
+
+export const updateApiKeyCache = (companyId: string, keyType: ApiKeyType, apiKey: string): void => {
   const cacheKey = `${companyId}:${keyType}`;
   apiKeyCache.set(cacheKey, apiKey);
 };
