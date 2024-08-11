@@ -135,14 +135,25 @@ export const handleSessionMessage = async (
 };
 
 export async function deleteAssistant(id: string, assistantId: string): Promise<void> {
-  const apiKey = await getApiKey(id, 'openai') as string;
-  
-  // Delete the assistant from OpenAI
-  const deleted = await deleteAssistantById(apiKey, assistantId, id);
-  if (!deleted) {
-    throw new Error('Failed to delete assistant from OpenAI');
-  }
+  try {
+    // First, find the assistant to get the company ID
+    const assistant = await Assistant.findById(id);
+    if (!assistant) {
+      throw new Error('Assistant not found in local database');
+    }
 
-  // Delete the assistant from the local database
-  await Assistant.findByIdAndDelete(id);
+    const apiKey = await getApiKey(assistant.companyId.toString(), 'openai') as string;
+    
+    // Delete the assistant from OpenAI
+    const deleted = await deleteAssistantById(apiKey, assistantId, id);
+    if (!deleted) {
+      throw new Error('Failed to delete assistant from OpenAI');
+    }
+
+    // Delete the assistant from the local database
+    await Assistant.findByIdAndDelete(id);
+  } catch (error) {
+    console.error('Error in deleteAssistant:', error);
+    throw error; // Re-throw the error to be caught by the route handler
+  }
 }
