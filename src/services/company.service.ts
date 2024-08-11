@@ -1,8 +1,9 @@
 // File: src/services/company.service.ts
 import { Types } from 'mongoose';
-import { Company, ICompany, IApiKey } from '../models/Company';
+import { Company, ICompany, IApiKey, OnboardingStatus } from '../models/Company';
 import { encryptData, decryptData } from './encryption.service';
 import jwt from 'jsonwebtoken';
+import { updateOnboardingStatus } from './onboarding.service';
 
 const generateToken = () => {
   return jwt.sign({}, process.env.JWT_SECRET as string);
@@ -69,9 +70,14 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
       }
     });
 
+    // Initialize onboarding fields
+    companyData.onboardingStatus = OnboardingStatus.CREATED;
+    companyData.onboardedModules = [];
+
     encryptCompanyData(companyData as ICompany);
 
     const company = new Company(companyData);
+    await updateOnboardingStatus(company.toObject() as ICompany);
     await company.save();
 
     const createdCompany = company.toObject();
@@ -132,7 +138,7 @@ export const getCompanies = async (companyId: Types.ObjectId | null): Promise<an
   }
 };
 
-export const updateCompany = async (id: string, data: ICompany) => {
+export const updateCompany = async (id: string, data: Partial<ICompany>) => {
   try {
     const company = await Company.findById(id);
     if (!company) {
@@ -142,18 +148,24 @@ export const updateCompany = async (id: string, data: ICompany) => {
 
     if (typeof data.token === 'string') {
       data.token = { value: data.token || '' };
+    } else if (data.token === null) {
+      data.token = undefined;
     }
 
     console.log('Auth.Middleware --------- data.token.value:  ' + data.token?.value);
 
-    encryptCompanyData(data);
+    if (data.api_keys) {
+      encryptCompanyData(data as ICompany);
+    }
+    
     company.set(data);
+    updateOnboardingStatus(company.toObject());
     await company.save();
 
     const updatedCompanyData = company.toObject();
     decryptCompanyData(updatedCompanyData);
 
-    return updatedCompanyData;
+    return updatedCompanyData as unknown as ICompany;
   } catch (error) {
     console.error('Error updating company:', error);
     throw error;
