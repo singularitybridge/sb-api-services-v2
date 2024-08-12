@@ -4,6 +4,7 @@ import { Company, ICompany, IApiKey, OnboardingStatus } from '../models/Company'
 import { encryptData, decryptData } from './encryption.service';
 import jwt from 'jsonwebtoken';
 import { updateOnboardingStatus } from './onboarding.service';
+import { User } from '../models/User';
 
 const generateToken = () => {
   return jwt.sign({}, process.env.JWT_SECRET as string);
@@ -182,6 +183,41 @@ export const deleteCompany = async (id: string) => {
     return company;
   } catch (error) {
     console.error('Error deleting company:', error);
+    throw error;
+  }
+};
+
+export const updateCompanyOnboarding = async (id: string, data: { name: string; description: string; userNickname: string }) => {
+  try {
+    const company = await Company.findById(id);
+    if (!company) {
+      throw new Error('Company not found');
+    }
+
+    company.name = data.name;
+    company.description = data.description;
+
+    // Update the user's nickname
+    const user = await User.findOne({ companyId: id });
+    if (user) {
+      user.nickname = data.userNickname;
+      await user.save();
+    }
+
+    // Update onboarding status
+    if (!company.onboardedModules.includes('company_info')) {
+      company.onboardedModules.push('company_info');
+    }
+    await updateOnboardingStatus(company._id.toString());
+
+    await company.save();
+
+    const updatedCompanyData = company.toObject();
+    decryptCompanyData(updatedCompanyData);
+
+    return updatedCompanyData as unknown as ICompany;
+  } catch (error) {
+    console.error('Error updating company onboarding information:', error);
     throw error;
   }
 };
