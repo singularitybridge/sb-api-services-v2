@@ -41,12 +41,12 @@ onboardingRouter.post('/refresh', verifyTokenMiddleware, async (req: Authenticat
 onboardingRouter.post('/update-info', verifyTokenMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
     const companyId = req.company._id;
-    const { companyName, companyDescription, userNickname } = req.body;
+    const { companyName, companyDescription, userName } = req.body;
     
     const updatedCompany = await updateCompanyOnboarding(companyId, {
-      name: companyName,
-      description: companyDescription,
-      userNickname: userNickname
+      companyName,
+      companyDescription,
+      userName
     });
 
     res.json({
