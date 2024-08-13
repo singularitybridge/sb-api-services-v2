@@ -187,20 +187,20 @@ export const deleteCompany = async (id: string) => {
   }
 };
 
-export const updateCompanyOnboarding = async (id: string, data: { name: string; description: string; userNickname: string }) => {
+export const updateCompanyOnboarding = async (id: string, data: { companyName: string; companyDescription: string; userName: string }) => {
   try {
     const company = await Company.findById(id);
     if (!company) {
       throw new Error('Company not found');
     }
 
-    company.name = data.name;
-    company.description = data.description;
+    company.name = data.companyName;
+    company.description = data.companyDescription;
 
     // Update the user's nickname
     const user = await User.findOne({ companyId: id });
     if (user) {
-      user.nickname = data.userNickname;
+      user.name = data.userName;
       await user.save();
     }
 
