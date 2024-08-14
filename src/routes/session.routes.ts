@@ -41,12 +41,19 @@ sessionRouter.put(
 // Create session
 sessionRouter.post(
   '/',
-  validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const apiKey = await getApiKey(req.company._id, 'openai');
+      
+      if (!apiKey) {
+        return res.status(200).json({
+          message: 'OpenAI API key is not set. Please configure the API key to use this feature.',
+          keyMissing: true
+        });
+      }
+
       const session = await getSessionOrCreate(
-        apiKey ?? '',
+        apiKey,
         req.user?._id.toString() ?? '',
         req.user?.companyId.toString() ?? '',
       );
