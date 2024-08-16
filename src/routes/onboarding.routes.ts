@@ -20,7 +20,7 @@ onboardingRouter.get('/status', verifyTokenMiddleware, async (req: Authenticated
   }
 });
 
-onboardingRouter.post('/refresh', verifyTokenMiddleware, async (req: AuthenticatedRequest, res) => {
+onboardingRouter.post('/status', verifyTokenMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
     const companyId = req.company._id;
     const updatedCompany = await updateOnboardingStatus(companyId);
@@ -29,7 +29,7 @@ onboardingRouter.post('/refresh', verifyTokenMiddleware, async (req: Authenticat
       onboardedModules: updatedCompany.onboardedModules
     });
   } catch (error) {
-    console.error('Error refreshing onboarding status:', error);
+    console.error('Error updating onboarding status:', error);
     if (error instanceof Error) {
       res.status(error.name === 'NotFoundError' ? 404 : 500).json({ error: error.message });
     } else {
