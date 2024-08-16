@@ -136,22 +136,25 @@ export const handleSessionMessage = async (
 
 export async function deleteAssistant(id: string, assistantId: string): Promise<void> {
   try {
-    // First, find the assistant to get the company ID
+    // First, find the assistant in the local database
     const assistant = await Assistant.findById(id);
     if (!assistant) {
       throw new Error('Assistant not found in local database');
     }
 
-    const apiKey = await getApiKey(assistant.companyId.toString(), 'openai') as string;
-    
-    // Delete the assistant from OpenAI
-    const deleted = await deleteAssistantById(apiKey, assistantId, id);
-    if (!deleted) {
-      throw new Error('Failed to delete assistant from OpenAI');
-    }
-
     // Delete the assistant from the local database
     await Assistant.findByIdAndDelete(id);
+
+    // Attempt to delete the assistant from OpenAI
+    try {
+      const apiKey = await getApiKey(assistant.companyId.toString(), 'openai') as string;
+      await deleteAssistantById(apiKey, assistantId, id);
+    } catch (error) {
+      // Log a warning if OpenAI deletion fails, but don't throw an error
+      console.warn(`Warning: Failed to delete assistant from OpenAI: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
+    console.log(`Successfully deleted assistant ${id} from MongoDB.`);
   } catch (error) {
     console.error('Error in deleteAssistant:', error);
     throw error; // Re-throw the error to be caught by the route handler

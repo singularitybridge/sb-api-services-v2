@@ -75,12 +75,15 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
     companyData.onboardingStatus = OnboardingStatus.CREATED;
     companyData.onboardedModules = [];
 
+    console.log('Setting initial onboarding status:', companyData.onboardingStatus);
+
     encryptCompanyData(companyData as ICompany);
 
     const company = new Company(companyData);
     
     await company.save();
-    await updateOnboardingStatus(company._id.toString());
+    // Remove the updateOnboardingStatus call here
+    // await updateOnboardingStatus(company._id.toString());
 
     const createdCompany = company.toObject();
     decryptCompanyData(createdCompany);
