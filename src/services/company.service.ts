@@ -10,7 +10,6 @@ const generateToken = () => {
   return jwt.sign({}, process.env.JWT_SECRET as string);
 };
 
-
 const encryptCompanyData = (companyData: ICompany) => {
   companyData.api_keys.forEach((apiKey: IApiKey) => {
     const encryptedData = encryptData(apiKey.value);
@@ -48,16 +47,12 @@ const decryptCompanyData = (companyData: any) => {
   }
 };
 
-
 export const createCompany = async (companyData: Partial<ICompany>): Promise<ICompany> => {
   try {
     const token = generateToken();
     companyData.token = { value: token };
 
-    // Always initialize identifiers as an empty array
     companyData.identifiers = [];
-
-    // Ensure default API keys are set
     companyData.api_keys = companyData.api_keys || [];
 
     const defaultKeys = [
@@ -71,7 +66,6 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
       }
     });
 
-    // Initialize onboarding fields
     companyData.onboardingStatus = OnboardingStatus.CREATED;
     companyData.onboardedModules = [];
 
@@ -82,8 +76,6 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
     const company = new Company(companyData);
     
     await company.save();
-    // Remove the updateOnboardingStatus call here
-    // await updateOnboardingStatus(company._id.toString());
 
     const createdCompany = company.toObject();
     decryptCompanyData(createdCompany);
@@ -94,7 +86,6 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
     throw error;
   }
 };
-
 
 export const getCompany = async (id: string) => {
   try {
@@ -129,11 +120,9 @@ export const getDecryptedCompany = async (id: string) => {
 export const getCompanies = async (companyId: Types.ObjectId | null): Promise<any[]> => {
   try {
     if (companyId === null) {
-      // If no companyId is provided (admin user), return all companies
       const companies = await Company.find();
       return companies.map((company) => company.toObject());
     } else {
-      // If a companyId is provided (regular user), return only that company
       const company = await Company.findById(companyId);
       return company ? [company.toObject()] : [];
     }
@@ -149,15 +138,12 @@ export const updateCompany = async (id: string, data: Partial<ICompany>) => {
     if (!company) {
       throw new Error('Company not found');
     }
-    console.log('Company.Service ---------data.token:  ' + data.token);
 
     if (typeof data.token === 'string') {
       data.token = { value: data.token || '' };
     } else if (data.token === null) {
       data.token = undefined;
     }
-
-    console.log('Auth.Middleware --------- data.token.value:  ' + data.token?.value);
 
     if (data.api_keys) {
       encryptCompanyData(data as ICompany);
@@ -200,14 +186,12 @@ export const updateCompanyOnboarding = async (id: string, data: { companyName: s
     company.name = data.companyName;
     company.description = data.companyDescription;
 
-    // Update the user's nickname
     const user = await User.findOne({ companyId: id });
     if (user) {
       user.name = data.userName;
       await user.save();
     }
 
-    // Update onboarding status
     if (!company.onboardedModules.includes('company_info')) {
       company.onboardedModules.push('company_info');
     }
