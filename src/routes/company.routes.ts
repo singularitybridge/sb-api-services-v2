@@ -5,7 +5,6 @@ import {
   deleteCompany,
   getCompanies,
   getCompany,
-  getDecryptedCompany,
   refreshCompanyToken,
   updateCompany,
 } from '../services/company.service';
@@ -41,17 +40,6 @@ companyRouter.delete('/:id', verifyAccess(true), async (req: AuthenticatedReques
     console.error('Error deleting company:', error);
     res.status(500).send({ message: 'Failed to delete company and related data' });
   }
-});
-
-
-
-companyRouter.get('/decrypted', verifyAccess(), async (req: AuthenticatedRequest, res) => {
-  const companyId = req.user?.companyId;
-  if (!companyId) {
-    return res.status(400).json({ message: 'Company ID not found in user session' });
-  }
-  const company = await getDecryptedCompany(companyId);
-  res.json(company);
 });
 
 companyRouter.put('/refresh-token', verifyAccess(), async (req: AuthenticatedRequest, res) => {
