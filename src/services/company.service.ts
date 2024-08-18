@@ -102,21 +102,6 @@ export const getCompany = async (id: string) => {
   }
 };
 
-export const getDecryptedCompany = async (id: string) => {
-  try {
-    const company = await Company.findById(id);
-    if (!company) {
-      throw new Error('Company not found');
-    }
-    const decryptedCompany = company.toObject();
-    decryptCompanyData(decryptedCompany);
-    return decryptedCompany;
-  } catch (error) {
-    console.error('Error retrieving decrypted company:', error);
-    throw error;
-  }
-};
-
 export const getCompanies = async (companyId: Types.ObjectId | null): Promise<any[]> => {
   try {
     if (companyId === null) {
