@@ -119,11 +119,6 @@ export const getCompanies = async (companyId: Types.ObjectId | null): Promise<an
 
 export const updateCompany = async (id: string, data: Partial<ICompany>) => {
   try {
-    const company = await Company.findById(id);
-    if (!company) {
-      throw new Error('Company not found');
-    }
-
     if (typeof data.token === 'string') {
       data.token = { value: data.token || '' };
     } else if (data.token === null) {
@@ -133,12 +128,20 @@ export const updateCompany = async (id: string, data: Partial<ICompany>) => {
     if (data.api_keys) {
       encryptCompanyData(data as ICompany);
     }
-    
-    company.set(data);
-    updateOnboardingStatus(company.toObject());
-    await company.save();
 
-    const updatedCompanyData = company.toObject();
+    const updatedCompany = await Company.findOneAndUpdate(
+      { _id: id },
+      { $set: data },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedCompany) {
+      throw new Error('Company not found');
+    }
+
+    await updateOnboardingStatus(updatedCompany._id.toString());
+
+    const updatedCompanyData = updatedCompany.toObject();
     decryptCompanyData(updatedCompanyData);
 
     return updatedCompanyData as unknown as ICompany;
