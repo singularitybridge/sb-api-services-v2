@@ -10,7 +10,7 @@ import {
 import { Assistant, IAssistant } from '../models/Assistant';
 import mongoose from 'mongoose';
 import { getApiKey } from './api.key.service';
-import { deleteAssistantById } from './oai.assistant.service';
+import { createAssistant, deleteAssistantById } from './oai.assistant.service';
 
 export const getOpenAIClient = (apiKey: string) => {
   return new OpenAI({
@@ -159,4 +159,35 @@ export async function deleteAssistant(id: string, assistantId: string): Promise<
     console.error('Error in deleteAssistant:', error);
     throw error; // Re-throw the error to be caught by the route handler
   }
+}
+
+export async function createDefaultAssistant(companyId: string, apiKey: string): Promise<IAssistant> {
+  const defaultAssistantData = {
+    name: 'Default Assistant',
+    description: 'Your company\'s default AI assistant',
+    introMessage: 'Hello! I\'m your default AI assistant. How can I help you today?',
+    voice: 'en-US-Standard-C',
+    language: 'en',
+    llmModel: 'gpt-4',
+    llmPrompt: 'You are a helpful AI assistant for a new company. Provide friendly and professional assistance.',
+    companyId: companyId,
+  };
+
+  const assistant = new Assistant(defaultAssistantData);
+  await assistant.save();
+
+  const openAIAssistant = await createAssistant(
+    apiKey,
+    companyId,
+    assistant._id,
+    assistant.name,
+    assistant.description,
+    assistant.llmModel,
+    assistant.llmPrompt
+  );
+
+  assistant.assistantId = openAIAssistant.id;
+  await assistant.save();
+
+  return assistant;
 }

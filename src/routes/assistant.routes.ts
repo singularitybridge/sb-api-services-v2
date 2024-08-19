@@ -3,6 +3,7 @@ import express from 'express';
 import {
   deleteAssistant,
   handleSessionMessage,
+  createDefaultAssistant,
 } from '../services/assistant.service';
 import { Assistant } from '../models/Assistant';
 import {
@@ -247,6 +248,27 @@ assistantRouter.delete(
       res.status(500).send({ message: `Failed to delete assistant: ${(error as Error).message}` });
     }
   },
+);
+
+assistantRouter.post(
+  '/default',
+  validateApiKeys(['openai']),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const companyId = req.company._id;
+      const apiKey = await getApiKey(companyId, 'openai') as string;
+
+      if (!apiKey) {
+        return res.status(400).json({ message: 'OpenAI API key not found' });
+      }
+
+      const defaultAssistant = await createDefaultAssistant(companyId.toString(), apiKey);
+      res.status(201).json(defaultAssistant);
+    } catch (error) {
+      console.error('Error creating default assistant:', error);
+      res.status(500).json({ message: 'Failed to create default assistant', error: (error as Error).message });
+    }
+  }
 );
 
 export { assistantRouter };
