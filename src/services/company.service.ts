@@ -57,7 +57,8 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
 
     const defaultKeys = [
       { key: 'openai_api_key', value: 'default_openai_key' },
-      { key: 'labs11_api_key', value: 'default_labs11_key' }
+      { key: 'labs11_api_key', value: 'default_labs11_key' },
+      { key: 'jsonbin_api_key', value: 'default_jsonbin_key' },
     ];
 
     defaultKeys.forEach(defaultKey => {
