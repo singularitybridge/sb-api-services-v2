@@ -1,68 +1,73 @@
-/// file_path: src/services/onboarding.service.ts
 import { IUser, User } from '../models/User';
-import { ICompany } from '../models/Company';
-import { createCompany, getCompanies, getCompany, getDecryptedCompany, refreshCompanyToken } from './company.service';
+import { Company, ICompany, OnboardingStatus } from '../models/Company';
+import { Document } from 'mongoose';
+import { NotFoundError } from '../utils/errors';
 
-export const handleOnboarding = async (user: any, name: string, description: string) => {
-    try {
-        
-        console.log('Starting onboarding process');
-        console.log('Received user:', user);
-        console.log('Company name and description:', name, description);
+const DEFAULT_ENCRYPTED_OPENAI_API_KEY = '91ac2fa32515511b3f1bb19e5e9980553115';
 
-
-        // Create new company for user with default values
-        const defaultCompany: ICompany = {
-            name: `${name}`,
-            api_keys: [
-                { key: 'openai_api_key', value: 'defaultValue' },
-                { key: 'gcp_key', value: 'defaultValue' },
-                { key: 'labs11_api_key', value: 'defaultValue' },
-                { key: 'twilio_account_sid', value: 'defaultValue' },
-                { key: 'twilio_auth_token', value: 'defaultValue' },
-            ],
-            identifiers: [{ key: 'email', value: user.email }],
-            __v: 0,
-        } as ICompany;
-
-        console.log('Default company object:', defaultCompany);
-
-        
-        // Create the company using the company service
-        const newCompany:any = await createCompany( defaultCompany as ICompany);
-        console.log('New company created:', newCompany);
-        console.log('New company id:', newCompany._id);
-        
-        // Create new user
-        const newUser = {
-            companyId: newCompany._id,
-            name: user.given_name,
-            email: user.email,
-            googleId: user.sub,
-            role: 'CompanyUser',
-            identifiers: [{ key: 'email', value: user.email }],
-        } as IUser;
-
-        console.log('New user object:', newUser);
-
-        // Create the user using the User model
-        const createdUser = await User.create(newUser);
-        console.log('New user created:', createdUser);
-
-        // decrypt the token for the new company
-        const token = newCompany.token?.value || ' ';
-        console.log('Token:', token);
-        
-        
-        console.log('Onboarding process completed successfully');
-
-        return {
-            user: createdUser,
-            company: newCompany,
-            token: token,
-        };
-    } catch (error) {
-        console.error('Error during onboarding:', error);
-        throw error;
+export const updateOnboardingStatus = async (companyId: string): Promise<ICompany> => {
+  try {
+    const company = await Company.findById(companyId);
+    if (!company) {
+      throw new NotFoundError('Company not found');
     }
+
+    if (!company.api_keys.some(key => key.key === 'openai_api_key' && key.value !== DEFAULT_ENCRYPTED_OPENAI_API_KEY)) {
+      company.onboardingStatus = OnboardingStatus.API_KEY_REQUIRED;
+    } else {
+      // If OpenAI API key is present, set status to READY_FOR_ASSISTANTS
+      company.onboardingStatus = OnboardingStatus.READY_FOR_ASSISTANTS;
+
+      // Check for further progression based on onboarded modules
+      if (company.onboardedModules.includes('assistants') && company.onboardedModules.length < 3) {
+        company.onboardingStatus = OnboardingStatus.USING_BASIC_FEATURES;
+      } else if (company.onboardedModules.length >= 3 && company.onboardedModules.length < 5) {
+        company.onboardingStatus = OnboardingStatus.ADVANCED_USER;
+      } else if (company.onboardedModules.length >= 5) {
+        company.onboardingStatus = OnboardingStatus.EXPERT_USER;
+      }
+    }
+
+    await company.save();
+    return company.toObject() as ICompany;
+  } catch (error) {
+    console.error('Error updating onboarding status:', error);
+    throw error;
+  }
+};
+
+export const updateOnboardedModule = async (companyId: string, module: string) => {
+  try {
+    const company = await Company.findById(companyId);
+    if (!company) {
+      throw new Error('Company not found');
+    }
+
+    if (!company.onboardedModules.includes(module)) {
+      company.onboardedModules.push(module);
+      updateOnboardingStatus(companyId);
+      await company.save();
+    }
+
+    return company.toObject() as ICompany;
+  } catch (error) {
+    console.error('Error updating onboarded module:', error);
+    throw error;
+  }
+};
+
+export const getOnboardingStatus = async (companyId: string): Promise<Pick<ICompany, 'onboardingStatus' | 'onboardedModules'>> => {
+  try {
+    const company = await Company.findById(companyId).select('onboardingStatus onboardedModules');
+    if (!company) {
+      throw new NotFoundError('Company not found');
+    }
+    return {
+      onboardingStatus: company.onboardingStatus,
+      onboardedModules: company.onboardedModules
+    };
+  } catch (error) {
+    console.error('Error fetching onboarding status:', error);
+    throw error;
+  }
 };

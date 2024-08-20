@@ -2,6 +2,7 @@
 import express from 'express';
 import { extractTokenFromHeader, verifyToken } from '../services/token.service';
 import { googleLogin, verifyBetaKey } from '../services/googleAuth.service';
+import { refreshApiKeyCache } from '../services/api.key.service';
 
 const authRouter = express.Router();
 
@@ -36,8 +37,10 @@ authRouter.post('/google/login', async (req, res) => {
   console.log('called google login route');
   try {
     const { user, company, sessionToken } = await googleLogin(req.body.token);
+    await refreshApiKeyCache(company._id.toString());
     res.json({ user, company, sessionToken });
   } catch (error) {
+    console.error('Error during Google login:', error);
     res.status(500).json({ error: 'Failed to login with Google' });
   }
 });
