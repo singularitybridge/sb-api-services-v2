@@ -168,7 +168,7 @@ export async function createDefaultAssistant(companyId: string, apiKey: string):
     introMessage: 'Hello! I\'m your default AI assistant. How can I help you today?',
     voice: 'en-US-Standard-C',
     language: 'en',
-    llmModel: 'gpt-4',
+    llmModel: 'gpt-4o',
     llmPrompt: 'You are a helpful AI assistant for a new company. Provide friendly and professional assistance.',
     companyId: companyId,
   };
