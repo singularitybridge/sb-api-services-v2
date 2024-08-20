@@ -16,7 +16,7 @@ export const readFile = async (companyId: string, binId: string): Promise<any> =
   try {
     const headers = await getHeaders(companyId);
     const response = await axios.get(`${BASE_URL}/b/${binId}`, { headers });
-    return response.data;
+    return response.data.record; // Return only the content of the "record" field
   } catch (error) {
     console.error('Error reading file from JSONBin:', error);
     throw error;

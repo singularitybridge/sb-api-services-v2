@@ -7,12 +7,18 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
     parameters: {
       type: 'object',
       properties: {
-        binId: { type: 'string' },
-        data: { type: 'object' },
+        binId: { 
+          type: 'string',
+          description: 'The ID of the file to update',
+         },
+        data: { 
+          type: 'object',
+          description: 'The new data to write to the file, always replace the entire JSON content',
+         },
       },
       required: ['binId', 'data'],
     },
-    function: async ({ binId, data }) => {
+    function: async ({ binId, data }) => {      
       return await updateFile(context.companyId, binId, data);
     },
   },
