@@ -4,11 +4,13 @@ import { FunctionFactory, ActionContext } from './types';
 import { createInboxActions } from './inboxActions';
 import { createAssistantActions } from './assistantActions';
 import { createCalendarActions } from './calendarActions';
+import { createJSONBinActions } from './jsonbinActions';
 
 export const createFunctionFactory = (context: ActionContext): FunctionFactory => ({
   ...createInboxActions(context),
   ...createAssistantActions(context),
   ...createCalendarActions(context),
+  ...createJSONBinActions(context),
 });
 
 export const executeFunctionCall = async (call: any, sessionId: string, companyId: string) => {

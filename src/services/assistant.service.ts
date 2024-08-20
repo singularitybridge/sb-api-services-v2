@@ -39,7 +39,7 @@ const pollRunStatus = async (
   runId: string,
   sessionId: string,
   companyId: string,
-  timeout: number = 45000,
+  timeout: number = 90000,
 ) => {
   const startTime = Date.now();
   let lastRun;
