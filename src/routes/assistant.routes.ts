@@ -1,7 +1,9 @@
 // file path: /src/routes/assistant.routes.ts
 import express from 'express';
 import {
+  deleteAssistant,
   handleSessionMessage,
+  createDefaultAssistant,
 } from '../services/assistant.service';
 import { Assistant } from '../models/Assistant';
 import {
@@ -173,11 +175,16 @@ assistantRouter.put(
   },
 );
 
+import { refreshApiKeyCache } from '../services/api.key.service';
+
 assistantRouter.post(
   '/',
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
     try {
+      // Refresh the API key cache before creating the assistant
+      await refreshApiKeyCache(req.company._id.toString());
+
       const assistantData = {
         ...req.body,
         companyId: req.user?.companyId,
@@ -208,8 +215,9 @@ assistantRouter.post(
             'Duplicate key error: an assistant with this phone number already exists.',
         });
       } else {
+        console.error('Error creating assistant:', err);
         res.status(500).send({
-          message: `An error occurred while trying to create the assistant : ${err}`,
+          message: `An error occurred while trying to create the assistant: ${err}`,
         });
       }
     }
@@ -221,35 +229,46 @@ assistantRouter.delete(
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
     const { id } = req.params;
-    const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
-    console.log('assistant id ------ ' + id);
 
-    const assistant = await Assistant.findOne({
-      _id: id,
-      companyId:
-        req.user?.role === 'Admin' ? { $exists: true } : req.user?.companyId,
-    });
+    try {
+      const assistant = await Assistant.findOne({
+        _id: id,
+        companyId:
+          req.user?.role === 'Admin' ? { $exists: true } : req.user?.companyId,
+      });
 
-    if (!assistant) {
-      return res.status(404).send({ message: 'Assistant not found ---- ' });
+      if (!assistant) {
+        return res.status(404).send({ message: 'Assistant not found' });
+      }
+
+      await deleteAssistant(id, assistant.assistantId);
+      res.send({ message: 'Assistant deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting assistant:', error);
+      res.status(500).send({ message: `Failed to delete assistant: ${(error as Error).message}` });
     }
-
-    // Delete the assistant from OpenAI
-    const deleted = await deleteAssistantById(
-      apiKey,
-      assistant.assistantId,
-      id,
-    );
-    if (!deleted) {
-      return res
-        .status(500)
-        .send({ message: 'Failed to delete assistant from OpenAI' });
-    }
-
-    // Delete the assistant from the local database
-    await Assistant.findByIdAndDelete(id);
-    res.send({ message: 'Assistant deleted successfully' });
   },
+);
+
+assistantRouter.post(
+  '/default',
+  validateApiKeys(['openai']),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const companyId = req.company._id;
+      const apiKey = await getApiKey(companyId, 'openai') as string;
+
+      if (!apiKey) {
+        return res.status(400).json({ message: 'OpenAI API key not found' });
+      }
+
+      const defaultAssistant = await createDefaultAssistant(companyId.toString(), apiKey);
+      res.status(201).json(defaultAssistant);
+    } catch (error) {
+      console.error('Error creating default assistant:', error);
+      res.status(500).json({ message: 'Failed to create default assistant', error: (error as Error).message });
+    }
+  }
 );
 
 export { assistantRouter };

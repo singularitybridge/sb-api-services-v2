@@ -39,7 +39,7 @@ export const createAssistantActions = (context: ActionContext): FunctionFactory 
     },
     function: async (args: { _id: string }) => {
       console.log('called setAssistant with args: ', args);
-      publishMessage('sb', 'setAssistant', { _id: args._id });
+      publishMessage(`sb-${context.sessionId}`, 'setAssistant', { _id: args._id });
       return {
         success: true,
         description: `set assistant to ${args._id}`,
@@ -68,7 +68,7 @@ export const createAssistantActions = (context: ActionContext): FunctionFactory 
     },
     function: async (args: { name: string; description: string; prompt: string }) => {
       console.log('called createNewAssistant with args: ', args);
-      publishMessage('sb', 'createNewAssistant', args);
+      publishMessage(`sb-${context.sessionId}`, 'createNewAssistant', args);
       return {
         success: true,
         description: 'created new assistant',
