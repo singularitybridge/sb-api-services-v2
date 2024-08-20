@@ -1,4 +1,3 @@
-/// file_path: src/index.ts
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -34,6 +33,7 @@ import { authRouter } from './routes/auth.routes';
 import { errorHandler } from './middleware/errorHandler.middleware';
 import { fileRouter } from './routes/file.routes';
 import { journalRouter } from './routes/journal.routes';
+import { jsonbinRouter } from './routes/jsonbin.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -64,17 +64,13 @@ app.use('/agenda', verifyTokenMiddleware, verifyAccess(), agendaRouter);
 app.use('/api', verifyTokenMiddleware, verifyAccess(), verificationRouter);
 app.use('/journal', verifyTokenMiddleware, verifyAccess(), journalRouter);
 app.use('/onboarding', verifyTokenMiddleware, verifyAccess() , onboardingRouter);
+app.use('/jsonbin', verifyTokenMiddleware, verifyAccess(), jsonbinRouter);
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);
 
-
 // error handler
 app.use(errorHandler);
-
-
-
-
 
 export default app;
 

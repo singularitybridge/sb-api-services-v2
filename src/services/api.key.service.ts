@@ -1,11 +1,10 @@
-/// file_path: src/services/api.key.service.ts
 import { Company } from '../models/Company';
 import { decryptData } from './encryption.service';
 import NodeCache from 'node-cache';
 import { Request, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
-export type ApiKeyType = 'openai' | 'labs11' | 'google' | 'twilio';
+export type ApiKeyType = 'openai' | 'labs11' | 'google' | 'twilio' | 'jsonbin';
 
 // Initialize cache with a 15-minute TTL (time to live)
 const apiKeyCache = new NodeCache({ stdTTL: 900 });
@@ -98,5 +97,3 @@ export const validateApiKeys = (requiredKeys: ApiKeyType[]) => {
     next();
   };
 };
-
-
