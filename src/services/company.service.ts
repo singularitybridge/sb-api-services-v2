@@ -1,13 +1,14 @@
 // File: src/services/company.service.ts
 import { Types } from 'mongoose';
-import { Company, ICompany, IApiKey } from '../models/Company';
+import { Company, ICompany, IApiKey, OnboardingStatus } from '../models/Company';
 import { encryptData, decryptData } from './encryption.service';
 import jwt from 'jsonwebtoken';
+import { updateOnboardingStatus } from './onboarding.service';
+import { User } from '../models/User';
 
 const generateToken = () => {
   return jwt.sign({}, process.env.JWT_SECRET as string);
 };
-
 
 const encryptCompanyData = (companyData: ICompany) => {
   companyData.api_keys.forEach((apiKey: IApiKey) => {
@@ -46,20 +47,35 @@ const decryptCompanyData = (companyData: any) => {
   }
 };
 
-
 export const createCompany = async (companyData: Partial<ICompany>): Promise<ICompany> => {
   try {
     const token = generateToken();
     companyData.token = { value: token };
 
-    // If identifiers are not provided, set it to an empty array
-    if (!companyData.identifiers || companyData.identifiers.length === 0) {
-      companyData.identifiers = [];
-    }
+    companyData.identifiers = [];
+    companyData.api_keys = companyData.api_keys || [];
+
+    const defaultKeys = [
+      { key: 'openai_api_key', value: 'default_openai_key' },
+      { key: 'labs11_api_key', value: 'default_labs11_key' },
+      { key: 'jsonbin_api_key', value: 'default_jsonbin_key' },
+    ];
+
+    defaultKeys.forEach(defaultKey => {
+      if (!companyData.api_keys!.some(key => key.key === defaultKey.key)) {
+        companyData.api_keys!.push(defaultKey);
+      }
+    });
+
+    companyData.onboardingStatus = OnboardingStatus.CREATED;
+    companyData.onboardedModules = [];
+
+    console.log('Setting initial onboarding status:', companyData.onboardingStatus);
 
     encryptCompanyData(companyData as ICompany);
 
     const company = new Company(companyData);
+    
     await company.save();
 
     const createdCompany = company.toObject();
@@ -71,7 +87,6 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
     throw error;
   }
 };
-
 
 export const getCompany = async (id: string) => {
   try {
@@ -88,29 +103,12 @@ export const getCompany = async (id: string) => {
   }
 };
 
-export const getDecryptedCompany = async (id: string) => {
-  try {
-    const company = await Company.findById(id);
-    if (!company) {
-      throw new Error('Company not found');
-    }
-    const decryptedCompany = company.toObject();
-    decryptCompanyData(decryptedCompany);
-    return decryptedCompany;
-  } catch (error) {
-    console.error('Error retrieving decrypted company:', error);
-    throw error;
-  }
-};
-
 export const getCompanies = async (companyId: Types.ObjectId | null): Promise<any[]> => {
   try {
     if (companyId === null) {
-      // If no companyId is provided (admin user), return all companies
       const companies = await Company.find();
       return companies.map((company) => company.toObject());
     } else {
-      // If a companyId is provided (regular user), return only that company
       const company = await Company.findById(companyId);
       return company ? [company.toObject()] : [];
     }
@@ -120,28 +118,34 @@ export const getCompanies = async (companyId: Types.ObjectId | null): Promise<an
   }
 };
 
-export const updateCompany = async (id: string, data: ICompany) => {
+export const updateCompany = async (id: string, data: Partial<ICompany>) => {
   try {
-    const company = await Company.findById(id);
-    if (!company) {
-      throw new Error('Company not found');
-    }
-    console.log('Company.Service ---------data.token:  ' + data.token);
-
     if (typeof data.token === 'string') {
       data.token = { value: data.token || '' };
+    } else if (data.token === null) {
+      data.token = undefined;
     }
 
-    console.log('Auth.Middleware --------- data.token.value:  ' + data.token?.value);
+    if (data.api_keys) {
+      encryptCompanyData(data as ICompany);
+    }
 
-    encryptCompanyData(data);
-    company.set(data);
-    await company.save();
+    const updatedCompany = await Company.findOneAndUpdate(
+      { _id: id },
+      { $set: data },
+      { new: true, runValidators: true }
+    );
 
-    const updatedCompanyData = company.toObject();
+    if (!updatedCompany) {
+      throw new Error('Company not found');
+    }
+
+    await updateOnboardingStatus(updatedCompany._id.toString());
+
+    const updatedCompanyData = updatedCompany.toObject();
     decryptCompanyData(updatedCompanyData);
 
-    return updatedCompanyData;
+    return updatedCompanyData as unknown as ICompany;
   } catch (error) {
     console.error('Error updating company:', error);
     throw error;
@@ -157,6 +161,39 @@ export const deleteCompany = async (id: string) => {
     return company;
   } catch (error) {
     console.error('Error deleting company:', error);
+    throw error;
+  }
+};
+
+export const updateCompanyOnboarding = async (id: string, data: { companyName: string; companyDescription: string; userName: string }) => {
+  try {
+    const company = await Company.findById(id);
+    if (!company) {
+      throw new Error('Company not found');
+    }
+
+    company.name = data.companyName;
+    company.description = data.companyDescription;
+
+    const user = await User.findOne({ companyId: id });
+    if (user) {
+      user.name = data.userName;
+      await user.save();
+    }
+
+    if (!company.onboardedModules.includes('company_info')) {
+      company.onboardedModules.push('company_info');
+    }
+    await updateOnboardingStatus(company._id.toString());
+
+    await company.save();
+
+    const updatedCompanyData = company.toObject();
+    decryptCompanyData(updatedCompanyData);
+
+    return updatedCompanyData as unknown as ICompany;
+  } catch (error) {
+    console.error('Error updating company onboarding information:', error);
     throw error;
   }
 };

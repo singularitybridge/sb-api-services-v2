@@ -1,11 +1,10 @@
-/// file_path: src/services/api.key.service.ts
 import { Company } from '../models/Company';
 import { decryptData } from './encryption.service';
 import NodeCache from 'node-cache';
 import { Request, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
-export type ApiKeyType = 'openai' | 'labs11' | 'google' | 'twilio';
+export type ApiKeyType = 'openai' | 'labs11' | 'google' | 'twilio' | 'jsonbin';
 
 // Initialize cache with a 15-minute TTL (time to live)
 const apiKeyCache = new NodeCache({ stdTTL: 900 });
@@ -51,6 +50,10 @@ export const setApiKey = async (companyId: string, keyType: ApiKeyType, apiKey: 
   await company.save();
 
   // Update cache
+  updateApiKeyCache(companyId, keyType, apiKey);
+};
+
+export const updateApiKeyCache = (companyId: string, keyType: ApiKeyType, apiKey: string): void => {
   const cacheKey = `${companyId}:${keyType}`;
   apiKeyCache.set(cacheKey, apiKey);
 };
@@ -58,6 +61,19 @@ export const setApiKey = async (companyId: string, keyType: ApiKeyType, apiKey: 
 export const invalidateApiKeyCache = (companyId: string, keyType: ApiKeyType): void => {
   const cacheKey = `${companyId}:${keyType}`;
   apiKeyCache.del(cacheKey);
+};
+
+export const refreshApiKeyCache = async (companyId: string): Promise<void> => {
+  const company = await Company.findById(companyId);
+  if (!company) {
+    throw new Error('Company not found');
+  }
+
+  for (const apiKey of company.api_keys) {
+    const keyType = apiKey.key.split('_')[0] as ApiKeyType;
+    const decryptedKey = decryptData({ 'value': apiKey.value, 'iv': apiKey.iv, 'tag': apiKey.tag });
+    updateApiKeyCache(companyId, keyType, decryptedKey);
+  }
 };
 
 export const validateApiKeys = (requiredKeys: ApiKeyType[]) => {
@@ -81,5 +97,3 @@ export const validateApiKeys = (requiredKeys: ApiKeyType[]) => {
     next();
   };
 };
-
-

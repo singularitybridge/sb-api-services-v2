@@ -28,12 +28,23 @@ const TokenSchema = new Schema({
   tag: { type: String, required: true },
 });
 
+export enum OnboardingStatus {
+  CREATED = 'created',
+  API_KEY_REQUIRED = 'api_key_required',
+  READY_FOR_ASSISTANTS = 'ready_for_assistants',
+  USING_BASIC_FEATURES = 'using_basic_features',
+  ADVANCED_USER = 'advanced_user',
+  EXPERT_USER = 'expert_user'
+}
+
 export interface ICompany extends Document {
   name: string;
-  description?: string;
+  description?: string | null;
   token?: Token;
   api_keys: IApiKey[];
   identifiers?: IIdentifier[]; // Made optional
+  onboardingStatus: OnboardingStatus;
+  onboardedModules: string[];
 }
 
 const CompanySchema = new Schema({
@@ -42,6 +53,8 @@ const CompanySchema = new Schema({
   token: TokenSchema,
   api_keys: [ApiKeySchema],
   identifiers: { type: [IdentifierSchema], required: false }, // Made optional
+  onboardingStatus: { type: String, enum: Object.values(OnboardingStatus), default: OnboardingStatus.CREATED },
+  onboardedModules: [{ type: String }],
 });
 
 // Update the index to allow null values and make it sparse

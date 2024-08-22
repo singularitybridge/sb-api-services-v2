@@ -9,6 +9,8 @@ import {
 } from './oai.thread.service';
 import { Assistant, IAssistant } from '../models/Assistant';
 import mongoose from 'mongoose';
+import { getApiKey } from './api.key.service';
+import { createAssistant, deleteAssistantById } from './oai.assistant.service';
 
 export const getOpenAIClient = (apiKey: string) => {
   return new OpenAI({
@@ -37,7 +39,7 @@ const pollRunStatus = async (
   runId: string,
   sessionId: string,
   companyId: string,
-  timeout: number = 45000,
+  timeout: number = 90000,
 ) => {
   const startTime = Date.now();
   let lastRun;
@@ -131,3 +133,61 @@ export const handleSessionMessage = async (
   const response = messages.data[0].content[0].text.value;
   return response;
 };
+
+export async function deleteAssistant(id: string, assistantId: string): Promise<void> {
+  try {
+    // First, find the assistant in the local database
+    const assistant = await Assistant.findById(id);
+    if (!assistant) {
+      throw new Error('Assistant not found in local database');
+    }
+
+    // Delete the assistant from the local database
+    await Assistant.findByIdAndDelete(id);
+
+    // Attempt to delete the assistant from OpenAI
+    try {
+      const apiKey = await getApiKey(assistant.companyId.toString(), 'openai') as string;
+      await deleteAssistantById(apiKey, assistantId, id);
+    } catch (error) {
+      // Log a warning if OpenAI deletion fails, but don't throw an error
+      console.warn(`Warning: Failed to delete assistant from OpenAI: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
+    console.log(`Successfully deleted assistant ${id} from MongoDB.`);
+  } catch (error) {
+    console.error('Error in deleteAssistant:', error);
+    throw error; // Re-throw the error to be caught by the route handler
+  }
+}
+
+export async function createDefaultAssistant(companyId: string, apiKey: string): Promise<IAssistant> {
+  const defaultAssistantData = {
+    name: 'Default Assistant',
+    description: 'Your company\'s default AI assistant',
+    introMessage: 'Hello! I\'m your default AI assistant. How can I help you today?',
+    voice: 'en-US-Standard-C',
+    language: 'en',
+    llmModel: 'gpt-4o',
+    llmPrompt: 'You are a helpful AI assistant for a new company. Provide friendly and professional assistance.',
+    companyId: companyId,
+  };
+
+  const assistant = new Assistant(defaultAssistantData);
+  await assistant.save();
+
+  const openAIAssistant = await createAssistant(
+    apiKey,
+    companyId,
+    assistant._id,
+    assistant.name,
+    assistant.description,
+    assistant.llmModel,
+    assistant.llmPrompt
+  );
+
+  assistant.assistantId = openAIAssistant.id;
+  await assistant.save();
+
+  return assistant;
+}

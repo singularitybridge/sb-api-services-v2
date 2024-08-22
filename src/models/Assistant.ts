@@ -1,4 +1,3 @@
-//file_path: src/models/Assistant.ts
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IIdentifier {
@@ -22,8 +21,8 @@ export interface IAssistant extends Document {
   llmPrompt: string;
   companyId: string;
   actions: mongoose.Types.ObjectId[];
+  avatarImage?: string; // New field, optional
 }
-
 
 const AssistantSchema: Schema = new Schema({
   assistantId: { type: String, required: false },
@@ -40,7 +39,7 @@ const AssistantSchema: Schema = new Schema({
     ref: 'Action', 
     required: false 
   }],
-
+  avatarImage: { type: String, required: false, default: 'default-avatar' }, // New field
 });
 
 export const Assistant = mongoose.model<IAssistant>(
