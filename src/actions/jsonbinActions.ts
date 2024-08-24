@@ -4,7 +4,7 @@ import { readFile, updateFile, createFile } from '../services/jsonbin.service';
 export const createJSONBinActions = (context: ActionContext): FunctionFactory => ({
   createJSONBinFile: {
     description: 'Create a new file in JSONBin',
-    strict: true,
+    strict: false,
     parameters: {
       type: 'object',
       properties: {
@@ -81,7 +81,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
   },
   updateJSONBinFile: {
     description: 'Update a file in JSONBin',
-    strict: true,
+    strict: false,
     parameters: {
       type: 'object',
       properties: {
@@ -158,12 +158,14 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
   },
   readJSONBinFile: {
     description: 'Read a file from JSONBin',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
         binId: { type: 'string' },
       },
       required: ['binId'],
+      additionalProperties: false,
     },
     function: async ({ binId }) => {
       return await readFile(context.companyId, binId);
