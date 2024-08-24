@@ -81,6 +81,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
   },
   updateJSONBinFile: {
     description: 'Update a file in JSONBin',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -94,13 +95,48 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
          },
       },
       required: ['binId', 'data'],
+      additionalProperties: false,
     },
-    function: async ({ binId, data }) => {
+    function: async (args) => {
+      console.log('updateJSONBinFile called with arguments:', JSON.stringify(args, null, 2));
+
+      const { binId, data } = args;
+
+      // Check if all required properties are present
+      if (binId === undefined || data === undefined) {
+        console.error('updateJSONBinFile: Missing required parameters');
+        return {
+          error: 'Missing parameters',
+          message: 'Both binId and data parameters are required.',
+        };
+      }
+
+      // Check for additional properties
+      const allowedProps = ['binId', 'data'];
+      const extraProps = Object.keys(args).filter(prop => !allowedProps.includes(prop));
+      if (extraProps.length > 0) {
+        console.error('updateJSONBinFile: Additional properties found', extraProps);
+        return {
+          error: 'Invalid parameters',
+          message: `Additional properties are not allowed: ${extraProps.join(', ')}`,
+        };
+      }
+
       // Verify that data is a valid JSON object
       if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+        console.error('updateJSONBinFile: Invalid data type', typeof data);
         return {
           error: 'Invalid JSON data',
-          message: 'The provided data must be a valid JSON object.',
+          message: `The provided data must be a valid JSON object. Received type: ${typeof data}`,
+        };
+      }
+
+      // Verify that binId is a string
+      if (typeof binId !== 'string') {
+        console.error('updateJSONBinFile: Invalid binId', binId);
+        return {
+          error: 'Invalid binId',
+          message: 'The binId must be a string.',
         };
       }
       
@@ -108,6 +144,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
         // Attempt to stringify and parse the data to ensure it's valid JSON
         JSON.parse(JSON.stringify(data));
       } catch (error) {
+        console.error('updateJSONBinFile: Error stringifying data', error);
         return {
           error: 'Invalid JSON data',
           message: 'The provided data could not be converted to a valid JSON string.',
@@ -115,6 +152,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       }
       
       // If we've reached this point, the data is valid JSON
+      console.log('updateJSONBinFile: Calling updateFile with valid data');
       return await updateFile(context.companyId, binId, data);
     },
   },
