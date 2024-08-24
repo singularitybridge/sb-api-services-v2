@@ -4,30 +4,44 @@ import { readFile, updateFile, createFile } from '../services/jsonbin.service';
 export const createJSONBinActions = (context: ActionContext): FunctionFactory => ({
   createJSONBinFile: {
     description: 'Create a new file in JSONBin',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
         data: { 
           type: 'object',
           description: 'The data to write to the new file, must be a valid JSON object',
-         },
+        },
         name: {
           type: 'string',
-          description: 'Optional name for the bin (1-128 characters)',
+          description: 'Name for the bin (1-128 characters), englsih letters, numbers, and underscores only',
         },
       },
-      required: ['name', 'data'],
+      required: ['data', 'name'],
+      additionalProperties: false,
     },
     function: async (args) => {
       console.log('createJSONBinFile called with arguments:', JSON.stringify(args, null, 2));
 
       const { data, name } = args;
 
-      if (data === undefined) {
-        console.error('createJSONBinFile: data parameter is missing');
+      // Check if all required properties are present
+      if (data === undefined || name === undefined) {
+        console.error('createJSONBinFile: Missing required parameters');
         return {
-          error: 'Missing data',
-          message: 'The required data parameter is missing.',
+          error: 'Missing parameters',
+          message: 'Both data and name parameters are required.',
+        };
+      }
+
+      // Check for additional properties
+      const allowedProps = ['data', 'name'];
+      const extraProps = Object.keys(args).filter(prop => !allowedProps.includes(prop));
+      if (extraProps.length > 0) {
+        console.error('createJSONBinFile: Additional properties found', extraProps);
+        return {
+          error: 'Invalid parameters',
+          message: `Additional properties are not allowed: ${extraProps.join(', ')}`,
         };
       }
 
@@ -37,6 +51,15 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
         return {
           error: 'Invalid JSON data',
           message: `The provided data must be a valid JSON object. Received type: ${typeof data}`,
+        };
+      }
+
+      // Verify that name is a string and within the correct length
+      if (typeof name !== 'string' || name.length < 1 || name.length > 128) {
+        console.error('createJSONBinFile: Invalid name', name);
+        return {
+          error: 'Invalid name',
+          message: 'The name must be a string between 1 and 128 characters long.',
         };
       }
       
