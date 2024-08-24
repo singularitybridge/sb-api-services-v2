@@ -27,7 +27,7 @@ export const updateFile = async (companyId: string, binId: string, data: any): P
   try {
     const headers = await getHeaders(companyId);
     const response = await axios.put(`${BASE_URL}/b/${binId}`, data, { headers });
-    return response.data;
+    return response.data.record;
   } catch (error) {
     console.error('Error updating file in JSONBin:', error);
     throw error;
