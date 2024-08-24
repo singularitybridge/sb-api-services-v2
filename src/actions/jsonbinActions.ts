@@ -18,7 +18,26 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       },
       required: ['binId', 'data'],
     },
-    function: async ({ binId, data }) => {      
+    function: async ({ binId, data }) => {
+      // Verify that data is a valid JSON object
+      if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+        return {
+          error: 'Invalid JSON data',
+          message: 'The provided data must be a valid JSON object.',
+        };
+      }
+      
+      try {
+        // Attempt to stringify and parse the data to ensure it's valid JSON
+        JSON.parse(JSON.stringify(data));
+      } catch (error) {
+        return {
+          error: 'Invalid JSON data',
+          message: 'The provided data could not be converted to a valid JSON string.',
+        };
+      }
+      
+      // If we've reached this point, the data is valid JSON
       return await updateFile(context.companyId, binId, data);
     },
   },
