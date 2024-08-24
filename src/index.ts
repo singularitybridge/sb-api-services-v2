@@ -26,7 +26,10 @@ import { userRouter } from './routes/user.routes';
 import { inboxRouter } from './routes/inbox.routes';
 import { actionRouter } from './routes/action.routes';
 import { verificationRouter } from './routes/verification.routes';
-import { verifyAccess, verifyTokenMiddleware } from './middleware/auth.middleware';
+import {
+  verifyAccess,
+  verifyTokenMiddleware,
+} from './middleware/auth.middleware';
 import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
 import { onboardingRouter } from './routes/onboarding.routes';
 import { authRouter } from './routes/auth.routes';
@@ -34,6 +37,7 @@ import { errorHandler } from './middleware/errorHandler.middleware';
 import { fileRouter } from './routes/file.routes';
 import { journalRouter } from './routes/journal.routes';
 import { jsonbinRouter } from './routes/jsonbin.routes';
+import { fluxImageRouter } from './routes/flux.image.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -59,12 +63,13 @@ app.use('/user', verifyTokenMiddleware, verifyAccess(), userRouter);
 app.use('/file', verifyTokenMiddleware, verifyAccess(), fileRouter);
 app.use('/inbox', verifyTokenMiddleware, verifyAccess(), inboxRouter);
 app.use('/action', verifyTokenMiddleware, verifyAccess(), actionRouter);
-app.use('/session', verifyTokenMiddleware, verifyAccess(),  sessionRouter);
+app.use('/session', verifyTokenMiddleware, verifyAccess(), sessionRouter);
 app.use('/agenda', verifyTokenMiddleware, verifyAccess(), agendaRouter);
 app.use('/api', verifyTokenMiddleware, verifyAccess(), verificationRouter);
 app.use('/journal', verifyTokenMiddleware, verifyAccess(), journalRouter);
-app.use('/onboarding', verifyTokenMiddleware, verifyAccess() , onboardingRouter);
+app.use('/onboarding', verifyTokenMiddleware, verifyAccess(), onboardingRouter);
 app.use('/jsonbin', verifyTokenMiddleware, verifyAccess(), jsonbinRouter);
+app.use('/flux-image', verifyTokenMiddleware, verifyAccess(), fluxImageRouter);
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);
