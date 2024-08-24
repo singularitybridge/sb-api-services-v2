@@ -4,12 +4,33 @@ import { ApiKey } from './verification.service';
 
 const BASE_URL = 'https://api.jsonbin.io/v3';
 
-const getHeaders = async (companyId: string) => {
+const getHeaders = async (companyId: string, binName?: string) => {
   const apiKey = await getApiKey(companyId, 'jsonbin');
-  return {
+  if (!apiKey) {
+    throw new Error('Failed to retrieve JSONBin API key');
+  }
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Master-Key': apiKey,
+    'X-Bin-Private': 'false',
   };
+  
+  if (binName) {
+    headers['X-Bin-Name'] = binName;
+  }
+  
+  return headers;
+};
+
+export const createFile = async (companyId: string, data: any, binName?: string): Promise<any> => {
+  try {
+    const headers = await getHeaders(companyId, binName);
+    const response = await axios.post(`${BASE_URL}/b`, data, { headers });
+    return response.data;
+  } catch (error) {
+    console.error('Error creating file in JSONBin:', error);
+    throw error;
+  }
 };
 
 export const readFile = async (companyId: string, binId: string): Promise<any> => {
