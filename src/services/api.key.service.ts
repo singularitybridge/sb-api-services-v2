@@ -4,7 +4,7 @@ import NodeCache from 'node-cache';
 import { Request, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
-export type ApiKeyType = 'openai' | 'labs11' | 'google' | 'twilio' | 'jsonbin' | 'getimg';
+export type ApiKeyType = 'openai' | 'labs11' | 'google' | 'twilio' | 'jsonbin' | 'getimg' | 'perplexity';
 
 // Initialize cache with a 15-minute TTL (time to live)
 const apiKeyCache = new NodeCache({ stdTTL: 900 });

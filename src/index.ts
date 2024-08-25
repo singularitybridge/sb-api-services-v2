@@ -38,6 +38,7 @@ import { fileRouter } from './routes/file.routes';
 import { journalRouter } from './routes/journal.routes';
 import { jsonbinRouter } from './routes/jsonbin.routes';
 import { fluxImageRouter } from './routes/flux.image.routes';
+import { perplexityRouter } from './routes/perplexity.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -70,6 +71,7 @@ app.use('/journal', verifyTokenMiddleware, verifyAccess(), journalRouter);
 app.use('/onboarding', verifyTokenMiddleware, verifyAccess(), onboardingRouter);
 app.use('/jsonbin', verifyTokenMiddleware, verifyAccess(), jsonbinRouter);
 app.use('/flux-image', verifyTokenMiddleware, verifyAccess(), fluxImageRouter);
+app.use('/perplexity', verifyTokenMiddleware, verifyAccess(), perplexityRouter);
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);
