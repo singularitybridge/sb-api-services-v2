@@ -1,6 +1,11 @@
 import sgMail from '@sendgrid/mail';
 import { getApiKey } from './api.key.service';
 
+
+/// @TODO: Update the sender email address to a valid email address
+/// later, we'll retrieve the sender email from the company settings
+/// key-value store. e.g - getCompanySetting(companyId, 'email')
+
 const SENDER_EMAIL = 'agent@singularitybridge.net';
 
 interface EmailParams {
