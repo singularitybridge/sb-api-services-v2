@@ -1,4 +1,3 @@
-/// file_path: /src/services/assistant.service.ts
 import OpenAI, { BadRequestError, NotFoundError } from 'openai';
 import { Session } from '../models/Session';
 import {
@@ -11,6 +10,7 @@ import { Assistant, IAssistant } from '../models/Assistant';
 import mongoose from 'mongoose';
 import { getApiKey } from './api.key.service';
 import { createAssistant, deleteAssistantById } from './oai.assistant.service';
+import { processTemplate } from './template.service';
 
 export const getOpenAIClient = (apiKey: string) => {
   return new OpenAI({
@@ -117,10 +117,16 @@ export const handleSessionMessage = async (
 
   console.log('create new run', session.threadId, session.assistantId);
 
+  const processedIntroMessage = messageCount === 0
+    ? await processTemplate(assistant.introMessage, sessionId)
+    : undefined;
+
+  const processedLlmPrompt = await processTemplate(assistant.llmPrompt, sessionId);
+
   const newRun = await openaiClient.beta.threads.runs.create(session.threadId, {
     assistant_id: assistant.assistantId as string,
-    additional_instructions:
-      messageCount === 0 ? assistant.introMessage : undefined,
+    additional_instructions: processedIntroMessage,
+    instructions: processedLlmPrompt,
   });
 
   const completedRun = await pollRunStatus(apiKey, session.threadId, newRun.id, sessionId, session.companyId);
@@ -165,11 +171,11 @@ export async function createDefaultAssistant(companyId: string, apiKey: string):
   const defaultAssistantData = {
     name: 'Default Assistant',
     description: 'Your company\'s default AI assistant',
-    introMessage: 'Hello! I\'m your default AI assistant. How can I help you today?',
+    introMessage: 'Hello {{user.name}}! I\'m your default AI assistant for {{company.name}}. How can I help you today?',
     voice: 'en-US-Standard-C',
     language: 'en',
-    llmModel: 'gpt-4o',
-    llmPrompt: 'You are a helpful AI assistant for a new company. Provide friendly and professional assistance.',
+    llmModel: 'gpt-4',
+    llmPrompt: 'You are a helpful AI assistant for {{company.name}}. Your name is {{assistant.name}}. Provide friendly and professional assistance to {{user.name}}.',
     companyId: companyId,
   };
 
