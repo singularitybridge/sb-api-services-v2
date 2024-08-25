@@ -8,6 +8,7 @@ import { createJSONBinActions } from './jsonbinActions';
 import { createFluxImageActions } from './fluxImageActions';
 import { createPerplexityActions } from './perplexityActions';
 import { createSendGridActions } from './sendgridActions';
+import { processTemplate } from '../services/template.service';
 
 export const createFunctionFactory = (context: ActionContext): FunctionFactory => ({
   ...createInboxActions(context),
@@ -26,7 +27,16 @@ export const executeFunctionCall = async (call: any, sessionId: string, companyI
   const functionName = call.function.name as keyof FunctionFactory;
 
   if (functionName in functionFactory) {
-    const args = JSON.parse(call.function.arguments);
+
+    let args = JSON.parse(call.function.arguments);
+    console.log('processing args', args);
+    // Process each argument with the template service
+    for (const key in args) {
+      if (typeof args[key] === 'string') {
+        args[key] = await processTemplate(args[key], sessionId);
+      }
+    }
+
     return await functionFactory[functionName].function(args);
   } else {
     throw new Error(`Function ${functionName} not implemented in the factory`);

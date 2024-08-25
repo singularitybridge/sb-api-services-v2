@@ -1,6 +1,6 @@
-import { UserCompanyData, getUserCompanyData } from './user-company-data.service';
+import { SessionContextData, getSessionContextData } from './session-context.service';
 
-const renderTemplate = (template: string, data: UserCompanyData): string => {
+const renderTemplate = (template: string, data: SessionContextData): string => {
   return template.replace(/{{\s*([^}\s]+)\s*}}/g, (match, key) => {
     const keys = key.split('.');
     let value: any = data;
@@ -17,7 +17,7 @@ const renderTemplate = (template: string, data: UserCompanyData): string => {
 
 export const processTemplate = async (template: string, sessionId: string): Promise<string> => {
   try {
-    const data = await getUserCompanyData(sessionId);
+    const data = await getSessionContextData(sessionId);
     return renderTemplate(template, data);
   } catch (error) {
     console.error('Error processing template:', error);
