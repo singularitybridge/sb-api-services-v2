@@ -19,7 +19,7 @@ interface PerplexityResponse {
   }[];
 }
 
-export async function performPerplexitySearch(companyId: string, model: string, query: string): Promise<PerplexityResponse> {
+export async function performPerplexitySearch(companyId: string, model: string, query: string): Promise<string> {
   const apiKey = await getApiKey(companyId, 'perplexity');
   if (!apiKey) {
     throw new Error('Perplexity API key not found');
@@ -55,7 +55,9 @@ export async function performPerplexitySearch(companyId: string, model: string, 
       }
     );
 
-    return response.data;
+    // Extract and return only the content from the response
+    const content = response.data.choices[0]?.message?.content || '';
+    return content;
   } catch (error) {
     console.error('Error calling Perplexity API:', error);
     throw new Error('Failed to perform Perplexity search');
