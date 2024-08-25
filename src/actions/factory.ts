@@ -6,6 +6,7 @@ import { createAssistantActions } from './assistantActions';
 import { createCalendarActions } from './calendarActions';
 import { createJSONBinActions } from './jsonbinActions';
 import { createFluxImageActions } from './fluxImageActions';
+import { createPerplexityActions } from './perplexityActions';
 
 export const createFunctionFactory = (context: ActionContext): FunctionFactory => ({
   ...createInboxActions(context),
@@ -13,6 +14,7 @@ export const createFunctionFactory = (context: ActionContext): FunctionFactory =
   ...createCalendarActions(context),
   ...createJSONBinActions(context),
   ...createFluxImageActions(context),
+  ...createPerplexityActions(context),
 });
 
 export const executeFunctionCall = async (call: any, sessionId: string, companyId: string) => {
