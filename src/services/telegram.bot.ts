@@ -12,6 +12,7 @@ const TOKEN = '6805951431:AAFLpe3FhD3ucF0csZw2T-jMAVlMuV816Bc';
 const bot = new TelegramBot(TOKEN, { polling: true });
 
 bot.on('message', async (msg) => {
+
   const chatId = msg.chat.id;
   const userId = msg.from?.id;
   const username = msg.from?.username || 'Unknown';
@@ -52,7 +53,7 @@ bot.on('message', async (msg) => {
       const apiKey = await getApiKey(user.companyId.toString(), 'openai') as string;
       
       // Use getSessionOrCreate instead of manually finding/creating the session
-      const { _id: sessionId } = await getSessionOrCreate(
+      const session = await getSessionOrCreate(
         apiKey,
         user.id,
         user.companyId.toString(),
@@ -60,7 +61,7 @@ bot.on('message', async (msg) => {
       );
 
       // We're not sending the response here, as it will be sent by handleSessionMessage
-      await handleSessionMessage(apiKey, messageText, sessionId.toString(), ChannelType.TELEGRAM);
+      await handleSessionMessage(apiKey, messageText, session._id, ChannelType.TELEGRAM);
     } else if (msg.photo) {
       bot.sendMessage(chatId, `Thanks for the photo, ${fullName}! Unfortunately, I can't process images yet.`);
     } else if (msg.document) {
