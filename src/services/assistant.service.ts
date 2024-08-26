@@ -13,6 +13,7 @@ import { createAssistant, deleteAssistantById } from './oai.assistant.service';
 import { processTemplate } from './template.service';
 import { findUserByIdentifier, getUserById } from './user.service';
 import { getTelegramBot } from './telegram.bot';
+import { ChannelType } from '../types/ChannelType';
 
 export const getOpenAIClient = (apiKey: string) => {
   return new OpenAI({
@@ -130,12 +131,13 @@ export const handleSessionMessage = async (
   apiKey: string,
   userInput: string,
   sessionId: string,
+  channel: ChannelType = ChannelType.WEB,
   metadata?: Record<string, string>,
 ): Promise<string> => {
-  console.log(`Handling session message for session ${sessionId}`);
+  console.log(`Handling session message for session ${sessionId} on channel ${channel}`);
   const session = await Session.findById(sessionId);
-  if (!session || !session.active) {
-    throw new Error('Invalid or inactive session');
+  if (!session || !session.active || session.channel !== channel) {
+    throw new Error('Invalid or inactive session, or channel mismatch');
   }
 
   const assistant = await Assistant.findOne({
@@ -181,9 +183,11 @@ export const handleSessionMessage = async (
   // Process the assistant's response with template placeholders
   const processedResponse = await processTemplate(response, sessionId);
 
-  // Send both user input and assistant's response to Telegram
-  console.log(`Sending Telegram message for user ${session.userId}`);
-  await sendTelegramMessage(session.userId.toString(), `User: ${userInput}\n\nAssistant: ${processedResponse}`);
+  // Send both user input and assistant's response to Telegram only if the channel is 'telegram'
+  if (channel === ChannelType.TELEGRAM) {
+    console.log(`Sending Telegram message for user ${session.userId}`);
+    await sendTelegramMessage(session.userId.toString(), processedResponse);
+  }
 
   return processedResponse;
 };

@@ -5,6 +5,8 @@ import { getApiKey } from './api.key.service';
 import { Session } from '../models/Session';
 import { Assistant } from '../models/Assistant';
 import { Company } from '../models/Company';
+import { ChannelType } from '../types/ChannelType';
+import { getSessionOrCreate } from './session.service';
 
 const TOKEN = '6805951431:AAFLpe3FhD3ucF0csZw2T-jMAVlMuV816Bc';
 const bot = new TelegramBot(TOKEN, { polling: true });
@@ -47,25 +49,18 @@ bot.on('message', async (msg) => {
     }
 
     if (messageText) {
-      // Find or create a session for the user
-      let session = await Session.findOne({ userId: user.id, active: true });
-      if (!session) {
-        const defaultAssistant = await Assistant.findOne({ companyId: user.companyId });
-        if (!defaultAssistant) {
-          throw new Error('No default assistant found for the company');
-        }
-        session = new Session({
-          userId: user.id,
-          assistantId: defaultAssistant._id,
-          companyId: user.companyId,
-          active: true,
-        });
-        await session.save();
-      }
-
       const apiKey = await getApiKey(user.companyId.toString(), 'openai') as string;
+      
+      // Use getSessionOrCreate instead of manually finding/creating the session
+      const { _id: sessionId } = await getSessionOrCreate(
+        apiKey,
+        user.id,
+        user.companyId.toString(),
+        ChannelType.TELEGRAM
+      );
+
       // We're not sending the response here, as it will be sent by handleSessionMessage
-      await handleSessionMessage(apiKey, messageText, session._id.toString());
+      await handleSessionMessage(apiKey, messageText, sessionId.toString(), ChannelType.TELEGRAM);
     } else if (msg.photo) {
       bot.sendMessage(chatId, `Thanks for the photo, ${fullName}! Unfortunately, I can't process images yet.`);
     } else if (msg.document) {
