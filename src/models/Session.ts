@@ -1,5 +1,5 @@
-/// file_path: src/models/Session.ts
 import mongoose, { Document, Schema } from 'mongoose';
+import { ChannelType } from '../types/ChannelType';
 
 export interface ISession extends Document {
     userId: string;
@@ -7,6 +7,7 @@ export interface ISession extends Document {
     threadId: string;
     active: boolean;
     companyId: string;
+    channel: ChannelType;
     createdAt: Date;
 }
 
@@ -22,8 +23,9 @@ export const SessionSchema: Schema = new Schema({
     threadId: { type: String, required: true },
     active: { type: Boolean, required: true },
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
+    channel: { type: String, required: true, enum: Object.values(ChannelType), default: ChannelType.WEB },
     createdAt: { type: Date, default: Date.now },
 });
 
-SessionSchema.index({ companyId: 1, userId: 1 }, { unique: true, partialFilterExpression: { active: true } });
+SessionSchema.index({ companyId: 1, userId: 1, channel: 1 }, { unique: true, partialFilterExpression: { active: true } });
 export const Session = mongoose.model<ISession>('Session', SessionSchema);
