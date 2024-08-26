@@ -25,7 +25,7 @@ companyRouter.get('/', verifyAccess(), async (req: AuthenticatedRequest, res) =>
   if (!companyId) {
     return res.status(400).json({ message: 'Company ID not found in user session' });
   }
-  const company = await getCompany(companyId);
+  const company = await getCompany(companyId.toString());
   res.json(company);
 });
 
@@ -47,7 +47,7 @@ companyRouter.put('/refresh-token', verifyAccess(), async (req: AuthenticatedReq
   if (!companyId) {
     return res.status(400).json({ message: 'Company ID not found in user session' });
   }
-  const company = await refreshCompanyToken(companyId, req.body);
+  const company = await refreshCompanyToken(companyId.toString(), req.body);
   res.json(company);
 });
 
@@ -56,7 +56,7 @@ companyRouter.put('/', verifyAccess(), async (req: AuthenticatedRequest, res) =>
   if (!companyId) {
     return res.status(400).json({ message: 'Company ID not found in user session' });
   }
-  const company = await updateCompany(companyId, req.body);
+  const company = await updateCompany(companyId.toString(), req.body);
   res.json(company);
 });
 
