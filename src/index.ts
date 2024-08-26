@@ -3,12 +3,14 @@ dotenv.config();
 
 import mongoose from 'mongoose';
 import { startAgenda } from './services/agenda/agenda.service';
+import { startTelegramBot } from './services/telegram.bot';
 
 mongoose
   .connect(`${process.env.MONGODB_URI}/sb` as string)
   .then(() => {
     console.log('Successfully connected to MongoDB');
     startAgenda();
+    startTelegramBot();
   })
   .catch((error) => console.error('Connection error', error));
 

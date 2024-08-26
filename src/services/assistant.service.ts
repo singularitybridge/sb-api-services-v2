@@ -11,6 +11,8 @@ import mongoose from 'mongoose';
 import { getApiKey } from './api.key.service';
 import { createAssistant, deleteAssistantById } from './oai.assistant.service';
 import { processTemplate } from './template.service';
+import { findUserByIdentifier, getUserById } from './user.service';
+import { getTelegramBot } from './telegram.bot';
 
 export const getOpenAIClient = (apiKey: string) => {
   return new OpenAI({
@@ -77,15 +79,52 @@ const pollRunStatus = async (
   throw new Error('Timeout exceeded while waiting for run to complete');
 };
 
-export async function getSessionMessages(apiKey:string, sessionId: string) {
+export async function getSessionMessages(apiKey: string, sessionId: string) {
   const session = await Session.findById(sessionId);
   if (!session) {
     throw new Error('Session not found');
   }
 
   const messages = await getMessages(apiKey, session.threadId);
-  return messages;
+  
+  // Process each message with the template
+  const processedMessages = await Promise.all(messages.map(async (message) => {
+    if (message.role === 'assistant' && message.content) {
+      const processedContent = await Promise.all(message.content.map(async (content: { type: string; text?: { value: string } }) => {
+        if (content.type === 'text' && content.text) {
+          content.text.value = await processTemplate(content.text.value, sessionId);
+        }
+        return content;
+      }));
+      message.content = processedContent;
+    }
+    return message;
+  }));
+
+  return processedMessages;
 }
+
+const sendTelegramMessage = async (userId: string, message: string) => {
+  console.log(`Attempting to send Telegram message to user ${userId}`);
+  const user = await getUserById(userId);
+  if (user) {
+    const telegramId = user.identifiers.find(i => i.key === 'tg_user_id')?.value;
+    if (telegramId) {
+      console.log(`Found Telegram ID ${telegramId} for user ${userId}`);
+      const bot = getTelegramBot();
+      try {
+        await bot.sendMessage(telegramId, message);
+        console.log(`Successfully sent Telegram message to user ${userId}`);
+      } catch (error) {
+        console.error(`Error sending Telegram message to user ${userId}:`, error);
+      }
+    } else {
+      console.log(`No Telegram ID found for user ${userId}`);
+    }
+  } else {
+    console.log(`User ${userId} not found`);
+  }
+};
 
 export const handleSessionMessage = async (
   apiKey: string,
@@ -93,6 +132,7 @@ export const handleSessionMessage = async (
   sessionId: string,
   metadata?: Record<string, string>,
 ): Promise<string> => {
+  console.log(`Handling session message for session ${sessionId}`);
   const session = await Session.findById(sessionId);
   if (!session || !session.active) {
     throw new Error('Invalid or inactive session');
@@ -140,6 +180,11 @@ export const handleSessionMessage = async (
   
   // Process the assistant's response with template placeholders
   const processedResponse = await processTemplate(response, sessionId);
+
+  // Send both user input and assistant's response to Telegram
+  console.log(`Sending Telegram message for user ${session.userId}`);
+  await sendTelegramMessage(session.userId.toString(), `User: ${userInput}\n\nAssistant: ${processedResponse}`);
+
   return processedResponse;
 };
 
