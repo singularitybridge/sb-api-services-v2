@@ -1,4 +1,3 @@
-// File: src/services/session.service.ts
 import { Assistant } from '../models/Assistant';
 import { Session } from '../models/Session';
 import { CustomError, NotFoundError } from '../utils/errors';
@@ -73,23 +72,17 @@ export const getSessionOrCreate = async (
   companyId: string,
   channel: ChannelType = ChannelType.WEB,
 ) => {
-  const defaultAssistant = await Assistant.findOne({ companyId });
+  // First, try to find an active session for the user, company, and channel
+  let session = await Session.findOne({ userId, companyId, channel, active: true });
 
-  if (!defaultAssistant) {
-    throw new Error('No default assistant available for this company');
-  }
-
-  // First, try to find an active session for the user and company, regardless of the channel
-  let session = await Session.findOne({ userId, companyId, active: true });
-
-  if (session) {
-    // If a session exists but the channel is different, update the channel
-    if (session.channel !== channel) {
-      session.channel = channel;
-      await session.save();
-    }
-  } else {
+  if (!session) {
     // If no session exists, create a new one
+    const defaultAssistant = await Assistant.findOne({ companyId });
+
+    if (!defaultAssistant) {
+      throw new Error('No default assistant available for this company');
+    }
+
     const threadId = await createNewThread(apiKey);
     session = new Session({
       userId,
