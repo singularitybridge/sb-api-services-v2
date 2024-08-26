@@ -1,10 +1,7 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { handleSessionMessage } from './assistant.service';
-import { findUserByIdentifier, createUser } from './user.service';
+import { findUserByIdentifier } from './user.service';
 import { getApiKey } from './api.key.service';
-import { Session } from '../models/Session';
-import { Assistant } from '../models/Assistant';
-import { Company } from '../models/Company';
 import { ChannelType } from '../types/ChannelType';
 import { getSessionOrCreate } from './session.service';
 
@@ -12,7 +9,6 @@ const TOKEN = '6805951431:AAFLpe3FhD3ucF0csZw2T-jMAVlMuV816Bc';
 const bot = new TelegramBot(TOKEN, { polling: true });
 
 bot.on('message', async (msg) => {
-
   const chatId = msg.chat.id;
   const userId = msg.from?.id;
   const username = msg.from?.username || 'Unknown';
@@ -29,30 +25,19 @@ bot.on('message', async (msg) => {
   console.log(`Received message from User ID: ${userId}, Username: ${username}, Name: ${fullName}`);
 
   try {
-    let user = await findUserByIdentifier('tg_user_id', userId.toString());
+    const user = await findUserByIdentifier('tg_user_id', userId.toString());
+    
     if (!user) {
-      // Find the first company in the database (you may need to implement a proper company selection logic)
-      const company = await Company.findOne();
-      if (!company) {
-        throw new Error('No company found in the database');
-      }
-
-      user = await createUser({
-        name: fullName,
-        email: `${username}@telegram.com`, // Using a placeholder email
-        companyId: company._id,
-        role: 'CompanyUser', // Default role
-        identifiers: [
-          { key: 'tg_user_id', value: userId.toString() },
-          { key: 'email', value: `${username}@telegram.com` }
-        ]
-      });
+      // Send onboarding message for new users
+      const onboardingMessage = `Welcome to the Agent Hub! It looks like you haven't connected your Telegram account with the AI Agent Portal yet. To onboard, please use the following number: ${userId}`;
+      await bot.sendMessage(chatId, onboardingMessage);
+      return; // Exit early as we can't process messages for non-registered users
     }
 
     if (messageText) {
+
       const apiKey = await getApiKey(user.companyId.toString(), 'openai') as string;
       
-      // Use getSessionOrCreate instead of manually finding/creating the session
       const session = await getSessionOrCreate(
         apiKey,
         user.id,
@@ -60,8 +45,8 @@ bot.on('message', async (msg) => {
         ChannelType.TELEGRAM
       );
 
-      // We're not sending the response here, as it will be sent by handleSessionMessage
       await handleSessionMessage(apiKey, messageText, session._id, ChannelType.TELEGRAM);
+      
     } else if (msg.photo) {
       bot.sendMessage(chatId, `Thanks for the photo, ${fullName}! Unfortunately, I can't process images yet.`);
     } else if (msg.document) {
