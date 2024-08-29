@@ -1,5 +1,5 @@
 import { FunctionFactory, ActionContext, FunctionDefinition } from './types';
-import { handleUserQuery, connectToMongoDB } from '../services/mongodb.query.service';
+import { handleUserQuery } from '../services/mongodb.query.service';
 
 const runMongoDbQuery = async (args: { input: string }) => {
   try {
@@ -19,9 +19,6 @@ const runMongoDbQuery = async (args: { input: string }) => {
 };
 
 export const createMongoDbActions = (_context: ActionContext): FunctionFactory => {
-  // Ensure MongoDB connection is established
-  connectToMongoDB().catch(console.error);
-
   const actions: FunctionFactory = {
     runMongoDbQuery: {
       function: runMongoDbQuery,
