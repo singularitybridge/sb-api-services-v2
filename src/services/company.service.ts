@@ -60,6 +60,7 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
       { key: 'labs11_api_key', value: 'default_labs11_key' },
       { key: 'jsonbin_api_key', value: 'default_jsonbin_key' },
       { key: 'photoroom_api_key', value: 'default_photoroom_key' },
+      { key: 'telegram_bot_token', value: 'default_telegram_bot_token' },
     ];
 
     defaultKeys.forEach(defaultKey => {
