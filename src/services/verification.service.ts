@@ -17,7 +17,7 @@ const services: Record<string, VerificationFunction> = {
   twilio_auth_token: verifyTwilioKeys,
   labs11_api_key: verify11LabsKey,
   jsonbin_api_key: verifyJsonBinKey,
-  telegram_bot_token: verifyTelegramBotToken,
+  telegram_bot: verifyTelegramBotToken,
 };
 
 export async function verifyApiKey(
