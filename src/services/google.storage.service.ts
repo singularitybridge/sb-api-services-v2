@@ -27,11 +27,35 @@ export const uploadFile = (file: Express.Multer.File): Promise<string> => {
       resolve(publicUrl);
     });
 
+    blobStream.end(file.buffer);
+  });
+};
+
+export const uploadBuffer = (companyId: string, filename: string, buffer: Buffer, contentType: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const bucket = storage.bucket('sb-ai-experiments-files');
+    const blob = bucket.file(`${companyId}/${filename}`);
+    const blobStream = blob.createWriteStream({
+      metadata: {
+        contentType: contentType,
+      },
+    });
+
     blobStream.on('error', (err) => {
       console.error('Error uploading to Cloud Storage:', err);
       reject(err);
-    });    
+    });
 
-    blobStream.end(file.buffer);
+    blobStream.on('finish', () => {
+      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+      resolve(publicUrl);
+    });
+
+    blobStream.end(buffer);
   });
+};
+
+export const googleStorageService = {
+  uploadFile,
+  uploadBuffer,
 };
