@@ -9,6 +9,7 @@ import { createSendGridActions } from './sendgridActions';
 import { createElevenLabsActions } from './elevenLabsActions';
 import { createOpenAiActions } from './openAiActions';
 import { processTemplate } from '../services/template.service';
+import { createPhotoRoomActions } from './photoRoomActions';
 
 export const createFunctionFactory = (context: ActionContext): FunctionFactory => ({
   ...createInboxActions(context),
@@ -20,6 +21,7 @@ export const createFunctionFactory = (context: ActionContext): FunctionFactory =
   ...createSendGridActions(context),
   ...createElevenLabsActions(context),
   ...createOpenAiActions(context),
+  ...createPhotoRoomActions(context),
 });
 
 export const executeFunctionCall = async (call: any, sessionId: string, companyId: string) => {
