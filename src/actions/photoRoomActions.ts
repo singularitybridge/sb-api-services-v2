@@ -1,5 +1,7 @@
 import { ActionContext, FunctionFactory } from './types';
 import { photoRoomService } from '../services/photoroom.service';
+import { googleStorageService } from '../services/google.storage.service';
+import * as path from 'path';
 
 export const createPhotoRoomActions = (context: ActionContext): FunctionFactory => ({
   removeBackground: {
@@ -64,10 +66,19 @@ export const createPhotoRoomActions = (context: ActionContext): FunctionFactory 
       console.log('removeBackground: Calling PhotoRoom service with valid data');
       try {
         const processedImage = await photoRoomService.removeBackground(context.companyId, imageUrl);
+        
+        // Generate a unique filename for the processed image
+        const filename = `processed_${Date.now()}${path.extname(imageUrl)}`;
+        
+        // Save the processed image to Google Storage
+        const uploadedImageUrl = await googleStorageService.uploadBuffer(context.companyId, filename, processedImage, 'image/png');
+        
         return {
           success: true,
           message: 'Background removed successfully',
-          data: processedImage.toString('base64'),
+          data: {
+            imageUrl: uploadedImageUrl,
+          },
         };
       } catch (error) {
         console.error('Error removing background:', error);
