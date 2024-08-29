@@ -10,10 +10,11 @@ let bot: TelegramBot | null = null;
 
 export const initializeTelegramBot = async (companyId: string) => {
   try {
-    const telegramBotToken = await getApiKey(companyId, 'telegram_bot_token') as string;
+    const telegramBotToken = await getApiKey(companyId, 'telegram_bot') as string;
 
     if (!telegramBotToken) {
-      throw new Error(`telegram bot token not found for company ID: ${companyId}`);
+      console.warn(`TG bot token not found for company ID: ${companyId}`);
+      return;
     }
 
     bot = new TelegramBot(telegramBotToken, { polling: true });

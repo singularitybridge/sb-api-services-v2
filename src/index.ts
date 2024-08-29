@@ -18,7 +18,7 @@ mongoose
       for (const company of companies) {
         await initializeTelegramBot(company._id.toString());
       }
-      console.log('Telegram bots initialized for all companies');
+      console.log('tg bots initialized for all companies');
     } catch (error) {
       console.error('Error initializing Telegram bots:', error);
     }

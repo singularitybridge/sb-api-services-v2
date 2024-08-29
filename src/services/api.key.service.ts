@@ -14,7 +14,7 @@ export type ApiKeyType =
   | 'perplexity'
   | 'sendgrid'
   | 'photoroom'
-  | 'telegram_bot_token';
+  | 'telegram_bot';
 
 // Initialize cache with a 15-minute TTL (time to live)
 const apiKeyCache = new NodeCache({ stdTTL: 900 });
