@@ -16,14 +16,23 @@ const getCollection = (collectionName: string): Collection => {
 };
 
 // Execute a query
-const executeQuery = async ({ collection, filter, limit = 0, skip = 0, sort }: QueryParams): Promise<any[]> => {
+const executeQuery = async (queryParams: QueryParams): Promise<any[]> => {
   try {
-    const result = await getCollection(collection)
-      .find(filter)
-      .skip(skip)
-      .limit(limit)
-      .sort(sort || {})
-      .toArray();
+    let query = getCollection(queryParams.collection).find(queryParams.filter);
+
+    if (queryParams.skip) {
+      query = query.skip(queryParams.skip);
+    }
+
+    if (queryParams.limit) {
+      query = query.limit(queryParams.limit);
+    }
+
+    if (queryParams.sort) {
+      query = query.sort(queryParams.sort);
+    }
+
+    const result = await query.toArray();
     return result;
   } catch (error) {
     console.error('Error executing query', error);
@@ -33,17 +42,34 @@ const executeQuery = async ({ collection, filter, limit = 0, skip = 0, sort }: Q
 
 // Parse user input to create a query
 const parseUserInput = (input: string): QueryParams => {
-  // This is a simplified parser. In a real-world scenario, you'd want to use a more robust parsing mechanism.
-  const [collection, ...rest] = input.split(' ');
-  const filterString = rest.join(' ');
-  
-  // Very basic filter parsing - this should be much more sophisticated in a real application
-  const filter: Filter<any> = {};
-  if (filterString.includes('finished onboarding')) {
-    filter.onboardingCompleted = true;
+  const regex = /db\.(\w+)\.(\w+)\((.*)\)(?:\.(\w+)\((\d*)\))?(?:\.(\w+)\(\))?/;
+  const match = input.match(regex);
+
+  if (!match) {
+    throw new Error('Invalid query format');
   }
-  
-  return { collection, filter };
+
+  const [, collection, operation, args, limitOrSkip, limitOrSkipValue, toArray] = match;
+
+  let filter: Filter<any> = {};
+  let limit: number | undefined;
+  let skip: number | undefined;
+
+  if (operation === 'find' && args) {
+    try {
+      filter = JSON.parse(args);
+    } catch (error) {
+      console.warn('Failed to parse filter, using empty filter');
+    }
+  }
+
+  if (limitOrSkip === 'limit') {
+    limit = parseInt(limitOrSkipValue, 10);
+  } else if (limitOrSkip === 'skip') {
+    skip = parseInt(limitOrSkipValue, 10);
+  }
+
+  return { collection, filter, limit, skip };
 };
 
 // Main function to handle user input and execute query
