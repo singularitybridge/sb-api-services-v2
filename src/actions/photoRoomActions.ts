@@ -63,7 +63,7 @@ export const createPhotoRoomActions = (context: ActionContext): FunctionFactory 
 
       console.log('removeBackground: Calling PhotoRoom service with valid data');
       try {
-        const processedImage = await photoRoomService.removeBackground(imageUrl);
+        const processedImage = await photoRoomService.removeBackground(context.companyId, imageUrl);
         return {
           success: true,
           message: 'Background removed successfully',
