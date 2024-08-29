@@ -42,6 +42,7 @@ import { jsonbinRouter } from './routes/jsonbin.routes';
 import { fluxImageRouter } from './routes/flux.image.routes';
 import { perplexityRouter } from './routes/perplexity.routes';
 import { sendgridRouter } from './routes/sendgrid.routes';
+import { photoRoomRouter } from './routes/photoroom.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -76,6 +77,7 @@ app.use('/jsonbin', verifyTokenMiddleware, verifyAccess(), jsonbinRouter);
 app.use('/flux-image', verifyTokenMiddleware, verifyAccess(), fluxImageRouter);
 app.use('/perplexity', verifyTokenMiddleware, verifyAccess(), perplexityRouter);
 app.use('/sendgrid', verifyTokenMiddleware, verifyAccess(), sendgridRouter);
+app.use('/photoroom', verifyTokenMiddleware, verifyAccess(), photoRoomRouter);
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);
