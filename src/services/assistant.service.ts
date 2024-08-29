@@ -1,4 +1,3 @@
-/// file_path: /src/services/assistant.service.ts
 import OpenAI, { BadRequestError, NotFoundError } from 'openai';
 import { Session } from '../models/Session';
 import {
@@ -11,6 +10,10 @@ import { Assistant, IAssistant } from '../models/Assistant';
 import mongoose from 'mongoose';
 import { getApiKey } from './api.key.service';
 import { createAssistant, deleteAssistantById } from './oai.assistant.service';
+import { processTemplate } from './template.service';
+import { findUserByIdentifier, getUserById } from './user.service';
+import { getTelegramBot } from './telegram.bot';
+import { ChannelType } from '../types/ChannelType';
 
 export const getOpenAIClient = (apiKey: string) => {
   return new OpenAI({
@@ -77,25 +80,64 @@ const pollRunStatus = async (
   throw new Error('Timeout exceeded while waiting for run to complete');
 };
 
-export async function getSessionMessages(apiKey:string, sessionId: string) {
+export async function getSessionMessages(apiKey: string, sessionId: string) {
   const session = await Session.findById(sessionId);
   if (!session) {
     throw new Error('Session not found');
   }
 
   const messages = await getMessages(apiKey, session.threadId);
-  return messages;
+  
+  // Process each message with the template
+  const processedMessages = await Promise.all(messages.map(async (message) => {
+    if (message.role === 'assistant' && message.content) {
+      const processedContent = await Promise.all(message.content.map(async (content: { type: string; text?: { value: string } }) => {
+        if (content.type === 'text' && content.text) {
+          content.text.value = await processTemplate(content.text.value, sessionId);
+        }
+        return content;
+      }));
+      message.content = processedContent;
+    }
+    return message;
+  }));
+
+  return processedMessages;
 }
+
+const sendTelegramMessage = async (userId: string, message: string) => {
+  console.log(`Attempting to send Telegram message to user ${userId}`);
+  const user = await getUserById(userId);
+  if (user) {
+    const telegramId = user.identifiers.find(i => i.key === 'tg_user_id')?.value;
+    if (telegramId) {
+      console.log(`Found Telegram ID ${telegramId} for user ${userId}`);
+      const bot = getTelegramBot();
+      try {
+        await bot.sendMessage(telegramId, message);
+        console.log(`Successfully sent Telegram message to user ${userId}`);
+      } catch (error) {
+        console.error(`Error sending Telegram message to user ${userId}:`, error);
+      }
+    } else {
+      console.log(`No Telegram ID found for user ${userId}`);
+    }
+  } else {
+    console.log(`User ${userId} not found`);
+  }
+};
 
 export const handleSessionMessage = async (
   apiKey: string,
   userInput: string,
   sessionId: string,
+  channel: ChannelType = ChannelType.WEB,
   metadata?: Record<string, string>,
 ): Promise<string> => {
+  console.log(`Handling session message for session ${sessionId} on channel ${channel}`);
   const session = await Session.findById(sessionId);
-  if (!session || !session.active) {
-    throw new Error('Invalid or inactive session');
+  if (!session || !session.active || session.channel !== channel) {
+    throw new Error('Invalid or inactive session, or channel mismatch');
   }
 
   const assistant = await Assistant.findOne({
@@ -117,10 +159,16 @@ export const handleSessionMessage = async (
 
   console.log('create new run', session.threadId, session.assistantId);
 
+  const processedIntroMessage = messageCount === 0
+    ? await processTemplate(assistant.introMessage, sessionId)
+    : undefined;
+
+  const processedLlmPrompt = await processTemplate(assistant.llmPrompt, sessionId);
+
   const newRun = await openaiClient.beta.threads.runs.create(session.threadId, {
     assistant_id: assistant.assistantId as string,
-    additional_instructions:
-      messageCount === 0 ? assistant.introMessage : undefined,
+    additional_instructions: processedIntroMessage,
+    instructions: processedLlmPrompt,
   });
 
   const completedRun = await pollRunStatus(apiKey, session.threadId, newRun.id, sessionId, session.companyId);
@@ -131,7 +179,17 @@ export const handleSessionMessage = async (
   );
   // @ts-ignore
   const response = messages.data[0].content[0].text.value;
-  return response;
+  
+  // Process the assistant's response with template placeholders
+  const processedResponse = await processTemplate(response, sessionId);
+
+  // Send both user input and assistant's response to Telegram only if the channel is 'telegram'
+  if (channel === ChannelType.TELEGRAM) {
+    console.log(`Sending Telegram message for user ${session.userId}`);
+    await sendTelegramMessage(session.userId.toString(), processedResponse);
+  }
+
+  return processedResponse;
 };
 
 export async function deleteAssistant(id: string, assistantId: string): Promise<void> {
@@ -165,11 +223,11 @@ export async function createDefaultAssistant(companyId: string, apiKey: string):
   const defaultAssistantData = {
     name: 'Default Assistant',
     description: 'Your company\'s default AI assistant',
-    introMessage: 'Hello! I\'m your default AI assistant. How can I help you today?',
+    introMessage: 'Hello {{user.name}}! I\'m your default AI assistant for {{company.name}}. How can I help you today?',
     voice: 'en-US-Standard-C',
     language: 'en',
-    llmModel: 'gpt-4o',
-    llmPrompt: 'You are a helpful AI assistant for a new company. Provide friendly and professional assistance.',
+    llmModel: 'gpt-4',
+    llmPrompt: 'You are a helpful AI assistant for {{company.name}}. Your name is {{assistant.name}}. Provide friendly and professional assistance to {{user.name}}. When referring to the user, use their name {{user.name}} or their email {{user.email}}. Always include placeholders like {{user.name}} or {{company.name}} in your responses, as they will be automatically replaced with the actual values.',
     companyId: companyId,
   };
 

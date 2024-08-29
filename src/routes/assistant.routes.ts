@@ -20,6 +20,8 @@ import {
 import { getCompletionResponse } from '../services/oai.completion.service';
 import { getApiKey, validateApiKeys } from '../services/api.key.service';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { Session } from '../models/Session';
+import { ChannelType } from '../types/ChannelType';
 
 const assistantRouter = express.Router();
 
@@ -95,7 +97,11 @@ assistantRouter.post(
     const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
     
     try {
-      const response = await handleSessionMessage(apiKey, userInput, sessionId);
+      const session = await Session.findById(sessionId);
+      if (!session) {
+        throw new Error('Session not found');
+      }
+      const response = await handleSessionMessage(apiKey, userInput, sessionId, ChannelType.WEB);
       res.send(response);
     } catch (error) {
       console.error('Error handling session message:', error);

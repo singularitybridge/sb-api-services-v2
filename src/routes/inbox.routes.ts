@@ -5,6 +5,7 @@ import { handleSessionMessage } from '../services/assistant.service';
 import { Session } from '../models/Session';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { getApiKey } from '../services/api.key.service';
+import { ChannelType } from '../types/ChannelType';
 
 const inboxRouter = express.Router();
 
@@ -56,9 +57,11 @@ inboxRouter.post('/reply/:sessionId', async (req: AuthenticatedRequest, res) => 
       apiKey as string,
       responseTemplate,
       session.id,
+      ChannelType.WEB,
       {
         message_type: 'human-agent-response',
-      },
+      }
+      
     );
 
     res.json({ message: 'Response sent successfully', llmResponse });
