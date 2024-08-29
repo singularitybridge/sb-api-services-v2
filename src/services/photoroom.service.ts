@@ -16,11 +16,12 @@ class PhotoRoomService {
       throw new Error('PhotoRoom API key not found for the company');
     }
 
-    const editParams = 'background.color=transparent&background.expandPrompt=never&background.scaling=fill&outputSize=1000x1000&padding=0.1';
+    // Removed outputSize parameter to preserve original image resolution
+    const editParams = 'background.color=transparent&background.expandPrompt=never&background.scaling=fill&padding=0.1';
     const options = {
       hostname: 'image-api.photoroom.com',
       port: 443,
-      path: `/v2/edit?${editParams}&imageUrl=${encodeURIComponent(imageUrl)}`,
+      path: `${this.apiUrl}?${editParams}&imageUrl=${encodeURIComponent(imageUrl)}`,
       method: 'GET',
       headers: {
         'x-api-key': apiKey
