@@ -3,14 +3,25 @@ dotenv.config();
 
 import mongoose from 'mongoose';
 import { startAgenda } from './services/agenda/agenda.service';
-import { startTelegramBot } from './services/telegram.bot';
+import { initializeTelegramBot } from './services/telegram.bot';
+import { Company } from './models/Company';
 
 mongoose
   .connect(`${process.env.MONGODB_URI}/sb` as string)
-  .then(() => {
+  .then(async () => {
     console.log('Successfully connected to MongoDB');
     startAgenda();
-    startTelegramBot();
+    
+    // Initialize Telegram bots for all companies
+    try {
+      const companies = await Company.find({});
+      for (const company of companies) {
+        await initializeTelegramBot(company._id.toString());
+      }
+      console.log('Telegram bots initialized for all companies');
+    } catch (error) {
+      console.error('Error initializing Telegram bots:', error);
+    }
   })
   .catch((error) => console.error('Connection error', error));
 
