@@ -25,6 +25,7 @@ const showMenu = async (bot: TelegramBot, chatId: number) => {
     reply_markup: {
       keyboard: [
         [{ text: 'Clear Chat' }],
+        [{ text: 'Change Agent' }],
         [{ text: 'Help' }]
       ],
       resize_keyboard: true,
@@ -81,8 +82,13 @@ export const initializeTelegramBots = async () => {
             return;
           }
 
+          if (messageText === 'Change Agent') {
+            await handleChangeAgent(bot, chatId, userId, companyId);
+            return;
+          }
+
           if (messageText === 'Help') {
-            await bot.sendMessage(chatId, 'Here are the available commands:\n/menu - Show menu options\n/debug - Show debug options\nClear Chat - End the current session and start a new one');
+            await bot.sendMessage(chatId, 'Here are the available commands:\n/menu - Show menu options\n/debug - Show debug options\nClear Chat - End the current session and start a new one\nChange Agent - Change the currently active assistant');
             return;
           }
 
@@ -174,6 +180,35 @@ const handleClearChat = async (bot: TelegramBot, chatId: number, userId: number,
   } catch (error) {
     console.error(`Error clearing chat:`, error);
     await bot.sendMessage(chatId, 'Error clearing chat. Please try again.');
+  }
+};
+
+const handleChangeAgent = async (bot: TelegramBot, chatId: number, userId: number, companyId: string) => {
+  try {
+    const user = await findUserByIdentifierAndCompany('tg_user_id', userId.toString(), companyId);
+    
+    if (!user) {
+      console.error(`User not found for Telegram bot`);
+      await bot.sendMessage(chatId, 'Error changing agent. Please try again.');
+      return;
+    }
+
+    const apiKey = await getApiKey(companyId, 'openai') as string;
+    
+    const session = await getSessionOrCreate(
+      apiKey,
+      user.id,
+      companyId,
+      ChannelType.TELEGRAM
+    );
+
+    // Send the command to get assistants and update the active assistant
+    await handleSessionMessage(apiKey, "run the function getAssistants and share a list of assistants. use the action setAssistant the update the currently active assistant.", session._id, ChannelType.TELEGRAM);
+
+    await bot.sendMessage(chatId, 'Agent change request has been sent. Please wait for the list of assistants and follow the instructions to set a new active assistant.');
+  } catch (error) {
+    console.error(`Error changing agent:`, error);
+    await bot.sendMessage(chatId, 'Error changing agent. Please try again.');
   }
 };
 
