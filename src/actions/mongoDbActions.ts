@@ -1,5 +1,6 @@
 import { FunctionFactory, ActionContext, FunctionDefinition } from './types';
 import { handleUserQuery } from '../services/mongodb.query.service';
+import { logger } from '../utils/logger';
 
 const runMongoDbQuery = async (args: { input: string }) => {
   try {
@@ -8,13 +9,17 @@ const runMongoDbQuery = async (args: { input: string }) => {
       success: true,
       data: results,
       message: 'Query executed successfully',
+      logs: logger.getLogs(),
     };
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : 'An unknown error occurred',
       message: 'Failed to execute MongoDB query',
+      logs: logger.getLogs(),
     };
+  } finally {
+    logger.clearLogs();
   }
 };
 
