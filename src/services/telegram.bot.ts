@@ -3,7 +3,7 @@ import { handleSessionMessage } from './assistant.service';
 import { findUserByIdentifierAndCompany } from './user.service';
 import { getApiKey } from './api.key.service';
 import { ChannelType } from '../types/ChannelType';
-import { getSessionOrCreate } from './session.service';
+import { getSessionOrCreate, endSession } from './session.service';
 import { getCompanies } from './company.service';
 import { ICompany, IApiKey } from '../models/Company';
 
@@ -18,6 +18,20 @@ const normalizeCompanyId = (id: string | any): string => {
   }
   console.error('Invalid company ID type:', typeof id);
   return '';
+};
+
+const showMenu = async (bot: TelegramBot, chatId: number) => {
+  const menuOptions = {
+    reply_markup: {
+      keyboard: [
+        [{ text: 'Clear Chat' }],
+        [{ text: 'Help' }]
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: false
+    }
+  };
+  await bot.sendMessage(chatId, 'Here are the available options:', menuOptions);
 };
 
 export const initializeTelegramBots = async () => {
@@ -38,6 +52,16 @@ export const initializeTelegramBots = async () => {
         bots.set(companyId, bot);
         console.log(`Bot added to map for company ${companyId} (type: ${typeof companyId})`);
 
+        bot.onText(/\/start/, async (msg) => {
+          const chatId = msg.chat.id;
+          await bot.sendMessage(chatId, 'Welcome! Type /menu to see available options.');
+        });
+
+        bot.onText(/\/(menu|debug)/, async (msg) => {
+          const chatId = msg.chat.id;
+          await showMenu(bot, chatId);
+        });
+
         bot.on('message', async (msg) => {
           const chatId = msg.chat.id;
           const userId = msg.from?.id;
@@ -49,6 +73,16 @@ export const initializeTelegramBots = async () => {
 
           if (!userId) {
             console.error('User ID not found in message');
+            return;
+          }
+
+          if (messageText === 'Clear Chat') {
+            await handleClearChat(bot, chatId, userId, companyId);
+            return;
+          }
+
+          if (messageText === 'Help') {
+            await bot.sendMessage(chatId, 'Here are the available commands:\n/menu - Show menu options\n/debug - Show debug options\nClear Chat - End the current session and start a new one');
             return;
           }
 
@@ -84,7 +118,6 @@ export const initializeTelegramBots = async () => {
               console.log(`[Company ${companyId}] Created/Retrieved session ${session._id} for user ${user.id}`);
 
               await handleSessionMessage(apiKey, messageText, session._id, ChannelType.TELEGRAM);
-              
             } else if (msg.photo) {
               console.log(`[Company ${companyId}] Received photo from user ${user.id}`);
               bot.sendMessage(chatId, `Thanks for the photo, ${fullName}! Unfortunately, I can't process images yet.`);
@@ -105,6 +138,42 @@ export const initializeTelegramBots = async () => {
     }
   } catch (error) {
     console.error('Error initializing Telegram bots:', error);
+  }
+};
+
+const handleClearChat = async (bot: TelegramBot, chatId: number, userId: number, companyId: string) => {
+  try {
+    const user = await findUserByIdentifierAndCompany('tg_user_id', userId.toString(), companyId);
+    
+    if (!user) {
+      console.error(`User not found for Telegram bot`);
+      await bot.sendMessage(chatId, 'Error clearing chat. Please try again.');
+      return;
+    }
+
+    const apiKey = await getApiKey(companyId, 'openai') as string;
+    
+    const session = await getSessionOrCreate(
+      apiKey,
+      user.id,
+      companyId,
+      ChannelType.TELEGRAM
+    );
+
+    await endSession(apiKey, session._id.toString());
+
+    await bot.sendMessage(chatId, 'Your current session has been ended. A new session will start with your next message.');
+
+    // Create a new session immediately
+    await getSessionOrCreate(
+      apiKey,
+      user.id,
+      companyId,
+      ChannelType.TELEGRAM
+    );
+  } catch (error) {
+    console.error(`Error clearing chat:`, error);
+    await bot.sendMessage(chatId, 'Error clearing chat. Please try again.');
   }
 };
 
