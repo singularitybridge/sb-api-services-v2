@@ -3,7 +3,7 @@ dotenv.config();
 
 import mongoose from 'mongoose';
 import { startAgenda } from './services/agenda/agenda.service';
-import { initializeTelegramBot } from './services/telegram.bot';
+import { initializeTelegramBots } from './services/telegram.bot';
 import { Company } from './models/Company';
 
 mongoose
@@ -14,11 +14,8 @@ mongoose
     
     // Initialize Telegram bots for all companies
     try {
-      const companies = await Company.find({});
-      for (const company of companies) {
-        await initializeTelegramBot(company._id.toString());
-      }
-      console.log('tg bots initialized for all companies');
+      await initializeTelegramBots();
+      console.log('Telegram bots initialized for all companies');
     } catch (error) {
       console.error('Error initializing Telegram bots:', error);
     }
