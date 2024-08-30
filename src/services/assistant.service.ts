@@ -12,7 +12,7 @@ import { getApiKey } from './api.key.service';
 import { createAssistant, deleteAssistantById } from './oai.assistant.service';
 import { processTemplate } from './template.service';
 import { findUserByIdentifier, getUserById } from './user.service';
-import { getTelegramBot } from './telegram.bot';
+import { sendTelegramMessage as sendTelegramBotMessage } from './telegram.bot';
 import { ChannelType } from '../types/ChannelType';
 
 export const getOpenAIClient = (apiKey: string) => {
@@ -112,9 +112,8 @@ const sendTelegramMessage = async (userId: string, message: string, companyId: s
     const telegramId = user.identifiers.find(i => i.key === 'tg_user_id')?.value;
     if (telegramId) {
       console.log(`Found Telegram ID ${telegramId} for user ${userId}`);
-      const bot = getTelegramBot(companyId);
       try {
-        await bot.sendMessage(telegramId, message);
+        await sendTelegramBotMessage(companyId, parseInt(telegramId), message);
         console.log(`Successfully sent Telegram message to user ${userId}`);
       } catch (error) {
         console.error(`Error sending Telegram message to user ${userId}:`, error);
