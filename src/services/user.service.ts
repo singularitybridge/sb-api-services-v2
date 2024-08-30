@@ -9,6 +9,18 @@ export const findUserByIdentifier = async (key: string, value: string): Promise<
   }
 };
 
+export const findUserByIdentifierAndCompany = async (key: string, value: string, companyId: string): Promise<IUser | null> => {
+  try {
+    return await User.findOne({
+      identifiers: { $elemMatch: { key, value } },
+      companyId: companyId
+    });
+  } catch (error) {
+    console.error(`Error finding user by identifier (${key}) and company:`, error);
+    return null;
+  }
+};
+
 export const createUser = async (userData: Partial<IUser>): Promise<IUser> => {
   try {
     const newUser = new User(userData);

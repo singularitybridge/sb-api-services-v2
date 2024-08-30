@@ -6,21 +6,26 @@ import { startAgenda } from './services/agenda/agenda.service';
 import { initializeTelegramBots } from './services/telegram.bot';
 import { Company } from './models/Company';
 
-mongoose
-  .connect(`${process.env.MONGODB_URI}/sb` as string)
-  .then(async () => {
+const initializeApp = async () => {
+  try {
+    console.log('Attempting to connect to MongoDB...');
+    await mongoose.connect(`${process.env.MONGODB_URI}/sb` as string);
     console.log('Successfully connected to MongoDB');
+
+    console.log('Starting Agenda...');
     startAgenda();
-    
-    // Initialize Telegram bots for all companies
-    try {
-      await initializeTelegramBots();
-      console.log('Telegram bots initialized for all companies');
-    } catch (error) {
-      console.error('Error initializing Telegram bots:', error);
-    }
-  })
-  .catch((error) => console.error('Connection error', error));
+    console.log('Agenda started successfully');
+
+    console.log('Initializing Telegram bots...');
+    await initializeTelegramBots();
+    console.log('Telegram bots initialized for all companies');
+  } catch (error) {
+    console.error('Error during initialization:', error);
+    process.exit(1);
+  }
+};
+
+initializeApp();
 
 import express from 'express';
 import cors from 'cors';
