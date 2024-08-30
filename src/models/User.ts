@@ -1,4 +1,3 @@
-// file_path: src/models/User.ts
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IUser extends Document {
@@ -20,5 +19,8 @@ const UserSchema: Schema = new Schema({
   role: { type: String, enum: ['Admin', 'CompanyUser'], default: 'CompanyUser' },
   identifiers: [{ key: String, value: String }],
 }, { timestamps: true });
+
+// Add a compound index to ensure uniqueness of identifiers per user
+UserSchema.index({ _id: 1, 'identifiers.key': 1, 'identifiers.value': 1 }, { unique: true });
 
 export const User = mongoose.model<IUser>('User', UserSchema);

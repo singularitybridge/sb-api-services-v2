@@ -12,7 +12,7 @@ import { getApiKey } from './api.key.service';
 import { createAssistant, deleteAssistantById } from './oai.assistant.service';
 import { processTemplate } from './template.service';
 import { findUserByIdentifier, getUserById } from './user.service';
-import { getTelegramBot } from './telegram.bot';
+import { sendTelegramMessage as sendTelegramBotMessage } from './telegram.bot';
 import { ChannelType } from '../types/ChannelType';
 
 export const getOpenAIClient = (apiKey: string) => {
@@ -105,16 +105,15 @@ export async function getSessionMessages(apiKey: string, sessionId: string) {
   return processedMessages;
 }
 
-const sendTelegramMessage = async (userId: string, message: string) => {
+const sendTelegramMessage = async (userId: string, message: string, companyId: string) => {
   console.log(`Attempting to send Telegram message to user ${userId}`);
   const user = await getUserById(userId);
   if (user) {
     const telegramId = user.identifiers.find(i => i.key === 'tg_user_id')?.value;
     if (telegramId) {
       console.log(`Found Telegram ID ${telegramId} for user ${userId}`);
-      const bot = getTelegramBot();
       try {
-        await bot.sendMessage(telegramId, message);
+        await sendTelegramBotMessage(companyId, parseInt(telegramId), message);
         console.log(`Successfully sent Telegram message to user ${userId}`);
       } catch (error) {
         console.error(`Error sending Telegram message to user ${userId}:`, error);
@@ -186,7 +185,7 @@ export const handleSessionMessage = async (
   // Send both user input and assistant's response to Telegram only if the channel is 'telegram'
   if (channel === ChannelType.TELEGRAM) {
     console.log(`Sending Telegram message for user ${session.userId}`);
-    await sendTelegramMessage(session.userId.toString(), processedResponse);
+    await sendTelegramMessage(session.userId.toString(), processedResponse, session.companyId);
   }
 
   return processedResponse;

@@ -3,16 +3,29 @@ dotenv.config();
 
 import mongoose from 'mongoose';
 import { startAgenda } from './services/agenda/agenda.service';
-import { startTelegramBot } from './services/telegram.bot';
+import { initializeTelegramBots } from './services/telegram.bot';
+import { Company } from './models/Company';
 
-mongoose
-  .connect(`${process.env.MONGODB_URI}/sb` as string)
-  .then(() => {
+const initializeApp = async () => {
+  try {
+    console.log('Attempting to connect to MongoDB...');
+    await mongoose.connect(`${process.env.MONGODB_URI}/sb` as string);
     console.log('Successfully connected to MongoDB');
+
+    console.log('Starting Agenda...');
     startAgenda();
-    startTelegramBot();
-  })
-  .catch((error) => console.error('Connection error', error));
+    console.log('Agenda started successfully');
+
+    console.log('Initializing Telegram bots...');
+    await initializeTelegramBots();
+    console.log('Telegram bots initialized for all companies');
+  } catch (error) {
+    console.error('Error during initialization:', error);
+    process.exit(1);
+  }
+};
+
+initializeApp();
 
 import express from 'express';
 import cors from 'cors';
@@ -42,6 +55,7 @@ import { jsonbinRouter } from './routes/jsonbin.routes';
 import { fluxImageRouter } from './routes/flux.image.routes';
 import { perplexityRouter } from './routes/perplexity.routes';
 import { sendgridRouter } from './routes/sendgrid.routes';
+import { photoRoomRouter } from './routes/photoroom.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -76,6 +90,7 @@ app.use('/jsonbin', verifyTokenMiddleware, verifyAccess(), jsonbinRouter);
 app.use('/flux-image', verifyTokenMiddleware, verifyAccess(), fluxImageRouter);
 app.use('/perplexity', verifyTokenMiddleware, verifyAccess(), perplexityRouter);
 app.use('/sendgrid', verifyTokenMiddleware, verifyAccess(), sendgridRouter);
+app.use('/photoroom', verifyTokenMiddleware, verifyAccess(), photoRoomRouter);
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);
