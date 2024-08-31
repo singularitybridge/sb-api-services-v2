@@ -1,6 +1,8 @@
 import Agenda, { Job } from 'agenda';
 import { handleVoiceRecordingRequest } from '../twilio/voice.service';
 import { ObjectId } from 'mongodb';
+import { sendMessageToAgent } from '../assistant.service';
+import { Session } from '../../models/Session';
 
 const agendaClient = new Agenda({
   db: { address: `${process.env.MONGODB_URI}/agenda` },
@@ -55,14 +57,53 @@ agendaClient.define('processVoiceRecording', async (job: Job, done) => {
     const response = await handleVoiceRecordingRequest('api-key', From, To, RecordingUrl);
     job.attrs.data.result = response;
     await job.save();
-    done(); 
+    done();
   } catch (error) {
-    console.log('job error', error);
-    done(); 
+    console.error('Error processing voice recording:', error);
+    done();
   }
 });
 
+// Updated job definition for scheduled messages
+agendaClient.define('sendScheduledMessage', async (job: Job, done) => {
+  try {
+    console.log('Scheduled message job started', job.attrs._id, job.attrs.data);
+    const { apiKey, sessionId, message, companyId, userId } = job.attrs.data;
+    const session = await Session.findById(sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+    await sendMessageToAgent(apiKey, sessionId, message, companyId, userId, session.channel);
+    console.log('Scheduled message sent successfully');
+    done();
+  } catch (error) {
+    console.error('Error sending scheduled message:', error);
+    done();
+  }
+});
 
-
+// Updated function to schedule a message with string scheduling
+export const scheduleMessage = async (
+  apiKey: string,
+  sessionId: string,
+  message: string,
+  companyId: string,
+  userId: string,
+  scheduledTime: string
+) => {
+  try {
+    await agendaClient.schedule(scheduledTime, 'sendScheduledMessage', {
+      apiKey,
+      sessionId,
+      message,
+      companyId,
+      userId,
+    });
+    console.log('Message scheduled successfully');
+  } catch (error) {
+    console.error('Error scheduling message:', error);
+    throw error;
+  }
+};
 
 export { agendaClient };

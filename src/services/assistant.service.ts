@@ -259,3 +259,45 @@ export async function createDefaultAssistant(companyId: string, apiKey: string):
 
   return assistant;
 }
+
+export const sendMessageToAgent = async (
+  apiKey: string,
+  sessionId: string,
+  message: string,
+  companyId: string,
+  userId: string,
+  channel: ChannelType
+) => {
+  try {
+    const session = await Session.findById(sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    // Update the session channel if it's different
+    if (session.channel !== channel) {
+      session.channel = channel;
+      await session.save();
+    }
+
+    const response = await handleSessionMessage(apiKey, message, sessionId, channel);
+    
+    // Send the response to the appropriate channel
+    switch (channel) {
+      case ChannelType.TELEGRAM:
+        await sendTelegramMessage(userId, response, companyId);
+        break;
+      case ChannelType.WEB:
+        console.log(`Message sent to Web channel: ${response}`);
+        break;
+      // Add cases for other channel types as needed
+      default:
+        console.log(`Message sent to channel ${channel}: ${response}`);
+    }
+
+    return response;
+  } catch (error) {
+    console.error('Error sending message to agent:', error);
+    throw error;
+  }
+};
