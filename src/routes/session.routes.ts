@@ -6,6 +6,7 @@ import {
   endSession,
   getSessionOrCreate,
   sessionFriendlyAggreationQuery,
+  updateSessionAssistant,
 } from '../services/session.service';
 import mongoose from 'mongoose';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
@@ -14,26 +15,28 @@ import { BadRequestError } from '../utils/errors';
 
 const sessionRouter = Router();
 
-// Update session
+// Update session assistant
 sessionRouter.put(
   '/:id/assistant',
   validateApiKeys(['openai']),
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const { id } = req.params;
     const { assistantId } = req.body;
+    const companyId = req.user?.companyId;
+
+    if (!companyId) {
+      return res.status(400).send({ error: 'Company ID not found' });
+    }
+
     try {
-      const session = await Session.findOneAndUpdate(
-        { _id: id, companyId: req.user?.companyId },
-        { assistantId },
-        { new: true },
-      );
-      if (session) {
-        res.status(200).send(session);
+      const updatedSession = await updateSessionAssistant(id, assistantId, companyId.toString());
+      if (updatedSession) {
+        res.status(200).send(updatedSession);
       } else {
         res.status(404).send({ error: 'Session not found' });
       }
     } catch (error) {
-      res.status(500).send({ error: 'Error updating assistant' });
+      next(error);
     }
   },
 );
