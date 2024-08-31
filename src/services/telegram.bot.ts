@@ -3,7 +3,7 @@ import { handleSessionMessage } from './assistant.service';
 import { findUserByIdentifierAndCompany } from './user.service';
 import { getApiKey } from './api.key.service';
 import { ChannelType } from '../types/ChannelType';
-import { getSessionOrCreate, endSession } from './session.service';
+import { getSessionOrCreate, endSession, updateSessionAssistant } from './session.service';
 import { getCompanies } from './company.service';
 import { ICompany, IApiKey } from '../models/Company';
 
@@ -202,8 +202,10 @@ const handleChangeAgent = async (bot: TelegramBot, chatId: number, userId: numbe
       ChannelType.TELEGRAM
     );
 
+    await bot.sendMessage(chatId, 'Preparing to change agent. Please wait...');
+
     // Send the command to get assistants and update the active assistant
-    await handleSessionMessage(apiKey, "run the function getAssistants and share a list of assistants. use the action setAssistant the update the currently active assistant.", session._id, ChannelType.TELEGRAM);
+    await handleSessionMessage(apiKey, "run the function getAssistants and share a list of assistants. use the action setAssistant to update the currently active assistant.", session._id, ChannelType.TELEGRAM);
 
     await bot.sendMessage(chatId, 'Agent change request has been sent. Please wait for the list of assistants and follow the instructions to set a new active assistant.');
   } catch (error) {
