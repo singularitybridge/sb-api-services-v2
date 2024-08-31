@@ -1,11 +1,12 @@
 import TelegramBot from 'node-telegram-bot-api';
-import { handleSessionMessage } from './assistant.service';
+import { getAssistants, handleSessionMessage } from './assistant.service';
 import { findUserByIdentifierAndCompany } from './user.service';
 import { getApiKey } from './api.key.service';
 import { ChannelType } from '../types/ChannelType';
 import { getSessionOrCreate, endSession, updateSessionAssistant } from './session.service';
 import { getCompanies } from './company.service';
 import { ICompany, IApiKey } from '../models/Company';
+import { IAssistant } from '../models/Assistant';
 
 const bots: Map<string, TelegramBot> = new Map();
 
@@ -202,9 +203,47 @@ const handleChangeAgent = async (bot: TelegramBot, chatId: number, userId: numbe
       ChannelType.TELEGRAM
     );
 
-    await bot.sendMessage(chatId, 'please wait...');
-    await handleSessionMessage(apiKey, "run the function getAssistants and share a list of assistants. ask the user to pick one", session._id, ChannelType.TELEGRAM);
-    
+    // Fetch the list of assistants using the getAssistants function
+    const assistants = await getAssistants(companyId);
+
+    if (!assistants || assistants.length === 0) {
+      await bot.sendMessage(chatId, 'No assistants available for this company.');
+      return;
+    }
+
+    // Create inline keyboard buttons for each assistant
+    const keyboard = assistants.map((assistant) => [{
+      text: assistant.name || 'Unnamed Assistant',
+      callback_data: `change_assistant:${assistant._id}`
+    }]);
+
+    const inlineKeyboardMarkup: TelegramBot.InlineKeyboardMarkup = {
+      inline_keyboard: keyboard
+    };
+
+    await bot.sendMessage(chatId, 'Please choose an assistant:', { reply_markup: inlineKeyboardMarkup });
+
+    // Handle button clicks
+    bot.on('callback_query', async (callbackQuery) => {
+      if (!callbackQuery.data?.startsWith('change_assistant:')) return;
+
+      const assistantId = callbackQuery.data.split(':')[1];
+      const selectedAssistant = assistants.find((a) => a._id.toString() === assistantId);
+
+      if (!selectedAssistant) {
+        await bot.answerCallbackQuery(callbackQuery.id, { text: 'Invalid assistant selection.' });
+        return;
+      }
+
+      try {
+        await updateSessionAssistant(session._id.toString(), selectedAssistant._id.toString(), companyId);
+        await bot.answerCallbackQuery(callbackQuery.id, { text: `Assistant changed to ${selectedAssistant.name}` });
+        await bot.sendMessage(chatId, `You are now chatting with ${selectedAssistant.name}. How can I assist you?`);
+      } catch (error) {
+        console.error('Error updating assistant:', error);
+        await bot.answerCallbackQuery(callbackQuery.id, { text: 'Error changing agent. Please try again.' });
+      }
+    });
   } catch (error) {
     console.error(`Error changing agent:`, error);
     await bot.sendMessage(chatId, 'Error changing agent. Please try again.');

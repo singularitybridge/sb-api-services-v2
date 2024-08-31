@@ -4,6 +4,7 @@ import {
   deleteAssistant,
   handleSessionMessage,
   createDefaultAssistant,
+  getAssistants,
 } from '../services/assistant.service';
 import { Assistant } from '../models/Assistant';
 import {
@@ -37,6 +38,10 @@ assistantRouter.post(
       maxTokens,
     } = req.body;
 
+    if (!req.company || !req.company._id) {
+      return res.status(400).json({ error: 'Company ID is missing' });
+    }
+
     const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
 
     try {
@@ -62,6 +67,11 @@ assistantRouter.get(
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
     const { id } = req.params;
+
+    if (!req.company || !req.company._id) {
+      return res.status(400).json({ error: 'Company ID is missing' });
+    }
+
     const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
     const messages = await getMessages(apiKey, id);
     res.send(messages);
@@ -72,6 +82,10 @@ assistantRouter.post(
   '/thread',
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
+    if (!req.company || !req.company._id) {
+      return res.status(400).json({ error: 'Company ID is missing' });
+    }
+
     const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
     const newThread = await createNewThread(apiKey);
     res.send(newThread);
@@ -83,6 +97,11 @@ assistantRouter.delete(
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
     const { id } = req.params;
+
+    if (!req.company || !req.company._id) {
+      return res.status(400).json({ error: 'Company ID is missing' });
+    }
+
     const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
     await deleteThread(apiKey, id);
     res.send({ message: 'Thread deleted successfully' });
@@ -94,6 +113,11 @@ assistantRouter.post(
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
     const { userInput, sessionId } = req.body;
+
+    if (!req.company || !req.company._id) {
+      return res.status(400).json({ error: 'Company ID is missing' });
+    }
+
     const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
     
     try {
@@ -110,12 +134,12 @@ assistantRouter.post(
   },
 );
 
-
-
-
 assistantRouter.get('/', async (req: AuthenticatedRequest, res) => {
   try {
-    const assistants = await Assistant.find({ companyId: req.user?.companyId });
+    if (!req.user?.companyId) {
+      return res.status(400).json({ error: 'Company ID is missing' });
+    }
+    const assistants = await getAssistants(req.user.companyId.toString());
     res.send(assistants);
   } catch (error) {
     res.status(500).send({ message: 'Error retrieving assistants' });
@@ -145,6 +169,11 @@ assistantRouter.put(
     try {
       const { id } = req.params;
       const assistantData = req.body;
+
+      if (!req.company || !req.company._id) {
+        return res.status(400).json({ error: 'Company ID is missing' });
+      }
+
       const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
 
       const assistant = await Assistant.findOneAndUpdate(
@@ -188,6 +217,10 @@ assistantRouter.post(
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
     try {
+      if (!req.company || !req.company._id) {
+        return res.status(400).json({ error: 'Company ID is missing' });
+      }
+
       // Refresh the API key cache before creating the assistant
       await refreshApiKeyCache(req.company._id.toString());
 
@@ -261,6 +294,10 @@ assistantRouter.post(
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
     try {
+      if (!req.company || !req.company._id) {
+        return res.status(400).json({ error: 'Company ID is missing' });
+      }
+
       const companyId = req.company._id;
       const apiKey = await getApiKey(companyId, 'openai') as string;
 

@@ -21,6 +21,17 @@ export const getOpenAIClient = (apiKey: string) => {
   });
 };
 
+
+export const getAssistants = async (companyId: string): Promise<IAssistant[]> => {
+  try {
+    const assistants = await Assistant.find({ companyId });
+    return assistants;
+  } catch (error) {
+    console.error('Error retrieving assistants:', error);
+    throw new Error('Error retrieving assistants');
+  }
+};
+
 const handleError = (error: Error): string => {
   let response = 'Something went wrong, ';
 
