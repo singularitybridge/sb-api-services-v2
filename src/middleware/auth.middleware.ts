@@ -18,17 +18,19 @@ export const verifyTokenMiddleware = async (
     const token = extractTokenFromHeader(req.headers.authorization);
     const { user, company } = await verifyToken(token);
 
+    if (!company || !company._id) {
+      throw new Error('Company or Company ID is missing');
+    }
+
     req.user = user;
     req.company = company;
     
     next();
   } catch (error) {
     console.error('Error verifying token:', error);
-    res.status(401).json({ message: 'Authentication token is required or invalid' });
+    res.status(401).json({ message: 'Authentication token is invalid or company information is missing' });
   }
 };
-
-
 
 export const verifyAccess = (adminOnly: boolean = false) => {
   return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -62,7 +64,6 @@ export const verifyAccess = (adminOnly: boolean = false) => {
     next();
   };
 };
-
 
 export const verifyCompanyAccess = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   if (req.user?.role !== 'Admin' && req.user?.companyId.toString() !== req.params.id) {
