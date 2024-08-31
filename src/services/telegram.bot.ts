@@ -202,12 +202,9 @@ const handleChangeAgent = async (bot: TelegramBot, chatId: number, userId: numbe
       ChannelType.TELEGRAM
     );
 
-    await bot.sendMessage(chatId, 'Preparing to change agent. Please wait...');
-
-    // Send the command to get assistants and update the active assistant
-    await handleSessionMessage(apiKey, "run the function getAssistants and share a list of assistants. use the action setAssistant to update the currently active assistant.", session._id, ChannelType.TELEGRAM);
-
-    await bot.sendMessage(chatId, 'Agent change request has been sent. Please wait for the list of assistants and follow the instructions to set a new active assistant.');
+    await bot.sendMessage(chatId, 'please wait...');
+    await handleSessionMessage(apiKey, "run the function getAssistants and share a list of assistants. ask the user to pick one", session._id, ChannelType.TELEGRAM);
+    
   } catch (error) {
     console.error(`Error changing agent:`, error);
     await bot.sendMessage(chatId, 'Error changing agent. Please try again.');
