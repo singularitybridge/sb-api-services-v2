@@ -33,8 +33,6 @@ agendaRouter.post('/jobs/run/:name', async (req, res) => {
 agendaRouter.post('/schedule', validateApiKeys(['openai']), async (req: AuthenticatedRequest, res) => {
   try {
     const { message, scheduledTime, sessionId } = req.body;
-    const companyId = req.company._id;
-    const userId = req.user?._id;
 
     if (!message || !scheduledTime || !sessionId) {
       return res.status(400).json({ error: 'Missing required parameters' });
@@ -49,8 +47,7 @@ agendaRouter.post('/schedule', validateApiKeys(['openai']), async (req: Authenti
       return res.status(400).json({ error: 'Invalid session' });
     }
 
-    const apiKey = await getApiKey(companyId, 'openai') as string;
-    await scheduleMessage(apiKey, sessionId, message, companyId.toString(), userId.toString(), scheduledTime);
+    await scheduleMessage(sessionId, message, scheduledTime);
     
     res.status(200).json({ message: 'Message scheduled successfully' });
   } catch (error) {

@@ -9,8 +9,10 @@ import { Company } from './models/Company';
 const initializeApp = async () => {
   try {
     console.log('Attempting to connect to MongoDB...');
-    await mongoose.connect(`${process.env.MONGODB_URI}/sb` as string);
-    console.log('Successfully connected to MongoDB');
+    const dbUri = process.env.MONGODB_URI || '';
+    const dbName = process.env.MONGODB_DB_NAME || 'dev';
+    await mongoose.connect(dbUri, { dbName });
+    console.log(`Successfully connected to MongoDB database: ${dbName}`);
 
     console.log('Starting Agenda...');
     startAgenda();

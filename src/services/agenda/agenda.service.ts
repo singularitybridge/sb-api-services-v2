@@ -68,12 +68,8 @@ agendaClient.define('processVoiceRecording', async (job: Job, done) => {
 agendaClient.define('sendScheduledMessage', async (job: Job, done) => {
   try {
     console.log('Scheduled message job started', job.attrs._id, job.attrs.data);
-    const { apiKey, sessionId, message, companyId, userId } = job.attrs.data;
-    const session = await Session.findById(sessionId);
-    if (!session) {
-      throw new Error('Session not found');
-    }
-    await sendMessageToAgent(apiKey, sessionId, message, companyId, userId, session.channel);
+    const { sessionId, message } = job.attrs.data;
+    await sendMessageToAgent(sessionId, message);
     console.log('Scheduled message sent successfully');
     done();
   } catch (error) {
@@ -84,20 +80,14 @@ agendaClient.define('sendScheduledMessage', async (job: Job, done) => {
 
 // Updated function to schedule a message with string scheduling
 export const scheduleMessage = async (
-  apiKey: string,
   sessionId: string,
   message: string,
-  companyId: string,
-  userId: string,
   scheduledTime: string
 ) => {
   try {
     await agendaClient.schedule(scheduledTime, 'sendScheduledMessage', {
-      apiKey,
       sessionId,
       message,
-      companyId,
-      userId,
     });
     console.log('Message scheduled successfully');
   } catch (error) {
