@@ -236,7 +236,7 @@ export async function createDefaultAssistant(companyId: string, apiKey: string):
     introMessage: 'Hello {{user.name}}! I\'m your default AI assistant for {{company.name}}. How can I help you today?',
     voice: 'en-US-Standard-C',
     language: 'en',
-    llmModel: 'gpt-4',
+    llmModel: 'gpt-4o',
     llmPrompt: 'You are a helpful AI assistant for {{company.name}}. Your name is {{assistant.name}}. Provide friendly and professional assistance to {{user.name}}. When referring to the user, use their name {{user.name}} or their email {{user.email}}. Always include placeholders like {{user.name}} or {{company.name}} in your responses, as they will be automatically replaced with the actual values.',
     companyId: companyId,
   };
@@ -261,12 +261,8 @@ export async function createDefaultAssistant(companyId: string, apiKey: string):
 }
 
 export const sendMessageToAgent = async (
-  apiKey: string,
   sessionId: string,
-  message: string,
-  companyId: string,
-  userId: string,
-  channel: ChannelType
+  message: string
 ) => {
   try {
     const session = await Session.findById(sessionId);
@@ -274,25 +270,20 @@ export const sendMessageToAgent = async (
       throw new Error('Session not found');
     }
 
-    // Update the session channel if it's different
-    if (session.channel !== channel) {
-      session.channel = channel;
-      await session.save();
-    }
-
-    const response = await handleSessionMessage(apiKey, message, sessionId, channel);
+    const apiKey = await getApiKey(session.companyId.toString(), 'openai') as string;
+    const response = await handleSessionMessage(apiKey, message, sessionId, session.channel);
     
     // Send the response to the appropriate channel
-    switch (channel) {
+    switch (session.channel) {
       case ChannelType.TELEGRAM:
-        await sendTelegramMessage(userId, response, companyId);
+        await sendTelegramMessage(session.userId.toString(), response, session.companyId.toString());
         break;
       case ChannelType.WEB:
         console.log(`Message sent to Web channel: ${response}`);
         break;
       // Add cases for other channel types as needed
       default:
-        console.log(`Message sent to channel ${channel}: ${response}`);
+        console.log(`Message sent to channel ${session.channel}: ${response}`);
     }
 
     return response;
