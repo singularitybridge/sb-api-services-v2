@@ -36,6 +36,17 @@ const showMenu = async (bot: TelegramBot, chatId: number) => {
   await bot.sendMessage(chatId, 'Here are the available options:', menuOptions);
 };
 
+const validateBotToken = async (token: string): Promise<boolean> => {
+  try {
+    const bot = new TelegramBot(token, { polling: false });
+    const me = await bot.getMe();
+    return !!me.id;
+  } catch (error) {
+    console.error('Error validating bot token:', error);
+    return false;
+  }
+};
+
 export const initializeTelegramBots = async () => {
   try {
     const companies = await getCompanies(null);
@@ -50,7 +61,17 @@ export const initializeTelegramBots = async () => {
           continue;
         }
 
+        const isValidToken = await validateBotToken(telegramBotToken);
+        if (!isValidToken) {
+          console.error(`Invalid Telegram bot token for company ${companyId}`);
+          continue;
+        }
+
         const bot = new TelegramBot(telegramBotToken, { polling: true });
+        bot.on('polling_error', (error) => {
+          console.error(`Polling error for company ${companyId}:`, error);
+        });
+
         bots.set(companyId, bot);
         console.log(`Bot added to map for company ${companyId} (type: ${typeof companyId})`);
 
