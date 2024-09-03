@@ -1,10 +1,14 @@
 import mongoose from 'mongoose';
-import { Collection, Filter, Sort } from 'mongodb';
+import { Collection, Filter, Sort, UpdateFilter, ObjectId } from 'mongodb';
+import { logger } from '../utils/logger';
 
 // Define the type for query parameters
 type QueryParams = {
   collection: string;
+  operation: 'find' | 'updateOne' | 'updateMany';
   filter: Filter<any>;
+  update?: UpdateFilter<any>;
+  projection?: any;
   limit?: number;
   skip?: number;
   sort?: Sort;
@@ -16,65 +20,144 @@ const getCollection = (collectionName: string): Collection => {
 };
 
 // Execute a query
-const executeQuery = async (queryParams: QueryParams): Promise<any[]> => {
+const executeQuery = async (queryParams: QueryParams): Promise<any> => {
   try {
-    let query = getCollection(queryParams.collection).find(queryParams.filter);
+    logger.log('Executing query with params:', queryParams);
+    logger.log('Connected to database:', mongoose.connection.db.databaseName);
 
-    if (queryParams.skip) {
-      query = query.skip(queryParams.skip);
+    const collection = getCollection(queryParams.collection);
+
+    if (queryParams.operation === 'find') {
+      let query = collection.find(queryParams.filter, queryParams.projection);
+
+      if (queryParams.skip) {
+        query = query.skip(queryParams.skip);
+      }
+
+      if (queryParams.limit) {
+        query = query.limit(queryParams.limit);
+      }
+
+      if (queryParams.sort) {
+        query = query.sort(queryParams.sort);
+      }
+
+      const result = await query.toArray();
+      logger.log('Raw query result:', result);
+      return result;
+    } else if (queryParams.operation === 'updateOne' || queryParams.operation === 'updateMany') {
+      const result = await executeUpdate(collection, queryParams);
+      logger.log('Raw update result:', result);
+      return result;
     }
-
-    if (queryParams.limit) {
-      query = query.limit(queryParams.limit);
-    }
-
-    if (queryParams.sort) {
-      query = query.sort(queryParams.sort);
-    }
-
-    const result = await query.toArray();
-    return result;
   } catch (error) {
-    console.error('Error executing query', error);
+    logger.error('Error executing query', error);
     throw error;
   }
 };
 
+// Execute update operation
+const executeUpdate = async (collection: Collection, queryParams: QueryParams): Promise<any> => {
+  if (!queryParams.update) {
+    throw new Error('Update operation requires an update parameter');
+  }
+
+  if (queryParams.operation === 'updateOne') {
+    return await collection.updateOne(queryParams.filter, queryParams.update);
+  } else if (queryParams.operation === 'updateMany') {
+    return await collection.updateMany(queryParams.filter, queryParams.update);
+  }
+};
+
+// Helper function to replace ObjectId strings with actual ObjectId objects
+const replaceObjectIds = (obj: any): any => {
+  if (typeof obj !== 'object' || obj === null) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(replaceObjectIds);
+  }
+
+  const result: { [key: string]: any } = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (typeof value === 'string' && value.startsWith('ObjectId(') && value.endsWith(')')) {
+      const idString = value.slice(9, -1).replace(/['"]/g, '');
+      result[key] = new ObjectId(idString);
+    } else if (typeof value === 'object') {
+      result[key] = replaceObjectIds(value);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+};
+
 // Parse user input to create a query
 const parseUserInput = (input: string): QueryParams => {
-  const regex = /db\.(\w+)\.(\w+)\((.*)\)(?:\.(\w+)\((\d*)\))?(?:\.(\w+)\(\))?/;
+  const regex = /db\.(\w+)\.(\w+)\((.*?)(,\s*{.*?})?\)(?:\.limit\((\d+)\))?(?:\.skip\((\d+)\))?(?:\.sort\((.*?)\))?/;
   const match = input.match(regex);
 
   if (!match) {
     throw new Error('Invalid query format');
   }
 
-  const [, collection, operation, args, limitOrSkip, limitOrSkipValue, toArray] = match;
+  const [, collection, operation, filterStr, updateOrProjectionStr, limitValue, skipValue, sortValue] = match;
 
   let filter: Filter<any> = {};
+  let update: UpdateFilter<any> | undefined;
+  let projection: any = undefined;
   let limit: number | undefined;
   let skip: number | undefined;
+  let sort: Sort | undefined;
 
-  if (operation === 'find' && args) {
+  if (filterStr) {
     try {
-      filter = JSON.parse(args);
+      filter = replaceObjectIds(eval(`(${filterStr})`));
     } catch (error) {
-      console.warn('Failed to parse filter, using empty filter');
+      logger.error('Failed to parse filter:', error);
+      throw new Error('Invalid filter format');
     }
   }
 
-  if (limitOrSkip === 'limit') {
-    limit = parseInt(limitOrSkipValue, 10);
-  } else if (limitOrSkip === 'skip') {
-    skip = parseInt(limitOrSkipValue, 10);
+  if (updateOrProjectionStr) {
+    try {
+      const parsed = replaceObjectIds(eval(`(${updateOrProjectionStr.slice(1)})`));
+      if (operation === 'find') {
+        projection = parsed;
+      } else if (operation === 'updateOne' || operation === 'updateMany') {
+        update = parsed;
+      }
+    } catch (error) {
+      logger.error('Failed to parse update/projection:', error);
+      throw new Error('Invalid update/projection format');
+    }
   }
 
-  return { collection, filter, limit, skip };
+  if (limitValue) {
+    limit = parseInt(limitValue, 10);
+  }
+
+  if (skipValue) {
+    skip = parseInt(skipValue, 10);
+  }
+
+  if (sortValue) {
+    try {
+      sort = replaceObjectIds(eval(`(${sortValue})`));
+    } catch (error) {
+      logger.error('Failed to parse sort:', error);
+      throw new Error('Invalid sort format');
+    }
+  }
+
+  return { collection, operation: operation as QueryParams['operation'], filter, update, projection, limit, skip, sort };
 };
 
 // Main function to handle user input and execute query
-const handleUserQuery = async (input: string): Promise<any[]> => {
+const handleUserQuery = async (input: string): Promise<any> => {
   const queryParams = parseUserInput(input);
+  logger.log('Parsed query params:', queryParams);
   return executeQuery(queryParams);
 };
 

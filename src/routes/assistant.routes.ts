@@ -4,6 +4,7 @@ import {
   deleteAssistant,
   handleSessionMessage,
   createDefaultAssistant,
+  getAssistants,
 } from '../services/assistant.service';
 import { Assistant } from '../models/Assistant';
 import {
@@ -62,6 +63,7 @@ assistantRouter.get(
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
     const { id } = req.params;
+
     const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
     const messages = await getMessages(apiKey, id);
     res.send(messages);
@@ -83,6 +85,7 @@ assistantRouter.delete(
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
     const { id } = req.params;
+
     const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
     await deleteThread(apiKey, id);
     res.send({ message: 'Thread deleted successfully' });
@@ -94,6 +97,7 @@ assistantRouter.post(
   validateApiKeys(['openai']),
   async (req: AuthenticatedRequest, res) => {
     const { userInput, sessionId } = req.body;
+
     const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
     
     try {
@@ -110,12 +114,9 @@ assistantRouter.post(
   },
 );
 
-
-
-
 assistantRouter.get('/', async (req: AuthenticatedRequest, res) => {
   try {
-    const assistants = await Assistant.find({ companyId: req.user?.companyId });
+    const assistants = await getAssistants(req.user!.companyId.toString());
     res.send(assistants);
   } catch (error) {
     res.status(500).send({ message: 'Error retrieving assistants' });
@@ -145,6 +146,7 @@ assistantRouter.put(
     try {
       const { id } = req.params;
       const assistantData = req.body;
+
       const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
 
       const assistant = await Assistant.findOneAndUpdate(

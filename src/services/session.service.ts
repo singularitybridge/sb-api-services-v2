@@ -1,5 +1,5 @@
 import { Assistant } from '../models/Assistant';
-import { Session } from '../models/Session';
+import { ISession, Session } from '../models/Session';
 import { CustomError, NotFoundError } from '../utils/errors';
 import { createNewThread, deleteThread } from './oai.thread.service';
 import { ChannelType } from '../types/ChannelType';
@@ -27,7 +27,6 @@ export const sessionFriendlyAggreationQuery = [
   {
     $unwind: '$assistantDetails',
   },
-
   {
     $lookup: {
       from: 'companies',
@@ -39,7 +38,6 @@ export const sessionFriendlyAggreationQuery = [
   {
     $unwind: '$companyDetails',
   },
-
   {
     $project: {
       assistantId: 1,
@@ -58,12 +56,19 @@ export const sessionFriendlyAggreationQuery = [
 export const updateSessionAssistant = async (
   sessionId: string,
   assistantId: string,
-) => {
-  const session = await Session.findById(sessionId);
-  if (session) {
-    session.assistantId = assistantId;
-    await session.save();
+  companyId: string
+): Promise<ISession | null> => {
+  const session = await Session.findOneAndUpdate(
+    { _id: sessionId, companyId: companyId },
+    { assistantId },
+    { new: true }
+  );
+
+  if (!session) {
+    throw new NotFoundError('Session not found');
   }
+
+  return session;
 };
 
 export const getSessionOrCreate = async (

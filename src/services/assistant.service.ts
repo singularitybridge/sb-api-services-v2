@@ -21,6 +21,17 @@ export const getOpenAIClient = (apiKey: string) => {
   });
 };
 
+
+export const getAssistants = async (companyId: string): Promise<IAssistant[]> => {
+  try {
+    const assistants = await Assistant.find({ companyId });
+    return assistants;
+  } catch (error) {
+    console.error('Error retrieving assistants:', error);
+    throw new Error('Error retrieving assistants');
+  }
+};
+
 const handleError = (error: Error): string => {
   let response = 'Something went wrong, ';
 
@@ -225,7 +236,7 @@ export async function createDefaultAssistant(companyId: string, apiKey: string):
     introMessage: 'Hello {{user.name}}! I\'m your default AI assistant for {{company.name}}. How can I help you today?',
     voice: 'en-US-Standard-C',
     language: 'en',
-    llmModel: 'gpt-4',
+    llmModel: 'gpt-4o',
     llmPrompt: 'You are a helpful AI assistant for {{company.name}}. Your name is {{assistant.name}}. Provide friendly and professional assistance to {{user.name}}. When referring to the user, use their name {{user.name}} or their email {{user.email}}. Always include placeholders like {{user.name}} or {{company.name}} in your responses, as they will be automatically replaced with the actual values.',
     companyId: companyId,
   };
@@ -248,3 +259,36 @@ export async function createDefaultAssistant(companyId: string, apiKey: string):
 
   return assistant;
 }
+
+export const sendMessageToAgent = async (
+  sessionId: string,
+  message: string
+) => {
+  try {
+    const session = await Session.findById(sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    const apiKey = await getApiKey(session.companyId.toString(), 'openai') as string;
+    const response = await handleSessionMessage(apiKey, message, sessionId, session.channel);
+    
+    // Send the response to the appropriate channel
+    switch (session.channel) {
+      case ChannelType.TELEGRAM:
+        await sendTelegramMessage(session.userId.toString(), response, session.companyId.toString());
+        break;
+      case ChannelType.WEB:
+        console.log(`Message sent to Web channel: ${response}`);
+        break;
+      // Add cases for other channel types as needed
+      default:
+        console.log(`Message sent to channel ${session.channel}: ${response}`);
+    }
+
+    return response;
+  } catch (error) {
+    console.error('Error sending message to agent:', error);
+    throw error;
+  }
+};

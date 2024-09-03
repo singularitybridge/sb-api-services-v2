@@ -11,6 +11,8 @@ import { createOpenAiActions } from './openAiActions';
 import { processTemplate } from '../services/template.service';
 import { createPhotoRoomActions } from './photoRoomActions';
 import { createMongoDbActions } from './mongoDbActions';
+import { createDebugActions } from './debugActions';
+import { createAgendaActions } from './agendaActions';
 
 export const createFunctionFactory = (context: ActionContext): FunctionFactory => ({
   ...createInboxActions(context),
@@ -24,6 +26,8 @@ export const createFunctionFactory = (context: ActionContext): FunctionFactory =
   ...createOpenAiActions(context),
   ...createPhotoRoomActions(context),
   ...createMongoDbActions(context),
+  ...createDebugActions(context),
+  ...createAgendaActions(context),
 });
 
 export const executeFunctionCall = async (call: any, sessionId: string, companyId: string) => {
