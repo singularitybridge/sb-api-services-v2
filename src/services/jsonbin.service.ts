@@ -80,6 +80,51 @@ export const updateArrayElement = async (companyId: string, binId: string, array
   }
 };
 
+export const deleteArrayElement = async (companyId: string, binId: string, arrayKey: string, elementId: string): Promise<any> => {
+  try {
+    const headers = await getHeaders(companyId);
+    const currentData = await readFile(companyId, binId);
+
+    if (!currentData[arrayKey] || !Array.isArray(currentData[arrayKey])) {
+      throw new Error(`Array '${arrayKey}' not found in the JSON file`);
+    }
+
+    currentData[arrayKey] = currentData[arrayKey].filter((item: any) => item.id !== elementId);
+
+    const response = await axios.put(`${BASE_URL}/b/${binId}`, currentData, { headers });
+    return response.data.record;
+  } catch (error) {
+    console.error('Error deleting array element in JSONBin:', error);
+    throw error;
+  }
+};
+
+export const insertArrayElement = async (companyId: string, binId: string, arrayKey: string, newElement: any): Promise<any> => {
+  try {
+    const headers = await getHeaders(companyId);
+    const currentData = await readFile(companyId, binId);
+
+    if (!currentData[arrayKey]) {
+      currentData[arrayKey] = [];
+    }
+
+    if (!Array.isArray(currentData[arrayKey])) {
+      throw new Error(`'${arrayKey}' is not an array in the JSON file`);
+    }
+
+    const newId = Math.random().toString(36).substr(2, 9);
+    const elementWithId = { ...newElement, id: newId };
+
+    currentData[arrayKey].push(elementWithId);
+
+    const response = await axios.put(`${BASE_URL}/b/${binId}`, currentData, { headers });
+    return response.data.record;
+  } catch (error) {
+    console.error('Error inserting array element in JSONBin:', error);
+    throw error;
+  }
+};
+
 export const verifyJsonBinKey = async (key: ApiKey): Promise<boolean> => {
   if (typeof key !== 'string') {
     console.error('Invalid JSONBin key type');

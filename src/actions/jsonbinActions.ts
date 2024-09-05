@@ -1,5 +1,5 @@
 import { ActionContext, FunctionFactory } from './types';
-import { readFile, updateFile, createFile, updateArrayElement } from '../services/jsonbin.service';
+import { readFile, updateFile, createFile, updateArrayElement, deleteArrayElement, insertArrayElement } from '../services/jsonbin.service';
 
 export const createJSONBinActions = (context: ActionContext): FunctionFactory => ({
   createJSONBinFile: {
@@ -261,6 +261,166 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
         return {
           error: 'Update failed',
           message: error instanceof Error ? error.message : 'An unknown error occurred while updating the array element.',
+        };
+      }
+    },
+  },
+  deleteJSONBinArrayElement: {
+    description: 'Delete a specific element from an array within a JSONBin file',
+    strict: false,
+    parameters: {
+      type: 'object',
+      properties: {
+        binId: { 
+          type: 'string',
+          description: 'The ID of the file to update',
+        },
+        arrayKey: {
+          type: 'string',
+          description: 'The key of the array in the JSON object',
+        },
+        elementId: {
+          type: 'string',
+          description: 'The ID of the element to delete from the array',
+        },
+      },
+      required: ['binId', 'arrayKey', 'elementId'],
+      additionalProperties: false,
+    },
+    function: async (args) => {
+      console.log('deleteJSONBinArrayElement called with arguments:', JSON.stringify(args, null, 2));
+
+      const { binId, arrayKey, elementId } = args;
+
+      // Check if all required properties are present
+      if (binId === undefined || arrayKey === undefined || elementId === undefined) {
+        console.error('deleteJSONBinArrayElement: Missing required parameters');
+        return {
+          error: 'Missing parameters',
+          message: 'All parameters (binId, arrayKey, elementId) are required.',
+        };
+      }
+
+      // Check for additional properties
+      const allowedProps = ['binId', 'arrayKey', 'elementId'];
+      const extraProps = Object.keys(args).filter(prop => !allowedProps.includes(prop));
+      if (extraProps.length > 0) {
+        console.error('deleteJSONBinArrayElement: Additional properties found', extraProps);
+        return {
+          error: 'Invalid parameters',
+          message: `Additional properties are not allowed: ${extraProps.join(', ')}`,
+        };
+      }
+
+      // Verify that binId, arrayKey, and elementId are strings
+      if (typeof binId !== 'string' || typeof arrayKey !== 'string' || typeof elementId !== 'string') {
+        console.error('deleteJSONBinArrayElement: Invalid parameter types', { binId, arrayKey, elementId });
+        return {
+          error: 'Invalid parameter types',
+          message: 'binId, arrayKey, and elementId must be strings.',
+        };
+      }
+
+      // If we've reached this point, all parameters are valid
+      console.log('deleteJSONBinArrayElement: Calling deleteArrayElement with valid data');
+      try {
+        const result = await deleteArrayElement(context.companyId, binId, arrayKey, elementId);
+        return result;
+      } catch (error) {
+        console.error('deleteJSONBinArrayElement: Error deleting array element', error);
+        return {
+          error: 'Delete failed',
+          message: error instanceof Error ? error.message : 'An unknown error occurred while deleting the array element.',
+        };
+      }
+    },
+  },
+  insertJSONBinArrayElement: {
+    description: 'Insert a new element into an array within a JSONBin file',
+    strict: false,
+    parameters: {
+      type: 'object',
+      properties: {
+        binId: { 
+          type: 'string',
+          description: 'The ID of the file to update',
+        },
+        arrayKey: {
+          type: 'string',
+          description: 'The key of the array in the JSON object',
+        },
+        newElement: {
+          type: 'object',
+          description: 'The new element to insert into the array',
+        },
+      },
+      required: ['binId', 'arrayKey', 'newElement'],
+      additionalProperties: false,
+    },
+    function: async (args) => {
+      console.log('insertJSONBinArrayElement called with arguments:', JSON.stringify(args, null, 2));
+
+      const { binId, arrayKey, newElement } = args;
+
+      // Check if all required properties are present
+      if (binId === undefined || arrayKey === undefined || newElement === undefined) {
+        console.error('insertJSONBinArrayElement: Missing required parameters');
+        return {
+          error: 'Missing parameters',
+          message: 'All parameters (binId, arrayKey, newElement) are required.',
+        };
+      }
+
+      // Check for additional properties
+      const allowedProps = ['binId', 'arrayKey', 'newElement'];
+      const extraProps = Object.keys(args).filter(prop => !allowedProps.includes(prop));
+      if (extraProps.length > 0) {
+        console.error('insertJSONBinArrayElement: Additional properties found', extraProps);
+        return {
+          error: 'Invalid parameters',
+          message: `Additional properties are not allowed: ${extraProps.join(', ')}`,
+        };
+      }
+
+      // Verify that binId and arrayKey are strings
+      if (typeof binId !== 'string' || typeof arrayKey !== 'string') {
+        console.error('insertJSONBinArrayElement: Invalid parameter types', { binId, arrayKey });
+        return {
+          error: 'Invalid parameter types',
+          message: 'binId and arrayKey must be strings.',
+        };
+      }
+
+      // Verify that newElement is a valid JSON object
+      if (typeof newElement !== 'object' || newElement === null || Array.isArray(newElement)) {
+        console.error('insertJSONBinArrayElement: Invalid newElement type', typeof newElement);
+        return {
+          error: 'Invalid JSON data',
+          message: `The provided newElement must be a valid JSON object. Received type: ${typeof newElement}`,
+        };
+      }
+
+      try {
+        // Attempt to stringify and parse the newElement to ensure it's valid JSON
+        JSON.parse(JSON.stringify(newElement));
+      } catch (error) {
+        console.error('insertJSONBinArrayElement: Error stringifying newElement', error);
+        return {
+          error: 'Invalid JSON data',
+          message: 'The provided newElement could not be converted to a valid JSON string.',
+        };
+      }
+
+      // If we've reached this point, all parameters are valid
+      console.log('insertJSONBinArrayElement: Calling insertArrayElement with valid data');
+      try {
+        const result = await insertArrayElement(context.companyId, binId, arrayKey, newElement);
+        return result;
+      } catch (error) {
+        console.error('insertJSONBinArrayElement: Error inserting array element', error);
+        return {
+          error: 'Insert failed',
+          message: error instanceof Error ? error.message : 'An unknown error occurred while inserting the array element.',
         };
       }
     },

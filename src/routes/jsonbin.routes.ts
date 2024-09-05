@@ -1,7 +1,7 @@
 import express from 'express';
 import { validateApiKeys } from '../services/api.key.service';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
-import { readFile, updateFile, createFile, updateArrayElement } from '../services/jsonbin.service';
+import { readFile, updateFile, createFile, updateArrayElement, deleteArrayElement, insertArrayElement } from '../services/jsonbin.service';
 
 const jsonbinRouter = express.Router();
 
@@ -47,6 +47,37 @@ jsonbinRouter.put('/:binId/:arrayKey/:elementId', validateApiKeys(['jsonbin']), 
       res.status(400).json({ error: error.message });
     } else {
       res.status(500).json({ error: 'Error updating array element in JSONBin' });
+    }
+  }
+});
+
+// New route for deleting an array element
+jsonbinRouter.delete('/:binId/:arrayKey/:elementId', validateApiKeys(['jsonbin']), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { binId, arrayKey, elementId } = req.params;
+    const result = await deleteArrayElement(req.company._id, binId, arrayKey, elementId);
+    res.json(result);
+  } catch (error) {
+    if (error instanceof Error) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'Error deleting array element in JSONBin' });
+    }
+  }
+});
+
+// New route for inserting an array element
+jsonbinRouter.post('/:binId/:arrayKey', validateApiKeys(['jsonbin']), express.json(), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { binId, arrayKey } = req.params;
+    const newElement = req.body;
+    const result = await insertArrayElement(req.company._id, binId, arrayKey, newElement);
+    res.status(201).json(result);
+  } catch (error) {
+    if (error instanceof Error) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'Error inserting array element in JSONBin' });
     }
   }
 });
