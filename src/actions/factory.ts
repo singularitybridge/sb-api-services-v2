@@ -13,6 +13,7 @@ import { createPhotoRoomActions } from './photoRoomActions';
 import { createMongoDbActions } from './mongoDbActions';
 import { createDebugActions } from './debugActions';
 import { createAgendaActions } from './agendaActions';
+import createAIAgentExecutorActions from './aiAgentExecutorActions';
 
 export const createFunctionFactory = (context: ActionContext): FunctionFactory => ({
   ...createInboxActions(context),
@@ -28,6 +29,7 @@ export const createFunctionFactory = (context: ActionContext): FunctionFactory =
   ...createMongoDbActions(context),
   ...createDebugActions(context),
   ...createAgendaActions(context),
+  ...createAIAgentExecutorActions(context),
 });
 
 export const executeFunctionCall = async (call: any, sessionId: string, companyId: string) => {
