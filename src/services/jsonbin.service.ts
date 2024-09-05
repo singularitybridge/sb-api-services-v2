@@ -55,6 +55,31 @@ export const updateFile = async (companyId: string, binId: string, data: any): P
   }
 };
 
+export const updateArrayElement = async (companyId: string, binId: string, arrayKey: string, elementId: string, updateData: any): Promise<any> => {
+  try {
+    const headers = await getHeaders(companyId);
+    const currentData = await readFile(companyId, binId);
+
+    if (!currentData[arrayKey] || !Array.isArray(currentData[arrayKey])) {
+      throw new Error(`Array '${arrayKey}' not found in the JSON file`);
+    }
+
+    const elementIndex = currentData[arrayKey].findIndex((item: any) => item.id === elementId);
+
+    if (elementIndex === -1) {
+      throw new Error(`Element with id '${elementId}' not found in the array '${arrayKey}'`);
+    }
+
+    currentData[arrayKey][elementIndex] = { ...currentData[arrayKey][elementIndex], ...updateData };
+
+    const response = await axios.put(`${BASE_URL}/b/${binId}`, currentData, { headers });
+    return response.data.record;
+  } catch (error) {
+    console.error('Error updating array element in JSONBin:', error);
+    throw error;
+  }
+};
+
 export const verifyJsonBinKey = async (key: ApiKey): Promise<boolean> => {
   if (typeof key !== 'string') {
     console.error('Invalid JSONBin key type');
