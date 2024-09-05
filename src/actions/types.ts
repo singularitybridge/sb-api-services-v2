@@ -18,3 +18,10 @@ export type FunctionDefinition = {
 };
 
 export type FunctionFactory = Record<string, FunctionDefinition>;
+
+export enum ActionType {
+  // ... existing action types ...
+  EXECUTE_COMMAND = 'EXECUTE_COMMAND',
+  FILE_OPERATION = 'FILE_OPERATION',
+  STOP_EXECUTION = 'STOP_EXECUTION',
+}
