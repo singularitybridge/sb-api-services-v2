@@ -74,37 +74,115 @@ The project includes various routes for different functionalities:
 
 The project supports various actions, including:
 
-1. Agenda Actions
-2. AI Agent Executor Actions
-3. Assistant Actions
-4. Calendar Actions
-5. Debug Actions
-6. Eleven Labs Actions
-7. Flux Image Actions
-8. Inbox Actions
-9. JSONbin Actions
-10. MongoDB Actions
-11. OpenAI Actions
-12. Perplexity Actions
-13. PhotoRoom Actions
-14. SendGrid Actions
+### Agenda Actions
+Manages scheduling and task management functionalities for AI agents.
+Available methods:
+createAgendaItem(item)
+updateAgendaItem(id, updates)
+
+### AI Agent Executor Actions
+Coordinates the execution of AI agent tasks and manages their lifecycle.
+Available methods:
+executeAgentTask(agentId, task)
+terminateAgentExecution(executionId)
+
+### Assistant Actions
+Handles interactions with AI assistants, including creation and management.
+Available methods:
+createAssistant(config)
+getAssistantResponse(assistantId, prompt)
+
+### Calendar Actions
+Manages calendar-related operations, including event creation and retrieval.
+Available methods:
+createEvent(eventDetails)
+getEvents(timeRange)
+
+### Debug Actions
+Provides debugging and logging functionalities for troubleshooting.
+Available methods:
+logDebugInfo(message)
+captureErrorState(error)
+
+### Eleven Labs Actions
+Interacts with Eleven Labs API for text-to-speech and voice-related tasks.
+Available methods:
+generateSpeech(text, voiceId)
+listAvailableVoices()
+
+### Flux Image Actions
+Handles image processing and manipulation tasks.
+Available methods:
+processImage(imageUrl, operations)
+generateImage(prompt)
+
+### Inbox Actions
+Manages message inboxes for users or AI agents.
+Available methods:
+sendMessage(recipientId, message)
+getInboxMessages(userId)
+
+### JSONbin Actions
+Interacts with JSONbin for storing and retrieving JSON data.
+Available methods:
+createBin(data)
+readBin(binId)
+
+### MongoDB Actions
+Performs database operations on MongoDB.
+Available methods:
+insertDocument(collection, document)
+queryDocuments(collection, query)
+
+### OpenAI Actions
+Interacts with OpenAI API for various AI-related tasks.
+Available methods:
+generateCompletion(prompt)
+createEmbedding(text)
+
+### Perplexity Actions
+Handles interactions with Perplexity API for advanced language understanding.
+Available methods:
+analyzeText(text)
+generateResponse(query)
+
+### PhotoRoom Actions
+Manages image editing and background removal tasks using PhotoRoom API.
+Available methods:
+removeBackground(imageUrl)
+editImage(imageUrl, edits)
+
+### SendGrid Actions
+Handles email operations using SendGrid API.
+Available methods:
+sendEmail(to, subject, content)
+createEmailTemplate(template)
 
 ## Integrations
 
 The SB Agent Portal integrates with various third-party services. The following integrations are supported:
 
-1. OpenAI
-2. Eleven Labs
-3. Google
-4. Twilio
-5. JSONbin
-6. GetImg
-7. Perplexity
-8. SendGrid
-9. PhotoRoom
-10. Telegram Bot
+1. OpenAI: Used for natural language processing, text generation, and AI model interactions. It powers the core AI capabilities of the agents, enabling them to understand and generate human-like text, and perform various AI tasks.
 
-Each integration requires an API key, which can be managed through the Company settings.
+2. Eleven Labs: Provides advanced text-to-speech capabilities. It's used to generate natural-sounding voice outputs for the AI agents, enhancing the conversational experience.
+
+3. Google: Utilized for various services including calendar management, cloud storage, and text-to-speech. It enables agents to interact with users' calendars, store and retrieve files, and generate speech from text.
+
+4. Twilio: Enables multi-channel communication capabilities. It's used for sending SMS, making voice calls, and potentially for WhatsApp integration, allowing agents to communicate through various channels.
+
+5. JSONbin: Provides a simple JSON storage service. It's used for storing and retrieving structured data that agents might need to access or update during their operations.
+
+6. GetImg: An image generation service. It allows agents to create or modify images based on text descriptions or other parameters, enhancing their visual output capabilities.
+
+7. Perplexity: Offers advanced language understanding and generation. It's used to improve the agents' ability to comprehend complex queries and generate more contextually relevant responses.
+
+8. SendGrid: An email delivery service. It's utilized for sending emails, which can be useful for notifications, reports, or any email-based communication the agents need to perform.
+
+9. PhotoRoom: Provides image editing and background removal services. It's used to manipulate images, which can be helpful for tasks involving visual content creation or editing.
+
+10. Telegram Bot: Enables interaction through Telegram. It allows agents to communicate with users via Telegram, expanding the range of platforms through which they can interact.
+
+Each integration requires an API key, which can be managed through the Company settings. These integrations collectively enhance the capabilities of the AI agents, allowing them to perform a wide range of tasks across different domains and communication channels.
 
 ## Getting Started
 
