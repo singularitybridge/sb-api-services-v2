@@ -17,6 +17,8 @@ Uploads a content file to Google Cloud Storage and saves its metadata to MongoDB
   - `companyId`: The ID of the company associated with the file
   - `title`: The title of the content file
   - `description`: Optional description of the content file
+  - `sessionId`: Optional ID of the session associated with the file
+  - `content`: Optional content of the file
 - **Returns:** Promise resolving to the saved ContentFile document
 - **Throws:** Error if upload or save operations fail
 
@@ -56,6 +58,8 @@ Uploads a new content file.
   - `file`: The file to be uploaded
   - `title`: The title of the content file
   - `description`: Optional description of the content file
+  - `sessionId`: Optional ID of the session associated with the file
+  - `content`: Optional content of the file
 - **Response:**
   - Status 201: Returns the uploaded content file data
   - Status 400: If no file is uploaded
@@ -89,5 +93,7 @@ Deletes a specific content file.
 - File uploads are handled using `multer` middleware with in-memory storage.
 - The service uses Google Cloud Storage for file storage and MongoDB for metadata storage.
 - Error handling is implemented for all operations, with appropriate error messages returned to the client.
+- The `sessionId` field is optional and can be used to associate a content file with a specific session.
+- The `content` field is optional and can be used to store additional textual content related to the file.
 
 For more detailed information about the implementation, please refer to the source code in `src/services/content-file.service.ts` and `src/routes/content-file.routes.ts`.
