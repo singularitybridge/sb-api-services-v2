@@ -60,21 +60,42 @@ export const getContentFiles = async (companyId: string): Promise<IContentFile[]
 
 export const deleteContentFile = async (fileId: string, companyId: string): Promise<{ deleted: boolean }> => {
   try {
+    console.log(`Attempting to delete file with ID: ${fileId} for company: ${companyId}`);
+    
     const file = await ContentFile.findOne({ _id: new mongoose.Types.ObjectId(fileId), companyId: new mongoose.Types.ObjectId(companyId) });
 
     if (!file) {
+      console.error(`File not found or not owned by the company. FileId: ${fileId}, CompanyId: ${companyId}`);
       throw new Error('File not found or not owned by the company');
     }
 
-    const bucket = storage.bucket(bucketName);
-    const blob = bucket.file(path.basename(file.gcpStorageUrl));
+    console.log(`File found in database: ${JSON.stringify(file)}`);
 
-    await blob.delete();
-    await file.deleteOne();
+    const bucket = storage.bucket(bucketName);
+    const blobName = path.basename(file.gcpStorageUrl.split('?')[0]);  // Extract filename from URL
+    console.log(`Attempting to delete blob: ${blobName} from bucket: ${bucketName}`);
+    
+    const blob = bucket.file(blobName);
+
+    try {
+      await blob.delete();
+      console.log(`Blob ${blobName} deleted successfully from GCS`);
+    } catch (gcsError) {
+      console.error(`Error deleting blob from GCS: ${gcsError}`);
+      throw gcsError;
+    }
+
+    try {
+      await file.deleteOne();
+      console.log(`File document deleted successfully from database`);
+    } catch (dbError) {
+      console.error(`Error deleting file document from database: ${dbError}`);
+      throw dbError;
+    }
 
     return { deleted: true };
   } catch (error) {
-    console.error('Error deleting content file:', error);
+    console.error('Error in deleteContentFile:', error);
     throw error;
   }
 };
