@@ -1,6 +1,7 @@
 import { ActionContext, FunctionFactory } from './types';
 import { generateSpeech } from '../services/oai.speech.service';
 import { getApiKey } from '../services/api.key.service';
+import { transcribeAudioWhisperFromURL } from '../services/speech.recognition.service';
 
 type OpenAIVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 type OpenAIModel = 'tts-1' | 'tts-1-hd';
@@ -47,6 +48,32 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
         },
       },
       required: ['text'],
+    },
+  },
+  transcribeAudioWhisperFromURL: {
+    function: async ({ audioUrl }: { audioUrl: string }) => {
+      try {
+        const apiKey = await getApiKey(context.companyId, 'openai');
+        if (!apiKey) {
+          throw new Error('OpenAI API key is missing');
+        }
+        const transcription = await transcribeAudioWhisperFromURL(apiKey, audioUrl);
+        return { transcription };
+      } catch (error) {
+        console.error('Error transcribing audio with OpenAI Whisper:', error);
+        throw new Error('Failed to transcribe audio with OpenAI Whisper');
+      }
+    },
+    description: 'Transcribe audio from a URL using OpenAI Whisper',
+    parameters: {
+      type: 'object',
+      properties: {
+        audioUrl: {
+          type: 'string',
+          description: 'The URL of the audio file to transcribe',
+        },
+      },
+      required: ['audioUrl'],
     },
   },
 });
