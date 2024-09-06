@@ -56,6 +56,7 @@ export const createNewServiceActions = (context: Context) => {
 5. Test the new actions:
    - Create unit tests for the new actions in the `tests/unit/actions/` directory.
    - Ensure all actions are properly tested with various scenarios.
+   - Run the full test suite to ensure no regressions: `npm test`
 
 Example test structure:
 
@@ -103,4 +104,13 @@ describe('NewService Actions', () => {
 });
 ```
 
-By following this playbook, you can consistently add new factory actions to services, ensuring they are properly integrated into the existing action system and well-tested.
+6. Update documentation:
+   - Review and update any relevant documentation in the `docs/` directory.
+   - If the new action introduces new functionality or changes existing behavior, make sure to document these changes.
+   - Update the README.md file if necessary, especially if the new action requires additional setup or configuration.
+
+7. Final verification:
+   - Run the entire test suite again to ensure all tests pass: `npm test`
+   - Manually test the new action to verify its functionality in the context of the entire application.
+
+By following this playbook, you can consistently add new factory actions to services, ensuring they are properly integrated into the existing action system, well-tested, and thoroughly documented.
