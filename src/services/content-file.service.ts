@@ -14,7 +14,7 @@ export const uploadContentFile = async (
   description?: string,
   sessionId?: string,
   content?: string
-): Promise<IContentFile> => {
+): Promise<Partial<IContentFile>> => {
   try {
     const fileExtension = path.extname(file.originalname);
     const uniqueFilename = `${uuidv4()}${fileExtension}`;
@@ -27,17 +27,14 @@ export const uploadContentFile = async (
       },
     });
 
-    const [url] = await blob.getSignedUrl({
-      action: 'read',
-      expires: '03-01-2500', // Set a far future expiration date
-    });
+    const baseUrl = `https://storage.googleapis.com/${bucketName}/${uniqueFilename}`;
 
     const contentFileData: any = {
       filename: file.originalname,
       title,
       mimeType: file.mimetype,
       size: file.size,
-      gcpStorageUrl: url,
+      gcpStorageUrl: baseUrl,
       companyId: new mongoose.Types.ObjectId(companyId),
     };
 
@@ -57,7 +54,11 @@ export const uploadContentFile = async (
 
     await contentFile.save();
 
-    return contentFile;
+    // Remove companyId from the response
+    const responseContentFile: Partial<IContentFile> = contentFile.toObject();
+    delete responseContentFile.companyId;
+
+    return responseContentFile;
   } catch (error) {
     console.error('Error uploading content file:', error);
     throw error;
@@ -87,7 +88,7 @@ export const deleteContentFile = async (fileId: string, companyId: string): Prom
     console.log(`File found in database: ${JSON.stringify(file)}`);
 
     const bucket = storage.bucket(bucketName);
-    const blobName = path.basename(file.gcpStorageUrl.split('?')[0]);  // Extract filename from URL
+    const blobName = path.basename(file.gcpStorageUrl);
     console.log(`Attempting to delete blob: ${blobName} from bucket: ${bucketName}`);
     
     const blob = bucket.file(blobName);
