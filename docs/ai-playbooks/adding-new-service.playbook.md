@@ -75,4 +75,22 @@ describe('NewService', () => {
 });
 ```
 
-By following this playbook, you can ensure consistent implementation of new services across the API, maintaining code quality and testability.
+6. Run tests:
+   - After implementing the new service and its unit tests, run the entire test suite to ensure no regressions:
+     ```
+     npm test
+     ```
+   - Address any failures or errors that may occur.
+
+7. Update documentation:
+   - Update the API documentation to include the new service and its endpoints.
+   - If using Swagger or OpenAPI, update the relevant specification files.
+   - Update the README.md file to mention the new service and any necessary setup or configuration steps.
+   - Create or update any specific documentation for the new service in the `docs/` directory.
+
+8. Final verification:
+   - Run the test suite again: `npm test`
+   - Manually test the new service to ensure it works as expected in the context of the entire application.
+   - Review the updated documentation for accuracy and completeness.
+
+By following this playbook, you can ensure consistent implementation of new services across the API, maintaining code quality, testability, and up-to-date documentation.
