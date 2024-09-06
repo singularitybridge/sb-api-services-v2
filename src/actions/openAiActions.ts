@@ -51,13 +51,13 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
     },
   },
   transcribeAudioWhisperFromURL: {
-    function: async ({ audioUrl }: { audioUrl: string }) => {
+    function: async ({ audioUrl, language }: { audioUrl: string; language?: string }) => {
       try {
         const apiKey = await getApiKey(context.companyId, 'openai');
         if (!apiKey) {
           throw new Error('OpenAI API key is missing');
         }
-        const transcription = await transcribeAudioWhisperFromURL(apiKey, audioUrl);
+        const transcription = await transcribeAudioWhisperFromURL(apiKey, audioUrl, language);
         return { transcription };
       } catch (error) {
         console.error('Error transcribing audio with OpenAI Whisper:', error);
@@ -71,6 +71,10 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
         audioUrl: {
           type: 'string',
           description: 'The URL of the audio file to transcribe',
+        },
+        language: {
+          type: 'string',
+          description: 'The language of the audio file (optional)',
         },
       },
       required: ['audioUrl'],
