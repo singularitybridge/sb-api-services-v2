@@ -58,6 +58,7 @@ import { fluxImageRouter } from './routes/flux.image.routes';
 import { perplexityRouter } from './routes/perplexity.routes';
 import { sendgridRouter } from './routes/sendgrid.routes';
 import { photoRoomRouter } from './routes/photoroom.routes';
+import contentFileRouter from './routes/content-file.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -81,6 +82,7 @@ app.use('/assistant', verifyTokenMiddleware, verifyAccess(), assistantRouter);
 app.use('/company', verifyTokenMiddleware, verifyAccess(), companyRouter);
 app.use('/user', verifyTokenMiddleware, verifyAccess(), userRouter);
 app.use('/file', verifyTokenMiddleware, verifyAccess(), fileRouter);
+app.use('/content-file', verifyTokenMiddleware, verifyAccess(), contentFileRouter);
 app.use('/inbox', verifyTokenMiddleware, verifyAccess(), inboxRouter);
 app.use('/action', verifyTokenMiddleware, verifyAccess(), actionRouter);
 app.use('/session', verifyTokenMiddleware, verifyAccess(), sessionRouter);
