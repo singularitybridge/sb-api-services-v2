@@ -8,6 +8,8 @@ export interface IContentFile extends Document {
   size: number;
   gcpStorageUrl: string;
   companyId: mongoose.Types.ObjectId;
+  sessionId?: mongoose.Types.ObjectId;
+  content?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -20,6 +22,8 @@ const ContentFileSchema: Schema = new Schema({
   size: { type: Number, required: true },
   gcpStorageUrl: { type: String, required: true },
   companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true },
+  sessionId: { type: Schema.Types.ObjectId, ref: 'Session' },
+  content: { type: String },
 }, { timestamps: true });
 
 export const ContentFile = mongoose.model<IContentFile>('ContentFile', ContentFileSchema);

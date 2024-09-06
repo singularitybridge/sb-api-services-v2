@@ -13,14 +13,21 @@ contentFileRouter.post(
   upload.single('file'),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { title, description } = req.body;
+      const { title, description, sessionId, content } = req.body;
       const companyId = req.company._id;
 
       if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
-      const contentFile = await uploadContentFile(req.file, companyId.toString(), title, description);
+      const contentFile = await uploadContentFile(
+        req.file,
+        companyId.toString(),
+        title,
+        description,
+        sessionId,
+        content
+      );
       res.status(201).json(contentFile);
     } catch (error) {
       console.error('Error uploading file:', error);

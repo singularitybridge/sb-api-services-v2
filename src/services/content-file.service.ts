@@ -11,7 +11,9 @@ export const uploadContentFile = async (
   file: Express.Multer.File,
   companyId: string,
   title: string,
-  description?: string
+  description?: string,
+  sessionId?: string,
+  content?: string
 ): Promise<IContentFile> => {
   try {
     const fileExtension = path.extname(file.originalname);
@@ -30,15 +32,28 @@ export const uploadContentFile = async (
       expires: '03-01-2500', // Set a far future expiration date
     });
 
-    const contentFile = new ContentFile({
+    const contentFileData: any = {
       filename: file.originalname,
       title,
-      description,
       mimeType: file.mimetype,
       size: file.size,
       gcpStorageUrl: url,
       companyId: new mongoose.Types.ObjectId(companyId),
-    });
+    };
+
+    if (description !== undefined) {
+      contentFileData.description = description;
+    }
+
+    if (sessionId) {
+      contentFileData.sessionId = new mongoose.Types.ObjectId(sessionId);
+    }
+
+    if (content !== undefined) {
+      contentFileData.content = content;
+    }
+
+    const contentFile = new ContentFile(contentFileData);
 
     await contentFile.save();
 
