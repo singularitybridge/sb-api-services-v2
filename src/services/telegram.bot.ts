@@ -42,7 +42,7 @@ const validateBotToken = async (token: string): Promise<boolean> => {
     const me = await bot.getMe();
     return !!me.id;
   } catch (error) {
-    console.error('Error validating bot token:', error);
+    console.log('Notice: Invalid Telegram bot token');
     return false;
   }
 };
@@ -57,19 +57,19 @@ export const initializeTelegramBots = async () => {
         const telegramBotToken = await getApiKey(companyId, 'telegram_bot');
 
         if (!telegramBotToken) {
-          console.log(`No Telegram bot token found for company ${companyId}`);
+          console.log(`Notice: No Telegram bot token found for company ${companyId}`);
           continue;
         }
 
         const isValidToken = await validateBotToken(telegramBotToken);
         if (!isValidToken) {
-          console.error(`Invalid Telegram bot token for company ${companyId}`);
+          console.log(`Notice: Invalid Telegram bot token for company ${companyId}`);
           continue;
         }
 
         const bot = new TelegramBot(telegramBotToken, { polling: true });
         bot.on('polling_error', (error) => {
-          console.error(`Polling error for company ${companyId}:`, error);
+          console.log(`Notice: Polling error for company ${companyId}`);
         });
 
         bots.set(companyId, bot);
@@ -95,7 +95,7 @@ export const initializeTelegramBots = async () => {
           const messageText = msg.text;
 
           if (!userId) {
-            console.error('User ID not found in message');
+            console.log('Notice: User ID not found in message');
             return;
           }
 
@@ -118,7 +118,7 @@ export const initializeTelegramBots = async () => {
             const companyId = Array.from(bots.entries()).find(([_, b]) => b === bot)?.[0];
             
             if (!companyId) {
-              console.error(`Company not found for Telegram bot`);
+              console.log(`Notice: Company not found for Telegram bot`);
               return;
             }
 
@@ -154,18 +154,18 @@ export const initializeTelegramBots = async () => {
               bot.sendMessage(chatId, `I received your document, ${fullName}. Unfortunately, I can't process documents yet.`);
             }
           } catch (error) {
-            console.error(`Error processing message:`, error);
+            console.log(`Notice: Error processing message`);
             bot.sendMessage(chatId, 'Sorry, there was an error processing your message. Please try again later.');
           }
         });
 
         console.log(`Telegram bot started for company ${companyId}`);
       } catch (error) {
-        console.error(`[DEBUG] Error initializing bot for company ${company._id}:`, error);
+        console.log(`Notice: Error initializing bot for company ${company._id}`);
       }
     }
   } catch (error) {
-    console.error('Error initializing Telegram bots:', error);
+    console.log('Notice: Error initializing Telegram bots');
   }
 };
 
@@ -174,7 +174,7 @@ const handleClearChat = async (bot: TelegramBot, chatId: number, userId: number,
     const user = await findUserByIdentifierAndCompany('tg_user_id', userId.toString(), companyId);
     
     if (!user) {
-      console.error(`User not found for Telegram bot`);
+      console.log(`Notice: User not found for Telegram bot`);
       await bot.sendMessage(chatId, 'Error clearing chat. Please try again.');
       return;
     }
@@ -200,7 +200,7 @@ const handleClearChat = async (bot: TelegramBot, chatId: number, userId: number,
       ChannelType.TELEGRAM
     );
   } catch (error) {
-    console.error(`Error clearing chat:`, error);
+    console.log(`Notice: Error clearing chat`);
     await bot.sendMessage(chatId, 'Error clearing chat. Please try again.');
   }
 };
@@ -210,7 +210,7 @@ const handleChangeAgent = async (bot: TelegramBot, chatId: number, userId: numbe
     const user = await findUserByIdentifierAndCompany('tg_user_id', userId.toString(), companyId);
     
     if (!user) {
-      console.error(`User not found for Telegram bot`);
+      console.log(`Notice: User not found for Telegram bot`);
       await bot.sendMessage(chatId, 'Error changing agent. Please try again.');
       return;
     }
@@ -261,12 +261,12 @@ const handleChangeAgent = async (bot: TelegramBot, chatId: number, userId: numbe
         await bot.answerCallbackQuery(callbackQuery.id, { text: `Assistant changed to ${selectedAssistant.name}` });
         await bot.sendMessage(chatId, `You are now chatting with ${selectedAssistant.name}. How can I assist you?`);
       } catch (error) {
-        console.error('Error updating assistant:', error);
+        console.log('Notice: Error updating assistant');
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Error changing agent. Please try again.' });
       }
     });
   } catch (error) {
-    console.error(`Error changing agent:`, error);
+    console.log(`Notice: Error changing agent`);
     await bot.sendMessage(chatId, 'Error changing agent. Please try again.');
   }
 };
@@ -283,7 +283,7 @@ export const sendTelegramMessage = async (companyId: string | any, chatId: numbe
   console.log(`Attempting to send Telegram message for company ${normalizedId} (original: ${companyId}) to chat ${chatId}`);
   const bot = bots.get(normalizedId);
   if (!bot) {
-    console.error(`Telegram bot not found for company ID: ${normalizedId}`);
+    console.log(`Notice: Telegram bot not found for company ID: ${normalizedId}`);
     console.log('Available bots:', Array.from(bots.keys()));
     throw new Error(`Telegram bot not found for company ID: ${normalizedId}`);
   }
