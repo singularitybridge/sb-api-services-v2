@@ -165,3 +165,14 @@ export const verifyJsonBinKey = async (key: ApiKey): Promise<boolean> => {
     return false;
   }
 };
+
+export const cloneJsonbin = async (companyId: string, binId: string): Promise<string> => {
+  try {
+    const data = await readFile(companyId, binId);
+    const clonedBin = await createFile(companyId, data);
+    return clonedBin.metadata.id;
+  } catch (error) {
+    console.error('Error cloning JSONBin:', error);
+    throw error;
+  }
+};

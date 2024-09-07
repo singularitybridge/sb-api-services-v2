@@ -1,5 +1,5 @@
 import { ActionContext, FunctionFactory } from './types';
-import { readFile, updateFile, createFile, updateArrayElement, deleteArrayElement, insertArrayElement } from '../services/jsonbin.service';
+import { readFile, updateFile, createFile, updateArrayElement, deleteArrayElement, insertArrayElement, cloneJsonbin } from '../services/jsonbin.service';
 
 // Debug logging function
 const DEBUG = process.env.DEBUG === 'true';
@@ -403,6 +403,64 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
         return {
           error: 'Insert failed',
           message: error instanceof Error ? error.message : 'An unknown error occurred while inserting the array element.',
+        };
+      }
+    },
+  },
+  cloneJSONBinFile: {
+    description: 'Clone a JSONBin file',
+    strict: false,
+    parameters: {
+      type: 'object',
+      properties: {
+        binId: { 
+          type: 'string',
+          description: 'The ID of the file to clone',
+        },
+      },
+      required: ['binId'],
+      additionalProperties: false,
+    },
+    function: async (args) => {
+      debug('cloneJSONBinFile called with arguments:', JSON.stringify(args, null, 2));
+
+      const { binId } = args;
+
+      if (binId === undefined) {
+        debug('cloneJSONBinFile: Missing required parameter');
+        return {
+          error: 'Missing parameter',
+          message: 'The binId parameter is required.',
+        };
+      }
+
+      const allowedProps = ['binId'];
+      const extraProps = Object.keys(args).filter(prop => !allowedProps.includes(prop));
+      if (extraProps.length > 0) {
+        debug('cloneJSONBinFile: Additional properties found', extraProps);
+        return {
+          error: 'Invalid parameters',
+          message: `Additional properties are not allowed: ${extraProps.join(', ')}`,
+        };
+      }
+
+      if (typeof binId !== 'string') {
+        debug('cloneJSONBinFile: Invalid binId', binId);
+        return {
+          error: 'Invalid binId',
+          message: 'The binId must be a string.',
+        };
+      }
+
+      debug('cloneJSONBinFile: Calling cloneJsonbin with valid data');
+      try {
+        const clonedBinId = await cloneJsonbin(context.companyId, binId);
+        return { success: true, clonedBinId };
+      } catch (error) {
+        debug('cloneJSONBinFile: Error cloning JSONBin', error);
+        return {
+          error: 'Clone failed',
+          message: error instanceof Error ? error.message : 'An unknown error occurred while cloning the JSONBin.',
         };
       }
     },
