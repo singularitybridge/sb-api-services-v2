@@ -78,7 +78,7 @@ const mergeDeep = (target: any, source: any) => {
   return target;
 };
 
-export const updateArrayElement = async (companyId: string, binId: string, arrayKey: string, elementId: string, updateData: any): Promise<any> => {
+export const updateArrayElement = async (companyId: string, binId: string, arrayKey: string, elementId: string, updateData: any, useMerge: boolean = false): Promise<any> => {
   try {
     const headers = await getHeaders(companyId);
     const currentData = await readFile(companyId, binId);
@@ -93,7 +93,11 @@ export const updateArrayElement = async (companyId: string, binId: string, array
       throw new Error(`Element with id '${elementId}' not found in the array '${arrayKey}'`);
     }
 
-    currentData[arrayKey][elementIndex] = mergeDeep(currentData[arrayKey][elementIndex], updateData);
+    if (useMerge) {
+      currentData[arrayKey][elementIndex] = mergeDeep(currentData[arrayKey][elementIndex], updateData);
+    } else {
+      currentData[arrayKey][elementIndex] = { ...currentData[arrayKey][elementIndex], ...updateData };
+    }
 
     const response = await axios.put(`${BASE_URL}/b/${binId}`, currentData, { headers });
     return response.data.record;

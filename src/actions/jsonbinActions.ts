@@ -191,6 +191,10 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
           type: 'object',
           description: 'The data to update the element with',
         },
+        useMerge: {
+          type: 'boolean',
+          description: 'Whether to use deep merge instead of shallow update (default: false)',
+        },
       },
       required: ['binId', 'arrayKey', 'elementId', 'updateData'],
       additionalProperties: false,
@@ -198,7 +202,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
     function: async (args) => {
       debug('updateJSONBinArrayElement called with arguments:', JSON.stringify(args, null, 2));
 
-      const { binId, arrayKey, elementId, updateData } = args;
+      const { binId, arrayKey, elementId, updateData, useMerge = false } = args;
 
       if (binId === undefined || arrayKey === undefined || elementId === undefined || updateData === undefined) {
         debug('updateJSONBinArrayElement: Missing required parameters');
@@ -208,7 +212,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
         };
       }
 
-      const allowedProps = ['binId', 'arrayKey', 'elementId', 'updateData'];
+      const allowedProps = ['binId', 'arrayKey', 'elementId', 'updateData', 'useMerge'];
       const extraProps = Object.keys(args).filter(prop => !allowedProps.includes(prop));
       if (extraProps.length > 0) {
         debug('updateJSONBinArrayElement: Additional properties found', extraProps);
@@ -234,6 +238,14 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
         };
       }
 
+      if (useMerge !== undefined && typeof useMerge !== 'boolean') {
+        debug('updateJSONBinArrayElement: Invalid useMerge type', typeof useMerge);
+        return {
+          error: 'Invalid useMerge parameter',
+          message: 'The useMerge parameter must be a boolean if provided.',
+        };
+      }
+
       try {
         JSON.parse(JSON.stringify(updateData));
       } catch (error) {
@@ -246,7 +258,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
 
       debug('updateJSONBinArrayElement: Calling updateArrayElement with valid data');
       try {
-        await updateArrayElement(context.companyId, binId, arrayKey, elementId, updateData);
+        await updateArrayElement(context.companyId, binId, arrayKey, elementId, updateData, useMerge);
         return { success: true };
       } catch (error) {
         debug('updateJSONBinArrayElement: Error updating array element', error);
