@@ -1,14 +1,14 @@
-import https from 'https';
+import axios from 'axios';
 import { getCompany } from './company.service';
 
 class PhotoRoomService {
   private apiUrl: string;
 
   constructor() {
-    this.apiUrl = 'https://image-api.photoroom.com/v2/edit';
+    this.apiUrl = 'https://sdk.photoroom.com/v1/segment';
   }
 
-  async removeBackground(companyId: string, imageUrl: string): Promise<Buffer> {
+  async removeBackground(companyId: string, imageUrl: string, crop: boolean = false): Promise<Buffer> {
     const company = await getCompany(companyId);
     const apiKey = company.api_keys.find((key: { key: string; value: string }) => key.key === 'photoroom_api_key')?.value;
 
@@ -16,35 +16,34 @@ class PhotoRoomService {
       throw new Error('PhotoRoom API key not found for the company');
     }
 
-    // Removed outputSize parameter to preserve original image resolution
-    const editParams = 'background.color=transparent&background.expandPrompt=never&background.scaling=fill&padding=0.1';
-    const options = {
-      hostname: 'image-api.photoroom.com',
-      port: 443,
-      path: `${this.apiUrl}?${editParams}&imageUrl=${encodeURIComponent(imageUrl)}`,
-      method: 'GET',
-      headers: {
-        'x-api-key': apiKey
+    try {
+      const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+      const formData = new FormData();
+      formData.append('image_file', new Blob([imageResponse.data], { type: imageResponse.headers['content-type'] }), 'image.jpg');
+      formData.append('format', 'png');
+      formData.append('crop', crop.toString());
+
+      const response = await axios.post(this.apiUrl, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'x-api-key': apiKey,
+          'Accept': 'image/png, application/json'
+        },
+        responseType: 'arraybuffer'
+      });
+
+      return Buffer.from(response.data);
+    } catch (error) {
+      console.error('Error removing background:', error);
+      if (axios.isAxiosError(error) && error.response) {
+        console.error('Response data:', error.response.data.toString());
+        console.error('Response status:', error.response.status);
+        console.error('Response headers:', error.response.headers);
+        throw new Error(`Failed to remove background: ${error.response.data.toString()}`);
+      } else {
+        throw new Error('Failed to remove background: Unknown error');
       }
-    };
-
-    return new Promise((resolve, reject) => {
-      const req = https.request(options, res => {
-        if (res.statusCode === 200) {
-          const chunks: Buffer[] = [];
-          res.on('data', (chunk: Buffer) => chunks.push(chunk));
-          res.on('end', () => resolve(Buffer.concat(chunks)));
-        } else {
-          reject(new Error(`Request failed with status code ${res.statusCode}`));
-        }
-      });
-
-      req.on('error', error => {
-        reject(error);
-      });
-
-      req.end();
-    });
+    }
   }
 }
 
