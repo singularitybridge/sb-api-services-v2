@@ -78,7 +78,8 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       }
       
       debug('createJSONBinFile: Calling createFile with valid data');
-      return await createFile(context.companyId, data, name);
+      await createFile(context.companyId, data, name);
+      return { success: true };
     },
   },
   updateJSONBinFile: {
@@ -149,7 +150,8 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       }
       
       debug('updateJSONBinFile: Calling updateFile with valid data');
-      return await updateFile(context.companyId, binId, data);
+      await updateFile(context.companyId, binId, data);
+      return { success: true };
     },
   },
   readJSONBinFile: {
@@ -244,8 +246,8 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
 
       debug('updateJSONBinArrayElement: Calling updateArrayElement with valid data');
       try {
-        const result = await updateArrayElement(context.companyId, binId, arrayKey, elementId, updateData);
-        return result;
+        await updateArrayElement(context.companyId, binId, arrayKey, elementId, updateData);
+        return { success: true };
       } catch (error) {
         debug('updateJSONBinArrayElement: Error updating array element', error);
         return {
@@ -310,8 +312,8 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
 
       debug('deleteJSONBinArrayElement: Calling deleteArrayElement with valid data');
       try {
-        const result = await deleteArrayElement(context.companyId, binId, arrayKey, elementId);
-        return result;
+        await deleteArrayElement(context.companyId, binId, arrayKey, elementId);
+        return { success: true };
       } catch (error) {
         debug('deleteJSONBinArrayElement: Error deleting array element', error);
         return {
@@ -394,8 +396,8 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
 
       debug('insertJSONBinArrayElement: Calling insertArrayElement with valid data');
       try {
-        const result = await insertArrayElement(context.companyId, binId, arrayKey, newElement);
-        return result;
+        await insertArrayElement(context.companyId, binId, arrayKey, newElement);
+        return { success: true };
       } catch (error) {
         debug('insertJSONBinArrayElement: Error inserting array element', error);
         return {
