@@ -43,6 +43,7 @@ The project includes various services to support different functionalities:
 25. JSONbin Service
 26. Telegram Bot Service
 27. Twilio Voice Service
+28. Linear Service
 
 ## Routes
 
@@ -69,6 +70,7 @@ The project includes various routes for different functionalities:
 19. User Routes
 20. Verification Routes
 21. Omni-channel Routes (Telegram, Twilio Messaging, Twilio Voice, WhatsApp)
+22. Linear Routes
 
 ## Actions
 
@@ -158,6 +160,15 @@ Available methods:
 sendEmail(to, subject, content)
 createEmailTemplate(template)
 
+### Linear Actions
+Manages issues and projects using Linear API.
+Available methods:
+fetchIssues()
+createIssue(title, description, teamId)
+updateIssue(issueId, updateData)
+deleteIssue(issueId)
+fetchAllIssues()
+
 ## Integrations
 
 The SB Agent Portal integrates with various third-party services. The following integrations are supported:
@@ -181,6 +192,8 @@ The SB Agent Portal integrates with various third-party services. The following 
 9. PhotoRoom: Provides image editing and background removal services. It's used to manipulate images, which can be helpful for tasks involving visual content creation or editing.
 
 10. Telegram Bot: Enables interaction through Telegram. It allows agents to communicate with users via Telegram, expanding the range of platforms through which they can interact.
+
+11. Linear: Project management and issue tracking service. It's used to manage tasks, issues, and projects, allowing agents to interact with and update project management data.
 
 Each integration requires an API key, which can be managed through the Company settings. These integrations collectively enhance the capabilities of the AI agents, allowing them to perform a wide range of tasks across different domains and communication channels.
 
