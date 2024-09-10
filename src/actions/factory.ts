@@ -14,6 +14,7 @@ import { createMongoDbActions } from './mongoDbActions';
 import { createDebugActions } from './debugActions';
 import { createAgendaActions } from './agendaActions';
 import createAIAgentExecutorActions from './aiAgentExecutorActions';
+import { createLinearActions } from './linearActions';
 
 export const createFunctionFactory = (context: ActionContext): FunctionFactory => ({
   ...createInboxActions(context),
@@ -30,6 +31,7 @@ export const createFunctionFactory = (context: ActionContext): FunctionFactory =
   ...createDebugActions(context),
   ...createAgendaActions(context),
   ...createAIAgentExecutorActions(context),
+  ...createLinearActions(context),
 });
 
 export const executeFunctionCall = async (call: any, sessionId: string, companyId: string) => {

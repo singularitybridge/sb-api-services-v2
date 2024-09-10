@@ -1,113 +1,117 @@
 import { LinearClient, Issue, IssueConnection, IssuePayload, User, UserConnection } from "@linear/sdk";
+import { getApiKey } from './api.key.service';
 
-export class LinearService {
-  private linearClient: LinearClient;
-
-  constructor(apiKey: string) {
-    this.linearClient = new LinearClient({ apiKey });
+const createLinearClient = async (companyId: string): Promise<LinearClient> => {
+  const apiKey = await getApiKey(companyId, 'linear');
+  if (!apiKey) {
+    throw new Error('Linear API key not found');
   }
+  return new LinearClient({ apiKey });
+};
 
-  async fetchIssues(first: number = 50): Promise<Issue[]> {
-    try {
-      const issues = await this.linearClient.issues({ first });
-      return issues.nodes;
-    } catch (error) {
-      console.error('Error fetching issues:', error);
-      throw new Error('Error fetching issues');
+export const fetchIssues = async (companyId: string, first: number = 50): Promise<Issue[]> => {
+  try {
+    const linearClient = await createLinearClient(companyId);
+    const issues = await linearClient.issues({ first });
+    return issues.nodes;
+  } catch (error) {
+    console.error('Error fetching issues:', error);
+    throw new Error('Error fetching issues');
+  }
+};
+
+export const createIssue = async (companyId: string, title: string, description: string, teamId: string): Promise<IssuePayload> => {
+  try {
+    const linearClient = await createLinearClient(companyId);
+    return await linearClient.createIssue({ title, description, teamId });
+  } catch (error) {
+    console.error('Error creating issue:', error);
+    throw new Error('Error creating issue');
+  }
+};
+
+export const updateIssue = async (companyId: string, issueId: string, updateData: { title?: string; state?: string }): Promise<void> => {
+  try {
+    const linearClient = await createLinearClient(companyId);
+    await linearClient.updateIssue(issueId, updateData);
+  } catch (error) {
+    console.error('Error updating issue:', error);
+    throw new Error('Error updating issue');
+  }
+};
+
+export const deleteIssue = async (companyId: string, issueId: string): Promise<void> => {
+  try {
+    const linearClient = await createLinearClient(companyId);
+    await linearClient.deleteIssue(issueId);
+  } catch (error) {
+    console.error('Error deleting issue:', error);
+    throw new Error('Error deleting issue');
+  }
+};
+
+export const fetchAllIssues = async (companyId: string): Promise<Issue[]> => {
+  try {
+    const linearClient = await createLinearClient(companyId);
+    let hasNextPage = true;
+    let endCursor: string | null = null;
+    const allIssues: Issue[] = [];
+    while (hasNextPage) {
+      const result: IssueConnection = await linearClient.issues({ first: 100, after: endCursor });
+      allIssues.push(...result.nodes);
+      hasNextPage = result.pageInfo.hasNextPage;
+      endCursor = result.pageInfo.endCursor || null;
     }
+    return allIssues;
+  } catch (error) {
+    console.error('Error fetching all issues:', error);
+    throw new Error('Error fetching all issues');
   }
+};
 
-  async createIssue(title: string, description: string, teamId: string): Promise<IssuePayload> {
-    try {
-      const newIssue = await this.linearClient.createIssue({
-        title,
-        description,
-        teamId
-      });
-      return newIssue;
-    } catch (error) {
-      console.error('Error creating issue:', error);
-      throw new Error('Error creating issue');
-    }
-  }
-
-  async updateIssue(issueId: string, updateData: { title?: string; state?: string }): Promise<void> {
-    try {
-      await this.linearClient.updateIssue(issueId, updateData);
-    } catch (error) {
-      console.error('Error updating issue:', error);
-      throw new Error('Error updating issue');
-    }
-  }
-
-  async deleteIssue(issueId: string): Promise<void> {
-    try {
-      await this.linearClient.deleteIssue(issueId);
-    } catch (error) {
-      console.error('Error deleting issue:', error);
-      throw new Error('Error deleting issue');
-    }
-  }
-
-  async fetchAllIssues(): Promise<Issue[]> {
-    try {
-      let hasNextPage = true;
-      let endCursor: string | null = null;
-      const allIssues: Issue[] = [];
-      while (hasNextPage) {
-        const result: IssueConnection = await this.linearClient.issues({ first: 100, after: endCursor });
-        allIssues.push(...result.nodes);
-        hasNextPage = result.pageInfo.hasNextPage;
-        endCursor = result.pageInfo.endCursor || null;
+export const fetchIssuesByUser = async (companyId: string, userId: string): Promise<Issue[]> => {
+  try {
+    const linearClient = await createLinearClient(companyId);
+    const result = await linearClient.issues({
+      filter: {
+        assignee: { id: { eq: userId } }
       }
-      return allIssues;
-    } catch (error) {
-      console.error('Error fetching all issues:', error);
-      throw new Error('Error fetching all issues');
-    }
+    });
+    return result.nodes;
+  } catch (error) {
+    console.error('Error fetching issues by user:', error);
+    throw new Error('Error fetching issues by user');
   }
+};
 
-  async fetchIssuesByUser(userId: string): Promise<Issue[]> {
-    try {
-      const result = await this.linearClient.issues({
-        filter: {
-          assignee: { id: { eq: userId } }
-        }
-      });
-      return result.nodes;
-    } catch (error) {
-      console.error('Error fetching issues by user:', error);
-      throw new Error('Error fetching issues by user');
-    }
+export const fetchIssuesByDate = async (companyId: string, days: number): Promise<Issue[]> => {
+  try {
+    const linearClient = await createLinearClient(companyId);
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+
+    const result = await linearClient.issues({
+      filter: {
+        or: [
+          { createdAt: { gt: date } },
+          { updatedAt: { gt: date } }
+        ]
+      }
+    });
+    return result.nodes;
+  } catch (error) {
+    console.error('Error fetching issues by date:', error);
+    throw new Error('Error fetching issues by date');
   }
+};
 
-  async fetchIssuesByDate(days: number): Promise<Issue[]> {
-    try {
-      const date = new Date();
-      date.setDate(date.getDate() - days);
-
-      const result = await this.linearClient.issues({
-        filter: {
-          or: [
-            { createdAt: { gt: date } },
-            { updatedAt: { gt: date } }
-          ]
-        }
-      });
-      return result.nodes;
-    } catch (error) {
-      console.error('Error fetching issues by date:', error);
-      throw new Error('Error fetching issues by date');
-    }
+export const fetchUserList = async (companyId: string): Promise<User[]> => {
+  try {
+    const linearClient = await createLinearClient(companyId);
+    const result: UserConnection = await linearClient.users();
+    return result.nodes;
+  } catch (error) {
+    console.error('Error fetching user list:', error);
+    throw new Error('Error fetching user list');
   }
-
-  async fetchUserList(): Promise<User[]> {
-    try {
-      const result: UserConnection = await this.linearClient.users();
-      return result.nodes;
-    } catch (error) {
-      console.error('Error fetching user list:', error);
-      throw new Error('Error fetching user list');
-    }
-  }
-}
+};
