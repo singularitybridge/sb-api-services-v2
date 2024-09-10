@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import {  AuthenticatedRequest } from '../middleware/auth.middleware';
+import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { LinearService } from '../services/linear.service';
 import { getApiKey, validateApiKeys } from '../services/api.key.service';
 
@@ -14,7 +14,7 @@ router.get('/issues', async (req: AuthenticatedRequest, res) => {
       return res.status(400).json({ error: 'Linear API key not found' });
     }
     const linearService = new LinearService(apiKey);
-    const issues = await linearService.fetchIssues();
+    const issues = await linearService.fetchIssues(10);
     res.json(issues);
   } catch (error) {
     res.status(500).json({ error: 'Error fetching issues' });
@@ -78,6 +78,53 @@ router.get('/issues/all', async (req: AuthenticatedRequest, res) => {
     res.json(allIssues);
   } catch (error) {
     res.status(500).json({ error: 'Error fetching all issues' });
+  }
+});
+
+// New route: Fetch Issues by User
+router.get('/issues/user/:userId', async (req: AuthenticatedRequest, res) => {
+  try {
+    const apiKey = await getApiKey(req.company._id, 'linear');
+    if (!apiKey) {
+      return res.status(400).json({ error: 'Linear API key not found' });
+    }
+    const linearService = new LinearService(apiKey);
+    const { userId } = req.params;
+    const issues = await linearService.fetchIssuesByUser(userId);
+    res.json(issues);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching issues by user' });
+  }
+});
+
+// New route: Fetch Issues by Date
+router.get('/issues/recent/:days', async (req: AuthenticatedRequest, res) => {
+  try {
+    const apiKey = await getApiKey(req.company._id, 'linear');
+    if (!apiKey) {
+      return res.status(400).json({ error: 'Linear API key not found' });
+    }
+    const linearService = new LinearService(apiKey);
+    const { days } = req.params;
+    const issues = await linearService.fetchIssuesByDate(parseInt(days, 10));
+    res.json(issues);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching issues by date' });
+  }
+});
+
+// New route: Fetch User List
+router.get('/users', async (req: AuthenticatedRequest, res) => {
+  try {
+    const apiKey = await getApiKey(req.company._id, 'linear');
+    if (!apiKey) {
+      return res.status(400).json({ error: 'Linear API key not found' });
+    }
+    const linearService = new LinearService(apiKey);
+    const users = await linearService.fetchUserList();
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching user list' });
   }
 });
 

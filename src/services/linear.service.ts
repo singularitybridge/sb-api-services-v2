@@ -1,4 +1,4 @@
-import { LinearClient, Issue, IssueConnection, IssuePayload } from "@linear/sdk";
+import { LinearClient, Issue, IssueConnection, IssuePayload, User, UserConnection } from "@linear/sdk";
 
 export class LinearService {
   private linearClient: LinearClient;
@@ -64,6 +64,50 @@ export class LinearService {
     } catch (error) {
       console.error('Error fetching all issues:', error);
       throw new Error('Error fetching all issues');
+    }
+  }
+
+  async fetchIssuesByUser(userId: string): Promise<Issue[]> {
+    try {
+      const result = await this.linearClient.issues({
+        filter: {
+          assignee: { id: { eq: userId } }
+        }
+      });
+      return result.nodes;
+    } catch (error) {
+      console.error('Error fetching issues by user:', error);
+      throw new Error('Error fetching issues by user');
+    }
+  }
+
+  async fetchIssuesByDate(days: number): Promise<Issue[]> {
+    try {
+      const date = new Date();
+      date.setDate(date.getDate() - days);
+
+      const result = await this.linearClient.issues({
+        filter: {
+          or: [
+            { createdAt: { gt: date } },
+            { updatedAt: { gt: date } }
+          ]
+        }
+      });
+      return result.nodes;
+    } catch (error) {
+      console.error('Error fetching issues by date:', error);
+      throw new Error('Error fetching issues by date');
+    }
+  }
+
+  async fetchUserList(): Promise<User[]> {
+    try {
+      const result: UserConnection = await this.linearClient.users();
+      return result.nodes;
+    } catch (error) {
+      console.error('Error fetching user list:', error);
+      throw new Error('Error fetching user list');
     }
   }
 }
