@@ -8,11 +8,15 @@ This playbook outlines the steps for adding a new service to the API, including 
    - Add a new file in the `src/models/` directory (e.g., `NewService.ts`).
    - Define the model interface and any necessary types.
 
-2. Create a new service:
+2. Update dependencies:
+   - If the new service requires external libraries, add them to the `package.json` file.
+   - Run `npm install` to install the new dependencies.
+
+3. Create a new service:
    - Add a new file in the `src/services/` directory (e.g., `newService.service.ts`).
    - Implement the service logic, including CRUD operations and any specific business logic.
 
-3. Create a new route:
+4. Create a new route:
    - Add a new file in the `src/routes/` directory (e.g., `newService.routes.ts`).
    - Define the routes for the new service, following the pattern in `src/routes/tts.routes.ts`.
    - Pay attention to the following middleware and functions:
@@ -36,6 +40,7 @@ router.post('/endpoint', validateApiKeys, async (req: AuthenticatedRequest, res)
     // Implement endpoint logic here
     res.status(200).json({ message: 'Success' });
   } catch (error) {
+    console.error('Error in endpoint:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -43,13 +48,18 @@ router.post('/endpoint', validateApiKeys, async (req: AuthenticatedRequest, res)
 export default router;
 ```
 
-4. Update the main application file:
+5. Update the main application file:
    - Import and use the new route in `src/app.ts` or the main application file.
 
-5. Implement unit tests:
+6. Run type checking:
+   - Execute `npm run tsc` or the appropriate command to run TypeScript compilation.
+   - Address any type errors that may occur.
+
+7. Implement unit tests:
    - Create a new test file in the `tests/unit/` directory (e.g., `newService.test.ts`).
    - Write comprehensive unit tests covering all the functions in your new service.
    - Ensure to test both successful cases and error handling.
+   - When testing services that rely on external APIs or databases, use mocking to isolate the service and test its logic independently.
 
 Example test structure:
 
@@ -70,27 +80,38 @@ describe('NewService', () => {
   });
 
   it('should handle errors correctly', async () => {
-    // Test error scenarios
+    jest.spyOn(externalDependency, 'method').mockRejectedValue(new Error('API Error'));
+    await expect(newService.methodThatUsesExternalDependency()).rejects.toThrow('Specific error message');
   });
 });
 ```
 
-6. Run tests:
+8. Run tests:
    - After implementing the new service and its unit tests, run the entire test suite to ensure no regressions:
      ```
      npm test
      ```
    - Address any failures or errors that may occur.
 
-7. Update documentation:
-   - Update the API documentation to include the new service and its endpoints.
-   - If using Swagger or OpenAPI, update the relevant specification files.
-   - Update the README.md file to mention the new service and any necessary setup or configuration steps.
-   - Create or update any specific documentation for the new service in the `docs/` directory.
+9. Implement integration tests:
+   - Create integration tests that verify the new service works correctly with other parts of the application.
+   - These tests should cover the full flow from API request to database operations (if applicable).
 
-8. Final verification:
-   - Run the test suite again: `npm test`
-   - Manually test the new service to ensure it works as expected in the context of the entire application.
-   - Review the updated documentation for accuracy and completeness.
+10. Update documentation:
+    - Update the API documentation to include the new service and its endpoints.
+    - If using Swagger or OpenAPI, update the relevant specification files.
+    - Update the README.md file to mention the new service and any necessary setup or configuration steps.
+    - Create or update any specific documentation for the new service in the `docs/` directory.
+    - If the new service integrates with an external API, update the `docs/` directory with information about the integration, including any necessary setup or API key requirements.
+
+11. Code Review:
+    - Submit the changes for code review.
+    - Address any feedback or suggestions from the review process.
+
+12. Final verification:
+    - Run the test suite again: `npm test`
+    - Manually test the new service to ensure it works as expected in the context of the entire application.
+    - Review the updated documentation for accuracy and completeness.
+    - Verify that the new service does not negatively impact existing services or overall application performance.
 
 By following this playbook, you can ensure consistent implementation of new services across the API, maintaining code quality, testability, and up-to-date documentation.
