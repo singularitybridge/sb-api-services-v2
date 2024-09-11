@@ -5,6 +5,7 @@ import {
   updateJournalEntry,
   deleteJournalEntry,
 } from '../services/journal.service';
+import { getSessionById } from '../services/session.service';
 import { ChannelType } from '../types/ChannelType';
 import { IJournal } from '../models/Journal';
 import { getApiKey } from '../services/api.key.service';
@@ -71,21 +72,36 @@ export const createJournalActions = (
     parameters: {
       type: 'object',
       properties: {
-        userId: { type: 'string' },
-        companyId: { type: 'string' },
-        sessionId: { type: 'string' },
         entryType: { type: 'string' },
         tags: { type: 'array', items: { type: 'string' } },
       },
-      required: ['userId'],
+      required: [],
       additionalProperties: false,
     },
-    function: async ({ userId, companyId, sessionId, entryType, tags }) => {
+    function: async ({ entryType, tags }) => {
       try {
+        const { companyId, sessionId } = context;
+
+        if (!sessionId) {
+          return {
+            error: 'Invalid session',
+            message: 'Session ID is required.',
+          };
+        }
+
+        const session = await getSessionById(sessionId);
+
+        if (!session) {
+          return {
+            error: 'Invalid session',
+            message: 'Unable to retrieve a valid session.',
+          };
+        }
+
         const entries = await getJournalEntries(
-          userId,
+          session.userId,
           companyId,
-          sessionId,
+          undefined,
           entryType,
           tags,
         );
