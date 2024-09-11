@@ -158,6 +158,19 @@ export const createLinearActions = (context: ActionContext) => {
     },
   };
 
+  const fetchTeams: FunctionDefinition = {
+    function: async () => {
+      const teams = await linearService.fetchTeams(context.companyId);
+      return teams;
+    },
+    description: 'Fetch list of teams from Linear',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  };
+
   return {
     fetchLinearIssues: fetchIssues,
     createLinearIssue: createIssue,
@@ -167,5 +180,6 @@ export const createLinearActions = (context: ActionContext) => {
     fetchLinearIssuesByUser: fetchIssuesByUser,
     fetchLinearIssuesByDate: fetchIssuesByDate,
     fetchLinearUserList: fetchUserList,
+    fetchLinearTeams: fetchTeams,
   };
 };
