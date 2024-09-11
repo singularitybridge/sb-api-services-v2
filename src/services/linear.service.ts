@@ -24,6 +24,7 @@ export const createIssue = async (companyId: string, title: string, description:
     const linearClient = await createLinearClient(companyId);
     return await linearClient.createIssue({ title, description, teamId });
   } catch (error) {    
+    console.log(error);
     throw new Error('Error creating issue');
   }
 };
