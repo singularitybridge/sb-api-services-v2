@@ -8,6 +8,7 @@ export type ActionContext = {
 export type FunctionDefinition = {
   description: string;
   strict?: boolean;
+  actionType?: ActionType;
   parameters: {
     type: 'object';
     properties: Record<string, any>;
@@ -24,4 +25,5 @@ export enum ActionType {
   EXECUTE_COMMAND = 'EXECUTE_COMMAND',
   FILE_OPERATION = 'FILE_OPERATION',
   STOP_EXECUTION = 'STOP_EXECUTION',
+  JOURNAL_OPERATION = 'JOURNAL_OPERATION',
 }
