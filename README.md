@@ -124,6 +124,14 @@ Available methods:
 sendMessage(recipientId, message)
 getInboxMessages(userId)
 
+### Journal Actions
+Manages journal entries for users or AI agents.
+Available methods:
+createJournalEntry(journalData, apiKey, channel)
+getJournalEntries(userId, companyId, sessionId, entryType, tags)
+updateJournalEntry(journalId, updateData)
+deleteJournalEntry(journalId)
+
 ### JSONbin Actions
 Interacts with JSONbin for storing and retrieving JSON data.
 Available methods:
