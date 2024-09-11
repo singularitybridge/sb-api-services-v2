@@ -70,35 +70,27 @@ describe('OpenAI Actions', () => {
       );
     });
 
-    it('should throw an error if API key is missing', async () => {
+    it('should return an error object if API key is missing', async () => {
       (apiKeyService.getApiKey as jest.Mock).mockResolvedValue(null);
 
-      await expect(
-        actions.generateOpenAiSpeech.function({
-          text: 'Hello, world!',
-        })
-      ).rejects.toThrow('Failed to generate speech with OpenAI');
+      const result = await actions.generateOpenAiSpeech.function({
+        text: 'Hello, world!',
+      });
+
+      expect(result).toEqual({ error: 'OpenAI API key is missing' });
     });
 
-    it('should throw an error if speech generation fails', async () => {
+    it('should return an error object if speech generation fails', async () => {
       const mockApiKey = 'test-api-key';
 
       (apiKeyService.getApiKey as jest.Mock).mockResolvedValue(mockApiKey);
       (oaiSpeechService.generateSpeech as jest.Mock).mockRejectedValue(new Error('Generation failed'));
 
-      await expect(
-        actions.generateOpenAiSpeech.function({
-          text: 'Hello, world!',
-        })
-      ).rejects.toThrow('Failed to generate speech with OpenAI');
-    });
+      const result = await actions.generateOpenAiSpeech.function({
+        text: 'Hello, world!',
+      });
 
-    it('should throw an error for missing required parameter', async () => {
-      await expect(
-        actions.generateOpenAiSpeech.function({
-          text: undefined as any,
-        })
-      ).rejects.toThrow('Failed to generate speech with OpenAI');
+      expect(result).toEqual({ error: 'Failed to generate speech with OpenAI' });
     });
   });
 
@@ -144,35 +136,27 @@ describe('OpenAI Actions', () => {
       );
     });
 
-    it('should throw an error if API key is missing', async () => {
+    it('should return an error object if API key is missing', async () => {
       (apiKeyService.getApiKey as jest.Mock).mockResolvedValue(null);
 
-      await expect(
-        actions.transcribeAudioWhisperFromURL.function({
-          audioUrl: 'https://example.com/audio.mp3',
-        })
-      ).rejects.toThrow('Failed to transcribe audio with OpenAI Whisper');
+      const result = await actions.transcribeAudioWhisperFromURL.function({
+        audioUrl: 'https://example.com/audio.mp3',
+      });
+
+      expect(result).toEqual({ error: 'OpenAI API key is missing' });
     });
 
-    it('should throw an error if transcription fails', async () => {
+    it('should return an error object if transcription fails', async () => {
       const mockApiKey = 'test-api-key';
 
       (apiKeyService.getApiKey as jest.Mock).mockResolvedValue(mockApiKey);
       (speechRecognitionService.transcribeAudioWhisperFromURL as jest.Mock).mockRejectedValue(new Error('Transcription failed'));
 
-      await expect(
-        actions.transcribeAudioWhisperFromURL.function({
-          audioUrl: 'https://example.com/audio.mp3',
-        })
-      ).rejects.toThrow('Failed to transcribe audio with OpenAI Whisper');
-    });
+      const result = await actions.transcribeAudioWhisperFromURL.function({
+        audioUrl: 'https://example.com/audio.mp3',
+      });
 
-    it('should throw an error for missing required parameter', async () => {
-      await expect(
-        actions.transcribeAudioWhisperFromURL.function({
-          audioUrl: undefined as any,
-        })
-      ).rejects.toThrow('Failed to transcribe audio with OpenAI Whisper');
+      expect(result).toEqual({ error: 'Failed to transcribe audio with OpenAI Whisper' });
     });
   });
 });

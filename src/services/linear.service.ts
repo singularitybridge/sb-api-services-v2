@@ -14,8 +14,7 @@ export const fetchIssues = async (companyId: string, first: number = 50): Promis
     const linearClient = await createLinearClient(companyId);
     const issues = await linearClient.issues({ first });
     return issues.nodes;
-  } catch (error) {
-    console.error('Error fetching issues:', error);
+  } catch (error) {    
     throw new Error('Error fetching issues');
   }
 };
@@ -24,8 +23,7 @@ export const createIssue = async (companyId: string, title: string, description:
   try {
     const linearClient = await createLinearClient(companyId);
     return await linearClient.createIssue({ title, description, teamId });
-  } catch (error) {
-    console.error('Error creating issue:', error);
+  } catch (error) {    
     throw new Error('Error creating issue');
   }
 };
@@ -34,8 +32,7 @@ export const updateIssue = async (companyId: string, issueId: string, updateData
   try {
     const linearClient = await createLinearClient(companyId);
     await linearClient.updateIssue(issueId, updateData);
-  } catch (error) {
-    console.error('Error updating issue:', error);
+  } catch (error) {    
     throw new Error('Error updating issue');
   }
 };
@@ -44,8 +41,7 @@ export const deleteIssue = async (companyId: string, issueId: string): Promise<v
   try {
     const linearClient = await createLinearClient(companyId);
     await linearClient.deleteIssue(issueId);
-  } catch (error) {
-    console.error('Error deleting issue:', error);
+  } catch (error) {    
     throw new Error('Error deleting issue');
   }
 };
@@ -63,8 +59,7 @@ export const fetchAllIssues = async (companyId: string): Promise<Issue[]> => {
       endCursor = result.pageInfo.endCursor || null;
     }
     return allIssues;
-  } catch (error) {
-    console.error('Error fetching all issues:', error);
+  } catch (error) {    
     throw new Error('Error fetching all issues');
   }
 };
@@ -78,8 +73,7 @@ export const fetchIssuesByUser = async (companyId: string, userId: string): Prom
       }
     });
     return result.nodes;
-  } catch (error) {
-    console.error('Error fetching issues by user:', error);
+  } catch (error) {    
     throw new Error('Error fetching issues by user');
   }
 };
@@ -99,8 +93,7 @@ export const fetchIssuesByDate = async (companyId: string, days: number): Promis
       }
     });
     return result.nodes;
-  } catch (error) {
-    console.error('Error fetching issues by date:', error);
+  } catch (error) {    
     throw new Error('Error fetching issues by date');
   }
 };
@@ -110,8 +103,7 @@ export const fetchUserList = async (companyId: string): Promise<User[]> => {
     const linearClient = await createLinearClient(companyId);
     const result: UserConnection = await linearClient.users();
     return result.nodes;
-  } catch (error) {
-    console.error('Error fetching user list:', error);
+  } catch (error) {    
     throw new Error('Error fetching user list');
   }
 };

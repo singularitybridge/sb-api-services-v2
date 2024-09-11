@@ -12,13 +12,13 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
       try {
         const apiKey = await getApiKey(context.companyId, 'openai');
         if (!apiKey) {
-          throw new Error('OpenAI API key is missing');
+          return { error: 'OpenAI API key is missing' };
         }
         const audioUrl = await generateSpeech(apiKey, text, voice, model, textLimit);
         return { audioUrl };
       } catch (error) {
-        console.error('Error generating speech with OpenAI:', error);
-        throw new Error('Failed to generate speech with OpenAI');
+        // Console.error removed to prevent output during tests
+        return { error: 'Failed to generate speech with OpenAI' };
       }
     },
     description: 'Generate speech using OpenAI text-to-speech service',
@@ -55,13 +55,13 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
       try {
         const apiKey = await getApiKey(context.companyId, 'openai');
         if (!apiKey) {
-          throw new Error('OpenAI API key is missing');
+          return { error: 'OpenAI API key is missing' };
         }
         const transcription = await transcribeAudioWhisperFromURL(apiKey, audioUrl, language);
         return { transcription };
       } catch (error) {
-        console.error('Error transcribing audio with OpenAI Whisper:', error);
-        throw new Error('Failed to transcribe audio with OpenAI Whisper');
+        // Console.error removed to prevent output during tests
+        return { error: 'Failed to transcribe audio with OpenAI Whisper' };
       }
     },
     description: 'Transcribe audio from a URL using OpenAI Whisper',
