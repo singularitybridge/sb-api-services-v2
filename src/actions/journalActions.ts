@@ -4,6 +4,7 @@ import {
   getJournalEntries,
   updateJournalEntry,
   deleteJournalEntry,
+  getFriendlyJournalEntries,
 } from '../services/journal.service';
 import { getSessionById } from '../services/session.service';
 import { ChannelType } from '../types/ChannelType';
@@ -30,6 +31,7 @@ export const createJournalActions = (
     },
     function: async (args) => {
       const { journalData } = args;
+      const { companyId, sessionId } = context;
 
       if (!journalData) {
         return {
@@ -38,17 +40,30 @@ export const createJournalActions = (
         };
       }
 
-      if (!journalData.userId || !journalData.companyId) {
+      if (!sessionId) {
         return {
-          error: 'Invalid journalData',
-          message: 'userId and companyId are required in journalData.',
+          error: 'Invalid session',
+          message: 'Session ID is required.',
         };
       }
 
       try {
-        const apiKey = (await getApiKey(context.companyId, 'openai')) || '';
+        const session = await getSessionById(sessionId);
+
+        if (!session) {
+          return {
+            error: 'Invalid session',
+            message: 'Unable to retrieve a valid session.',
+          };
+        }
+
+        const apiKey = (await getApiKey(companyId, 'openai')) || '';
         const result = await createJournalEntry(
-          journalData,
+          {
+            ...journalData,
+            userId: session.userId,
+            companyId,
+          },
           apiKey,
           ChannelType.WEB,
         );
@@ -74,11 +89,12 @@ export const createJournalActions = (
       properties: {
         entryType: { type: 'string' },
         tags: { type: 'array', items: { type: 'string' } },
+        limit: { type: 'number' },
       },
       required: [],
       additionalProperties: false,
     },
-    function: async ({ entryType, tags }) => {
+    function: async ({ entryType, tags, limit = 25 }) => {
       try {
         const { companyId, sessionId } = context;
 
@@ -104,6 +120,7 @@ export const createJournalActions = (
           undefined,
           entryType,
           tags,
+          limit,
         );
         return { success: true, data: entries };
       } catch (error) {
@@ -113,6 +130,61 @@ export const createJournalActions = (
             error instanceof Error
               ? error.message
               : 'An unknown error occurred while fetching journal entries.',
+        };
+      }
+    },
+  },
+
+  getFriendlyJournalEntries: {
+    description: 'Get journal entries in a friendly format with user and agent names',
+    strict: true,
+    actionType: ActionType.JOURNAL_OPERATION,
+    parameters: {
+      type: 'object',
+      properties: {
+        entryType: { type: 'string' },
+        tags: { type: 'array', items: { type: 'string' } },
+        limit: { type: 'number' },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    function: async ({ entryType, tags, limit = 25 }) => {
+      try {
+        const { companyId, sessionId } = context;
+
+        if (!sessionId) {
+          return {
+            error: 'Invalid session',
+            message: 'Session ID is required.',
+          };
+        }
+
+        const session = await getSessionById(sessionId);
+
+        if (!session) {
+          return {
+            error: 'Invalid session',
+            message: 'Unable to retrieve a valid session.',
+          };
+        }
+
+        const entries = await getFriendlyJournalEntries(
+          session.userId,
+          companyId,
+          undefined,
+          entryType,
+          tags,
+          limit,
+        );
+        return { success: true, data: entries };
+      } catch (error) {
+        return {
+          error: 'Fetch failed',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'An unknown error occurred while fetching friendly journal entries.',
         };
       }
     },
