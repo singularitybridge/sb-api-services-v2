@@ -21,7 +21,6 @@ export const getOpenAIClient = (apiKey: string) => {
   });
 };
 
-
 export const getAssistants = async (companyId: string): Promise<IAssistant[]> => {
   try {
     const assistants = await Assistant.find({ companyId });
@@ -29,6 +28,16 @@ export const getAssistants = async (companyId: string): Promise<IAssistant[]> =>
   } catch (error) {
     console.error('Error retrieving assistants:', error);
     throw new Error('Error retrieving assistants');
+  }
+};
+
+export const getAssistantById = async (id: string): Promise<IAssistant | null> => {
+  try {
+    const assistant = await Assistant.findById(id);
+    return assistant;
+  } catch (error) {
+    console.error('Error retrieving assistant by id:', error);
+    throw new Error('Error retrieving assistant by id');
   }
 };
 

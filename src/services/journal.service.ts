@@ -1,7 +1,10 @@
 import { Journal, IJournal } from '../models/Journal';
 import mongoose from 'mongoose';
-import { getSessionOrCreate } from './session.service';
+import { getSessionOrCreate, getSessionById } from './session.service';
 import { ChannelType } from '../types/ChannelType';
+import { getUserById } from './user.service';
+import { getAssistantById } from './assistant.service';
+import { format, toZonedTime } from 'date-fns-tz';
 
 export async function createJournalEntry(
   journalData: Partial<IJournal>,
@@ -37,7 +40,8 @@ export async function getJournalEntries(
   companyId?: string,
   sessionId?: string,
   entryType?: string,
-  tags?: string[]
+  tags?: string[],
+  limit: number = 25
 ): Promise<IJournal[]> {
   try {
     const query: any = { userId: new mongoose.Types.ObjectId(userId) };
@@ -46,9 +50,51 @@ export async function getJournalEntries(
     if (entryType) query.entryType = entryType;
     if (tags && tags.length > 0) query.tags = { $in: tags };
 
-    return await Journal.find(query).sort({ timestamp: -1 });
+    return await Journal.find(query).sort({ timestamp: -1 }).limit(limit);
   } catch (error) {
     console.error('Error getting journal entries:', error);
+    throw error;
+  }
+}
+
+export async function getFriendlyJournalEntries(
+  userId: string,
+  companyId?: string,
+  sessionId?: string,
+  entryType?: string,
+  tags?: string[],
+  limit: number = 25
+): Promise<Array<IJournal & { userName: string; agentName: string | null; friendlyTimestamp: string }>> {
+  try {
+    const entries = await getJournalEntries(userId, companyId, sessionId, entryType, tags, limit);
+    const user = await getUserById(userId);
+    
+    const friendlyEntries = await Promise.all(entries.map(async (entry) => {
+      const session = await getSessionById(entry.sessionId.toString());
+      let agentName = null;
+      
+      if (session && session.assistantId) {
+        const assistant = await getAssistantById(session.assistantId);
+        agentName = assistant ? assistant.name : null;
+      }
+
+      const israelTime = toZonedTime(entry.timestamp, 'Asia/Jerusalem');
+      const friendlyTimestamp = format(israelTime, 'dd/MM/yy, HH:mm', { timeZone: 'Asia/Jerusalem' });
+
+      return {
+        ...entry.toObject(),
+        userName: user?.name || 'Unknown User',
+        agentName: agentName,
+        friendlyTimestamp: friendlyTimestamp
+      };
+    }));
+
+    // Sort entries from new to old
+    friendlyEntries.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+    return friendlyEntries;
+  } catch (error) {
+    console.error('Error getting friendly journal entries:', error);
     throw error;
   }
 }
