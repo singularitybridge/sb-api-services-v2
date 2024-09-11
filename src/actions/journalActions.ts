@@ -10,9 +10,10 @@ import { getSessionById } from '../services/session.service';
 import { ChannelType } from '../types/ChannelType';
 import { IJournal } from '../models/Journal';
 import { getApiKey } from '../services/api.key.service';
+import { Types } from 'mongoose';
 
 export const createJournalActions = (
-  context: ActionContext,
+  context: ActionContext & { companyId: string },
 ): FunctionFactory => ({
   createJournalEntry: {
     description: 'Create a new journal entry',
@@ -21,24 +22,16 @@ export const createJournalActions = (
     parameters: {
       type: 'object',
       properties: {
-        journalData: {
-          type: 'object',
-          description: 'The data for the new journal entry',
-        },
+        content: { type: 'string', description: 'The content of the journal entry' },
+        entryType: { type: 'string', description: 'The type of the journal entry' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Tags for the journal entry' },
       },
-      required: ['journalData'],
+      required: ['content'],
       additionalProperties: false,
     },
     function: async (args) => {
-      const { journalData } = args;
+      const { content, entryType, tags } = args;
       const { companyId, sessionId } = context;
-
-      if (!journalData) {
-        return {
-          error: 'Missing parameters',
-          message: 'journalData is required.',
-        };
-      }
 
       if (!sessionId) {
         return {
@@ -57,12 +50,21 @@ export const createJournalActions = (
           };
         }
 
+        if (!session.userId || !companyId) {
+          return {
+            error: 'Missing parameters',
+            message: 'userId and companyId are required to create a journal entry.',
+          };
+        }
+
         const apiKey = (await getApiKey(companyId, 'openai')) || '';
         const result = await createJournalEntry(
           {
-            ...journalData,
-            userId: session.userId,
-            companyId,
+            content,
+            entryType,
+            tags,
+            userId: new Types.ObjectId(session.userId),
+            companyId: new Types.ObjectId(companyId),
           },
           apiKey,
           ChannelType.WEB,
