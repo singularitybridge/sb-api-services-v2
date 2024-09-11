@@ -1,4 +1,4 @@
-import { LinearClient, Issue, IssueConnection, IssuePayload, User, UserConnection } from "@linear/sdk";
+import { LinearClient, Issue, IssueConnection, IssuePayload, User, UserConnection, Team } from "@linear/sdk";
 import { getApiKey } from './api.key.service';
 
 const createLinearClient = async (companyId: string): Promise<LinearClient> => {
@@ -106,5 +106,16 @@ export const fetchUserList = async (companyId: string): Promise<User[]> => {
     return result.nodes;
   } catch (error) {    
     throw new Error('Error fetching user list');
+  }
+};
+
+export const fetchTeams = async (companyId: string): Promise<Team[]> => {
+  try {
+    const linearClient = await createLinearClient(companyId);
+    const teams = await linearClient.teams();
+    return teams.nodes;
+  } catch (error) {
+    console.error("Error fetching Linear teams:", error);
+    throw new Error('Error fetching teams');
   }
 };
