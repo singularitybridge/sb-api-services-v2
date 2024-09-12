@@ -1,0 +1,54 @@
+{
+  "tasks": [
+    {
+      "title": "Update Assistant Model",
+      "description": "Update the Assistant model in MongoDB to include the `allowedActions` field and remove the `actions` field.",
+      "status": "done"
+    },
+    {
+      "title": "Create Migration Script",
+      "description": "Create a migration script to convert existing `actions` references to action names in `allowedActions`.",
+      "status": "skipped"
+    },
+    {
+      "title": "Modify Assistant Interface",
+      "description": "Modify the `Assistant` interface and schema in the codebase to reflect the new `allowedActions` field.",
+      "status": "done"
+    },
+    {
+      "title": "Update createFunctionFactory",
+      "description": "Update the `createFunctionFactory` function in `src/actions/factory.ts` to filter actions based on `allowedActions`.",
+      "status": "done"
+    },
+    {
+      "title": "Modify handleSessionMessage",
+      "description": "Modify the `handleSessionMessage` function in `assistant.service.ts` to use the assistant-specific function factory.",
+      "status": "done"
+    },
+    {
+      "title": "Create API Endpoint",
+      "description": "Create the new API endpoint for managing allowed actions in `assistant.routes.ts`.",
+      "status": "done"
+    },
+    {
+      "title": "Implement updateAllowedActions",
+      "description": "Implement the `updateAllowedActions` method in `assistant.service.ts`.",
+      "status": "done"
+    },
+    {
+      "title": "Update createDefaultAssistant",
+      "description": "Update the `createDefaultAssistant` function to include default allowed actions.",
+      "status": "done"
+    },
+    {
+      "title": "Update Tests",
+      "description": "Update any relevant tests to account for the new allowed actions system.",
+      "status": "done"
+    },
+    {
+      "title": "Update Documentation",
+      "description": "Update the documentation to reflect the new ability to set actions per assistant.",
+      "status": "done"
+    }
+  ]
+}
