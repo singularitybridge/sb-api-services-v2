@@ -54,7 +54,7 @@ export const updateAllowedActions = async (assistantId: string, allowedActions: 
 
     // Update the OpenAI assistant first
     const apiKey = await getApiKey(assistant.companyId.toString(), 'openai') as string;
-    const updatedOpenAIAssistant = await updateAssistantById(
+    let updatedOpenAIAssistant = await updateAssistantById(
       apiKey,
       assistant.assistantId,
       assistant.name,
@@ -65,17 +65,44 @@ export const updateAllowedActions = async (assistantId: string, allowedActions: 
     );
 
     // Check if all allowed actions were successfully added to the OpenAI assistant
-    const updatedTools = updatedOpenAIAssistant.tools
+    let updatedTools = updatedOpenAIAssistant.tools
       .filter(tool => tool.type === 'function')
       .map(tool => (tool as any).function.name);
-    const missingActions = allowedActions.filter(action => !updatedTools.includes(action));
+    let missingActions = allowedActions.filter(action => !updatedTools.includes(action));
 
+    // If there are missing actions, try to update again with only the missing ones
     if (missingActions.length > 0) {
       console.warn(`Warning: The following actions were not successfully added to the OpenAI assistant: ${missingActions.join(', ')}`);
+      console.log('Attempting to add missing actions...');
+
+      // Combine existing and missing actions
+      const combinedActions = [...updatedTools, ...missingActions];
+
+      // Try updating again with combined actions
+      updatedOpenAIAssistant = await updateAssistantById(
+        apiKey,
+        assistant.assistantId,
+        assistant.name,
+        assistant.description,
+        assistant.llmModel,
+        assistant.llmPrompt,
+        combinedActions
+      );
+
+      // Check again for missing actions
+      updatedTools = updatedOpenAIAssistant.tools
+        .filter(tool => tool.type === 'function')
+        .map(tool => (tool as any).function.name);
+      missingActions = allowedActions.filter(action => !updatedTools.includes(action));
+
+      if (missingActions.length > 0) {
+        console.error(`Error: Failed to add the following actions: ${missingActions.join(', ')}`);
+        throw new Error(`Failed to add actions: ${missingActions.join(', ')}`);
+      }
     }
 
     // Update the local database only if OpenAI update was successful
-    assistant.allowedActions = allowedActions;
+    assistant.allowedActions = updatedTools;
     const updatedAssistant = await assistant.save({ session });
 
     await session.commitTransaction();

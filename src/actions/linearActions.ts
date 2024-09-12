@@ -172,7 +172,7 @@ export const createLinearActions = (context: ActionContext) => {
   };
 
   return {
-    fetchLinearIssues: fetchIssues,
+    fetchIssues,
     createLinearIssue: createIssue,
     updateLinearIssue: updateIssue,
     deleteLinearIssue: deleteIssue,
