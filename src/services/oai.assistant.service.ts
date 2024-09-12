@@ -1,7 +1,6 @@
 import OpenAI from 'openai';
 import { getOpenAIClient } from './assistant.service';
 import { ApiKey } from './verification.service';
-import Api from 'twilio/lib/rest/Api';
 import { cleanupAssistantFiles } from './file.service';
 import { VectorStore } from '../models/VectorStore';
 import { createFunctionFactory, ActionContext } from '../actions';
@@ -34,22 +33,36 @@ export const updateAssistantById = async (
   const openaiClient = getOpenAIClient(apiKey);
 
   // Create function definitions based on allowed actions
-  const functionDefinitions = createFunctionDefinitions(allowedActions);
+  const functionTools = createFunctionDefinitions(allowedActions);
 
-  const updatedAssistant = await openaiClient.beta.assistants.update(
-    assistantId,
-    {
-      instructions,
-      name,
-      description,
-      model,
-      tools: [
-        { type: 'file_search' },
-        ...functionDefinitions
-      ],
-    },
-  );
-  return updatedAssistant;
+  try {
+    const updatedAssistant = await openaiClient.beta.assistants.update(
+      assistantId,
+      {
+        instructions,
+        name,
+        description,
+        model,
+        tools: [
+          { type: 'file_search' },
+          ...functionTools
+        ],
+      },
+    );
+
+    // Validate that all allowed actions are present in the updated assistant
+    const updatedTools = updatedAssistant.tools.filter(tool => tool.type === 'function').map(tool => (tool as any).function.name);
+    const missingActions = allowedActions.filter(action => !updatedTools.includes(action));
+
+    if (missingActions.length > 0) {
+      console.warn(`Warning: The following actions were not successfully added to the OpenAI assistant: ${missingActions.join(', ')}`);
+    }
+
+    return updatedAssistant;
+  } catch (error) {
+    console.error('Error updating OpenAI assistant:', error);
+    throw new Error('Failed to update OpenAI assistant');
+  }
 };
 
 export const createAssistant = async (
@@ -67,33 +80,38 @@ export const createAssistant = async (
   const openaiClient = getOpenAIClient(apiKey);
 
   // Create function definitions based on allowed actions
-  const functionDefinitions = createFunctionDefinitions(allowedActions);
+  const functionTools = createFunctionDefinitions(allowedActions);
 
-  const assistant = await openaiClient.beta.assistants.create({
-    name,
-    description,
-    instructions,
-    model,
-    tools: [
-      { type: 'file_search' },
-      ...functionDefinitions
-    ],
-  });
+  try {
+    const assistant = await openaiClient.beta.assistants.create({
+      name,
+      description,
+      instructions,
+      model,
+      tools: [
+        { type: 'file_search' },
+        ...functionTools
+      ],
+    });
 
-  // Create a new vector store
-  const vectorStore = await openaiClient.beta.vectorStores.create({
-    name: `${name} Vector Store`,
-  });
+    // Create a new vector store
+    const vectorStore = await openaiClient.beta.vectorStores.create({
+      name: `${name} Vector Store`,
+    });
 
-  const newVectorStore = new VectorStore({
-    openaiId: vectorStore.id,
-    assistantId: assistantId,
-    companyId: companyId,
-    name: vectorStore.name,
-  });
-  await newVectorStore.save();
+    const newVectorStore = new VectorStore({
+      openaiId: vectorStore.id,
+      assistantId: assistantId,
+      companyId: companyId,
+      name: vectorStore.name,
+    });
+    await newVectorStore.save();
 
-  return assistant;
+    return assistant;
+  } catch (error) {
+    console.error('Error creating OpenAI assistant:', error);
+    throw new Error('Failed to create OpenAI assistant');
+  }
 };
 
 const createFunctionDefinitions = (allowedActions: string[]) => {

@@ -42,33 +42,56 @@ export const getAssistantById = async (id: string): Promise<IAssistant | null> =
 };
 
 export const updateAllowedActions = async (assistantId: string, allowedActions: string[]): Promise<IAssistant | null> => {
+  let session = null;
   try {
-    const updatedAssistant = await Assistant.findByIdAndUpdate(
-      assistantId,
-      { $set: { allowedActions } },
-      { new: true }
-    );
+    session = await mongoose.startSession();
+    session.startTransaction();
 
-    if (!updatedAssistant) {
+    const assistant = await Assistant.findById(assistantId).session(session);
+    if (!assistant) {
       throw new Error('Assistant not found');
     }
 
-    // Update the OpenAI assistant
-    const apiKey = await getApiKey(updatedAssistant.companyId.toString(), 'openai') as string;
-    await updateAssistantById(
+    // Update the OpenAI assistant first
+    const apiKey = await getApiKey(assistant.companyId.toString(), 'openai') as string;
+    const updatedOpenAIAssistant = await updateAssistantById(
       apiKey,
-      updatedAssistant.assistantId,
-      updatedAssistant.name,
-      updatedAssistant.description,
-      updatedAssistant.llmModel,
-      updatedAssistant.llmPrompt,
+      assistant.assistantId,
+      assistant.name,
+      assistant.description,
+      assistant.llmModel,
+      assistant.llmPrompt,
       allowedActions
     );
 
+    // Check if all allowed actions were successfully added to the OpenAI assistant
+    const updatedTools = updatedOpenAIAssistant.tools
+      .filter(tool => tool.type === 'function')
+      .map(tool => (tool as any).function.name);
+    const missingActions = allowedActions.filter(action => !updatedTools.includes(action));
+
+    if (missingActions.length > 0) {
+      console.warn(`Warning: The following actions were not successfully added to the OpenAI assistant: ${missingActions.join(', ')}`);
+    }
+
+    // Update the local database only if OpenAI update was successful
+    assistant.allowedActions = allowedActions;
+    const updatedAssistant = await assistant.save({ session });
+
+    await session.commitTransaction();
+    console.log(`Successfully updated allowed actions for assistant ${assistantId}`);
+
     return updatedAssistant;
   } catch (error) {
+    if (session) {
+      await session.abortTransaction();
+    }
     console.error('Error updating allowed actions:', error);
     throw error;
+  } finally {
+    if (session) {
+      session.endSession();
+    }
   }
 };
 
