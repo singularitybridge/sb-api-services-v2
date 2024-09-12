@@ -5,6 +5,7 @@ import {
   handleSessionMessage,
   createDefaultAssistant,
   getAssistants,
+  updateAllowedActions,
 } from '../services/assistant.service';
 import { Assistant } from '../models/Assistant';
 import {
@@ -19,7 +20,7 @@ import {
   getMessageHistoryFormatted,
 } from '../services/oai.thread.service';
 import { getCompletionResponse } from '../services/oai.completion.service';
-import { getApiKey, validateApiKeys } from '../services/api.key.service';
+import { getApiKey, refreshApiKeyCache, validateApiKeys } from '../services/api.key.service';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { Session } from '../models/Session';
 import { ChannelType } from '../types/ChannelType';
@@ -139,6 +140,7 @@ assistantRouter.get('/:id', async (req: AuthenticatedRequest, res) => {
   }
 });
 
+
 assistantRouter.put(
   '/:id',
   validateApiKeys(['openai']),
@@ -174,6 +176,7 @@ assistantRouter.put(
         assistant.description,
         assistant.llmModel,
         assistant.llmPrompt,
+        assistant.allowedActions
       );
 
       res.send(assistant);
@@ -182,8 +185,6 @@ assistantRouter.put(
     }
   },
 );
-
-import { refreshApiKeyCache } from '../services/api.key.service';
 
 assistantRouter.post(
   '/',
@@ -210,6 +211,7 @@ assistantRouter.post(
         assistantData.description,
         assistantData.llmModel,
         assistantData.llmPrompt,
+        assistantData.allowedActions
       );
 
       newAssistant.assistantId = openAIAssistant.id;
@@ -231,6 +233,7 @@ assistantRouter.post(
     }
   },
 );
+
 
 assistantRouter.delete(
   '/:id',
@@ -275,6 +278,32 @@ assistantRouter.post(
     } catch (error) {
       console.error('Error creating default assistant:', error);
       res.status(500).json({ message: 'Failed to create default assistant', error: (error as Error).message });
+    }
+  }
+);
+
+assistantRouter.patch(
+  '/:id/allowed-actions',
+  validateApiKeys(['openai']),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { allowedActions } = req.body;
+
+      if (!Array.isArray(allowedActions)) {
+        return res.status(400).send({ message: 'allowedActions must be an array of strings' });
+      }
+
+      const updatedAssistant = await updateAllowedActions(id, allowedActions);
+
+      if (!updatedAssistant) {
+        return res.status(404).send({ message: 'Assistant not found' });
+      }
+
+      res.send(updatedAssistant);
+    } catch (error) {
+      console.error('Error updating allowed actions:', error);
+      res.status(500).send({ message: 'Error updating allowed actions', error: (error as Error).message });
     }
   }
 );

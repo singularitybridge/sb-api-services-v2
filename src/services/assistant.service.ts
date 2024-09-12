@@ -9,7 +9,7 @@ import {
 import { Assistant, IAssistant } from '../models/Assistant';
 import mongoose from 'mongoose';
 import { getApiKey } from './api.key.service';
-import { createAssistant, deleteAssistantById } from './oai.assistant.service';
+import { createAssistant, deleteAssistantById, updateAssistantById } from './oai.assistant.service';
 import { processTemplate } from './template.service';
 import { findUserByIdentifier, getUserById } from './user.service';
 import { sendTelegramMessage as sendTelegramBotMessage } from './telegram.bot';
@@ -41,6 +41,37 @@ export const getAssistantById = async (id: string): Promise<IAssistant | null> =
   }
 };
 
+export const updateAllowedActions = async (assistantId: string, allowedActions: string[]): Promise<IAssistant | null> => {
+  try {
+    const updatedAssistant = await Assistant.findByIdAndUpdate(
+      assistantId,
+      { $set: { allowedActions } },
+      { new: true }
+    );
+
+    if (!updatedAssistant) {
+      throw new Error('Assistant not found');
+    }
+
+    // Update the OpenAI assistant
+    const apiKey = await getApiKey(updatedAssistant.companyId.toString(), 'openai') as string;
+    await updateAssistantById(
+      apiKey,
+      updatedAssistant.assistantId,
+      updatedAssistant.name,
+      updatedAssistant.description,
+      updatedAssistant.llmModel,
+      updatedAssistant.llmPrompt,
+      allowedActions
+    );
+
+    return updatedAssistant;
+  } catch (error) {
+    console.error('Error updating allowed actions:', error);
+    throw error;
+  }
+};
+
 const handleError = (error: Error): string => {
   let response = 'Something went wrong, ';
 
@@ -62,6 +93,7 @@ const pollRunStatus = async (
   runId: string,
   sessionId: string,
   companyId: string,
+  allowedActions: string[],
   timeout: number = 90000,
 ) => {
   const startTime = Date.now();
@@ -88,7 +120,8 @@ const pollRunStatus = async (
         runId,
         run.required_action.submit_tool_outputs.tool_calls,
         sessionId,
-        companyId
+        companyId,
+        allowedActions
       );
     }
 
@@ -190,7 +223,7 @@ export const handleSessionMessage = async (
     instructions: processedLlmPrompt,
   });
 
-  const completedRun = await pollRunStatus(apiKey, session.threadId, newRun.id, sessionId, session.companyId);
+  const completedRun = await pollRunStatus(apiKey, session.threadId, newRun.id, sessionId, session.companyId, assistant.allowedActions);
   console.log('run completed > ' + completedRun.status);
 
   const messages = await openaiClient.beta.threads.messages.list(
@@ -238,7 +271,7 @@ export async function deleteAssistant(id: string, assistantId: string): Promise<
   }
 }
 
-export async function createDefaultAssistant(companyId: string, apiKey: string): Promise<IAssistant> {
+export const createDefaultAssistant = async (companyId: string, apiKey: string): Promise<IAssistant> => {
   const defaultAssistantData = {
     name: 'Default Assistant',
     description: 'Your company\'s default AI assistant',
@@ -248,6 +281,7 @@ export async function createDefaultAssistant(companyId: string, apiKey: string):
     llmModel: 'gpt-4o',
     llmPrompt: 'You are a helpful AI assistant for {{company.name}}. Your name is {{assistant.name}}. Provide friendly and professional assistance to {{user.name}}. When referring to the user, use their name {{user.name}} or their email {{user.email}}. Always include placeholders like {{user.name}} or {{company.name}} in your responses, as they will be automatically replaced with the actual values.',
     companyId: companyId,
+    allowedActions: ['readJournal', 'writeJournal', 'searchInbox', 'sendEmail', 'scheduleEvent'], // Add default allowed actions
   };
 
   const assistant = new Assistant(defaultAssistantData);
@@ -260,14 +294,15 @@ export async function createDefaultAssistant(companyId: string, apiKey: string):
     assistant.name,
     assistant.description,
     assistant.llmModel,
-    assistant.llmPrompt
+    assistant.llmPrompt,
+    assistant.allowedActions
   );
 
   assistant.assistantId = openAIAssistant.id;
   await assistant.save();
 
   return assistant;
-}
+};
 
 export const sendMessageToAgent = async (
   sessionId: string,
