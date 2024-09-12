@@ -20,8 +20,8 @@ export interface IAssistant extends Document {
   llmModel: string;
   llmPrompt: string;
   companyId: string;
-  actions: mongoose.Types.ObjectId[];
-  avatarImage?: string; // New field, optional
+  allowedActions: string[]; // New field
+  avatarImage?: string;
 }
 
 const AssistantSchema: Schema = new Schema({
@@ -34,12 +34,8 @@ const AssistantSchema: Schema = new Schema({
   llmModel: { type: String, required: false },
   llmPrompt: { type: String, required: false },
   companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
-  actions: [{ 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Action', 
-    required: false 
-  }],
-  avatarImage: { type: String, required: false, default: 'default-avatar' }, // New field
+  allowedActions: [{ type: String, required: false }], // New field
+  avatarImage: { type: String, required: false, default: 'default-avatar' },
 });
 
 export const Assistant = mongoose.model<IAssistant>(

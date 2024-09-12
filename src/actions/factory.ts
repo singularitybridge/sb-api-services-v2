@@ -17,28 +17,34 @@ import createAIAgentExecutorActions from './aiAgentExecutorActions';
 import { createLinearActions } from './linearActions';
 import { createJournalActions } from './journalActions';
 
-export const createFunctionFactory = (context: ActionContext): FunctionFactory => ({
-  ...createInboxActions(context),
-  ...createAssistantActions(context),
-  ...createCalendarActions(context),
-  ...createJSONBinActions(context),
-  ...createFluxImageActions(context),
-  ...createPerplexityActions(context),
-  ...createSendGridActions(context),
-  ...createElevenLabsActions(context),
-  ...createOpenAiActions(context),
-  ...createPhotoRoomActions(context),
-  ...createMongoDbActions(context),
-  ...createDebugActions(context),
-  ...createAgendaActions(context),
-  ...createAIAgentExecutorActions(context),
-  ...createLinearActions(context),
-  ...createJournalActions(context),
-});
+export const createFunctionFactory = (context: ActionContext, allowedActions: string[]): FunctionFactory => {
+  const allActions = {
+    ...createInboxActions(context),
+    ...createAssistantActions(context),
+    ...createCalendarActions(context),
+    ...createJSONBinActions(context),
+    ...createFluxImageActions(context),
+    ...createPerplexityActions(context),
+    ...createSendGridActions(context),
+    ...createElevenLabsActions(context),
+    ...createOpenAiActions(context),
+    ...createPhotoRoomActions(context),
+    ...createMongoDbActions(context),
+    ...createDebugActions(context),
+    ...createAgendaActions(context),
+    ...createAIAgentExecutorActions(context),
+    ...createLinearActions(context),
+    ...createJournalActions(context),
+  };
 
-export const executeFunctionCall = async (call: any, sessionId: string, companyId: string) => {
+  return Object.fromEntries(
+    Object.entries(allActions).filter(([actionName]) => allowedActions.includes(actionName))
+  ) as FunctionFactory;
+};
+
+export const executeFunctionCall = async (call: any, sessionId: string, companyId: string, allowedActions: string[]) => {
   const context: ActionContext = { sessionId, companyId };
-  const functionFactory = createFunctionFactory(context);
+  const functionFactory = createFunctionFactory(context, allowedActions);
   
   const functionName = call.function.name as keyof FunctionFactory;
 

@@ -1,4 +1,3 @@
-/// file_path: /src/services/oai.thread.service.ts
 import OpenAI from 'openai';
 import { executeFunctionCall } from '../actions';
 import { getOpenAIClient } from './assistant.service';
@@ -10,12 +9,13 @@ export const submitToolOutputs = async (
   toolCalls: any[],
   sessionId: string,
   companyId: string,
+  allowedActions: string[]
 ) => {
   console.log('called submitToolOutputs with args: ', toolCalls);
 
   const outputs = await Promise.all(
     toolCalls.map(async (call) => {
-      const output = await executeFunctionCall(call, sessionId, companyId);
+      const output = await executeFunctionCall(call, sessionId, companyId, allowedActions);
       return {
         tool_call_id: call.id,
         output: JSON.stringify(output),

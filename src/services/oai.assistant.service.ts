@@ -1,4 +1,3 @@
-// file path: src/services/oai.assistant.service.ts
 import OpenAI from 'openai';
 import { getOpenAIClient } from './assistant.service';
 import { ApiKey } from './verification.service';
@@ -30,18 +29,24 @@ export const updateAssistantById = async (
   description: string,
   model: string,
   instructions: string,
-  //   file_ids: string[],
+  allowedActions: string[],
 ) => {
   const openaiClient = getOpenAIClient(apiKey);
+
+  // Create function definitions based on allowed actions
+  const functionDefinitions = createFunctionDefinitions(allowedActions);
+
   const updatedAssistant = await openaiClient.beta.assistants.update(
     assistantId,
     {
       instructions,
       name,
       description,
-      //   tools: [{ type: 'retrieval' }],
       model,
-      //   file_ids,
+      tools: [
+        { type: 'file_search' },
+        ...functionDefinitions
+      ],
     },
   );
   return updatedAssistant;
@@ -55,24 +60,14 @@ export const createAssistant = async (
   description: string,
   model: string,
   instructions: string,
+  allowedActions: string[],
 ) => {
   console.log('Creating assistant');
 
   const openaiClient = getOpenAIClient(apiKey);
 
-  // Create a dummy context to generate function definitions
-  const dummyContext: ActionContext = { sessionId: 'dummy-session-id', companyId: 'dummy-company-id' };
-  const functionFactory = createFunctionFactory(dummyContext);
-
-  // Create function definitions based on functionFactory
-  const functionDefinitions = Object.entries(functionFactory).map(([funcName, funcDef]) => ({
-    type: "function" as const,
-    function: {
-      name: funcName,
-      description: funcDef.description,
-      parameters: funcDef.parameters
-    }
-  }));
+  // Create function definitions based on allowed actions
+  const functionDefinitions = createFunctionDefinitions(allowedActions);
 
   const assistant = await openaiClient.beta.assistants.create({
     name,
@@ -101,6 +96,23 @@ export const createAssistant = async (
   return assistant;
 };
 
+const createFunctionDefinitions = (allowedActions: string[]) => {
+  // Create a dummy context to generate function definitions
+  const dummyContext: ActionContext = { sessionId: 'dummy-session-id', companyId: 'dummy-company-id' };
+  const functionFactory = createFunctionFactory(dummyContext, allowedActions);
+
+  // Filter and create function definitions based on allowed actions
+  return Object.entries(functionFactory)
+    .filter(([funcName]) => allowedActions.includes(funcName))
+    .map(([funcName, funcDef]) => ({
+      type: "function" as const,
+      function: {
+        name: funcName,
+        description: funcDef.description,
+        parameters: funcDef.parameters
+      }
+    }));
+};
 
 export const deleteAssistantById = async (
   apiKey: string,
