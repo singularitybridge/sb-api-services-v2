@@ -32,8 +32,14 @@ export const updateAssistantById = async (
 ) => {
   const openaiClient = getOpenAIClient(apiKey);
 
+  // Adjust allowedActions to remove service prefixes
+  const adjustedAllowedActions = allowedActions.map(actionName => {
+    const parts = actionName.split('.');
+    return parts.length > 1 ? parts[1] : actionName;
+  });
+
   // Create function definitions based on allowed actions
-  const functionTools = createFunctionDefinitions(allowedActions);
+  const functionTools = createFunctionDefinitions(adjustedAllowedActions);
 
   try {
     const updatedAssistant = await openaiClient.beta.assistants.update(
@@ -51,8 +57,17 @@ export const updateAssistantById = async (
     );
 
     // Validate that all allowed actions are present in the updated assistant
-    const updatedTools = updatedAssistant.tools.filter(tool => tool.type === 'function').map(tool => (tool as any).function.name);
-    const missingActions = allowedActions.filter(action => !updatedTools.includes(action));
+    const updatedTools = updatedAssistant.tools
+      .filter(tool => tool.type === 'function')
+      .map(tool => (tool as any).function.name);
+
+    // Map updated tools back to original action names with prefixes
+    const updatedToolsWithPrefixes = updatedTools.map(actionName => {
+      const originalAction = allowedActions.find(a => a.endsWith(actionName));
+      return originalAction || actionName;
+    });
+
+    const missingActions = allowedActions.filter(action => !updatedToolsWithPrefixes.includes(action));
 
     if (missingActions.length > 0) {
       console.warn(`Warning: The following actions were not successfully added to the OpenAI assistant: ${missingActions.join(', ')}`);
@@ -64,6 +79,7 @@ export const updateAssistantById = async (
     throw new Error('Failed to update OpenAI assistant');
   }
 };
+
 
 export const createAssistant = async (
   apiKey: string,
@@ -79,8 +95,14 @@ export const createAssistant = async (
 
   const openaiClient = getOpenAIClient(apiKey);
 
+  // Adjust allowedActions to remove service prefixes
+  const adjustedAllowedActions = allowedActions.map(actionName => {
+    const parts = actionName.split('.');
+    return parts.length > 1 ? parts[1] : actionName;
+  });
+
   // Create function definitions based on allowed actions
-  const functionTools = createFunctionDefinitions(allowedActions);
+  const functionTools = createFunctionDefinitions(adjustedAllowedActions);
 
   try {
     const assistant = await openaiClient.beta.assistants.create({
@@ -117,11 +139,17 @@ export const createAssistant = async (
 const createFunctionDefinitions = (allowedActions: string[]) => {
   // Create a dummy context to generate function definitions
   const dummyContext: ActionContext = { sessionId: 'dummy-session-id', companyId: 'dummy-company-id' };
-  const functionFactory = createFunctionFactory(dummyContext, allowedActions);
 
-  // Filter and create function definitions based on allowed actions
+  // Adjust allowedActions to remove service prefixes
+  const adjustedAllowedActions = allowedActions.map(actionName => {
+    const parts = actionName.split('.');
+    return parts.length > 1 ? parts[1] : actionName;
+  });
+
+  const functionFactory = createFunctionFactory(dummyContext, adjustedAllowedActions);
+
+  // Create function definitions
   return Object.entries(functionFactory)
-    .filter(([funcName]) => allowedActions.includes(funcName))
     .map(([funcName, funcDef]) => ({
       type: "function" as const,
       function: {
@@ -131,6 +159,7 @@ const createFunctionDefinitions = (allowedActions: string[]) => {
       }
     }));
 };
+
 
 export const deleteAssistantById = async (
   apiKey: string,

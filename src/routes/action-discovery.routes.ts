@@ -12,8 +12,7 @@ router.get('/discover', async (req, res) => {
       return res.status(400).json({ error: 'Unsupported language. Use "en" or "he".' });
     }
 
-    const actions = await actionDiscoveryService.discoverActions(language as 'en' | 'he');
-    console.log('Discovered actions:', JSON.stringify(actions, null, 2));
+    const actions = await actionDiscoveryService.discoverActions(language as 'en' | 'he');    
     res.json(actions);
   } catch (error) {
     console.error('Error discovering actions:', error);
