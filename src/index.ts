@@ -60,6 +60,7 @@ import { sendgridRouter } from './routes/sendgrid.routes';
 import { photoRoomRouter } from './routes/photoroom.routes';
 import contentFileRouter from './routes/content-file.routes';
 import linearRouter from './routes/linear.routes';
+import actionDiscoveryRouter from './routes/action-discovery.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -86,6 +87,7 @@ app.use('/file', verifyTokenMiddleware, verifyAccess(), fileRouter);
 app.use('/content-file', verifyTokenMiddleware, verifyAccess(), contentFileRouter);
 app.use('/inbox', verifyTokenMiddleware, verifyAccess(), inboxRouter);
 app.use('/action', verifyTokenMiddleware, verifyAccess(), actionRouter);
+app.use('/action-discovery', verifyTokenMiddleware, verifyAccess(), actionDiscoveryRouter);
 app.use('/session', verifyTokenMiddleware, verifyAccess(), sessionRouter);
 app.use('/agenda', verifyTokenMiddleware, verifyAccess(), agendaRouter);
 app.use('/api', verifyTokenMiddleware, verifyAccess(), verificationRouter);
