@@ -62,21 +62,22 @@ export class ActionDiscoveryService {
   private getIconForService(serviceName: string): string {
     const iconMap: { [key: string]: string } = {
       agenda: 'calendar',
-      aiAgentExecutor: 'cpu',
+      aiAgentexecutor: 'cpu',
       assistant: 'message-square',
       calendar: 'calendar',
       debug: 'bug',
-      elevenLabs: 'headphones',
-      fluxImage: 'image',
+      elevenlabs: 'headphones',
+      fluximage: 'image',
       inbox: 'inbox',
       journal: 'book',
       jsonbin: 'database',
       linear: 'trello',
-      mongoDb: 'database',
-      openAi: 'brain',
+      mongodb: 'database',
+      openai: 'brain',
       perplexity: 'search',
-      photoRoom: 'image',
+      photoroom: 'image',
       sendgrid: 'mail',
+      aiagentexecutor : 'cpu',
       // Add more mappings as needed
     };
 
