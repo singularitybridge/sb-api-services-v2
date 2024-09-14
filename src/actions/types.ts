@@ -1,5 +1,3 @@
-/// file_path: /src/actions/types.ts
-
 export type ActionContext = {
   sessionId: string;
   companyId: string;

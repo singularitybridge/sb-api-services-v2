@@ -37,14 +37,36 @@ export const createFunctionFactory = (context: ActionContext, allowedActions: st
     ...createJournalActions(context),
   };
 
+  // Adjust the action names to strip off the service prefix
+  const adjustedActions = Object.fromEntries(
+    Object.entries(allActions).map(([actionName, funcDef]) => {
+      const parts = actionName.split('.');
+      const adjustedName = parts.length > 1 ? parts[1] : actionName;
+      return [adjustedName, funcDef];
+    })
+  );
+
+  // Adjust allowedActions to strip off service prefixes
+  const adjustedAllowedActions = allowedActions.map(actionName => {
+    const parts = actionName.split('.');
+    return parts.length > 1 ? parts[1] : actionName;
+  });
+
   return Object.fromEntries(
-    Object.entries(allActions).filter(([actionName]) => allowedActions.includes(actionName))
+    Object.entries(adjustedActions).filter(([actionName]) => adjustedAllowedActions.includes(actionName))
   ) as FunctionFactory;
 };
 
 export const executeFunctionCall = async (call: any, sessionId: string, companyId: string, allowedActions: string[]) => {
   const context: ActionContext = { sessionId, companyId };
-  const functionFactory = createFunctionFactory(context, allowedActions);
+
+  // Adjust allowedActions to remove service prefixes
+  const adjustedAllowedActions = allowedActions.map(actionName => {
+    const parts = actionName.split('.');
+    return parts.length > 1 ? parts[1] : actionName;
+  });
+
+  const functionFactory = createFunctionFactory(context, adjustedAllowedActions);
   
   const functionName = call.function.name as keyof FunctionFactory;
 
