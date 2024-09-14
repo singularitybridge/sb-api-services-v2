@@ -3,7 +3,7 @@ import { join } from 'path';
 
 interface ActionInfo {
   id: string;
-  name: string;
+  serviceName: string;
   actionTitle: string;
   description: string;
   icon: string;
@@ -21,7 +21,7 @@ type SupportedLanguage = 'en' | 'he';
 
 interface TranslationMap {
   [key: string]: {
-    name: string;
+    serviceName: string;
     actionTitle: string;
     description: string;
   };
@@ -32,27 +32,27 @@ export class ActionDiscoveryService {
 
   private translationMap: TranslationMap = {
     'agenda.scheduleMessage': {
-      name: 'יומן',
+      serviceName: 'יומן',
       actionTitle: 'תזמון הודעה',
       description: 'פעולה לתזמון הודעה בשירות היומן'
     },
     'assistant.createAssistant': {
-      name: 'עוזר',
+      serviceName: 'עוזר',
       actionTitle: 'יצירת עוזר',
       description: 'פעולה ליצירת עוזר חדש'
     },
     'calendar.createEvent': {
-      name: 'לוח שנה',
+      serviceName: 'לוח שנה',
       actionTitle: 'יצירת אירוע',
       description: 'פעולה ליצירת אירוע חדש בלוח השנה'
     },
     'inbox.createTask': {
-      name: 'תיבת דואר נכנס',
+      serviceName: 'תיבת דואר נכנס',
       actionTitle: 'יצירת משימה',
       description: 'פעולה ליצירת משימה חדשה בתיבת הדואר הנכנס'
     },
     'journal.createEntry': {
-      name: 'יומן אישי',
+      serviceName: 'יומן אישי',
       actionTitle: 'יצירת רשומה',
       description: 'פעולה ליצירת רשומה חדשה ביומן האישי'
     },
@@ -102,7 +102,7 @@ export class ActionDiscoveryService {
             const actionId = `${serviceName}.${key}`;
             actions.push({
               id: actionId,
-              name: this.getLocalizedString(actionId, 'name', this.toTitleCase(serviceName), language),
+              serviceName: this.getLocalizedString(actionId, 'serviceName', this.toTitleCase(serviceName), language),
               actionTitle: this.getLocalizedString(actionId, 'actionTitle', this.toTitleCase(key), language),
               description: this.getLocalizedString(actionId, 'description', actionDef.description, language),
               icon: this.getIconForService(serviceName),
@@ -127,7 +127,7 @@ export class ActionDiscoveryService {
 
   private getLocalizedString(
     actionId: string,
-    field: 'name' | 'actionTitle' | 'description',
+    field: 'serviceName' | 'actionTitle' | 'description',
     defaultValue: string,
     language: SupportedLanguage
   ): string {
