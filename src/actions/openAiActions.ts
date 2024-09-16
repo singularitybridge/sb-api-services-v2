@@ -2,13 +2,24 @@ import { ActionContext, FunctionFactory } from './types';
 import { generateSpeech } from '../services/oai.speech.service';
 import { getApiKey } from '../services/api.key.service';
 import { transcribeAudioWhisperFromURL } from '../services/speech.recognition.service';
+import { getO1CompletionResponse } from '../services/oai.completion.service';
 
 type OpenAIVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 type OpenAIModel = 'tts-1' | 'tts-1-hd';
 
 export const createOpenAiActions = (context: ActionContext): FunctionFactory => ({
   generateOpenAiSpeech: {
-    function: async ({ text, voice = 'alloy', model = 'tts-1-hd', textLimit = 256 }: { text: string; voice?: OpenAIVoice; model?: OpenAIModel; textLimit?: number }) => {
+    function: async ({
+      text,
+      voice = 'alloy',
+      model = 'tts-1-hd',
+      textLimit = 256,
+    }: {
+      text: string;
+      voice?: OpenAIVoice;
+      model?: OpenAIModel;
+      textLimit?: number;
+    }) => {
       try {
         const apiKey = await getApiKey(context.companyId, 'openai');
         if (!apiKey) {
@@ -78,6 +89,41 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
         },
       },
       required: ['audioUrl'],
+    },
+  },
+  askO1Model: {
+    function: async ({ question, model }: { question: string; model: string }) => {
+      try {
+        const apiKey = await getApiKey(context.companyId, 'openai');
+        if (!apiKey) {
+          return { error: 'OpenAI API key is missing' };
+        }
+        const allowedModels = ['o1-preview', 'o1-mini'];
+        if (!allowedModels.includes(model)) {
+          return { error: `Invalid model specified. Allowed models are ${allowedModels.join(', ')}` };
+        }
+        const responseText = await getO1CompletionResponse(apiKey, question, model, 2048);
+        return { response: responseText };
+      } catch (error) {
+        console.error('Error in askO1Model action:', error);
+        return { error: 'Failed to get response from OpenAI o1 model' };
+      }
+    },
+    description: 'Ask a question to the OpenAI o1 models (o1-preview or o1-mini)',
+    parameters: {
+      type: 'object',
+      properties: {
+        question: {
+          type: 'string',
+          description: 'The question or input to send to the model',
+        },
+        model: {
+          type: 'string',
+          enum: ['o1-preview', 'o1-mini'],
+          description: 'The OpenAI o1 model to use',
+        },
+      },
+      required: ['question', 'model'],
     },
   },
 });
