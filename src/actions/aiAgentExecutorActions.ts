@@ -1,3 +1,4 @@
+// src/actions/aiAgentExecutorActions.ts
 import axios, { AxiosError } from 'axios';
 import { ActionType, ActionContext, FunctionFactory } from './types';
 
@@ -10,9 +11,13 @@ interface AIAgentExecutorResponse {
 // Enhanced error handling with detailed logging
 const handleError = (error: unknown): string => {
   if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError<{ message?: string }>;
+    const axiosError = error as AxiosError<{ error?: string }>;
     console.error(`API Error: ${axiosError.response?.status} - ${JSON.stringify(axiosError.response?.data)}`);
-    return axiosError.response?.data?.message || axiosError.message || 'An error occurred with the API request';
+    return (
+      axiosError.response?.data?.error ||
+      axiosError.message ||
+      'An error occurred with the API request'
+    );
   }
   console.error(`Unexpected error: ${error}`);
   return error instanceof Error ? error.message : 'An unknown error occurred';
@@ -25,31 +30,94 @@ const createAIAgentExecutorActions = (context: ActionContext): FunctionFactory =
   // Common headers for all requests
   const getHeaders = () => ({
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${process.env.AI_AGENT_EXECUTOR_TOKEN}`
+    Authorization: `Bearer ${process.env.AI_AGENT_EXECUTOR_TOKEN}`,
   });
 
   const executeCommand: FunctionFactory[ActionType.EXECUTE_COMMAND] = {
-    description: 'Execute a whitelisted command on the AI Agent Executor',
+    description: 'Execute a command on the AI Agent Executor. Optionally run in background.',
     parameters: {
       type: 'object',
       properties: {
-        command: { type: 'string' },
-        workingDirectory: { type: 'string', optional: true }
+        command: { type: 'string', description: 'The command to execute' },
+        runInBackground: {
+          type: 'boolean',
+          description: 'Whether to run the command in background',
+          optional: true,
+        },
       },
-      required: ['command']
+      required: ['command'],
     },
-    function: async ({ command, workingDirectory }: { command: string; workingDirectory?: string }): Promise<AIAgentExecutorResponse> => {
+    function: async ({
+      command,
+      runInBackground,
+    }: {
+      command: string;
+      runInBackground?: boolean;
+    }): Promise<AIAgentExecutorResponse> => {
       try {
         const response = await axios.post(
           `${baseUrl}/execute`,
-          { command, workingDirectory, sessionId: context.sessionId, companyId: context.companyId },
+          { command, runInBackground },
+          { headers: getHeaders() }
+        );
+        const data = response.data;
+        if (data.result) {
+          // Foreground execution result
+          return { success: true, data: data.result };
+        } else if (data.pid) {
+          // Background execution result
+          return { success: true, data: { message: data.message, pid: data.pid } };
+        } else {
+          return { success: false, error: 'Unknown response format from execute command.' };
+        }
+      } catch (error: unknown) {
+        return { success: false, error: handleError(error) };
+      }
+    },
+  };
+
+  const getProcessStatus: FunctionFactory[ActionType.GET_PROCESS_STATUS] = {
+    description: 'Get the status of a background process',
+    parameters: {
+      type: 'object',
+      properties: {
+        pid: { type: 'string', description: 'The process ID returned when the process was started' },
+      },
+      required: ['pid'],
+    },
+    function: async ({ pid }: { pid: string }): Promise<AIAgentExecutorResponse> => {
+      try {
+        const response = await axios.get(`${baseUrl}/process/${pid}`, {
+          headers: getHeaders(),
+        });
+        return { success: true, data: response.data };
+      } catch (error: unknown) {
+        return { success: false, error: handleError(error) };
+      }
+    },
+  };
+
+  const stopProcess: FunctionFactory[ActionType.STOP_PROCESS] = {
+    description: 'Stop a background process',
+    parameters: {
+      type: 'object',
+      properties: {
+        pid: { type: 'string', description: 'The process ID of the process to stop' },
+      },
+      required: ['pid'],
+    },
+    function: async ({ pid }: { pid: string }): Promise<AIAgentExecutorResponse> => {
+      try {
+        const response = await axios.post(
+          `${baseUrl}/process/${pid}/stop`,
+          {},
           { headers: getHeaders() }
         );
         return { success: true, data: response.data };
       } catch (error: unknown) {
         return { success: false, error: handleError(error) };
       }
-    }
+    },
   };
 
   const fileOperation: FunctionFactory[ActionType.FILE_OPERATION] = {
@@ -57,71 +125,96 @@ const createAIAgentExecutorActions = (context: ActionContext): FunctionFactory =
     parameters: {
       type: 'object',
       properties: {
-        operation: { 
+        operation: {
           type: 'string',
-          enum: ['list', 'read', 'write', 'createFile', 'update', 'deleteFile', 'createDir', 'deleteDirectory', 'checkExistence']
+          enum: [
+            'list',
+            'read',
+            'write',
+            'createFile',
+            'update',
+            'deleteFile',
+            'createDir',
+            'deleteDirectory',
+            'checkExistence',
+          ],
+          description: 'The file operation to perform',
         },
-        path: { type: 'string' },
-        content: { type: 'string', optional: true },
-        recursive: { type: 'boolean', optional: true },
-        mode: { type: 'string', enum: ['overwrite', 'append'], optional: true }
+        path: { type: 'string', description: 'The path to the file or directory' },
+        content: {
+          type: 'string',
+          description: 'Content for write, createFile, or update operations',
+          optional: true,
+        },
+        recursive: {
+          type: 'boolean',
+          description: 'Whether to perform the operation recursively (for list operation)',
+          optional: true,
+        },
+        mode: {
+          type: 'string',
+          enum: ['overwrite', 'append'],
+          description: 'Mode for update operation',
+          optional: true,
+        },
       },
-      required: ['operation', 'path']
+      required: ['operation', 'path'],
     },
-    function: async ({ operation, path, content, recursive, mode }: { 
-      operation: string; 
-      path: string; 
-      content?: string; 
+    function: async ({
+      operation,
+      path,
+      content,
+      recursive,
+      mode,
+    }: {
+      operation: string;
+      path: string;
+      content?: string;
       recursive?: boolean;
       mode?: 'overwrite' | 'append';
     }): Promise<AIAgentExecutorResponse> => {
       try {
         const response = await axios.post(
           `${baseUrl}/file-operation`,
-          { operation, path, content, recursive, mode, sessionId: context.sessionId, companyId: context.companyId },
+          { operation, path, content, recursive, mode },
           { headers: getHeaders() }
         );
-        return { success: true, data: response.data };
+        const data = response.data;
+        return { success: true, data: data.result };
       } catch (error: unknown) {
         return { success: false, error: handleError(error) };
       }
-    }
+    },
   };
 
   const stopExecution: FunctionFactory[ActionType.STOP_EXECUTION] = {
-    description: 'Stop execution on the AI Agent Executor',
+    description: 'Stop all running processes and shut down the AI Agent Executor',
     parameters: {
       type: 'object',
       properties: {},
-      required: []
+      required: [],
     },
     function: async (): Promise<AIAgentExecutorResponse> => {
       try {
         const response = await axios.post(
           `${baseUrl}/stop-execution`,
-          { sessionId: context.sessionId, companyId: context.companyId },
+          {},
           { headers: getHeaders() }
         );
-        return { success: true, data: response.data };
+        return { success: true, data: response.data.message };
       } catch (error: unknown) {
         return { success: false, error: handleError(error) };
       }
-    }
+    },
   };
 
   return {
     [ActionType.EXECUTE_COMMAND]: executeCommand,
+    [ActionType.GET_PROCESS_STATUS]: getProcessStatus,
+    [ActionType.STOP_PROCESS]: stopProcess,
     [ActionType.FILE_OPERATION]: fileOperation,
     [ActionType.STOP_EXECUTION]: stopExecution,
   };
 };
-
-// Security measures:
-// 1. All operations run within a Docker container on the server side
-// 2. Commands are whitelisted (git, npm, node, python, pip)
-// 3. File access is controlled and limited to a specific working directory
-// 4. Input sanitization is implemented to prevent injection attacks
-// 5. Authentication is required to access the API (using AUTH_TOKEN)
-// 6. Rate limiting is implemented on the server side (100 requests per minute per client)
 
 export default createAIAgentExecutorActions;
