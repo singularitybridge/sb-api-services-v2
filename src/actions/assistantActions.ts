@@ -1,4 +1,3 @@
-/// file_path: /src/actions/assistantActions.ts
 import { Assistant } from '../models/Assistant';
 import { Session } from '../models/Session';
 import { publishMessage } from '../services/pusher.service';
@@ -13,15 +12,30 @@ export const createAssistantActions = (context: ActionContext): FunctionFactory 
       required: [],
     },
     function: async () => {
-      const session = await Session.findById(context.sessionId);
-      if (!session) {
-        throw new Error('Invalid session');
+      try {
+        const session = await Session.findById(context.sessionId);
+        if (!session) {
+          return {
+            success: false,
+            description: 'Invalid session',
+          };
+        }
+        const assistants = await Assistant.find(
+          { companyId: session.companyId },
+          { _id: 1, name: 1, description: 1 }
+        );
+        return {
+          success: true,
+          description: 'Assistants retrieved successfully',
+          data: assistants,
+        };
+      } catch (error) {
+        console.error('Error getting assistants:', error);
+        return {
+          success: false,
+          description: 'Failed to retrieve assistants',
+        };
       }
-      const assistants = await Assistant.find(
-        { companyId: session.companyId },
-        { _id: 1, name: 1, description: 1 }
-      );
-      return assistants;
     },
   },
 
@@ -38,14 +52,29 @@ export const createAssistantActions = (context: ActionContext): FunctionFactory 
       required: ['_id'],
     },
     function: async (args: { _id: string }) => {
-      console.log('called setAssistant with args: ', args);
-      publishMessage(`sb-${context.sessionId}`, 'setAssistant', { _id: args._id });
-      return {
-        success: true,
-        description: `set assistant to ${args._id}`,
-      };
+      try {
+        const assistant = await Assistant.findById(args._id);
+        if (!assistant) {
+          return {
+            success: false,
+            description: 'Assistant not found',
+          };
+        }
+        publishMessage(`sb-${context.sessionId}`, 'setAssistant', { _id: args._id });
+        return {
+          success: true,
+          description: `Assistant set to ${assistant.name} (ID: ${args._id})`,
+        };
+      } catch (error) {
+        console.error('Error setting assistant:', error);
+        return {
+          success: false,
+          description: 'Failed to set assistant',
+        };
+      }
     },
   },
+
   createNewAssistant: {
     description: 'Create a new assistant',
     parameters: {
@@ -67,13 +96,46 @@ export const createAssistantActions = (context: ActionContext): FunctionFactory 
       required: ['name', 'description', 'prompt'],
     },
     function: async (args: { name: string; description: string; prompt: string }) => {
-      console.log('called createNewAssistant with args: ', args);
-      publishMessage(`sb-${context.sessionId}`, 'createNewAssistant', args);
-      return {
-        success: true,
-        description: 'created new assistant',
-      };
+      try {
+        const session = await Session.findById(context.sessionId);
+        if (!session) {
+          return {
+            success: false,
+            description: 'Invalid session',
+          };
+        }
+
+        const newAssistant = new Assistant({
+          name: args.name,
+          description: args.description,
+          prompt: args.prompt,
+          companyId: session.companyId,
+        });
+
+        await newAssistant.save();
+
+        publishMessage(`sb-${context.sessionId}`, 'createNewAssistant', {
+          _id: newAssistant._id,
+          name: newAssistant.name,
+          description: newAssistant.description,
+        });
+
+        return {
+          success: true,
+          description: 'New assistant created successfully',
+          data: {
+            _id: newAssistant._id,
+            name: newAssistant.name,
+            description: newAssistant.description,
+          },
+        };
+      } catch (error) {
+        console.error('Error creating new assistant:', error);
+        return {
+          success: false,
+          description: 'Failed to create new assistant',
+        };
+      }
     },
   },
 });
-
