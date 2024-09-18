@@ -61,6 +61,7 @@ import { photoRoomRouter } from './routes/photoroom.routes';
 import contentFileRouter from './routes/content-file.routes';
 import linearRouter from './routes/linear.routes';
 import actionDiscoveryRouter from './routes/action-discovery.routes';
+import contentRouter from './routes/content.routes'; // Import the new content routes
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -99,6 +100,7 @@ app.use('/perplexity', verifyTokenMiddleware, verifyAccess(), perplexityRouter);
 app.use('/sendgrid', verifyTokenMiddleware, verifyAccess(), sendgridRouter);
 app.use('/photoroom', verifyTokenMiddleware, verifyAccess(), photoRoomRouter);
 app.use('/linear', verifyTokenMiddleware, verifyAccess(), linearRouter);
+app.use('/content', verifyTokenMiddleware, verifyAccess(), contentRouter); // Add the new content routes
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);
