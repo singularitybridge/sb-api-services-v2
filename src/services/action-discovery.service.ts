@@ -90,6 +90,12 @@ export class ActionDiscoveryService {
 
     for (const file of actionFiles) {
       const serviceName = file.replace('Actions.ts', '');
+      
+      // Skip the calendar service
+      if (serviceName.toLowerCase() === 'calendar') {
+        continue;
+      }
+
       const filePath = join(this.actionsPath, file);
       try {
         const module = await import(filePath);
