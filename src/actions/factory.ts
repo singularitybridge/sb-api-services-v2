@@ -21,7 +21,7 @@ export const createFunctionFactory = (context: ActionContext, allowedActions: st
   const allActions = {
     ...createInboxActions(context),
     ...createAssistantActions(context),
-    ...createCalendarActions(context),
+    // ...createCalendarActions(context),
     ...createJSONBinActions(context),
     ...createFluxImageActions(context),
     ...createPerplexityActions(context),
