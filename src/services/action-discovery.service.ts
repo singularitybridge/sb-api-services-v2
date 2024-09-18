@@ -91,27 +91,41 @@ export class ActionDiscoveryService {
     for (const file of actionFiles) {
       const serviceName = file.replace('Actions.ts', '');
       const filePath = join(this.actionsPath, file);
-      const module = await import(filePath);
-      
-      if (typeof module.default === 'function' || typeof module[`create${this.capitalize(serviceName)}Actions`] === 'function') {
-        const actionCreator = module.default || module[`create${this.capitalize(serviceName)}Actions`];
-        const actionObj = actionCreator({} as any);  // Pass an empty context
+      try {
+        const module = await import(filePath);
         
-        for (const [key, value] of Object.entries(actionObj)) {
-          const actionDef = value as ActionDefinition;
-          if (typeof actionDef === 'object' && actionDef.description) {
-            const actionId = `${serviceName}.${key}`;
-            actions.push({
-              id: actionId,
-              serviceName: this.getLocalizedString(actionId, 'serviceName', this.toTitleCase(serviceName), language),
-              actionTitle: this.getLocalizedString(actionId, 'actionTitle', this.toTitleCase(key), language),
-              description: this.getLocalizedString(actionId, 'description', actionDef.description, language),
-              icon: this.getIconForService(serviceName),
-              service: serviceName,
-              parameters: actionDef.parameters
-            });
+        let actionCreator;
+        if (typeof module.default === 'function') {
+          actionCreator = module.default;
+        } else if (typeof module[`create${this.capitalize(serviceName)}Actions`] === 'function') {
+          actionCreator = module[`create${this.capitalize(serviceName)}Actions`];
+        } else if (typeof module[`create${serviceName}Actions`] === 'function') {
+          actionCreator = module[`create${serviceName}Actions`];
+        } else if (typeof module.createJSONBinActions === 'function') {
+          actionCreator = module.createJSONBinActions;
+        }
+
+        if (actionCreator) {
+          const actionObj = actionCreator({} as any);  // Pass an empty context
+          
+          for (const [key, value] of Object.entries(actionObj)) {
+            const actionDef = value as ActionDefinition;
+            if (typeof actionDef === 'object' && actionDef.description) {
+              const actionId = `${serviceName}.${key}`;
+              actions.push({
+                id: actionId,
+                serviceName: this.getLocalizedString(actionId, 'serviceName', this.toTitleCase(serviceName), language),
+                actionTitle: this.getLocalizedString(actionId, 'actionTitle', this.toTitleCase(key), language),
+                description: this.getLocalizedString(actionId, 'description', actionDef.description, language),
+                icon: this.getIconForService(serviceName),
+                service: serviceName,
+                parameters: actionDef.parameters
+              });
+            }
           }
         }
+      } catch (error) {
+        console.error(`Failed to process ${file}:`, error);
       }
     }
 
