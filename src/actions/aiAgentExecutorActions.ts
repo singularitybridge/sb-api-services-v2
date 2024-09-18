@@ -1,4 +1,3 @@
-// src/actions/aiAgentExecutorActions.ts
 import axios, { AxiosError } from 'axios';
 import { ActionType, ActionContext, FunctionFactory } from './types';
 
@@ -23,7 +22,7 @@ const handleError = (error: unknown): string => {
   return error instanceof Error ? error.message : 'An unknown error occurred';
 };
 
-const createAIAgentExecutorActions = (context: ActionContext): FunctionFactory => {
+export const createAIAgentExecutorActions = (context: ActionContext): FunctionFactory => {
   // Base URL for the AI Agent Executor API
   const baseUrl = process.env.AI_AGENT_EXECUTOR_URL || 'http://localhost:3001';
 
