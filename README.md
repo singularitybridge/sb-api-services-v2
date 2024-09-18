@@ -44,6 +44,7 @@ The project includes various services to support different functionalities:
 26. Telegram Bot Service
 27. Twilio Voice Service
 28. Linear Service
+29. Content Service
 
 ## Routes
 
@@ -71,6 +72,7 @@ The project includes various routes for different functionalities:
 20. Verification Routes
 21. Omni-channel Routes (Telegram, Twilio Messaging, Twilio Voice, WhatsApp)
 22. Linear Routes
+23. Content Routes
 
 ## Actions
 
@@ -176,6 +178,14 @@ createIssue(title, description, teamId)
 updateIssue(issueId, updateData)
 deleteIssue(issueId)
 fetchAllIssues()
+
+### Content Actions
+Manages content items for companies.
+Available methods:
+createContentItem(title, contentType, content, metadata, tags)
+getContentItems()
+updateContentItem(itemId, updateData)
+deleteContentItem(itemId)
 
 ## Integrations
 

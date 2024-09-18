@@ -16,6 +16,7 @@ import { createAgendaActions } from './agendaActions';
 import createAIAgentExecutorActions from './aiAgentExecutorActions';
 import { createLinearActions } from './linearActions';
 import { createJournalActions } from './journalActions';
+import { createContentActions } from './contentActions'; // Import the new content actions
 
 export const createFunctionFactory = (context: ActionContext, allowedActions: string[]): FunctionFactory => {
   const allActions = {
@@ -35,6 +36,7 @@ export const createFunctionFactory = (context: ActionContext, allowedActions: st
     ...createAIAgentExecutorActions(context),
     ...createLinearActions(context),
     ...createJournalActions(context),
+    ...createContentActions(context), // Add the new content actions
   };
 
   // Adjust the action names to strip off the service prefix
