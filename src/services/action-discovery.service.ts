@@ -36,10 +36,70 @@ export class ActionDiscoveryService {
       actionTitle: 'תזמון הודעה',
       description: 'פעולה לתזמון הודעה בשירות היומן'
     },
-    'assistant.createAssistant': {
+    'assistant.getAssistants': {
+      serviceName: 'עוזר',
+      actionTitle: 'קבלת רשימת עוזרים',
+      description: 'קבלת רשימה של כל העוזרים עבור החברה של המשתמש הנוכחי'
+    },
+    'assistant.setAssistant': {
+      serviceName: 'עוזר',
+      actionTitle: 'הגדרת עוזר נוכחי',
+      description: 'הגדרת העוזר הנוכחי'
+    },
+    'assistant.CREATE_ASSISTANT': {
       serviceName: 'עוזר',
       actionTitle: 'יצירת עוזר',
       description: 'פעולה ליצירת עוזר חדש'
+    },
+    'assistant.LIST_ASSISTANTS': {
+      serviceName: 'עוזר',
+      actionTitle: 'רשימת עוזרים',
+      description: 'פעולה להצגת רשימת העוזרים הקיימים'
+    },
+    'assistant.GET_ASSISTANT': {
+      serviceName: 'עוזר',
+      actionTitle: 'קבלת פרטי עוזר',
+      description: 'פעולה לקבלת פרטים על עוזר ספציפי'
+    },
+    'assistant.UPDATE_ASSISTANT': {
+      serviceName: 'עוזר',
+      actionTitle: 'עדכון עוזר',
+      description: 'פעולה לעדכון פרטי עוזר קיים'
+    },
+    'assistant.DELETE_ASSISTANT': {
+      serviceName: 'עוזר',
+      actionTitle: 'מחיקת עוזר',
+      description: 'פעולה למחיקת עוזר קיים'
+    },
+    'assistant.CREATE_THREAD': {
+      serviceName: 'עוזר',
+      actionTitle: 'יצירת שיחה',
+      description: 'פעולה ליצירת שיחה חדשה עם עוזר'
+    },
+    'assistant.GET_THREAD': {
+      serviceName: 'עוזר',
+      actionTitle: 'קבלת פרטי שיחה',
+      description: 'פעולה לקבלת פרטים על שיחה ספציפית'
+    },
+    'assistant.DELETE_THREAD': {
+      serviceName: 'עוזר',
+      actionTitle: 'מחיקת שיחה',
+      description: 'פעולה למחיקת שיחה קיימת'
+    },
+    'assistant.CREATE_MESSAGE': {
+      serviceName: 'עוזר',
+      actionTitle: 'יצירת הודעה',
+      description: 'פעולה ליצירת הודעה חדשה בשיחה'
+    },
+    'assistant.LIST_MESSAGES': {
+      serviceName: 'עוזר',
+      actionTitle: 'רשימת הודעות',
+      description: 'פעולה להצגת רשימת ההודעות בשיחה'
+    },
+    'assistant.RUN_ASSISTANT': {
+      serviceName: 'עוזר',
+      actionTitle: 'הפעלת עוזר',
+      description: 'פעולה להפעלת עוזר על שיחה'
     },
     'calendar.createEvent': {
       serviceName: 'לוח שנה',
@@ -56,13 +116,37 @@ export class ActionDiscoveryService {
       actionTitle: 'יצירת רשומה',
       description: 'פעולה ליצירת רשומה חדשה ביומן האישי'
     },
-    // Add more translations as needed
+    'aiAgentExecutor.EXECUTE_COMMAND': {
+      serviceName: 'מבצע סוכן AI',
+      actionTitle: 'הפעלת פקודה',
+      description: 'פעולה להפעלת פקודה במבצע סוכן AI'
+    },
+    'aiAgentExecutor.GET_PROCESS_STATUS': {
+      serviceName: 'מבצע סוכן AI',
+      actionTitle: 'קבלת סטטוס תהליך',
+      description: 'פעולה לקבלת סטטוס של תהליך רקע'
+    },
+    'aiAgentExecutor.STOP_PROCESS': {
+      serviceName: 'מבצע סוכן AI',
+      actionTitle: 'עצירת תהליך',
+      description: 'פעולה לעצירת תהליך רקע'
+    },
+    'aiAgentExecutor.FILE_OPERATION': {
+      serviceName: 'מבצע סוכן AI',
+      actionTitle: 'פעולת קובץ',
+      description: 'פעולה לביצוע פעולות על קבצים'
+    },
+    'aiAgentExecutor.STOP_EXECUTION': {
+      serviceName: 'מבצע סוכן AI',
+      actionTitle: 'עצירת ביצוע',
+      description: 'פעולה לעצירת כל התהליכים וכיבוי מבצע סוכן AI'
+    },
   };
 
   private getIconForService(serviceName: string): string {
     const iconMap: { [key: string]: string } = {
       agenda: 'calendar',
-      aiAgentexecutor: 'cpu',
+      aiAgentExecutor: 'cpu',
       assistant: 'message-square',
       calendar: 'calendar',
       debug: 'bug',
@@ -77,8 +161,6 @@ export class ActionDiscoveryService {
       perplexity: 'search',
       photoroom: 'image',
       sendgrid: 'mail',
-      aiagentexecutor : 'cpu',
-      // Add more mappings as needed
     };
 
     return iconMap[serviceName.toLowerCase()] || 'help-circle'; // Default icon
@@ -118,7 +200,7 @@ export class ActionDiscoveryService {
             const actionDef = value as ActionDefinition;
             if (typeof actionDef === 'object' && actionDef.description) {
               const actionId = `${serviceName}.${key}`;
-              actions.push({
+              const action = {
                 id: actionId,
                 serviceName: this.getLocalizedString(actionId, 'serviceName', this.toTitleCase(serviceName), language),
                 actionTitle: this.getLocalizedString(actionId, 'actionTitle', this.toTitleCase(key), language),
@@ -126,7 +208,11 @@ export class ActionDiscoveryService {
                 icon: this.getIconForService(serviceName),
                 service: serviceName,
                 parameters: actionDef.parameters
-              });
+              };
+              actions.push(action);
+              
+              // Log the discovered action (for verification purposes)
+              console.log(`Discovered action: ${JSON.stringify(action, null, 2)}`);
             }
           }
         }
@@ -139,7 +225,7 @@ export class ActionDiscoveryService {
   }
 
   private toTitleCase(str: string): string {
-    return str.replace(/([A-Z])/g, ' $1').trim().replace(/^./, s => s.toUpperCase());
+    return str.split(/(?=[A-Z])/).map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
   }
 
   private capitalize(str: string): string {
@@ -152,8 +238,8 @@ export class ActionDiscoveryService {
     defaultValue: string,
     language: SupportedLanguage
   ): string {
-    if (language === 'he' && this.translationMap[actionId]) {
-      return this.translationMap[actionId][field] || defaultValue;
+    if (language === 'he' && this.translationMap[actionId] && this.translationMap[actionId][field]) {
+      return this.translationMap[actionId][field];
     }
     return defaultValue;
   }
