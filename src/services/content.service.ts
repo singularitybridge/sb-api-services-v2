@@ -1,26 +1,191 @@
+import { ContentType, IContentType } from '../models/ContentType';
 import { ContentItem, IContentItem } from '../models/ContentItem';
+import mongoose from 'mongoose';
 
-export const createContentItem = async (companyId: string, data: any): Promise<IContentItem> => {
-  const contentItem = new ContentItem({ ...data, companyId });
+export const validateContentData = async (
+  contentTypeId: string,
+  data: any
+): Promise<void> => {
+  const contentType = await ContentType.findById(contentTypeId);
+  if (!contentType) {
+    throw new Error('ContentType not found');
+  }
+
+  const errors: { field: string; message: string }[] = [];
+
+  for (const fieldDef of contentType.fields) {
+    const value = data[fieldDef.name];
+    const fieldType = fieldDef.type.toLowerCase();
+
+    // Check required fields
+    if (fieldDef.required && (value === undefined || value === null)) {
+      errors.push({ field: fieldDef.name, message: `Field '${fieldDef.name}' is required.` });
+      continue;
+    }
+
+    // Validate field type
+    if (value !== undefined && value !== null) {
+      switch (fieldType) {
+        case 'string':
+          if (typeof value !== 'string') {
+            errors.push({ field: fieldDef.name, message: `Field '${fieldDef.name}' must be a string.` });
+          }
+          break;
+        case 'number':
+          if (typeof value !== 'number') {
+            errors.push({ field: fieldDef.name, message: `Field '${fieldDef.name}' must be a number.` });
+          }
+          break;
+        case 'boolean':
+          if (typeof value !== 'boolean') {
+            errors.push({ field: fieldDef.name, message: `Field '${fieldDef.name}' must be a boolean.` });
+          }
+          break;
+        case 'date':
+          if (!(value instanceof Date) && isNaN(Date.parse(value))) {
+            errors.push({ field: fieldDef.name, message: `Field '${fieldDef.name}' must be a valid date.` });
+          }
+          break;
+        case 'array':
+          if (!Array.isArray(value)) {
+            errors.push({ field: fieldDef.name, message: `Field '${fieldDef.name}' must be an array.` });
+          }
+          break;
+        default:
+          errors.push({ field: fieldDef.name, message: `Unsupported field type '${fieldDef.type}' for field '${fieldDef.name}'.` });
+      }
+    }
+
+    // Validate enumeration values
+    if (fieldDef.enum && fieldDef.enum.length > 0) {
+      if (!fieldDef.enum.includes(value)) {
+        errors.push({ field: fieldDef.name, message: `Field '${fieldDef.name}' must be one of [${fieldDef.enum.join(', ')}].` });
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(JSON.stringify({ error: 'Validation Error', details: errors }));
+  }
+};
+
+export const createContentItem = async (
+  companyId: string,
+  contentTypeId: string,
+  data: any
+): Promise<IContentItem> => {
+  await validateContentData(contentTypeId, data);
+
+  const contentItem = new ContentItem({
+    companyId,
+    contentTypeId,
+    data,
+  });
+
   return await contentItem.save();
 };
 
-export const getContentItems = async (companyId: string): Promise<IContentItem[]> => {
-  return await ContentItem.find({ companyId });
-};
-
-export const getContentItem = async (companyId: string, itemId: string): Promise<IContentItem | null> => {
-  return await ContentItem.findOne({ _id: itemId, companyId });
-};
-
 export const updateContentItem = async (
+  id: string,
   companyId: string,
-  itemId: string,
-  updateData: any
+  data: any
 ): Promise<IContentItem | null> => {
-  return await ContentItem.findOneAndUpdate({ _id: itemId, companyId }, updateData, { new: true });
+  const contentItem = await ContentItem.findOne({ _id: id, companyId });
+
+  if (!contentItem) {
+    throw new Error('Content item not found');
+  }
+
+  await validateContentData(contentItem.contentTypeId.toString(), data);
+
+  contentItem.data = data;
+  return await contentItem.save();
 };
 
-export const deleteContentItem = async (companyId: string, itemId: string): Promise<void> => {
-  await ContentItem.findOneAndDelete({ _id: itemId, companyId });
+export const getContentItems = async (
+  companyId: string,
+  contentTypeId?: string,
+  orderBy?: string,
+  limit?: number,
+  skip?: number
+): Promise<IContentItem[]> => {
+  const query: any = { companyId };
+  if (contentTypeId) {
+    query.contentTypeId = contentTypeId;
+  }
+
+  let sort: any = {};
+  if (orderBy) {
+    const [field, order] = orderBy.split(':');
+    sort[`data.${field}`] = order === 'desc' ? -1 : 1;
+  } else {
+    sort = { createdAt: -1 };
+  }
+
+  return await ContentItem.find(query)
+    .sort(sort)
+    .limit(limit || 10)
+    .skip(skip || 0);
+};
+
+export const getContentItem = async (
+  id: string,
+  companyId: string
+): Promise<IContentItem | null> => {
+  return await ContentItem.findOne({ _id: id, companyId });
+};
+
+export const deleteContentItem = async (
+  id: string,
+  companyId: string
+): Promise<boolean> => {
+  const result = await ContentItem.deleteOne({ _id: id, companyId });
+  return result.deletedCount === 1;
+};
+
+export const getContentTypes = async (companyId: string): Promise<IContentType[]> => {
+  return await ContentType.find({ companyId });
+};
+
+export const getContentType = async (
+  id: string,
+  companyId: string
+): Promise<IContentType | null> => {
+  return await ContentType.findOne({ _id: id, companyId });
+};
+
+export const createContentType = async (
+  companyId: string,
+  name: string,
+  description: string,
+  fields: any[]
+): Promise<IContentType> => {
+  const contentType = new ContentType({
+    companyId,
+    name,
+    description,
+    fields,
+  });
+
+  return await contentType.save();
+};
+
+export const updateContentType = async (
+  id: string,
+  companyId: string,
+  updates: Partial<IContentType>
+): Promise<IContentType | null> => {
+  return await ContentType.findOneAndUpdate(
+    { _id: id, companyId },
+    updates,
+    { new: true }
+  );
+};
+
+export const deleteContentType = async (
+  id: string,
+  companyId: string
+): Promise<boolean> => {
+  const result = await ContentType.deleteOne({ _id: id, companyId });
+  return result.deletedCount === 1;
 };

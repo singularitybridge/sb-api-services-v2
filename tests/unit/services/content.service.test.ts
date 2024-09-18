@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import * as ContentService from '../../../src/services/content.service';
 import { ContentItem } from '../../../src/models/ContentItem';
+import { ContentType } from '../../../src/models/ContentType';
 
 let mongoServer: MongoMemoryServer;
 
@@ -18,58 +19,75 @@ afterAll(async () => {
 
 describe('Content Service', () => {
   const mockCompanyId = new mongoose.Types.ObjectId().toString();
+  let mockContentTypeId: string;
 
   beforeEach(async () => {
     await ContentItem.deleteMany({});
+    await ContentType.deleteMany({});
+
+    // Create a mock content type
+    const contentType = new ContentType({
+      companyId: mockCompanyId,
+      name: 'Test Content Type',
+      fields: [
+        { name: 'title', type: 'string', required: true },
+        { name: 'body', type: 'string', required: true },
+        { name: 'tags', type: 'array', required: false }
+      ]
+    });
+    await contentType.save();
+    mockContentTypeId = contentType._id.toString();
   });
 
   it('should create a content item', async () => {
     const contentData = {
       title: 'Test Content',
-      contentType: 'text',
-      content: { text: 'This is a test content' },
-      metadata: { author: 'Test Author' },
+      body: 'This is a test content',
       tags: ['test', 'content']
     };
 
-    const createdContent = await ContentService.createContentItem(mockCompanyId, contentData);
+    const createdContent = await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData);
 
     expect(createdContent).toBeDefined();
-    expect(createdContent.title).toBe(contentData.title);
+    expect(createdContent.data.title).toBe(contentData.title);
     expect(createdContent.companyId.toString()).toBe(mockCompanyId);
+    expect(createdContent.contentTypeId.toString()).toBe(mockContentTypeId);
   });
 
   it('should get all content items for a company', async () => {
-    const contentData1 = { title: 'Content 1', contentType: 'text', content: { text: 'Content 1' } };
-    const contentData2 = { title: 'Content 2', contentType: 'text', content: { text: 'Content 2' } };
+    const contentData1 = { title: 'Content 1', body: 'Body 1' };
+    const contentData2 = { title: 'Content 2', body: 'Body 2' };
 
-    await ContentService.createContentItem(mockCompanyId, contentData1);
-    await ContentService.createContentItem(mockCompanyId, contentData2);
+    await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData1);
+    await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData2);
 
     const contentItems = await ContentService.getContentItems(mockCompanyId);
 
     expect(contentItems).toHaveLength(2);
-    expect(contentItems[0].title).toBe(contentData1.title);
-    expect(contentItems[1].title).toBe(contentData2.title);
+    // Check that items are sorted by createdAt in descending order
+    expect(contentItems[0].data.title).toBe(contentData2.title);
+    expect(contentItems[1].data.title).toBe(contentData1.title);
   });
 
   it('should update a content item', async () => {
-    const contentData = { title: 'Original Title', contentType: 'text', content: { text: 'Original content' } };
-    const createdContent = await ContentService.createContentItem(mockCompanyId, contentData);
+    const contentData = { title: 'Original Title', body: 'Original body' };
+    const createdContent = await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData);
 
-    const updatedData = { title: 'Updated Title', content: { text: 'Updated content' } };
-    const updatedContent = await ContentService.updateContentItem(mockCompanyId, createdContent._id.toString(), updatedData);
+    const updatedData = { title: 'Updated Title', body: 'Updated body' };
+    const updatedContent = await ContentService.updateContentItem(createdContent._id.toString(), mockCompanyId, updatedData);
 
     expect(updatedContent).toBeDefined();
-    expect(updatedContent?.title).toBe(updatedData.title);
-    expect(updatedContent?.content).toEqual(updatedData.content);
+    expect(updatedContent?.data.title).toBe(updatedData.title);
+    expect(updatedContent?.data.body).toBe(updatedData.body);
   });
 
   it('should delete a content item', async () => {
-    const contentData = { title: 'To be deleted', contentType: 'text', content: { text: 'This will be deleted' } };
-    const createdContent = await ContentService.createContentItem(mockCompanyId, contentData);
+    const contentData = { title: 'To be deleted', body: 'This will be deleted' };
+    const createdContent = await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData);
 
-    await ContentService.deleteContentItem(mockCompanyId, createdContent._id.toString());
+    const result = await ContentService.deleteContentItem(createdContent._id.toString(), mockCompanyId);
+
+    expect(result).toBe(true);
 
     const contentItems = await ContentService.getContentItems(mockCompanyId);
     expect(contentItems).toHaveLength(0);
