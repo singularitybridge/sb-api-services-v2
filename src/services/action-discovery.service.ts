@@ -58,13 +58,17 @@ export class ActionDiscoveryService {
     return iconMap[serviceName.toLowerCase()] || 'help-circle'; // Default icon
   }
 
-  async discoverActions(language: SupportedLanguage = 'en'): Promise<ActionInfo[]> {
-    const actionFiles = readdirSync(this.actionsPath).filter(file => file.endsWith('Actions.ts'));
+  async discoverActions(
+    language: SupportedLanguage = 'en',
+  ): Promise<ActionInfo[]> {
+    const actionFiles = readdirSync(this.actionsPath).filter((file) =>
+      file.endsWith('Actions.ts'),
+    );
     const actions: ActionInfo[] = [];
 
     for (const file of actionFiles) {
       const serviceName = file.replace('Actions.ts', '');
-      
+
       // Skip the calendar service
       if (serviceName.toLowerCase() === 'calendar') {
         continue;
@@ -73,38 +77,56 @@ export class ActionDiscoveryService {
       const filePath = join(this.actionsPath, file);
       try {
         const module = await import(filePath);
-        
+
         let actionCreator;
         if (typeof module.default === 'function') {
           actionCreator = module.default;
-        } else if (typeof module[`create${this.capitalize(serviceName)}Actions`] === 'function') {
-          actionCreator = module[`create${this.capitalize(serviceName)}Actions`];
-        } else if (typeof module[`create${serviceName}Actions`] === 'function') {
+        } else if (
+          typeof module[`create${this.capitalize(serviceName)}Actions`] ===
+          'function'
+        ) {
+          actionCreator =
+            module[`create${this.capitalize(serviceName)}Actions`];
+        } else if (
+          typeof module[`create${serviceName}Actions`] === 'function'
+        ) {
           actionCreator = module[`create${serviceName}Actions`];
         } else if (typeof module.createJSONBinActions === 'function') {
           actionCreator = module.createJSONBinActions;
         }
 
         if (actionCreator) {
-          const actionObj = actionCreator({} as any);  // Pass an empty context
-          
+          const actionObj = actionCreator({} as any); // Pass an empty context
+
           for (const [key, value] of Object.entries(actionObj)) {
             const actionDef = value as ActionDefinition;
             if (typeof actionDef === 'object' && actionDef.description) {
               const actionId = `${serviceName}.${key}`;
               const action = {
                 id: actionId,
-                serviceName: this.getLocalizedString(actionId, 'serviceName', this.toTitleCase(serviceName), language),
-                actionTitle: this.getLocalizedString(actionId, 'actionTitle', this.toTitleCase(key), language),
-                description: this.getLocalizedString(actionId, 'description', actionDef.description, language),
+                serviceName: this.getLocalizedString(
+                  actionId,
+                  'serviceName',
+                  this.toTitleCase(serviceName),
+                  language,
+                ),
+                actionTitle: this.getLocalizedString(
+                  actionId,
+                  'actionTitle',
+                  this.toTitleCase(key),
+                  language,
+                ),
+                description: this.getLocalizedString(
+                  actionId,
+                  'description',
+                  actionDef.description,
+                  language,
+                ),
                 icon: this.getIconForService(serviceName),
                 service: serviceName,
-                parameters: actionDef.parameters
+                parameters: actionDef.parameters,
               };
               actions.push(action);
-              
-              // Log the discovered action (for verification purposes)
-              console.log(`Discovered action: ${JSON.stringify(action, null, 2)}`);
             }
           }
         }
@@ -117,7 +139,10 @@ export class ActionDiscoveryService {
   }
 
   private toTitleCase(str: string): string {
-    return str.split(/(?=[A-Z])/).map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+    return str
+      .split(/(?=[A-Z])/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
   }
 
   private capitalize(str: string): string {
@@ -128,7 +153,7 @@ export class ActionDiscoveryService {
     actionId: string,
     field: keyof TranslationEntry,
     defaultValue: string,
-    language: SupportedLanguage
+    language: SupportedLanguage,
   ): string {
     if (language === 'he') {
       const translations = hebrewTranslations as TranslationMap;

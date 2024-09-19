@@ -5,10 +5,14 @@ import mongoose from 'mongoose';
 export const validateContentData = async (
   contentTypeId: string,
   data: any
-): Promise<void> => {
+): Promise<{ isValid: boolean; errors: { field: string; message: string }[]; contentType: IContentType | null }> => {
   const contentType = await ContentType.findById(contentTypeId);
   if (!contentType) {
-    throw new Error('ContentType not found');
+    return { isValid: false, errors: [{ field: 'contentTypeId', message: 'ContentType not found' }], contentType: null };
+  }
+
+  if (!data || typeof data !== 'object') {
+    return { isValid: false, errors: [{ field: 'data', message: 'Content data is missing or invalid' }], contentType };
   }
 
   const errors: { field: string; message: string }[] = [];
@@ -57,15 +61,49 @@ export const validateContentData = async (
     }
 
     // Validate enumeration values
-    if (fieldDef.enum && fieldDef.enum.length > 0) {
+    if (fieldDef.enum && fieldDef.enum.length > 0 && value !== undefined) {
       if (!fieldDef.enum.includes(value)) {
         errors.push({ field: fieldDef.name, message: `Field '${fieldDef.name}' must be one of [${fieldDef.enum.join(', ')}].` });
       }
     }
   }
 
-  if (errors.length > 0) {
-    throw new Error(JSON.stringify({ error: 'Validation Error', details: errors }));
+  return { isValid: errors.length === 0, errors, contentType };
+};
+
+const handleContentItemOperation = async (
+  operation: 'create' | 'update',
+  companyId: string,
+  contentTypeId: string,
+  data: any,
+  existingItem?: IContentItem
+): Promise<IContentItem | { error: string; details: any }> => {
+  const validation = await validateContentData(contentTypeId, data);
+
+  if (!validation.isValid) {
+    return {
+      error: 'Validation Error',
+      details: {
+        message: 'Request does not match the content type schema.',
+        schema: validation.contentType?.fields,
+        errors: validation.errors
+      }
+    };
+  }
+
+  if (operation === 'create') {
+    const contentItem = new ContentItem({
+      companyId,
+      contentTypeId,
+      data,
+    });
+    return await contentItem.save();
+  } else {
+    if (!existingItem) {
+      return { error: 'Not Found', details: { message: 'Content item not found' } };
+    }
+    existingItem.data = data;
+    return await existingItem.save();
   }
 };
 
@@ -73,33 +111,20 @@ export const createContentItem = async (
   companyId: string,
   contentTypeId: string,
   data: any
-): Promise<IContentItem> => {
-  await validateContentData(contentTypeId, data);
-
-  const contentItem = new ContentItem({
-    companyId,
-    contentTypeId,
-    data,
-  });
-
-  return await contentItem.save();
+): Promise<IContentItem | { error: string; details: any }> => {
+  return handleContentItemOperation('create', companyId, contentTypeId, data);
 };
 
 export const updateContentItem = async (
   id: string,
   companyId: string,
   data: any
-): Promise<IContentItem | null> => {
-  const contentItem = await ContentItem.findOne({ _id: id, companyId });
-
-  if (!contentItem) {
-    throw new Error('Content item not found');
+): Promise<IContentItem | { error: string; details: any }> => {
+  const existingItem = await ContentItem.findOne({ _id: id, companyId });
+  if (!existingItem) {
+    return { error: 'Not Found', details: { message: 'Content item not found' } };
   }
-
-  await validateContentData(contentItem.contentTypeId.toString(), data);
-
-  contentItem.data = data;
-  return await contentItem.save();
+  return handleContentItemOperation('update', companyId, existingItem.contentTypeId.toString(), data, existingItem);
 };
 
 export const getContentItems = async (
