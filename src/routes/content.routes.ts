@@ -4,6 +4,30 @@ import * as ContentService from '../services/content.service';
 
 const contentRouter = express.Router();
 
+// Get content items by content type ID
+contentRouter.get('/type/:contentTypeId', verifyAccess(), async (req: AuthenticatedRequest, res) => {
+  const { contentTypeId } = req.params;
+  const { orderBy, limit, skip } = req.query;
+
+  if (!req.company?._id) {
+    return res.status(400).json({ error: 'Company ID is required' });
+  }
+
+  try {
+    const contentItems = await ContentService.getContentItemsByType(
+      req.company._id,
+      contentTypeId,
+      orderBy as string | undefined,
+      limit ? parseInt(limit as string) : undefined,
+      skip ? parseInt(skip as string) : undefined
+    );
+    res.status(200).json(contentItems);
+  } catch (error) {
+    console.error('Error getting content items by content type ID:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Create a new content item
 contentRouter.post('/', verifyAccess(), async (req: AuthenticatedRequest, res) => {
   const { contentTypeId, data } = req.body;
