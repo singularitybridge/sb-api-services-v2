@@ -39,6 +39,8 @@ export class ActionDiscoveryService {
       aiAgentExecutor: 'cpu',
       assistant: 'message-square',
       calendar: 'calendar',
+      content: 'file',
+      contentType: 'layers',
       debug: 'bug',
       elevenlabs: 'headphones',
       fluximage: 'image',
