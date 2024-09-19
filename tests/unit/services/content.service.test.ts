@@ -20,6 +20,7 @@ afterAll(async () => {
 describe('Content Service', () => {
   const mockCompanyId = new mongoose.Types.ObjectId().toString();
   let mockContentTypeId: string;
+  const mockArtifactKey = 'testArtifactKey';
 
   beforeEach(async () => {
     await ContentItem.deleteMany({});
@@ -32,8 +33,8 @@ describe('Content Service', () => {
       fields: [
         { name: 'title', type: 'string', required: true },
         { name: 'body', type: 'string', required: true },
-        { name: 'tags', type: 'array', required: false }
-      ]
+        { name: 'tags', type: 'array', required: false },
+      ],
     });
     await contentType.save();
     mockContentTypeId = contentType._id.toString();
@@ -43,10 +44,15 @@ describe('Content Service', () => {
     const contentData = {
       title: 'Test Content',
       body: 'This is a test content',
-      tags: ['test', 'content']
+      tags: ['test', 'content'],
     };
 
-    const createdContent = await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData) as IContentItem;
+    const createdContent = (await ContentService.createContentItem(
+      mockCompanyId,
+      mockContentTypeId,
+      contentData,
+      mockArtifactKey
+    )) as IContentItem;
 
     expect(createdContent).toBeDefined();
     expect(createdContent.data.title).toBe(contentData.title);
@@ -58,8 +64,8 @@ describe('Content Service', () => {
     const contentData1 = { title: 'Content 1', body: 'Body 1' };
     const contentData2 = { title: 'Content 2', body: 'Body 2' };
 
-    await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData1);
-    await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData2);
+    await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData1, mockArtifactKey);
+    await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData2, mockArtifactKey);
 
     const contentItems = await ContentService.getContentItems(mockCompanyId);
 
@@ -71,19 +77,34 @@ describe('Content Service', () => {
 
   it('should update a content item', async () => {
     const contentData = { title: 'Original Title', body: 'Original body' };
-    const createdContent = await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData) as IContentItem;
+    const createdContent = (await ContentService.createContentItem(
+      mockCompanyId,
+      mockContentTypeId,
+      contentData,
+      mockArtifactKey
+    )) as IContentItem;
 
     const updatedData = { title: 'Updated Title', body: 'Updated body' };
-    const updatedContent = await ContentService.updateContentItem(createdContent._id.toString(), mockCompanyId, updatedData) as IContentItem;
+    const updatedContent = (await ContentService.updateContentItem(
+      createdContent._id.toString(),
+      mockCompanyId,
+      updatedData,
+      mockArtifactKey
+    )) as IContentItem;
 
     expect(updatedContent).toBeDefined();
-    expect(updatedContent?.data.title).toBe(updatedData.title);
-    expect(updatedContent?.data.body).toBe(updatedData.body);
+    expect(updatedContent.data.title).toBe(updatedData.title);
+    expect(updatedContent.data.body).toBe(updatedData.body);
   });
 
   it('should delete a content item', async () => {
     const contentData = { title: 'To be deleted', body: 'This will be deleted' };
-    const createdContent = await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData) as IContentItem;
+    const createdContent = (await ContentService.createContentItem(
+      mockCompanyId,
+      mockContentTypeId,
+      contentData,
+      mockArtifactKey
+    )) as IContentItem;
 
     const result = await ContentService.deleteContentItem(createdContent._id.toString(), mockCompanyId);
 
