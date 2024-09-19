@@ -7,16 +7,17 @@ const contentRouter = express.Router();
 // Get content items by content type ID
 contentRouter.get('/type/:contentTypeId', verifyAccess(), async (req: AuthenticatedRequest, res) => {
   const { contentTypeId } = req.params;
-  const { orderBy, limit, skip } = req.query;
+  const { orderBy, limit, skip, artifactKey } = req.query;
 
   if (!req.company?._id) {
     return res.status(400).json({ error: 'Company ID is required' });
   }
 
   try {
-    const contentItems = await ContentService.getContentItemsByType(
+    const contentItems = await ContentService.getContentItems(
       req.company._id,
       contentTypeId,
+      artifactKey as string | undefined,
       orderBy as string | undefined,
       limit ? parseInt(limit as string) : undefined,
       skip ? parseInt(skip as string) : undefined
@@ -28,18 +29,46 @@ contentRouter.get('/type/:contentTypeId', verifyAccess(), async (req: Authentica
   }
 });
 
+// Get content items by artifact key
+contentRouter.get('/artifact/:artifactKey', verifyAccess(), async (req: AuthenticatedRequest, res) => {
+  const { artifactKey } = req.params;
+  const { contentTypeId, orderBy, limit, skip } = req.query;
+
+  if (!req.company?._id) {
+    return res.status(400).json({ error: 'Company ID is required' });
+  }
+
+  try {
+    const contentItems = await ContentService.getContentItemsByArtifactKey(
+      req.company._id,
+      artifactKey,
+      contentTypeId as string | undefined,
+      orderBy as string | undefined,
+      limit ? parseInt(limit as string) : undefined,
+      skip ? parseInt(skip as string) : undefined
+    );
+    res.status(200).json(contentItems);
+  } catch (error) {
+    console.error('Error getting content items by artifact key:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Create a new content item
 contentRouter.post('/', verifyAccess(), async (req: AuthenticatedRequest, res) => {
-  const { contentTypeId, data } = req.body;
+  const { contentTypeId, data, artifactKey } = req.body;
   if (!req.company?._id) {
     return res.status(400).json({ error: 'Company ID is required' });
   }
   if (!contentTypeId) {
     return res.status(400).json({ error: 'Content Type ID is required' });
   }
+  if (!artifactKey) {
+    return res.status(400).json({ error: 'Artifact Key is required' });
+  }
 
   try {
-    const contentItem = await ContentService.createContentItem(req.company._id, contentTypeId, data);
+    const contentItem = await ContentService.createContentItem(req.company._id, contentTypeId, data, artifactKey);
     res.status(201).json(contentItem);
   } catch (error) {
     console.error('Error creating content item:', error);
@@ -49,7 +78,7 @@ contentRouter.post('/', verifyAccess(), async (req: AuthenticatedRequest, res) =
 
 // Get all content items
 contentRouter.get('/', verifyAccess(), async (req: AuthenticatedRequest, res) => {
-  const { contentTypeId, orderBy, limit, skip } = req.query;
+  const { contentTypeId, artifactKey, orderBy, limit, skip } = req.query;
   if (!req.company?._id) {
     return res.status(400).json({ error: 'Company ID is required' });
   }
@@ -58,6 +87,7 @@ contentRouter.get('/', verifyAccess(), async (req: AuthenticatedRequest, res) =>
     const contentItems = await ContentService.getContentItems(
       req.company._id,
       contentTypeId as string | undefined,
+      artifactKey as string | undefined,
       orderBy as string | undefined,
       limit ? parseInt(limit as string) : undefined,
       skip ? parseInt(skip as string) : undefined
@@ -91,14 +121,15 @@ contentRouter.get('/:id', verifyAccess(), async (req: AuthenticatedRequest, res)
 // Update a content item
 contentRouter.put('/:id', verifyAccess(), async (req: AuthenticatedRequest, res) => {
   const { id } = req.params;
+  const { data, artifactKey } = req.body;
   if (!req.company?._id) {
     return res.status(400).json({ error: 'Company ID is required' });
   }
 
   try {
-    const contentItem = await ContentService.updateContentItem(id, req.company._id, req.body);
-    if (!contentItem) {
-      return res.status(404).json({ error: 'Content item not found' });
+    const contentItem = await ContentService.updateContentItem(id, req.company._id, data, artifactKey);
+    if ('error' in contentItem) {
+      return res.status(400).json(contentItem);
     }
     res.status(200).json(contentItem);
   } catch (error) {

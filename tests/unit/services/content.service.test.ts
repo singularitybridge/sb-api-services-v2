@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import * as ContentService from '../../../src/services/content.service';
-import { ContentItem } from '../../../src/models/ContentItem';
+import { ContentItem, IContentItem } from '../../../src/models/ContentItem';
 import { ContentType } from '../../../src/models/ContentType';
 
 let mongoServer: MongoMemoryServer;
@@ -46,7 +46,7 @@ describe('Content Service', () => {
       tags: ['test', 'content']
     };
 
-    const createdContent = await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData);
+    const createdContent = await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData) as IContentItem;
 
     expect(createdContent).toBeDefined();
     expect(createdContent.data.title).toBe(contentData.title);
@@ -71,10 +71,10 @@ describe('Content Service', () => {
 
   it('should update a content item', async () => {
     const contentData = { title: 'Original Title', body: 'Original body' };
-    const createdContent = await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData);
+    const createdContent = await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData) as IContentItem;
 
     const updatedData = { title: 'Updated Title', body: 'Updated body' };
-    const updatedContent = await ContentService.updateContentItem(createdContent._id.toString(), mockCompanyId, updatedData);
+    const updatedContent = await ContentService.updateContentItem(createdContent._id.toString(), mockCompanyId, updatedData) as IContentItem;
 
     expect(updatedContent).toBeDefined();
     expect(updatedContent?.data.title).toBe(updatedData.title);
@@ -83,7 +83,7 @@ describe('Content Service', () => {
 
   it('should delete a content item', async () => {
     const contentData = { title: 'To be deleted', body: 'This will be deleted' };
-    const createdContent = await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData);
+    const createdContent = await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData) as IContentItem;
 
     const result = await ContentService.deleteContentItem(createdContent._id.toString(), mockCompanyId);
 

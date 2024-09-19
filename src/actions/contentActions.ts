@@ -19,10 +19,14 @@ export const createContentActions = (
           description: 'The content data of the item',
           additionalProperties: true,
         },
+        artifactKey: {
+          type: 'string',
+          description: 'The artifact key to group multiple content items',
+        },
       },
-      required: ['contentTypeId', 'data'],
+      required: ['contentTypeId', 'data', 'artifactKey'],
     },
-    function: async (args: { contentTypeId: string; data: any }) => {
+    function: async (args: { contentTypeId: string; data: any; artifactKey: string }) => {
       try {
         const session = await Session.findById(context.sessionId);
         if (!session) {
@@ -41,6 +45,7 @@ export const createContentActions = (
           session.companyId,
           args.contentTypeId,
           args.data,
+          args.artifactKey,
         );
         if ('error' in result) {
           return {
@@ -77,6 +82,10 @@ export const createContentActions = (
           type: 'string',
           description: 'The ID of the content type to filter by (optional)',
         },
+        artifactKey: {
+          type: 'string',
+          description: 'The artifact key to filter by (optional)',
+        },
         orderBy: {
           type: 'string',
           description: 'The field to order by (optional)',
@@ -94,6 +103,7 @@ export const createContentActions = (
     },
     function: async (args: {
       contentTypeId?: string;
+      artifactKey?: string;
       orderBy?: string;
       limit?: number;
       skip?: number;
@@ -106,6 +116,7 @@ export const createContentActions = (
         const contentItems = await ContentService.getContentItems(
           session.companyId,
           args.contentTypeId,
+          args.artifactKey,
           args.orderBy,
           args.limit,
           args.skip,
@@ -125,6 +136,69 @@ export const createContentActions = (
     },
   },
 
+  getContentItemsByArtifactKey: {
+    description: 'Get content items by artifact key',
+    parameters: {
+      type: 'object',
+      properties: {
+        artifactKey: {
+          type: 'string',
+          description: 'The artifact key to filter by',
+        },
+        contentTypeId: {
+          type: 'string',
+          description: 'The ID of the content type to filter by (optional)',
+        },
+        orderBy: {
+          type: 'string',
+          description: 'The field to order by (optional)',
+        },
+        limit: {
+          type: 'number',
+          description: 'The maximum number of items to return (optional)',
+        },
+        skip: {
+          type: 'number',
+          description: 'The number of items to skip (optional)',
+        },
+      },
+      required: ['artifactKey'],
+    },
+    function: async (args: {
+      artifactKey: string;
+      contentTypeId?: string;
+      orderBy?: string;
+      limit?: number;
+      skip?: number;
+    }) => {
+      try {
+        const session = await Session.findById(context.sessionId);
+        if (!session) {
+          return { success: false, description: 'Invalid session' };
+        }
+        const contentItems = await ContentService.getContentItemsByArtifactKey(
+          session.companyId,
+          args.artifactKey,
+          args.contentTypeId,
+          args.orderBy,
+          args.limit,
+          args.skip,
+        );
+        return {
+          success: true,
+          description: 'Content items retrieved successfully',
+          data: contentItems,
+        };
+      } catch (error) {
+        console.error('Error getting content items by artifact key:', error);
+        return {
+          success: false,
+          description: 'Failed to retrieve content items by artifact key',
+        };
+      }
+    },
+  },
+
   updateContentItem: {
     description: 'Update an existing content item',
     parameters: {
@@ -135,10 +209,14 @@ export const createContentActions = (
           description: 'The ID of the content item to update',
         },
         data: { type: 'object', description: 'The data to update' },
+        artifactKey: {
+          type: 'string',
+          description: 'The new artifact key (optional)',
+        },
       },
       required: ['itemId', 'data'],
     },
-    function: async (args: { itemId: string; data: any }) => {
+    function: async (args: { itemId: string; data: any; artifactKey?: string }) => {
       try {
         const session = await Session.findById(context.sessionId);
         if (!session) {
@@ -148,6 +226,7 @@ export const createContentActions = (
           args.itemId,
           session.companyId,
           args.data,
+          args.artifactKey || '',
         );
         if ('error' in result) {
           return {
