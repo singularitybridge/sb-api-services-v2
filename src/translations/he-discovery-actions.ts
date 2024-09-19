@@ -44,6 +44,46 @@ export const hebrewTranslations = {
     actionTitle: 'יצירת עוזר חדש',
     description: 'פעולה ליצירת עוזר חדש'
   },
+  'content.createContentItem': {
+    serviceName: 'תוכן',
+    actionTitle: 'יצירת פריט תוכן',
+    description: 'יצירת פריט תוכן חדש'
+  },
+  'content.getContentItems': {
+    serviceName: 'תוכן',
+    actionTitle: 'קבלת פריטי תוכן',
+    description: 'קבלת כל פריטי התוכן עבור החברה'
+  },
+  'content.updateContentItem': {
+    serviceName: 'תוכן',
+    actionTitle: 'עדכון פריט תוכן',
+    description: 'עדכון פריט תוכן קיים'
+  },
+  'content.deleteContentItem': {
+    serviceName: 'תוכן',
+    actionTitle: 'מחיקת פריט תוכן',
+    description: 'מחיקת פריט תוכן'
+  },
+  'contentType.createContentType': {
+    serviceName: 'סוג תוכן',
+    actionTitle: 'יצירת סוג תוכן',
+    description: 'יצירת סוג תוכן חדש'
+  },
+  'contentType.getContentTypes': {
+    serviceName: 'סוג תוכן',
+    actionTitle: 'קבלת סוגי תוכן',
+    description: 'קבלת כל סוגי התוכן עבור החברה'
+  },
+  'contentType.updateContentType': {
+    serviceName: 'סוג תוכן',
+    actionTitle: 'עדכון סוג תוכן',
+    description: 'עדכון סוג תוכן קיים'
+  },
+  'contentType.deleteContentType': {
+    serviceName: 'סוג תוכן',
+    actionTitle: 'מחיקת סוג תוכן',
+    description: 'מחיקת סוג תוכן'
+  },
   'debug.getSessionInfo': {
     serviceName: 'ניפוי באגים',
     actionTitle: 'קבלת מידע על הסשן',
