@@ -1,41 +1,38 @@
-import express, { Request, Response } from 'express';
-import { verifyAccess } from '../middleware/auth.middleware';
+import express from 'express';
+import { AuthenticatedRequest, verifyAccess } from '../middleware/auth.middleware';
 import * as ContentService from '../services/content.service';
 
-const router = express.Router();
-
-interface AuthenticatedRequest extends Request {
-  companyId?: string;
-}
+const contentRouter = express.Router();
 
 // Create a new content item
-router.post('/', verifyAccess(), async (req: AuthenticatedRequest, res: Response) => {
+contentRouter.post('/', verifyAccess(), async (req: AuthenticatedRequest, res) => {
+  const { contentTypeId, data } = req.body;
+  if (!req.company?._id) {
+    return res.status(400).json({ error: 'Company ID is required' });
+  }
+  if (!contentTypeId) {
+    return res.status(400).json({ error: 'Content Type ID is required' });
+  }
+
   try {
-    const companyId = req.companyId;
-    const { contentTypeId, data } = req.body;
-    if (!companyId) {
-      return res.status(400).json({ error: 'Company ID is required' });
-    }
-    if (!contentTypeId) {
-      return res.status(400).json({ error: 'Content Type ID is required' });
-    }
-    const contentItem = await ContentService.createContentItem(companyId, contentTypeId, data);
+    const contentItem = await ContentService.createContentItem(req.company._id, contentTypeId, data);
     res.status(201).json(contentItem);
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'An unknown error occurred' });
+    console.error('Error creating content item:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Get all content items
-router.get('/', verifyAccess(), async (req: AuthenticatedRequest, res: Response) => {
+contentRouter.get('/', verifyAccess(), async (req: AuthenticatedRequest, res) => {
+  const { contentTypeId, orderBy, limit, skip } = req.query;
+  if (!req.company?._id) {
+    return res.status(400).json({ error: 'Company ID is required' });
+  }
+
   try {
-    const companyId = req.companyId;
-    const { contentTypeId, orderBy, limit, skip } = req.query;
-    if (!companyId) {
-      return res.status(400).json({ error: 'Company ID is required' });
-    }
     const contentItems = await ContentService.getContentItems(
-      companyId,
+      req.company._id,
       contentTypeId as string | undefined,
       orderBy as string | undefined,
       limit ? parseInt(limit as string) : undefined,
@@ -43,60 +40,67 @@ router.get('/', verifyAccess(), async (req: AuthenticatedRequest, res: Response)
     );
     res.status(200).json(contentItems);
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'An unknown error occurred' });
+    console.error('Error getting content items:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Get a specific content item
-router.get('/:id', verifyAccess(), async (req: AuthenticatedRequest, res: Response) => {
+contentRouter.get('/:id', verifyAccess(), async (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
+  if (!req.company?._id) {
+    return res.status(400).json({ error: 'Company ID is required' });
+  }
+
   try {
-    const companyId = req.companyId;
-    if (!companyId) {
-      return res.status(400).json({ error: 'Company ID is required' });
-    }
-    const contentItem = await ContentService.getContentItem(req.params.id, companyId);
+    const contentItem = await ContentService.getContentItem(id, req.company._id);
     if (!contentItem) {
       return res.status(404).json({ error: 'Content item not found' });
     }
     res.status(200).json(contentItem);
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'An unknown error occurred' });
+    console.error('Error getting content item:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Update a content item
-router.put('/:id', verifyAccess(), async (req: AuthenticatedRequest, res: Response) => {
+contentRouter.put('/:id', verifyAccess(), async (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
+  if (!req.company?._id) {
+    return res.status(400).json({ error: 'Company ID is required' });
+  }
+
   try {
-    const companyId = req.companyId;
-    if (!companyId) {
-      return res.status(400).json({ error: 'Company ID is required' });
-    }
-    const contentItem = await ContentService.updateContentItem(req.params.id, companyId, req.body);
+    const contentItem = await ContentService.updateContentItem(id, req.company._id, req.body);
     if (!contentItem) {
       return res.status(404).json({ error: 'Content item not found' });
     }
     res.status(200).json(contentItem);
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'An unknown error occurred' });
+    console.error('Error updating content item:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Delete a content item
-router.delete('/:id', verifyAccess(), async (req: AuthenticatedRequest, res: Response) => {
+contentRouter.delete('/:id', verifyAccess(), async (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
+  if (!req.company?._id) {
+    return res.status(400).json({ error: 'Company ID is required' });
+  }
+
   try {
-    const companyId = req.companyId;
-    if (!companyId) {
-      return res.status(400).json({ error: 'Company ID is required' });
-    }
-    const result = await ContentService.deleteContentItem(req.params.id, companyId);
+    const result = await ContentService.deleteContentItem(id, req.company._id);
     if (result) {
       res.status(200).json({ message: 'Content item deleted' });
     } else {
       res.status(404).json({ error: 'Content item not found' });
     }
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'An unknown error occurred' });
+    console.error('Error deleting content item:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-export default router;
+export { contentRouter };

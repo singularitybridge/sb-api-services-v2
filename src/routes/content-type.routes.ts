@@ -1,70 +1,79 @@
-import express, { Request, Response } from 'express';
-import { verifyAccess } from '../middleware/auth.middleware';
+import express from 'express';
+import { AuthenticatedRequest, verifyAccess } from '../middleware/auth.middleware';
 import { ContentTypeService } from '../services/content-type.service';
 
-const router = express.Router();
+const contentTypeRouter = express.Router();
 
 // Get all content types
-router.get('/', verifyAccess(), async (req: Request, res: Response) => {
+contentTypeRouter.get('/', verifyAccess(), async (req: AuthenticatedRequest, res) => {
   try {
     const contentTypes = await ContentTypeService.getAllContentTypes();
     res.status(200).json(contentTypes);
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'An unknown error occurred' });
+    console.error('Error getting all content types:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Get a specific content type
-router.get('/:id', verifyAccess(), async (req: Request, res: Response) => {
+contentTypeRouter.get('/:id', verifyAccess(), async (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
   try {
-    const contentType = await ContentTypeService.getContentTypeById(req.params.id);
+    const contentType = await ContentTypeService.getContentTypeById(id);
     if (!contentType) {
       return res.status(404).json({ error: 'Content type not found' });
     }
     res.status(200).json(contentType);
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'An unknown error occurred' });
+    console.error('Error getting content type:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Create a new content type
-router.post('/', verifyAccess(), async (req: Request & { user?: { companyId: string } }, res: Response) => {
+contentTypeRouter.post('/', verifyAccess(), async (req: AuthenticatedRequest, res) => {
+  if (!req.company?._id) {
+    return res.status(400).json({ error: 'Company ID is required' });
+  }
+
   try {
-    if (!req.user || !req.user.companyId) {
-      return res.status(400).json({ error: 'Company ID is required' });
-    }
-    const contentTypeData = { ...req.body, companyId: req.user.companyId };
+    const contentTypeData = { ...req.body, companyId: req.company._id };
     const contentType = await ContentTypeService.createContentType(contentTypeData);
     res.status(201).json(contentType);
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'An unknown error occurred' });
+    console.error('Error creating content type:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Update a content type
-router.put('/:id', verifyAccess(), async (req: Request, res: Response) => {
+contentTypeRouter.put('/:id', verifyAccess(), async (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
   try {
-    const contentType = await ContentTypeService.updateContentType(req.params.id, req.body);
+    const contentType = await ContentTypeService.updateContentType(id, req.body);
     if (!contentType) {
       return res.status(404).json({ error: 'Content type not found' });
     }
     res.status(200).json(contentType);
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'An unknown error occurred' });
+    console.error('Error updating content type:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Delete a content type
-router.delete('/:id', verifyAccess(), async (req: Request, res: Response) => {
+contentTypeRouter.delete('/:id', verifyAccess(), async (req: AuthenticatedRequest, res) => {
+  const { id } = req.params;
   try {
-    const contentType = await ContentTypeService.deleteContentType(req.params.id);
+    const contentType = await ContentTypeService.deleteContentType(id);
     if (!contentType) {
       return res.status(404).json({ error: 'Content type not found' });
     }
     res.status(200).json({ message: 'Content type deleted' });
   } catch (error) {
-    res.status(500).json({ error: error instanceof Error ? error.message : 'An unknown error occurred' });
+    console.error('Error deleting content type:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-export default router;
+export { contentTypeRouter };
