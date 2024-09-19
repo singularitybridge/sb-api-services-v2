@@ -76,6 +76,7 @@ const handleContentItemOperation = async (
   companyId: string,
   contentTypeId: string,
   data: any,
+  artifactKey: string,
   existingItem?: IContentItem
 ): Promise<IContentItem | { error: string; details: any }> => {
   const validation = await validateContentData(contentTypeId, data);
@@ -95,6 +96,7 @@ const handleContentItemOperation = async (
     const contentItem = new ContentItem({
       companyId,
       contentTypeId,
+      artifactKey,
       data,
     });
     return await contentItem.save();
@@ -103,6 +105,7 @@ const handleContentItemOperation = async (
       return { error: 'Not Found', details: { message: 'Content item not found' } };
     }
     existingItem.data = data;
+    existingItem.artifactKey = artifactKey;
     return await existingItem.save();
   }
 };
@@ -110,26 +113,29 @@ const handleContentItemOperation = async (
 export const createContentItem = async (
   companyId: string,
   contentTypeId: string,
-  data: any
+  data: any,
+  artifactKey: string
 ): Promise<IContentItem | { error: string; details: any }> => {
-  return handleContentItemOperation('create', companyId, contentTypeId, data);
+  return handleContentItemOperation('create', companyId, contentTypeId, data, artifactKey);
 };
 
 export const updateContentItem = async (
   id: string,
   companyId: string,
-  data: any
+  data: any,
+  artifactKey: string
 ): Promise<IContentItem | { error: string; details: any }> => {
   const existingItem = await ContentItem.findOne({ _id: id, companyId });
   if (!existingItem) {
     return { error: 'Not Found', details: { message: 'Content item not found' } };
   }
-  return handleContentItemOperation('update', companyId, existingItem.contentTypeId.toString(), data, existingItem);
+  return handleContentItemOperation('update', companyId, existingItem.contentTypeId.toString(), data, artifactKey, existingItem);
 };
 
 export const getContentItems = async (
   companyId: string,
   contentTypeId?: string,
+  artifactKey?: string,
   orderBy?: string,
   limit?: number,
   skip?: number
@@ -137,6 +143,9 @@ export const getContentItems = async (
   const query: any = { companyId };
   if (contentTypeId) {
     query.contentTypeId = contentTypeId;
+  }
+  if (artifactKey) {
+    query.artifactKey = artifactKey;
   }
 
   let sort: any = {};
@@ -158,6 +167,33 @@ export const getContentItem = async (
   companyId: string
 ): Promise<IContentItem | null> => {
   return await ContentItem.findOne({ _id: id, companyId });
+};
+
+export const getContentItemsByArtifactKey = async (
+  companyId: string,
+  artifactKey: string,
+  contentTypeId?: string,
+  orderBy?: string,
+  limit?: number,
+  skip?: number
+): Promise<IContentItem[]> => {
+  const query: any = { companyId, artifactKey };
+  if (contentTypeId) {
+    query.contentTypeId = contentTypeId;
+  }
+
+  let sort: any = {};
+  if (orderBy) {
+    const [field, order] = orderBy.split(':');
+    sort[`data.${field}`] = order === 'desc' ? -1 : 1;
+  } else {
+    sort = { createdAt: -1 };
+  }
+
+  return await ContentItem.find(query)
+    .sort(sort)
+    .limit(limit || 10)
+    .skip(skip || 0);
 };
 
 export const deleteContentItem = async (
