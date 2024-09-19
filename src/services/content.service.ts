@@ -168,6 +168,29 @@ export const deleteContentItem = async (
   return result.deletedCount === 1;
 };
 
+export const getContentItemsByType = async (
+  companyId: string,
+  contentTypeId: string,
+  orderBy?: string,
+  limit?: number,
+  skip?: number
+): Promise<IContentItem[]> => {
+  const query: any = { companyId, contentTypeId };
+
+  let sort: any = {};
+  if (orderBy) {
+    const [field, order] = orderBy.split(':');
+    sort[`data.${field}`] = order === 'desc' ? -1 : 1;
+  } else {
+    sort = { createdAt: -1 };
+  }
+
+  return await ContentItem.find(query)
+    .sort(sort)
+    .limit(limit || 10)
+    .skip(skip || 0);
+};
+
 export const getContentTypes = async (companyId: string): Promise<IContentType[]> => {
   return await ContentType.find({ companyId });
 };
