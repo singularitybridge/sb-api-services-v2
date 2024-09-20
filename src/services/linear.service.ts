@@ -1,4 +1,4 @@
-import { LinearClient, Issue, IssueConnection, IssuePayload, User, UserConnection, Team } from "@linear/sdk";
+import { LinearClient, Issue, IssueConnection, IssuePayload, User, UserConnection, Team, WorkflowStateConnection, WorkflowState } from "@linear/sdk";
 import { getApiKey } from './api.key.service';
 
 const createLinearClient = async (companyId: string): Promise<LinearClient> => {
@@ -29,10 +29,31 @@ export const createIssue = async (companyId: string, title: string, description:
   }
 };
 
-export const updateIssue = async (companyId: string, issueId: string, updateData: { title?: string; state?: string }): Promise<void> => {
+export const updateIssue = async (companyId: string, issueId: string, updateData: { title?: string; status?: string }): Promise<void> => {
   try {
     const linearClient = await createLinearClient(companyId);
-    await linearClient.updateIssue(issueId, updateData);
+
+    const issue = await linearClient.issue(issueId);
+    if (!issue) {
+      throw new Error('Issue not found');
+    }
+
+    const updatePayload: any = {};
+
+    if (updateData.title) {
+      updatePayload.title = updateData.title;
+    }
+
+    if (updateData.status) {
+      const states = await linearClient.workflowStates();
+      const status = states.nodes.find(s => s.name.toLowerCase() === updateData.status!.toLowerCase());
+      if (!status) {
+        throw new Error('Invalid status');
+      }
+      updatePayload.stateId = status.id;
+    }
+
+    await issue.update(updatePayload);
   } catch (error) {    
     throw new Error('Error updating issue');
   }
@@ -117,5 +138,15 @@ export const fetchTeams = async (companyId: string): Promise<Team[]> => {
   } catch (error) {
     console.error("Error fetching Linear teams:", error);
     throw new Error('Error fetching teams');
+  }
+};
+
+export const fetchIssueStatuses = async (companyId: string): Promise<WorkflowState[]> => {
+  try {
+    const linearClient = await createLinearClient(companyId);
+    const states: WorkflowStateConnection = await linearClient.workflowStates();
+    return states.nodes;
+  } catch (error) {
+    throw new Error('Error fetching issue statuses');
   }
 };
