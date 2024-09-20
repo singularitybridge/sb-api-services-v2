@@ -1,4 +1,4 @@
-import { LinearClient, Issue, IssueConnection, IssuePayload, User, UserConnection, Team, WorkflowStateConnection, WorkflowState } from "@linear/sdk";
+import { LinearClient, Issue, IssueConnection, IssuePayload, User, UserConnection, Team, WorkflowStateConnection, WorkflowState, Comment, CommentPayload } from "@linear/sdk";
 import { getApiKey } from './api.key.service';
 
 const createLinearClient = async (companyId: string): Promise<LinearClient> => {
@@ -152,5 +152,19 @@ export const fetchIssueStatuses = async (companyId: string): Promise<WorkflowSta
     return states.nodes;
   } catch (error) {
     throw new Error('Error fetching issue statuses');
+  }
+};
+
+export const createComment = async (companyId: string, issueId: string, body: string): Promise<CommentPayload> => {
+  try {
+    const linearClient = await createLinearClient(companyId);
+    const commentPayload = await linearClient.createComment({
+      issueId,
+      body
+    });
+    return commentPayload;
+  } catch (error) {
+    console.error("Error creating comment:", error);
+    throw new Error('Error creating comment');
   }
 };
