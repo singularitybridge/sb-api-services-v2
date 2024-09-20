@@ -29,8 +29,8 @@ router.post('/issues', async (req: AuthenticatedRequest, res) => {
 router.put('/issues/:id', async (req: AuthenticatedRequest, res) => {
   try {
     const { id } = req.params;
-    const { title, state } = req.body;
-    await linearService.updateIssue(req.company._id, id, { title, state });
+    const { title, status } = req.body;
+    await linearService.updateIssue(req.company._id, id, { title, status });
     res.status(200).json({ message: 'Issue updated successfully' });
   } catch (error) {
     res.status(500).json({ error: 'Error updating issue' });
@@ -82,6 +82,15 @@ router.get('/users', async (req: AuthenticatedRequest, res) => {
     res.json(users);
   } catch (error) {
     res.status(500).json({ error: 'Error fetching user list' });
+  }
+});
+
+router.get('/issues/statuses', async (req: AuthenticatedRequest, res) => {
+  try {
+    const statuses = await linearService.fetchIssueStatuses(req.company._id);
+    res.json(statuses);
+  } catch (error) {
+    res.status(500).json({ error: 'Error fetching issue statuses' });
   }
 });
 

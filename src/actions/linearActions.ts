@@ -66,9 +66,9 @@ export const createLinearActions = (context: ActionContext) => {
               type: 'string',
               description: 'New title of the issue',
             },
-            state: {
+            status: {
               type: 'string',
-              description: 'New state of the issue',
+              description: 'New status of the issue',
             },
           },
           description: 'Data to update in the issue',
@@ -171,6 +171,19 @@ export const createLinearActions = (context: ActionContext) => {
     },
   };
 
+  const fetchIssueStatuses: FunctionDefinition = {
+    function: async () => {
+      const statuses = await linearService.fetchIssueStatuses(context.companyId);
+      return statuses;
+    },
+    description: 'Fetch issue statuses from Linear',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  };
+
   return {
     fetchIssues,
     createLinearIssue: createIssue,
@@ -181,5 +194,6 @@ export const createLinearActions = (context: ActionContext) => {
     fetchLinearIssuesByDate: fetchIssuesByDate,
     fetchLinearUserList: fetchUserList,
     fetchLinearTeams: fetchTeams,
+    fetchIssueStatuses,
   };
 };
