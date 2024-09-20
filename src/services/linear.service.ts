@@ -29,7 +29,7 @@ export const createIssue = async (companyId: string, title: string, description:
   }
 };
 
-export const updateIssue = async (companyId: string, issueId: string, updateData: { title?: string; status?: string }): Promise<void> => {
+export const updateIssue = async (companyId: string, issueId: string, updateData: { title?: string; description?: string; status?: string }): Promise<void> => {
   try {
     const linearClient = await createLinearClient(companyId);
 
@@ -40,8 +40,12 @@ export const updateIssue = async (companyId: string, issueId: string, updateData
 
     const updatePayload: any = {};
 
-    if (updateData.title) {
+    if (updateData.title !== undefined) {
       updatePayload.title = updateData.title;
+    }
+
+    if (updateData.description !== undefined) {
+      updatePayload.description = updateData.description;
     }
 
     if (updateData.status) {
