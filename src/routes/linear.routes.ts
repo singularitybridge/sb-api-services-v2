@@ -94,4 +94,15 @@ router.get('/issues/statuses', async (req: AuthenticatedRequest, res) => {
   }
 });
 
+router.post('/issues/:id/comments', async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { body } = req.body;
+    const comment = await linearService.createComment(req.company._id, id, body);
+    res.status(201).json(comment);
+  } catch (error) {
+    res.status(500).json({ error: 'Error creating comment' });
+  }
+});
+
 export default router;

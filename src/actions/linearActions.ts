@@ -184,6 +184,28 @@ export const createLinearActions = (context: ActionContext) => {
     },
   };
 
+  const createComment: FunctionDefinition = {
+    function: async ({ issueId, body }) => {
+      const comment = await linearService.createComment(context.companyId, issueId, body);
+      return comment;
+    },
+    description: 'Create a new comment on a Linear issue',
+    parameters: {
+      type: 'object',
+      properties: {
+        issueId: {
+          type: 'string',
+          description: 'ID of the issue to comment on',
+        },
+        body: {
+          type: 'string',
+          description: 'Content of the comment',
+        },
+      },
+      required: ['issueId', 'body'],
+    },
+  };
+
   return {
     fetchIssues,
     createLinearIssue: createIssue,
@@ -195,5 +217,6 @@ export const createLinearActions = (context: ActionContext) => {
     fetchLinearUserList: fetchUserList,
     fetchLinearTeams: fetchTeams,
     fetchIssueStatuses,
+    createLinearComment: createComment,
   };
 };
