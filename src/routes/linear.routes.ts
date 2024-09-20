@@ -29,8 +29,8 @@ router.post('/issues', async (req: AuthenticatedRequest, res) => {
 router.put('/issues/:id', async (req: AuthenticatedRequest, res) => {
   try {
     const { id } = req.params;
-    const { title, status } = req.body;
-    await linearService.updateIssue(req.company._id, id, { title, status });
+    const { title, description, status } = req.body;
+    await linearService.updateIssue(req.company._id, id, { title, description, status });
     res.status(200).json({ message: 'Issue updated successfully' });
   } catch (error) {
     res.status(500).json({ error: 'Error updating issue' });
