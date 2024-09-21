@@ -14,12 +14,14 @@ import { createMongoDbActions } from './mongoDbActions';
 import { createDebugActions } from './debugActions';
 import { createAgendaActions } from './agendaActions';
 import createAIAgentExecutorActions from './aiAgentExecutorActions';
-import { createLinearActions } from './linearActions';
 import { createJournalActions } from './journalActions';
 import { createContentActions } from './contentActions';
-import { createContentTypeActions } from './contentTypeActions'; // Import the content type actions
+import { createContentTypeActions } from './contentTypeActions';
+import { initializeLinearIntegration } from '../integrations/linear';
 
 export const createFunctionFactory = (context: ActionContext, allowedActions: string[]): FunctionFactory => {
+  const linearIntegration = initializeLinearIntegration(context);
+
   const allActions = {
     ...createInboxActions(context),
     ...createAssistantActions(context),
@@ -35,10 +37,10 @@ export const createFunctionFactory = (context: ActionContext, allowedActions: st
     ...createDebugActions(context),
     ...createAgendaActions(context),
     ...createAIAgentExecutorActions(context),
-    ...createLinearActions(context),
+    ...linearIntegration.actions,
     ...createJournalActions(context),
     ...createContentActions(context),
-    ...createContentTypeActions(context), // Add the content type actions
+    ...createContentTypeActions(context),
   };
 
   // Adjust the action names to strip off the service prefix

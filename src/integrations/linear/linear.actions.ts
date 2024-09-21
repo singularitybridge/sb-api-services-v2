@@ -1,5 +1,5 @@
-import { ActionContext, FunctionDefinition } from './types';
-import * as linearService from '../services/linear.service';
+import { ActionContext, FunctionDefinition } from '../../actions/types';
+import * as linearService from './linear.service';
 
 export const createLinearActions = (context: ActionContext) => {
   const fetchIssues: FunctionDefinition = {

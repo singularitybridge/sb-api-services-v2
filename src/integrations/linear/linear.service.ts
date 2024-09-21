@@ -1,5 +1,5 @@
 import { LinearClient, Issue, IssueConnection, IssuePayload, User, UserConnection, Team, WorkflowStateConnection, WorkflowState, Comment, CommentPayload } from "@linear/sdk";
-import { getApiKey } from './api.key.service';
+import { getApiKey } from '../../services/api.key.service';
 
 const createLinearClient = async (companyId: string): Promise<LinearClient> => {
   const apiKey = await getApiKey(companyId, 'linear');
