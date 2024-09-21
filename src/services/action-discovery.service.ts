@@ -1,6 +1,7 @@
 import { readdirSync } from 'fs';
 import { join } from 'path';
 import { hebrewTranslations } from '../translations/he-discovery-actions';
+import { initializeLinearIntegration } from '../integrations/linear';
 
 interface ActionInfo {
   id: string;
@@ -32,6 +33,7 @@ type TranslationMap = {
 
 export class ActionDiscoveryService {
   private actionsPath = join(__dirname, '..', 'actions');
+  private integrationsPath = join(__dirname, '..', 'integrations');
 
   private getIconForService(serviceName: string): string {
     const iconMap: { [key: string]: string } = {
@@ -64,7 +66,7 @@ export class ActionDiscoveryService {
     const actionFiles = readdirSync(this.actionsPath).filter((file) =>
       file.endsWith('Actions.ts'),
     );
-    const actions: ActionInfo[] = [];
+    let actions: ActionInfo[] = [];
 
     for (const file of actionFiles) {
       const serviceName = file.replace('Actions.ts', '');
@@ -132,6 +134,54 @@ export class ActionDiscoveryService {
         }
       } catch (error) {
         console.error(`Failed to process ${file}:`, error);
+      }
+    }
+
+    // Discover plugin actions
+    const pluginActions = await this.discoverPluginActions(language);
+    actions = actions.concat(pluginActions);
+
+    return actions;
+  }
+
+  private async discoverPluginActions(
+    language: SupportedLanguage = 'en',
+  ): Promise<ActionInfo[]> {
+    const actions: ActionInfo[] = [];
+
+    // For now, we're only handling the Linear integration
+    const linearIntegration = initializeLinearIntegration({} as any);
+    const linearActions = linearIntegration.actions;
+
+    for (const [key, value] of Object.entries(linearActions)) {
+      const actionDef = value as ActionDefinition;
+      if (typeof actionDef === 'object' && actionDef.description) {
+        const actionId = `linear.${key}`;
+        const action = {
+          id: actionId,
+          serviceName: this.getLocalizedString(
+            actionId,
+            'serviceName',
+            'Linear',
+            language,
+          ),
+          actionTitle: this.getLocalizedString(
+            actionId,
+            'actionTitle',
+            this.toTitleCase(key),
+            language,
+          ),
+          description: this.getLocalizedString(
+            actionId,
+            'description',
+            actionDef.description,
+            language,
+          ),
+          icon: this.getIconForService('linear'),
+          service: 'linear',
+          parameters: actionDef.parameters,
+        };
+        actions.push(action);
       }
     }
 
