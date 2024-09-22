@@ -1,8 +1,7 @@
 import express from 'express';
-import { ActionDiscoveryService } from '../services/action-discovery.service';
+import { actionDiscoveryService } from '../integrations/action-discovery.service';
 
 const router = express.Router();
-const actionDiscoveryService = new ActionDiscoveryService();
 
 router.get('/discover', async (req, res) => {
   try {

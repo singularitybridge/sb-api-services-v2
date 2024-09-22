@@ -9,7 +9,7 @@ import { createSendGridActions } from './sendgridActions';
 import { createElevenLabsActions } from './elevenLabsActions';
 import { createOpenAiActions } from './openAiActions';
 import { processTemplate } from '../services/template.service';
-import { createPhotoRoomActions } from './photoRoomActions';
+import { createPhotoRoomActions } from '../integrations/photoroom/photoroom.actions';
 import { createMongoDbActions } from './mongoDbActions';
 import { createDebugActions } from './debugActions';
 import { createAgendaActions } from './agendaActions';
