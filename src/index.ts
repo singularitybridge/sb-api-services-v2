@@ -56,9 +56,8 @@ import { journalRouter } from './routes/journal.routes';
 import { jsonbinRouter } from './routes/jsonbin.routes';
 import { fluxImageRouter } from './routes/flux.image.routes';
 import { sendgridRouter } from './routes/sendgrid.routes';
-import { photoRoomRouter } from './routes/photoroom.routes';
 import contentFileRouter from './routes/content-file.routes';
-import actionDiscoveryRouter from './routes/action-discovery.routes';
+import actionDiscoveryRouter from './routes/action.discovery.routes';
 import { contentRouter } from './routes/content.routes';
 import { contentTypeRouter } from './routes/content-type.routes';
 
@@ -106,7 +105,6 @@ app.use('/onboarding', verifyTokenMiddleware, verifyAccess(), onboardingRouter);
 app.use('/jsonbin', verifyTokenMiddleware, verifyAccess(), jsonbinRouter);
 app.use('/flux-image', verifyTokenMiddleware, verifyAccess(), fluxImageRouter);
 app.use('/sendgrid', verifyTokenMiddleware, verifyAccess(), sendgridRouter);
-app.use('/photoroom', verifyTokenMiddleware, verifyAccess(), photoRoomRouter);
 app.use('/content', verifyTokenMiddleware, verifyAccess(), contentRouter);
 app.use(
   '/content-types',
