@@ -4,7 +4,7 @@ import { createAssistantActions } from './assistantActions';
 import { createCalendarActions } from './calendarActions';
 import { createJSONBinActions } from './jsonbinActions';
 import { createFluxImageActions } from './fluxImageActions';
-import { createPerplexityActions } from './perplexityActions';
+import { createPerplexityActions } from '../integrations/perplexity/perplexity.actions';
 import { createSendGridActions } from './sendgridActions';
 import { createElevenLabsActions } from './elevenLabsActions';
 import { createOpenAiActions } from './openAiActions';

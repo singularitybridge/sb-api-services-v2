@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getApiKey } from './api.key.service';
+import { getApiKey } from '../../services/api.key.service';
 
 interface PerplexityResponse {
   id: string;
