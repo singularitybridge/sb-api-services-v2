@@ -1,0 +1,47 @@
+{
+  "serviceName": "Linear",
+  "fetchIssues": {
+    "actionTitle": "Fetch Issues",
+    "description": "Fetch issues from Linear"
+  },
+  "createLinearIssue": {
+    "actionTitle": "Create Issue",
+    "description": "Create a new issue in Linear"
+  },
+  "updateLinearIssue": {
+    "actionTitle": "Update Issue",
+    "description": "Update an existing issue in Linear"
+  },
+  "deleteLinearIssue": {
+    "actionTitle": "Delete Issue",
+    "description": "Delete an issue from Linear"
+  },
+  "fetchAllLinearIssues": {
+    "actionTitle": "Fetch All Issues",
+    "description": "Fetch all issues from Linear"
+  },
+  "fetchLinearIssuesByUser": {
+    "actionTitle": "Fetch Issues by User",
+    "description": "Fetch issues assigned to a specific user from Linear"
+  },
+  "fetchLinearIssuesByDate": {
+    "actionTitle": "Fetch Issues by Date",
+    "description": "Fetch issues created or updated within a specific number of days"
+  },
+  "fetchLinearUserList": {
+    "actionTitle": "Fetch User List",
+    "description": "Fetch list of users from Linear"
+  },
+  "fetchLinearTeams": {
+    "actionTitle": "Fetch Teams",
+    "description": "Fetch list of teams from Linear"
+  },
+  "fetchIssueStatuses": {
+    "actionTitle": "Fetch Issue Statuses",
+    "description": "Fetch issue statuses from Linear"
+  },
+  "createLinearComment": {
+    "actionTitle": "Create Comment",
+    "description": "Create a new comment on a Linear issue"
+  }
+}

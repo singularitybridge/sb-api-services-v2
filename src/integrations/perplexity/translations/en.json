@@ -1,0 +1,7 @@
+{
+  "serviceName": "Perplexity",
+  "perplexitySearch": {
+    "actionTitle": "Search",
+    "description": "Perform a search using the Perplexity API"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "Perplexity",
+  "icon": "search",
+  "apiKeyName": "perplexity_api_key",
+  "actionCreator": "createPerplexityActions",
+  "actionsFile": "perplexity.actions.ts"
+}

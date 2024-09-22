@@ -1,6 +1,0 @@
-{
-  "apiEndpoint": "https://api.linear.app/graphql",
-  "defaultPageSize": 50,
-  "maxRetries": 3,
-  "retryDelay": 1000
-}
