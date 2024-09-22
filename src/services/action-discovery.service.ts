@@ -65,9 +65,15 @@ export class ActionDiscoveryService {
   ): Promise<ActionInfo[]> {
     const regularActions = await this.discoverRegularActions(language);
     const integrationActions = await this.discoverIntegrationActions(language);
+    
+    // Remove Linear actions from integrationActions
+    const nonLinearIntegrationActions = integrationActions.filter(
+      action => action.service !== 'linear'
+    );
+    
     const pluginActions = await this.discoverPluginActions(language);
 
-    return [...regularActions, ...integrationActions, ...pluginActions];
+    return [...regularActions, ...nonLinearIntegrationActions, ...pluginActions];
   }
 
   private async discoverRegularActions(
