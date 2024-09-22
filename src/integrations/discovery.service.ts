@@ -30,7 +30,7 @@ type TranslationMap = {
   [key: string]: TranslationEntry;
 };
 
-export const actionDiscoveryService = {
+export const discoveryService = {
   getIconForService: (serviceName: string): string => {
     const iconMap: { [key: string]: string } = {
       linear: 'trello',
@@ -90,7 +90,7 @@ export const actionDiscoveryService = {
                 serviceName: getLocalizedString(actionId, 'serviceName', toTitleCase(folder), language),
                 actionTitle: getLocalizedString(actionId, 'actionTitle', toTitleCase(key), language),
                 description: getLocalizedString(actionId, 'description', actionDef.description, language),
-                icon: actionDiscoveryService.getIconForService(folder),
+                icon: discoveryService.getIconForService(folder),
                 service: folder,
                 parameters: actionDef.parameters,
               };
