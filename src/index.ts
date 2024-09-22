@@ -57,7 +57,7 @@ import { jsonbinRouter } from './routes/jsonbin.routes';
 import { fluxImageRouter } from './routes/flux.image.routes';
 import { sendgridRouter } from './routes/sendgrid.routes';
 import contentFileRouter from './routes/content-file.routes';
-import actionDiscoveryRouter from './routes/action.discovery.routes';
+import actionDiscoveryRouter from './routes/discovery.routes';
 import { contentRouter } from './routes/content.routes';
 import { contentTypeRouter } from './routes/content-type.routes';
 
