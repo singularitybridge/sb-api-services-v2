@@ -1,79 +1,69 @@
-import { FunctionFactory, ActionContext } from './types';
-import { createInboxActions } from './inboxActions';
-import { createAssistantActions } from './assistantActions';
-import { createCalendarActions } from './calendarActions';
-import { createJSONBinActions } from './jsonbinActions';
-import { createFluxImageActions } from './fluxImageActions';
-import { createPerplexityActions } from '../integrations/perplexity/perplexity.actions';
-import { createSendGridActions } from './sendgridActions';
-import { createElevenLabsActions } from './elevenLabsActions';
-import { createOpenAiActions } from './openAiActions';
+import { readdirSync, existsSync } from 'fs';
+import { join } from 'path';
+import { FunctionFactory, ActionContext, FunctionDefinition } from './types';
 import { processTemplate } from '../services/template.service';
-import { createPhotoRoomActions } from '../integrations/photoroom/photoroom.actions';
-import { createMongoDbActions } from './mongoDbActions';
-import { createDebugActions } from './debugActions';
-import { createAgendaActions } from './agendaActions';
-import createAIAgentExecutorActions from './aiAgentExecutorActions';
-import { createJournalActions } from './journalActions';
-import { createContentActions } from './contentActions';
-import { createContentTypeActions } from './contentTypeActions';
-import { initializeLinearIntegration } from '../integrations/linear';
 
-export const createFunctionFactory = (context: ActionContext, allowedActions: string[]): FunctionFactory => {
-  const linearIntegration = initializeLinearIntegration(context);
-
-  const allActions = {
-    ...createInboxActions(context),
-    ...createAssistantActions(context),
-    // ...createCalendarActions(context),
-    ...createJSONBinActions(context),
-    ...createFluxImageActions(context),
-    ...createPerplexityActions(context),
-    ...createSendGridActions(context),
-    ...createElevenLabsActions(context),
-    ...createOpenAiActions(context),
-    ...createPhotoRoomActions(context),
-    ...createMongoDbActions(context),
-    ...createDebugActions(context),
-    ...createAgendaActions(context),
-    ...createAIAgentExecutorActions(context),
-    ...linearIntegration.actions,
-    ...createJournalActions(context),
-    ...createContentActions(context),
-    ...createContentTypeActions(context),
-  };
-
-  // Adjust the action names to strip off the service prefix
-  const adjustedActions = Object.fromEntries(
-    Object.entries(allActions).map(([actionName, funcDef]) => {
-      const parts = actionName.split('.');
-      const adjustedName = parts.length > 1 ? parts[1] : actionName;
-      return [adjustedName, funcDef];
-    })
+export const createFunctionFactory = async (context: ActionContext, allowedActions: string[]): Promise<FunctionFactory> => {
+  const integrationsPath = join(__dirname, '..', 'integrations');
+  const integrationFolders = readdirSync(integrationsPath).filter(folder =>
+    existsSync(join(integrationsPath, folder, 'integration.config.json'))
   );
 
-  // Adjust allowedActions to strip off service prefixes
-  const adjustedAllowedActions = allowedActions.map(actionName => {
-    const parts = actionName.split('.');
-    return parts.length > 1 ? parts[1] : actionName;
-  });
+  let allActions: FunctionFactory = {};
 
-  return Object.fromEntries(
-    Object.entries(adjustedActions).filter(([actionName]) => adjustedAllowedActions.includes(actionName))
+  for (const folder of integrationFolders) {
+    const integrationPath = join(integrationsPath, folder);
+    const configFilePath = join(integrationPath, 'integration.config.json');
+
+    let config: any;
+    try {
+      config = require(configFilePath);
+    } catch (error) {
+      console.error(`Failed to read config file for ${folder}:`, error);
+      continue;
+    }
+
+    const actionFilePath = join(integrationPath, config.actionsFile || `${folder}.actions.ts`);
+
+    if (!existsSync(actionFilePath)) {
+      console.log(`Action file not found for ${folder}. Skipping.`);
+      continue;
+    }
+
+    try {
+      const module = await import(actionFilePath);
+      const actionCreator = module[config.actionCreator];
+
+      if (typeof actionCreator === 'function') {
+        const actionObj = actionCreator(context) as FunctionFactory;
+        // Prefix the action names with the integration name
+        const prefixedActions = Object.fromEntries(
+          Object.entries(actionObj).map(([actionName, funcDef]) => {
+            const fullActionName = `${folder}.${actionName}`;
+            return [fullActionName, funcDef as FunctionDefinition];
+          })
+        );
+        allActions = { ...allActions, ...prefixedActions };
+      } else {
+        console.log(`No valid action creator found for ${folder}.`);
+      }
+    } catch (error) {
+      console.error(`Failed to process ${actionFilePath}:`, error);
+    }
+  }
+
+  // Filter allowed actions
+  const functionFactory = Object.fromEntries(
+    Object.entries(allActions).filter(([actionName]) => allowedActions.includes(actionName))
   ) as FunctionFactory;
+
+  return functionFactory;
 };
 
 export const executeFunctionCall = async (call: any, sessionId: string, companyId: string, allowedActions: string[]) => {
   const context: ActionContext = { sessionId, companyId };
+  const functionFactory = await createFunctionFactory(context, allowedActions);
 
-  // Adjust allowedActions to remove service prefixes
-  const adjustedAllowedActions = allowedActions.map(actionName => {
-    const parts = actionName.split('.');
-    return parts.length > 1 ? parts[1] : actionName;
-  });
-
-  const functionFactory = createFunctionFactory(context, adjustedAllowedActions);
-  
   const functionName = call.function.name as keyof FunctionFactory;
 
   if (functionName in functionFactory) {
