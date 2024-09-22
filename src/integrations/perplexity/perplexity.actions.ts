@@ -1,5 +1,5 @@
-import { ActionContext, FunctionFactory } from './types';
-import { performPerplexitySearch } from '../services/perplexity.service';
+import { ActionContext, FunctionFactory } from '../../actions/types';
+import { performPerplexitySearch } from './perplexity.service';
 
 export const createPerplexityActions = (context: ActionContext): FunctionFactory => ({
   perplexitySearch: {

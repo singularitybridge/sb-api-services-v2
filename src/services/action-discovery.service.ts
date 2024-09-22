@@ -63,6 +63,16 @@ export class ActionDiscoveryService {
   async discoverActions(
     language: SupportedLanguage = 'en',
   ): Promise<ActionInfo[]> {
+    const regularActions = await this.discoverRegularActions(language);
+    const integrationActions = await this.discoverIntegrationActions(language);
+    const pluginActions = await this.discoverPluginActions(language);
+
+    return [...regularActions, ...integrationActions, ...pluginActions];
+  }
+
+  private async discoverRegularActions(
+    language: SupportedLanguage = 'en',
+  ): Promise<ActionInfo[]> {
     const actionFiles = readdirSync(this.actionsPath).filter((file) =>
       file.endsWith('Actions.ts'),
     );
@@ -77,70 +87,86 @@ export class ActionDiscoveryService {
       }
 
       const filePath = join(this.actionsPath, file);
-      try {
-        const module = await import(filePath);
-
-        let actionCreator;
-        if (typeof module.default === 'function') {
-          actionCreator = module.default;
-        } else if (
-          typeof module[`create${this.capitalize(serviceName)}Actions`] ===
-          'function'
-        ) {
-          actionCreator =
-            module[`create${this.capitalize(serviceName)}Actions`];
-        } else if (
-          typeof module[`create${serviceName}Actions`] === 'function'
-        ) {
-          actionCreator = module[`create${serviceName}Actions`];
-        } else if (typeof module.createJSONBinActions === 'function') {
-          actionCreator = module.createJSONBinActions;
-        }
-
-        if (actionCreator) {
-          const actionObj = actionCreator({} as any); // Pass an empty context
-
-          for (const [key, value] of Object.entries(actionObj)) {
-            const actionDef = value as ActionDefinition;
-            if (typeof actionDef === 'object' && actionDef.description) {
-              const actionId = `${serviceName}.${key}`;
-              const action = {
-                id: actionId,
-                serviceName: this.getLocalizedString(
-                  actionId,
-                  'serviceName',
-                  this.toTitleCase(serviceName),
-                  language,
-                ),
-                actionTitle: this.getLocalizedString(
-                  actionId,
-                  'actionTitle',
-                  this.toTitleCase(key),
-                  language,
-                ),
-                description: this.getLocalizedString(
-                  actionId,
-                  'description',
-                  actionDef.description,
-                  language,
-                ),
-                icon: this.getIconForService(serviceName),
-                service: serviceName,
-                parameters: actionDef.parameters,
-              };
-              actions.push(action);
-            }
-          }
-        }
-      } catch (error) {
-        console.error(`Failed to process ${file}:`, error);
-      }
+      actions = actions.concat(await this.processActionFile(filePath, serviceName, language));
     }
 
-    // Discover plugin actions
-    const pluginActions = await this.discoverPluginActions(language);
-    actions = actions.concat(pluginActions);
+    return actions;
+  }
 
+  private async discoverIntegrationActions(
+    language: SupportedLanguage = 'en',
+  ): Promise<ActionInfo[]> {
+    let actions: ActionInfo[] = [];
+    const integrationFolders = readdirSync(this.integrationsPath);
+
+    for (const folder of integrationFolders) {
+      const actionFilePath = join(this.integrationsPath, folder, `${folder}.actions.ts`);
+      actions = actions.concat(await this.processActionFile(actionFilePath, folder, language));
+    }
+
+    return actions;
+  }
+
+  private async processActionFile(filePath: string, serviceName: string, language: SupportedLanguage): Promise<ActionInfo[]> {
+    let actions: ActionInfo[] = [];
+    try {
+      const module = await import(filePath);
+
+      let actionCreator;
+      if (typeof module.default === 'function') {
+        actionCreator = module.default;
+      } else if (
+        typeof module[`create${this.capitalize(serviceName)}Actions`] ===
+        'function'
+      ) {
+        actionCreator =
+          module[`create${this.capitalize(serviceName)}Actions`];
+      } else if (
+        typeof module[`create${serviceName}Actions`] === 'function'
+      ) {
+        actionCreator = module[`create${serviceName}Actions`];
+      } else if (typeof module.createJSONBinActions === 'function') {
+        actionCreator = module.createJSONBinActions;
+      }
+
+      if (actionCreator) {
+        const actionObj = actionCreator({} as any); // Pass an empty context
+
+        for (const [key, value] of Object.entries(actionObj)) {
+          const actionDef = value as ActionDefinition;
+          if (typeof actionDef === 'object' && actionDef.description) {
+            const actionId = `${serviceName}.${key}`;
+            const action = {
+              id: actionId,
+              serviceName: this.getLocalizedString(
+                actionId,
+                'serviceName',
+                this.toTitleCase(serviceName),
+                language,
+              ),
+              actionTitle: this.getLocalizedString(
+                actionId,
+                'actionTitle',
+                this.toTitleCase(key),
+                language,
+              ),
+              description: this.getLocalizedString(
+                actionId,
+                'description',
+                actionDef.description,
+                language,
+              ),
+              icon: this.getIconForService(serviceName),
+              service: serviceName,
+              parameters: actionDef.parameters,
+            };
+            actions.push(action);
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to process ${filePath}:`, error);
+    }
     return actions;
   }
 
