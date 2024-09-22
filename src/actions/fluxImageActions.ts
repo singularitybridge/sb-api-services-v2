@@ -1,5 +1,11 @@
-import { ActionContext, FunctionFactory } from './types';
+import { ActionContext, FunctionFactory } from '../integrations/actions/types';
 import { generateFluxImage } from '../services/flux.image.service';
+
+interface FluxImageArgs {
+  prompt: string;
+  width?: number;
+  height?: number;
+}
 
 export const createFluxImageActions = (context: ActionContext): FunctionFactory => ({
   generateFluxImage: {
@@ -24,7 +30,7 @@ export const createFluxImageActions = (context: ActionContext): FunctionFactory 
       required: ['prompt', 'width', 'height'],
       additionalProperties: false,
     },
-    function: async (args) => {
+    function: async (args: FluxImageArgs) => {
       console.log('generateFluxImage called with arguments:', JSON.stringify(args, null, 2));
 
       const { prompt, width, height } = args;

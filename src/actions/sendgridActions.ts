@@ -1,5 +1,12 @@
-import { ActionContext, FunctionFactory } from './types';
+import { ActionContext, FunctionFactory } from '../integrations/actions/types';
 import { sendEmail } from '../services/sendgrid.service';
+
+interface SendEmailArgs {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}
 
 export const createSendGridActions = (context: ActionContext): FunctionFactory => ({
   sendEmail: {
@@ -28,7 +35,7 @@ export const createSendGridActions = (context: ActionContext): FunctionFactory =
       required: ['to', 'subject', 'text', 'html'],
       additionalProperties: false,
     },
-    function: async (args) => {
+    function: async (args: SendEmailArgs) => {
       console.log('sendEmail called with arguments:', JSON.stringify(args, null, 2));
 
       const { to, subject, text, html } = args;

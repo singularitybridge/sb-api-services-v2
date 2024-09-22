@@ -1,4 +1,4 @@
-import { ActionContext, FunctionFactory } from './types';
+import { ActionContext, FunctionFactory } from '../integrations/actions/types';
 import { Session } from '../models/Session';
 import { getUserById } from '../services/user.service';
 import { getCompany } from '../services/company.service';

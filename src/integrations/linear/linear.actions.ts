@@ -1,9 +1,36 @@
-import { ActionContext, FunctionDefinition } from '../../actions/types';
+import { ActionContext, FunctionDefinition } from '../actions/types';
 import * as linearService from './linear.service';
+
+interface CreateIssueArgs {
+  title: string;
+  description: string;
+  teamId: string;
+}
+
+interface UpdateIssueArgs {
+  issueId: string;
+  updateData: {
+    title?: string;
+    status?: string;
+  };
+}
+
+interface FetchIssuesByUserArgs {
+  userId: string;
+}
+
+interface FetchIssuesByDateArgs {
+  days: number;
+}
+
+interface CreateCommentArgs {
+  issueId: string;
+  body: string;
+}
 
 export const createLinearActions = (context: ActionContext) => {
   const fetchIssues: FunctionDefinition = {
-    function: async ({ first = 50 }) => {
+    function: async ({ first = 50 }: { first?: number }) => {
       const issues = await linearService.fetchIssues(context.companyId, first);
       return issues;
     },
@@ -21,7 +48,7 @@ export const createLinearActions = (context: ActionContext) => {
   };
 
   const createIssue: FunctionDefinition = {
-    function: async ({ title, description, teamId }) => {
+    function: async ({ title, description, teamId }: CreateIssueArgs) => {
       const issue = await linearService.createIssue(context.companyId, title, description, teamId);
       return issue;
     },
@@ -47,7 +74,7 @@ export const createLinearActions = (context: ActionContext) => {
   };
 
   const updateIssue: FunctionDefinition = {
-    function: async ({ issueId, updateData }) => {
+    function: async ({ issueId, updateData }: UpdateIssueArgs) => {
       await linearService.updateIssue(context.companyId, issueId, updateData);
       return { success: true };
     },
@@ -79,7 +106,7 @@ export const createLinearActions = (context: ActionContext) => {
   };
 
   const deleteIssue: FunctionDefinition = {
-    function: async ({ issueId }) => {
+    function: async ({ issueId }: { issueId: string }) => {
       await linearService.deleteIssue(context.companyId, issueId);
       return { success: true };
     },
@@ -110,7 +137,7 @@ export const createLinearActions = (context: ActionContext) => {
   };
 
   const fetchIssuesByUser: FunctionDefinition = {
-    function: async ({ userId }) => {
+    function: async ({ userId }: FetchIssuesByUserArgs) => {
       const issues = await linearService.fetchIssuesByUser(context.companyId, userId);
       return issues;
     },
@@ -128,7 +155,7 @@ export const createLinearActions = (context: ActionContext) => {
   };
 
   const fetchIssuesByDate: FunctionDefinition = {
-    function: async ({ days }) => {
+    function: async ({ days }: FetchIssuesByDateArgs) => {
       const issues = await linearService.fetchIssuesByDate(context.companyId, days);
       return issues;
     },
@@ -185,7 +212,7 @@ export const createLinearActions = (context: ActionContext) => {
   };
 
   const createComment: FunctionDefinition = {
-    function: async ({ issueId, body }) => {
+    function: async ({ issueId, body }: CreateCommentArgs) => {
       const comment = await linearService.createComment(context.companyId, issueId, body);
       return comment;
     },

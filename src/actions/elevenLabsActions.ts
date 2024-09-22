@@ -1,4 +1,4 @@
-import { ActionContext, FunctionFactory } from './types';
+import { ActionContext, FunctionFactory } from '../integrations/actions/types';
 import { generateAudio } from '../services/11labs.service';
 import { getApiKey } from '../services/api.key.service';
 

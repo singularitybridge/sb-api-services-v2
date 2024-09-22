@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
-import { executeFunctionCall } from '../actions';
 import { getOpenAIClient } from './assistant.service';
+import { executeFunctionCall } from '../integrations/actions/factory';
 
 export const submitToolOutputs = async (
   openaiClient: OpenAI,

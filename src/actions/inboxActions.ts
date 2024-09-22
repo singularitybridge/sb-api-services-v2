@@ -1,5 +1,5 @@
+import { ActionContext, FunctionFactory } from '../integrations/actions/types';
 import { addMessageToInbox, getInboxMessages, updateInboxMessageStatus } from '../services/inbox.service';
-import { FunctionFactory, ActionContext } from './types';
 
 // Extend the ActionContext to include companyId if it's not already there
 interface ExtendedActionContext extends ActionContext {
