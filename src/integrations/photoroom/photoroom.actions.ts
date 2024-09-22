@@ -2,7 +2,7 @@ import { ActionContext, FunctionFactory } from '../../actions/types';
 import { removeBackgroundFromImage } from './photoroom.service';
 
 export const createPhotoRoomActions = (context: ActionContext): FunctionFactory => ({
-  photoRoomRemoveBackground: {
+  removeBackground: {
     description: 'Remove the background from an image using PhotoRoom API',
     strict: true,
     parameters: {
@@ -17,13 +17,13 @@ export const createPhotoRoomActions = (context: ActionContext): FunctionFactory 
       additionalProperties: false,
     },
     function: async (args) => {
-      console.log('photoRoomRemoveBackground called with arguments:', JSON.stringify(args, null, 2));
+      console.log('removeBackground called with arguments:', JSON.stringify(args, null, 2));
 
       const { imageUrl } = args;
 
       // Check if all required properties are present
       if (imageUrl === undefined) {
-        console.error('photoRoomRemoveBackground: Missing required parameter');
+        console.error('removeBackground: Missing required parameter');
         return {
           error: 'Missing parameter',
           message: 'imageUrl parameter is required.',
@@ -34,7 +34,7 @@ export const createPhotoRoomActions = (context: ActionContext): FunctionFactory 
       const allowedProps = ['imageUrl'];
       const extraProps = Object.keys(args).filter(prop => !allowedProps.includes(prop));
       if (extraProps.length > 0) {
-        console.error('photoRoomRemoveBackground: Additional properties found', extraProps);
+        console.error('removeBackground: Additional properties found', extraProps);
         return {
           error: 'Invalid parameters',
           message: `Additional properties are not allowed: ${extraProps.join(', ')}`,
@@ -43,7 +43,7 @@ export const createPhotoRoomActions = (context: ActionContext): FunctionFactory 
 
       // Verify that imageUrl is a string
       if (typeof imageUrl !== 'string') {
-        console.error('photoRoomRemoveBackground: Invalid imageUrl type', typeof imageUrl);
+        console.error('removeBackground: Invalid imageUrl type', typeof imageUrl);
         return {
           error: 'Invalid imageUrl',
           message: 'The imageUrl must be a string.',
@@ -54,7 +54,7 @@ export const createPhotoRoomActions = (context: ActionContext): FunctionFactory 
       try {
         new URL(imageUrl);
       } catch (error) {
-        console.error('photoRoomRemoveBackground: Invalid URL', imageUrl);
+        console.error('removeBackground: Invalid URL', imageUrl);
         return {
           error: 'Invalid URL',
           message: 'The provided imageUrl is not a valid URL.',
@@ -62,11 +62,11 @@ export const createPhotoRoomActions = (context: ActionContext): FunctionFactory 
       }
 
       try {
-        console.log('photoRoomRemoveBackground: Calling removeBackgroundFromImage service');
+        console.log('removeBackground: Calling removeBackgroundFromImage service');
         const result = await removeBackgroundFromImage(context.companyId, imageUrl);
         return { result };
       } catch (error) {
-        console.error('photoRoomRemoveBackground: Error removing background', error);
+        console.error('removeBackground: Error removing background', error);
         return {
           error: 'Background removal failed',
           message: 'Failed to remove background using PhotoRoom API.',
