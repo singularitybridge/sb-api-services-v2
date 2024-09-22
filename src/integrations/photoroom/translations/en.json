@@ -1,6 +1,6 @@
 {
   "serviceName": "PhotoRoom",
-  "photoRoomRemoveBackground": {
+  "removeBackground": {
     "actionTitle": "Remove Background",
     "description": "Remove the background from an image using PhotoRoom API"
   }
