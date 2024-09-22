@@ -1,5 +1,5 @@
 import axios, { AxiosError } from 'axios';
-import { ActionType, ActionContext, FunctionFactory } from './types';
+import { ActionType, ActionContext, FunctionFactory } from '../integrations/actions/types';
 
 interface AIAgentExecutorResponse {
   success: boolean;

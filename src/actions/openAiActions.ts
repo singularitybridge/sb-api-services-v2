@@ -1,4 +1,4 @@
-import { ActionContext, FunctionFactory } from './types';
+import { ActionContext, FunctionFactory } from '../integrations/actions/types';
 import { generateSpeech } from '../services/oai.speech.service';
 import { getApiKey } from '../services/api.key.service';
 import { transcribeAudioWhisperFromURL } from '../services/speech.recognition.service';
@@ -7,6 +7,23 @@ import { getO1CompletionResponse } from '../services/oai.completion.service';
 type OpenAIVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 type OpenAIModel = 'tts-1' | 'tts-1-hd';
 
+interface GenerateSpeechArgs {
+  text: string;
+  voice?: OpenAIVoice;
+  model?: OpenAIModel;
+  textLimit?: number;
+}
+
+interface TranscribeAudioArgs {
+  audioUrl: string;
+  language?: string;
+}
+
+interface AskO1ModelArgs {
+  question: string;
+  model: 'o1-preview' | 'o1-mini';
+}
+
 export const createOpenAiActions = (context: ActionContext): FunctionFactory => ({
   generateOpenAiSpeech: {
     function: async ({
@@ -14,12 +31,7 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
       voice = 'alloy',
       model = 'tts-1-hd',
       textLimit = 256,
-    }: {
-      text: string;
-      voice?: OpenAIVoice;
-      model?: OpenAIModel;
-      textLimit?: number;
-    }) => {
+    }: GenerateSpeechArgs) => {
       try {
         const apiKey = await getApiKey(context.companyId, 'openai');
         if (!apiKey) {
@@ -62,7 +74,7 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
     },
   },
   transcribeAudioWhisperFromURL: {
-    function: async ({ audioUrl, language }: { audioUrl: string; language?: string }) => {
+    function: async ({ audioUrl, language }: TranscribeAudioArgs) => {
       try {
         const apiKey = await getApiKey(context.companyId, 'openai');
         if (!apiKey) {
@@ -92,7 +104,7 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
     },
   },
   askO1Model: {
-    function: async ({ question, model }: { question: string; model: string }) => {
+    function: async ({ question, model }: AskO1ModelArgs) => {
       try {
         const apiKey = await getApiKey(context.companyId, 'openai');
         if (!apiKey) {

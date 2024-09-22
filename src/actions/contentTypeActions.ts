@@ -1,6 +1,6 @@
 import { Session } from '../models/Session';
 import { ContentTypeService } from '../services/content-type.service';
-import { ActionContext, FunctionFactory } from './types';
+import { ActionContext, FunctionFactory } from '../integrations/actions/types';
 import mongoose from 'mongoose';
 
 export const createContentTypeActions = (context: ActionContext): FunctionFactory => ({

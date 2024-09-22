@@ -1,5 +1,10 @@
-import { ActionContext, FunctionFactory } from '../../actions/types';
+import { ActionContext, FunctionFactory } from '../actions/types';
 import { performPerplexitySearch } from './perplexity.service';
+
+interface PerplexitySearchArgs {
+  model: 'llama-3.1-sonar-small-128k-online' | 'llama-3.1-sonar-large-128k-online';
+  query: string;
+}
 
 export const createPerplexityActions = (context: ActionContext): FunctionFactory => ({
   perplexitySearch: {
@@ -21,7 +26,7 @@ export const createPerplexityActions = (context: ActionContext): FunctionFactory
       required: ['model', 'query'],
       additionalProperties: false,
     },
-    function: async (args) => {
+    function: async (args: PerplexitySearchArgs) => {
       console.log('perplexitySearch called with arguments:', JSON.stringify(args, null, 2));
 
       const { model, query } = args;

@@ -5,12 +5,11 @@
   "main": "src/index.ts",
   "scripts": {
     "start": "ts-node src/index.ts",
-    "build": "npm run validate-integrations && tsc",
-    "test": "npm run validate-integrations && NODE_ENV=test jest",
+    "build": "tsc",
+    "test": "NODE_ENV=test jest",
     "dev": "nodemon --exec ts-node src/index.ts",
     "dev-public": "concurrently \"npm run start\" \"ngrok http --domain=sb-api.ngrok.app 3000\"",
-    "lint": "eslint '*/**/*.{js,ts}' --quiet --fix",
-    "validate-integrations": "ts-node validate-integrations.ts"
+    "lint": "eslint '*/**/*.{js,ts}' --quiet --fix"
   },
   "keywords": [
     "task",

@@ -1,4 +1,4 @@
-import { ActionContext, FunctionFactory } from './types';
+import { ActionContext, FunctionFactory } from '../integrations/actions/types';
 import { readFile, updateFile, createFile, updateArrayElement, deleteArrayElement, insertArrayElement, cloneJsonbin } from '../services/jsonbin.service';
 
 // Debug logging function
@@ -8,6 +8,40 @@ const debug = (message: string, ...args: any[]) => {
     console.log(`[JSONBinActions] ${message}`, ...args);
   }
 };
+
+interface CreateJSONBinFileArgs {
+  data: Record<string, any>;
+  name: string;
+}
+
+interface UpdateJSONBinFileArgs {
+  binId: string;
+  data: Record<string, any>;
+}
+
+interface UpdateJSONBinArrayElementArgs {
+  binId: string;
+  arrayKey: string;
+  elementId: string;
+  updateData: Record<string, any>;
+  useMerge?: boolean;
+}
+
+interface DeleteJSONBinArrayElementArgs {
+  binId: string;
+  arrayKey: string;
+  elementId: string;
+}
+
+interface InsertJSONBinArrayElementArgs {
+  binId: string;
+  arrayKey: string;
+  newElement: Record<string, any>;
+}
+
+interface CloneJSONBinFileArgs {
+  binId: string;
+}
 
 export const createJSONBinActions = (context: ActionContext): FunctionFactory => ({
   createJSONBinFile: {
@@ -28,7 +62,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       required: ['data', 'name'],
       additionalProperties: false,
     },
-    function: async (args) => {
+    function: async (args: CreateJSONBinFileArgs) => {
       debug('createJSONBinFile called with arguments:', JSON.stringify(args, null, 2));
 
       const { data, name } = args;
@@ -100,7 +134,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       required: ['binId', 'data'],
       additionalProperties: false,
     },
-    function: async (args) => {
+    function: async (args: UpdateJSONBinFileArgs) => {
       debug('updateJSONBinFile called with arguments:', JSON.stringify(args, null, 2));
 
       const { binId, data } = args;
@@ -165,7 +199,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       required: ['binId'],
       additionalProperties: false,
     },
-    function: async ({ binId }) => {
+    function: async ({ binId }: { binId: string }) => {
       return await readFile(context.companyId, binId);
     },
   },
@@ -199,7 +233,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       required: ['binId', 'arrayKey', 'elementId', 'updateData'],
       additionalProperties: false,
     },
-    function: async (args) => {
+    function: async (args: UpdateJSONBinArrayElementArgs) => {
       debug('updateJSONBinArrayElement called with arguments:', JSON.stringify(args, null, 2));
 
       const { binId, arrayKey, elementId, updateData, useMerge = false } = args;
@@ -291,7 +325,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       required: ['binId', 'arrayKey', 'elementId'],
       additionalProperties: false,
     },
-    function: async (args) => {
+    function: async (args: DeleteJSONBinArrayElementArgs) => {
       debug('deleteJSONBinArrayElement called with arguments:', JSON.stringify(args, null, 2));
 
       const { binId, arrayKey, elementId } = args;
@@ -357,7 +391,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       required: ['binId', 'arrayKey', 'newElement'],
       additionalProperties: false,
     },
-    function: async (args) => {
+    function: async (args: InsertJSONBinArrayElementArgs) => {
       debug('insertJSONBinArrayElement called with arguments:', JSON.stringify(args, null, 2));
 
       const { binId, arrayKey, newElement } = args;
@@ -433,7 +467,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       required: ['binId'],
       additionalProperties: false,
     },
-    function: async (args) => {
+    function: async (args: CloneJSONBinFileArgs) => {
       debug('cloneJSONBinFile called with arguments:', JSON.stringify(args, null, 2));
 
       const { binId } = args;

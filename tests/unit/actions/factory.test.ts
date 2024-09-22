@@ -1,7 +1,6 @@
-import { createFunctionFactory, executeFunctionCall } from '../../../src/actions/factory';
-import { ActionContext, FunctionFactory, FunctionDefinition } from '../../../src/actions/types';
 import * as fs from 'fs';
 import * as path from 'path';
+import { ActionContext, createFunctionFactory, executeFunctionCall, FunctionDefinition, FunctionFactory } from '../../../src/integrations/actions/factory';
 
 jest.mock('fs');
 jest.mock('path');

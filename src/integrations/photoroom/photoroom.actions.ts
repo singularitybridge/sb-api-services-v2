@@ -1,5 +1,9 @@
-import { ActionContext, FunctionFactory } from '../../actions/types';
+import { ActionContext, FunctionFactory } from '../actions/types';
 import { removeBackgroundFromImage } from './photoroom.service';
+
+interface RemoveBackgroundArgs {
+  imageUrl: string;
+}
 
 export const createPhotoRoomActions = (context: ActionContext): FunctionFactory => ({
   removeBackground: {
@@ -16,7 +20,7 @@ export const createPhotoRoomActions = (context: ActionContext): FunctionFactory 
       required: ['imageUrl'],
       additionalProperties: false,
     },
-    function: async (args) => {
+    function: async (args: RemoveBackgroundArgs) => {
       console.log('removeBackground called with arguments:', JSON.stringify(args, null, 2));
 
       const { imageUrl } = args;

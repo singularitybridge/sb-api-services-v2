@@ -1,6 +1,6 @@
 import { Session } from '../models/Session';
 import * as ContentService from '../services/content.service';
-import { ActionContext, FunctionFactory } from './types';
+import { ActionContext, FunctionFactory } from '../integrations/actions/types';
 
 export const createContentActions = (
   context: ActionContext,

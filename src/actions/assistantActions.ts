@@ -1,7 +1,7 @@
 import { Assistant } from '../models/Assistant';
 import { Session } from '../models/Session';
 import { publishMessage } from '../services/pusher.service';
-import { ActionContext, FunctionFactory } from './types';
+import { ActionContext, FunctionFactory } from '../integrations/actions/types';
 
 export const createAssistantActions = (context: ActionContext): FunctionFactory => ({
   getAssistants: {

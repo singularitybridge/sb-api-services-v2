@@ -1,4 +1,4 @@
-import { ActionContext, FunctionFactory, ActionType } from './types';
+import { ActionContext, FunctionFactory, ActionType } from '../integrations/actions/types';
 import {
   createJournalEntry,
   getJournalEntries,
@@ -11,6 +11,23 @@ import { ChannelType } from '../types/ChannelType';
 import { IJournal } from '../models/Journal';
 import { getApiKey } from '../services/api.key.service';
 import { Types } from 'mongoose';
+
+interface JournalEntryArgs {
+  content: string;
+  entryType?: string;
+  tags?: string[];
+}
+
+interface GetJournalEntriesArgs {
+  entryType?: string;
+  tags?: string[];
+  limit?: number;
+}
+
+interface UpdateJournalEntryArgs {
+  journalId: string;
+  updateData: Partial<IJournal>;
+}
 
 export const createJournalActions = (
   context: ActionContext & { companyId: string },
@@ -29,7 +46,7 @@ export const createJournalActions = (
       required: ['content'],
       additionalProperties: false,
     },
-    function: async (args) => {
+    function: async (args: JournalEntryArgs) => {
       const { content, entryType, tags } = args;
       const { companyId, sessionId } = context;
 
@@ -96,7 +113,7 @@ export const createJournalActions = (
       required: [],
       additionalProperties: false,
     },
-    function: async ({ entryType, tags, limit = 25 }) => {
+    function: async ({ entryType, tags, limit = 25 }: GetJournalEntriesArgs) => {
       try {
         const { companyId, sessionId } = context;
 
@@ -151,7 +168,7 @@ export const createJournalActions = (
       required: [],
       additionalProperties: false,
     },
-    function: async ({ entryType, tags, limit = 25 }) => {
+    function: async ({ entryType, tags, limit = 25 }: GetJournalEntriesArgs) => {
       try {
         const { companyId, sessionId } = context;
 
@@ -205,7 +222,7 @@ export const createJournalActions = (
       required: ['journalId', 'updateData'],
       additionalProperties: false,
     },
-    function: async (args) => {
+    function: async (args: UpdateJournalEntryArgs) => {
       const { journalId, updateData } = args;
 
       if (!journalId || !updateData) {
@@ -242,7 +259,7 @@ export const createJournalActions = (
       required: ['journalId'],
       additionalProperties: false,
     },
-    function: async ({ journalId }) => {
+    function: async ({ journalId }: { journalId: string }) => {
       try {
         const result = await deleteJournalEntry(journalId);
         return { success: true, data: result };

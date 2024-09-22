@@ -3,7 +3,7 @@ import { getOpenAIClient } from './assistant.service';
 import { ApiKey } from './verification.service';
 import { cleanupAssistantFiles } from './file.service';
 import { VectorStore } from '../models/VectorStore';
-import { createFunctionFactory, ActionContext } from '../actions';
+import { createFunctionFactory, ActionContext, FunctionFactory, FunctionDefinition, sanitizeFunctionName } from '../integrations/actions/factory';
 
 export const getAssistants = async (apiKey: string) => {
   const openaiClient = getOpenAIClient(apiKey);
@@ -32,14 +32,8 @@ export const updateAssistantById = async (
 ) => {
   const openaiClient = getOpenAIClient(apiKey);
 
-  // Adjust allowedActions to remove service prefixes
-  const adjustedAllowedActions = allowedActions.map(actionName => {
-    const parts = actionName.split('.');
-    return parts.length > 1 ? parts[1] : actionName;
-  });
-
   // Create function definitions based on allowed actions
-  const functionTools = createFunctionDefinitions(adjustedAllowedActions);
+  const functionTools = await createFunctionDefinitions(allowedActions);
 
   try {
     const updatedAssistant = await openaiClient.beta.assistants.update(
@@ -61,13 +55,8 @@ export const updateAssistantById = async (
       .filter(tool => tool.type === 'function')
       .map(tool => (tool as any).function.name);
 
-    // Map updated tools back to original action names with prefixes
-    const updatedToolsWithPrefixes = updatedTools.map(actionName => {
-      const originalAction = allowedActions.find(a => a.endsWith(actionName));
-      return originalAction || actionName;
-    });
-
-    const missingActions = allowedActions.filter(action => !updatedToolsWithPrefixes.includes(action));
+    const sanitizedAllowedActions = allowedActions.map(action => sanitizeFunctionName(action));
+    const missingActions = sanitizedAllowedActions.filter(action => !updatedTools.includes(action));
 
     if (missingActions.length > 0) {
       console.warn(`Warning: The following actions were not successfully added to the OpenAI assistant: ${missingActions.join(', ')}`);
@@ -79,7 +68,6 @@ export const updateAssistantById = async (
     throw new Error('Failed to update OpenAI assistant');
   }
 };
-
 
 export const createAssistant = async (
   apiKey: string,
@@ -95,14 +83,8 @@ export const createAssistant = async (
 
   const openaiClient = getOpenAIClient(apiKey);
 
-  // Adjust allowedActions to remove service prefixes
-  const adjustedAllowedActions = allowedActions.map(actionName => {
-    const parts = actionName.split('.');
-    return parts.length > 1 ? parts[1] : actionName;
-  });
-
   // Create function definitions based on allowed actions
-  const functionTools = createFunctionDefinitions(adjustedAllowedActions);
+  const functionTools = await createFunctionDefinitions(allowedActions);
 
   try {
     const assistant = await openaiClient.beta.assistants.create({
@@ -136,30 +118,27 @@ export const createAssistant = async (
   }
 };
 
-const createFunctionDefinitions = (allowedActions: string[]) => {
+const createFunctionDefinitions = async (allowedActions: string[]) => {
   // Create a dummy context to generate function definitions
   const dummyContext: ActionContext = { sessionId: 'dummy-session-id', companyId: 'dummy-company-id' };
 
-  // Adjust allowedActions to remove service prefixes
-  const adjustedAllowedActions = allowedActions.map(actionName => {
-    const parts = actionName.split('.');
-    return parts.length > 1 ? parts[1] : actionName;
-  });
+  // Sanitize allowed actions
+  const sanitizedAllowedActions = allowedActions.map(actionName => sanitizeFunctionName(actionName));
 
-  const functionFactory = createFunctionFactory(dummyContext, adjustedAllowedActions);
+  // Use sanitizedAllowedActions
+  const functionFactory = await createFunctionFactory(dummyContext, sanitizedAllowedActions);
 
-  // Create function definitions
-  return Object.entries(functionFactory)
-    .map(([funcName, funcDef]) => ({
+  // Create function definitions with sanitized names
+  return Object.entries(functionFactory as FunctionFactory)
+    .map(([funcName, funcDef]: [string, FunctionDefinition]) => ({
       type: "function" as const,
       function: {
-        name: funcName,
+        name: sanitizeFunctionName(funcName),
         description: funcDef.description,
         parameters: funcDef.parameters
       }
     }));
 };
-
 
 export const deleteAssistantById = async (
   apiKey: string,
