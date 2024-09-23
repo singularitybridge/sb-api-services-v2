@@ -46,39 +46,42 @@ export const discoveryService = {
         continue;
       }
 
+      let actionObj;
       try {
         const module = await import(actionFilePath);
         const actionCreator = module[config.actionCreator];
 
         if (typeof actionCreator === 'function') {
-          const actionObj = actionCreator({} as any); // Pass an empty context
-
-          // Load translations
-          const translations = loadTranslations(integrationPath, language);
-
-          for (const [key, value] of Object.entries(actionObj)) {
-            const actionDef = value as ActionDefinition;
-            if (typeof actionDef === 'object' && actionDef.description) {
-              const actionId = `${folder}.${key}`;
-              const action = {
-                id: actionId,
-                serviceName: translations?.serviceName || config.name || folder,
-                actionTitle: translations?.[key]?.actionTitle || key,
-                description: translations?.[key]?.description || actionDef.description,
-                icon: config.icon || 'help-circle',
-                service: folder,
-                parameters: actionDef.parameters,
-              };
-              actions.push(action);
-            } else {
-              console.log(`Skipped invalid action: ${key}`);
-            }
-          }
+          actionObj = actionCreator({} as any); // Pass an empty context
         } else {
           console.log(`No valid action creator found for ${folder}.`);
+          continue;
         }
       } catch (error) {
         console.error(`Failed to process ${actionFilePath}:`, error);
+        continue;
+      }
+
+      // Load translations
+      const translations = loadTranslations(integrationPath, language);
+
+      for (const [key, value] of Object.entries(actionObj)) {
+        const actionDef = value as ActionDefinition;
+        if (typeof actionDef === 'object' && actionDef.description) {
+          const actionId = `${folder}.${key}`;
+          const action = {
+            id: actionId,
+            serviceName: translations?.serviceName || config.name || folder,
+            actionTitle: translations?.[key]?.actionTitle || key,
+            description: translations?.[key]?.description || actionDef.description,
+            icon: config.icon || 'help-circle',
+            service: folder,
+            parameters: actionDef.parameters,
+          };
+          actions.push(action);
+        } else {
+          console.log(`Skipped invalid action: ${key}`);
+        }
       }
     }
 
