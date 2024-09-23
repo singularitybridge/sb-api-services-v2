@@ -262,4 +262,60 @@ describe('executeFunctionCall', () => {
 
     expect(result).toEqual({ result: 'success' });
   });
+
+  it('should handle missing required arguments', async () => {
+    const mockActions = [
+      {
+        id: 'testFunctionWithRequiredArgs',
+        serviceName: 'TestService',
+        actionTitle: 'Test Function with Required Args',
+        description: 'A test function with required arguments',
+        icon: 'test',
+        service: 'test',
+        parameters: {
+          type: 'object',
+          properties: {
+            requiredArg1: { type: 'string' },
+            requiredArg2: { type: 'number' },
+            optionalArg: { type: 'boolean' }
+          },
+          required: ['requiredArg1', 'requiredArg2']
+        },
+      },
+    ];
+
+    (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
+    (factory.executeFunctionCall as jest.Mock).mockImplementation(async (call, sessionId, companyId) => {
+      await discoveryService.discoverActions(companyId);
+      const action = mockActions.find(a => a.id === call.function.name);
+      if (!action) throw new Error('Function not found');
+
+      const args = JSON.parse(call.function.arguments);
+      const missingArgs = action.parameters.required.filter(arg => !(arg in args));
+
+      if (missingArgs.length > 0) {
+        throw new Error(`Missing required parameters: ${missingArgs.join(', ')}`);
+      }
+
+      return { result: 'success' };
+    });
+
+    // Test with missing required arguments
+    await expect(factory.executeFunctionCall(
+      { function: { name: 'testFunctionWithRequiredArgs', arguments: '{"requiredArg1": "value"}' } },
+      'test-session',
+      'test-company',
+      ['testFunctionWithRequiredArgs']
+    )).rejects.toThrow('Missing required parameters: requiredArg2');
+
+    // Test with all required arguments provided
+    const result = await factory.executeFunctionCall(
+      { function: { name: 'testFunctionWithRequiredArgs', arguments: '{"requiredArg1": "value", "requiredArg2": 42}' } },
+      'test-session',
+      'test-company',
+      ['testFunctionWithRequiredArgs']
+    );
+
+    expect(result).toEqual({ result: 'success' });
+  });
 });
