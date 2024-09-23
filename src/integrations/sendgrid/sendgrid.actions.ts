@@ -1,5 +1,5 @@
-import { ActionContext, FunctionFactory } from '../integrations/actions/types';
-import { sendEmail } from '../services/sendgrid.service';
+import { ActionContext, FunctionFactory } from '../../integrations/actions/types';
+import { sendEmail } from './sendgrid.service';
 
 interface SendEmailArgs {
   to: string;
@@ -11,7 +11,7 @@ interface SendEmailArgs {
 export const createSendGridActions = (context: ActionContext): FunctionFactory => ({
   sendEmail: {
     description: 'Send an email using SendGrid',
-    strict: false,
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -39,26 +39,6 @@ export const createSendGridActions = (context: ActionContext): FunctionFactory =
       console.log('sendEmail called with arguments:', JSON.stringify(args, null, 2));
 
       const { to, subject, text, html } = args;
-
-      // Check if all required properties are present
-      if (to === undefined || subject === undefined || text === undefined || html === undefined) {
-        console.error('sendEmail: Missing required parameters');
-        return {
-          error: 'Missing parameters',
-          message: 'to, subject, text, and html parameters are required.',
-        };
-      }
-
-      // Check for additional properties
-      const allowedProps = ['to', 'subject', 'text', 'html'];
-      const extraProps = Object.keys(args).filter(prop => !allowedProps.includes(prop));
-      if (extraProps.length > 0) {
-        console.error('sendEmail: Additional properties found', extraProps);
-        return {
-          error: 'Invalid parameters',
-          message: `Additional properties are not allowed: ${extraProps.join(', ')}`,
-        };
-      }
 
       // Verify that 'to' is a valid email address
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -95,8 +75,17 @@ export const createSendGridActions = (context: ActionContext): FunctionFactory =
         };
       }
 
-      console.log('sendEmail: Calling sendEmail service with valid data');
-      return await sendEmail(context.companyId, { to, subject, text, html });
+      try {
+        console.log('sendEmail: Calling sendEmail service');
+        const result = await sendEmail(context.companyId, { to, subject, text, html });
+        return result;
+      } catch (error) {
+        console.error('sendEmail: Error sending email', error);
+        return {
+          error: 'Email sending failed',
+          message: 'Failed to send the email using SendGrid API.',
+        };
+      }
     },
   },
 });
