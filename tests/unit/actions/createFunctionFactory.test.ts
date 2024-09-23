@@ -116,4 +116,25 @@ describe('createFunctionFactory', () => {
     expect(Object.keys(factory)).toHaveLength(1);
     expect(Object.keys(factory)[0]).toBe('perplexity_perplexitySearch');
   });
+
+  it('should handle empty allowed actions', async () => {
+    const mockActions = [
+      {
+        id: 'someAction.action',
+        serviceName: 'SomeService',
+        actionTitle: 'Some Action',
+        description: 'Description of some action',
+        icon: 'icon',
+        service: 'someService',
+        parameters: {},
+      },
+    ];
+
+    (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
+
+    const factory = await createFunctionFactory(mockContext, []);
+
+    expect(factory).toEqual({});
+    expect(Object.keys(factory)).toHaveLength(0);
+  });
 });
