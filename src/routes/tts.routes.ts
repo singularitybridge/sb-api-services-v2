@@ -1,10 +1,10 @@
 /// file_path: src/routes/tts.routes.ts
 import express from 'express';
-import { generateAudio } from '../services/11labs.service';
 import { synthesizeText } from '../services/google.tts.service';
 import { generateSpeech } from '../services/oai.speech.service';
 import { getApiKey, validateApiKeys } from '../services/api.key.service';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { generateAudio } from '../integrations/elevenlabs/elevenlabs.service';
 
 const router = express.Router();
 

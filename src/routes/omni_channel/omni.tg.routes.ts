@@ -7,8 +7,6 @@ import {
   createNewThread,
   deleteThread,
 } from '../../services/oai.thread.service';
-import { Request } from 'express';
-import { generateAudio } from '../../services/11labs.service';
 import axios from 'axios';
 
 import { file } from 'googleapis/build/src/apis/file';
