@@ -15,7 +15,7 @@ describe('Action Factory', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
-    (fs.readdirSync as jest.Mock).mockReturnValue(['photoroom']);
+    (fs.readdirSync as jest.Mock).mockReturnValue(['photoroom', 'perplexity']);
     (fs.existsSync as jest.Mock).mockReturnValue(true);
     (path.join as jest.Mock).mockImplementation((...args) => args.join('/'));
   });
@@ -90,6 +90,63 @@ describe('Action Factory', () => {
 
       expect(factory).toHaveProperty('photoroom_removeBackground');
       expect(factory).not.toHaveProperty('photoroom_anotherAction');
+    });
+
+    it('should load actions with valid integrations and allowed actions', async () => {
+      const mockActions = [
+        {
+          id: 'perplexity.perplexitySearch',
+          serviceName: 'Perplexity',
+          actionTitle: 'Perplexity Search',
+          description: 'Perform a search using the Perplexity API',
+          icon: 'search',
+          service: 'perplexity',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'The search query',
+              },
+              model: {
+                type: 'string',
+                description: 'The Perplexity model to use for the search',
+              },
+            },
+            required: ['model', 'query'],
+            additionalProperties: false,
+          },
+        },
+      ];
+
+      (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
+
+      const factory = await createFunctionFactory(mockContext, ['perplexity.perplexitySearch']);
+
+      expect(factory).toHaveProperty('perplexity_perplexitySearch');
+      expect(factory['perplexity_perplexitySearch']).toMatchObject({
+        description: 'Perform a search using the Perplexity API',
+        parameters: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'The search query',
+            },
+            model: {
+              type: 'string',
+              description: 'The Perplexity model to use for the search',
+            },
+          },
+          required: ['model', 'query'],
+          additionalProperties: false,
+        },
+      });
+      expect(typeof factory['perplexity_perplexitySearch'].function).toBe('function');
+
+      // Verify that only the allowed action is loaded
+      expect(Object.keys(factory)).toHaveLength(1);
+      expect(Object.keys(factory)[0]).toBe('perplexity_perplexitySearch');
     });
   });
 
