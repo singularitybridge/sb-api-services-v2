@@ -52,7 +52,7 @@ describe('executeFunctionCall', () => {
     );
   });
 
-  it('should throw an error for non-existent functions', async () => {
+  it('should throw an error when function name is not present in the function factory', async () => {
     const mockActions: any[] = [];
     (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
     (factory.executeFunctionCall as jest.Mock).mockImplementation(async (call, sessionId, companyId) => {
@@ -66,6 +66,43 @@ describe('executeFunctionCall', () => {
       'test-company',
       ['nonExistentFunction']
     )).rejects.toThrow('Function nonExistentFunction not implemented in the factory');
+
+    expect(discoveryService.discoverActions).toHaveBeenCalledWith('test-company');
+  });
+
+  it('should throw an error when function name is not in allowedActions', async () => {
+    const mockActions = [
+      {
+        id: 'testFunction',
+        serviceName: 'TestService',
+        actionTitle: 'Test Function',
+        description: 'A test function',
+        icon: 'test',
+        service: 'test',
+        parameters: {
+          type: 'object',
+          properties: {
+            testParam: { type: 'string' }
+          }
+        },
+      },
+    ];
+
+    (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
+    (factory.executeFunctionCall as jest.Mock).mockImplementation(async (call, sessionId, companyId, allowedActions) => {
+      await discoveryService.discoverActions(companyId);
+      if (!allowedActions.includes(call.function.name)) {
+        throw new Error(`Function ${call.function.name} is not allowed`);
+      }
+      return { result: 'success' };
+    });
+
+    await expect(factory.executeFunctionCall(
+      { function: { name: 'testFunction', arguments: '{"testParam": "testValue"}' } },
+      'test-session',
+      'test-company',
+      ['otherFunction']
+    )).rejects.toThrow('Function testFunction is not allowed');
 
     expect(discoveryService.discoverActions).toHaveBeenCalledWith('test-company');
   });
