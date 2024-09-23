@@ -5,7 +5,9 @@ interface RemoveBackgroundArgs {
   imageUrl: string;
 }
 
-export const createPhotoRoomActions = (context: ActionContext): FunctionFactory => ({
+export const createPhotoRoomActions = (
+  context: ActionContext,
+): FunctionFactory => ({
   removeBackground: {
     description: 'Remove the background from an image using PhotoRoom API',
     strict: true,
@@ -21,13 +23,10 @@ export const createPhotoRoomActions = (context: ActionContext): FunctionFactory 
       additionalProperties: false,
     },
     function: async (args: RemoveBackgroundArgs) => {
-      console.log('removeBackground called with arguments:', JSON.stringify(args, null, 2));
-
       const { imageUrl } = args;
 
       // Check if all required properties are present
       if (imageUrl === undefined) {
-        console.error('removeBackground: Missing required parameter');
         return {
           error: 'Missing parameter',
           message: 'imageUrl parameter is required.',
@@ -36,18 +35,20 @@ export const createPhotoRoomActions = (context: ActionContext): FunctionFactory 
 
       // Check for additional properties
       const allowedProps = ['imageUrl'];
-      const extraProps = Object.keys(args).filter(prop => !allowedProps.includes(prop));
+      const extraProps = Object.keys(args).filter(
+        (prop) => !allowedProps.includes(prop),
+      );
       if (extraProps.length > 0) {
-        console.error('removeBackground: Additional properties found', extraProps);
         return {
           error: 'Invalid parameters',
-          message: `Additional properties are not allowed: ${extraProps.join(', ')}`,
+          message: `Additional properties are not allowed: ${extraProps.join(
+            ', ',
+          )}`,
         };
       }
 
       // Verify that imageUrl is a string
       if (typeof imageUrl !== 'string') {
-        console.error('removeBackground: Invalid imageUrl type', typeof imageUrl);
         return {
           error: 'Invalid imageUrl',
           message: 'The imageUrl must be a string.',
@@ -57,8 +58,7 @@ export const createPhotoRoomActions = (context: ActionContext): FunctionFactory 
       // Verify that imageUrl is a valid URL
       try {
         new URL(imageUrl);
-      } catch (error) {
-        console.error('removeBackground: Invalid URL', imageUrl);
+      } catch (error) {        
         return {
           error: 'Invalid URL',
           message: 'The provided imageUrl is not a valid URL.',
@@ -66,8 +66,10 @@ export const createPhotoRoomActions = (context: ActionContext): FunctionFactory 
       }
 
       try {
-        console.log('removeBackground: Calling removeBackgroundFromImage service');
-        const result = await removeBackgroundFromImage(context.companyId, imageUrl);
+        const result = await removeBackgroundFromImage(
+          context.companyId,
+          imageUrl,
+        );
         return { result };
       } catch (error) {
         console.error('removeBackground: Error removing background', error);

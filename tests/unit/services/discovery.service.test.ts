@@ -95,6 +95,8 @@ describe('Discovery Service', () => {
   });
 
   it('should handle errors when loading actions file', async () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
     jest.mock('../../../src/integrations/testIntegration/integration.config.json', () => mockConfig, { virtual: true });
     jest.doMock('../../../src/integrations/testIntegration/test.actions.ts', () => {
       throw new Error('Failed to load actions file');
@@ -106,5 +108,11 @@ describe('Discovery Service', () => {
     const actions = await discoveryService.discoverActions();
 
     expect(actions).toHaveLength(0);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to process'),
+      expect.any(Error)
+    );
+
+    consoleSpy.mockRestore();
   });
 });
