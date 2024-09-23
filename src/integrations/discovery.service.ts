@@ -17,7 +17,7 @@ interface ActionDefinition {
   function: Function;
 }
 
-type SupportedLanguage = 'en' | 'he';
+export type SupportedLanguage = 'en' | 'he';
 
 export const discoveryService = {
   discoverActions: async (language: SupportedLanguage = 'en'): Promise<ActionInfo[]> => {

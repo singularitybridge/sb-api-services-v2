@@ -1,4 +1,4 @@
-import { discoveryService } from '../../../src/integrations/discovery.service';
+import { discoveryService, SupportedLanguage } from '../../../src/integrations/discovery.service';
 import fs from 'fs';
 import path from 'path';
 
@@ -48,7 +48,7 @@ describe('Discovery Service', () => {
     }
   };
 
-  it('should discover actions from integrations', async () => {
+  it('should discover actions with valid integrations and default language', async () => {
     jest.mock('../../../src/integrations/testIntegration/integration.config.json', () => mockConfig, { virtual: true });
     jest.mock('../../../src/integrations/testIntegration/test.actions.ts', () => mockActions, { virtual: true });
     jest.mock('../../../src/integrations/testIntegration/translations/en.json', () => mockTranslations, { virtual: true });
@@ -73,6 +73,26 @@ describe('Discovery Service', () => {
     (fs.existsSync as jest.Mock).mockImplementation((path) => !path.includes('translations'));
 
     const actions = await discoveryService.discoverActions();
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toEqual({
+      id: 'testIntegration.testAction',
+      serviceName: 'Test Integration',
+      actionTitle: 'testAction',
+      description: 'Test action description',
+      icon: 'test-icon',
+      service: 'testIntegration',
+      parameters: mockActions.createTestActions().testAction.parameters
+    });
+  });
+
+  it('should handle unsupported language', async () => {
+    jest.mock('../../../src/integrations/testIntegration/integration.config.json', () => mockConfig, { virtual: true });
+    jest.mock('../../../src/integrations/testIntegration/test.actions.ts', () => mockActions, { virtual: true });
+    jest.mock('../../../src/integrations/testIntegration/translations/en.json', () => mockTranslations, { virtual: true });
+    (fs.existsSync as jest.Mock).mockImplementation((path) => !path.includes('fr.json'));
+
+    const actions = await discoveryService.discoverActions('fr' as SupportedLanguage);
 
     expect(actions).toHaveLength(1);
     expect(actions[0]).toEqual({
