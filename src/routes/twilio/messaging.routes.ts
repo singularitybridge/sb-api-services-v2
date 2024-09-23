@@ -4,8 +4,6 @@ import { Assistant, IAssistant } from "../../models/Assistant";
 import { IUser, User } from "../../models/User";
 import { ISession, Session } from "../../models/Session";
 import { createNewThread, deleteThread } from "../../services/oai.thread.service";
-import { Request } from "express";
-import { generateAudio } from "../../services/11labs.service";
 
 import { file } from "googleapis/build/src/apis/file";
 import { transcribeAudioWhisper } from "../../services/speech.recognition.service";

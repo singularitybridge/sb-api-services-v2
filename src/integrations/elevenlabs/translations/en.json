@@ -1,0 +1,14 @@
+{
+  "name": "ElevenLabs",
+  "description": "Generate high-quality text-to-speech audio using ElevenLabs AI voices",
+  "actions": {
+    "generateElevenLabsAudio": {
+      "name": "Generate ElevenLabs Audio",
+      "description": "Generate audio using ElevenLabs text-to-speech service",
+      "parameters": {
+        "text": "The text to convert to speech",
+        "voiceId": "The ID of the voice to use for speech generation"
+      }
+    }
+  }
+}

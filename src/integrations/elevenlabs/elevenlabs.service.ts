@@ -1,7 +1,6 @@
-/// file_path: src/services/11labs.service.ts
 import axios from 'axios';
-import { ApiKey } from './verification.service';
-import { uploadFile } from './google.storage.service';
+import { uploadFile } from '../../services/google.storage.service';
+import { ApiKey } from '../../services/verification.service';
 
 export const generateAudio = async (
   apikey: string,
@@ -32,7 +31,7 @@ export const generateAudio = async (
           'Content-Type': 'application/json',
           Accept: 'audio/mpeg',
         },
-        responseType: 'arraybuffer', // Changed from 'stream' to 'arraybuffer'
+        responseType: 'arraybuffer',
       },
     );
 
@@ -62,7 +61,7 @@ export const generateAudio = async (
   }
 };
 
-export const verify11LabsKey = async (apiKey: ApiKey) => {
+export const verifyElevenLabsKey = async (apiKey: ApiKey) => {
   try {
     if (typeof apiKey !== 'string') {
       throw new Error('Invalid API key type for 11labs verification');
