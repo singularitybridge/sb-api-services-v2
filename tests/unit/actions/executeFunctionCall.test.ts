@@ -149,4 +149,46 @@ describe('executeFunctionCall', () => {
       ['testFunction']
     );
   });
+
+  it('should handle function execution errors', async () => {
+    const mockActions = [
+      {
+        id: 'errorFunction',
+        serviceName: 'ErrorService',
+        actionTitle: 'Error Function',
+        description: 'A function that throws an error',
+        icon: 'error',
+        service: 'error',
+        parameters: {
+          type: 'object',
+          properties: {
+            errorParam: { type: 'string' }
+          }
+        },
+      },
+    ];
+
+    const errorMessage = 'Test error during function execution';
+
+    (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
+    (factory.executeFunctionCall as jest.Mock).mockImplementation(async (call, sessionId, companyId) => {
+      await discoveryService.discoverActions(companyId);
+      throw new Error(errorMessage);
+    });
+
+    await expect(factory.executeFunctionCall(
+      { function: { name: 'errorFunction', arguments: '{"errorParam": "errorValue"}' } },
+      'test-session',
+      'test-company',
+      ['errorFunction']
+    )).rejects.toThrow(errorMessage);
+
+    expect(discoveryService.discoverActions).toHaveBeenCalledWith('test-company');
+    expect(factory.executeFunctionCall).toHaveBeenCalledWith(
+      { function: { name: 'errorFunction', arguments: '{"errorParam": "errorValue"}' } },
+      'test-session',
+      'test-company',
+      ['errorFunction']
+    );
+  });
 });
