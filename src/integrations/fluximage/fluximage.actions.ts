@@ -1,5 +1,5 @@
-import { ActionContext, FunctionFactory } from '../integrations/actions/types';
-import { generateFluxImage } from '../services/flux.image.service';
+import { ActionContext, FunctionFactory } from '../actions/types';
+import { generateFluxImage } from './fluximage.service';
 
 interface FluxImageArgs {
   prompt: string;
@@ -27,7 +27,7 @@ export const createFluxImageActions = (context: ActionContext): FunctionFactory 
           description: 'The height of the generated image in pixels (256 to 1280)',
         }
       },
-      required: ['prompt', 'width', 'height'],
+      required: ['prompt'],
       additionalProperties: false,
     },
     function: async (args: FluxImageArgs) => {
@@ -35,32 +35,12 @@ export const createFluxImageActions = (context: ActionContext): FunctionFactory 
 
       const { prompt, width, height } = args;
 
-      // Check if all required properties are present
-      if (prompt === undefined) {
-        console.error('generateFluxImage: Missing required parameter');
-        return {
-          error: 'Missing parameter',
-          message: 'The prompt parameter is required.',
-        };
-      }
-
-      // Check for additional properties
-      const allowedProps = ['prompt', 'width', 'height'];
-      const extraProps = Object.keys(args).filter(prop => !allowedProps.includes(prop));
-      if (extraProps.length > 0) {
-        console.error('generateFluxImage: Additional properties found', extraProps);
-        return {
-          error: 'Invalid parameters',
-          message: `Additional properties are not allowed: ${extraProps.join(', ')}`,
-        };
-      }
-
       // Verify that prompt is a string
-      if (typeof prompt !== 'string') {
-        console.error('generateFluxImage: Invalid prompt type', typeof prompt);
+      if (typeof prompt !== 'string' || prompt.trim().length === 0) {
+        console.error('generateFluxImage: Invalid prompt', prompt);
         return {
           error: 'Invalid prompt',
-          message: 'The prompt must be a string.',
+          message: 'The prompt must be a non-empty string.',
         };
       }
 

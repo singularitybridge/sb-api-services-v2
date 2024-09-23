@@ -54,7 +54,6 @@ import { errorHandler } from './middleware/errorHandler.middleware';
 import { fileRouter } from './routes/file.routes';
 import { journalRouter } from './routes/journal.routes';
 import { jsonbinRouter } from './routes/jsonbin.routes';
-import { fluxImageRouter } from './routes/flux.image.routes';
 import contentFileRouter from './routes/content-file.routes';
 import actionDiscoveryRouter from './routes/discovery.routes';
 import { contentRouter } from './routes/content.routes';
@@ -102,7 +101,6 @@ app.use('/api', verifyTokenMiddleware, verifyAccess(), verificationRouter);
 app.use('/journal', verifyTokenMiddleware, verifyAccess(), journalRouter);
 app.use('/onboarding', verifyTokenMiddleware, verifyAccess(), onboardingRouter);
 app.use('/jsonbin', verifyTokenMiddleware, verifyAccess(), jsonbinRouter);
-app.use('/flux-image', verifyTokenMiddleware, verifyAccess(), fluxImageRouter);
 app.use('/content', verifyTokenMiddleware, verifyAccess(), contentRouter);
 app.use(
   '/content-types',

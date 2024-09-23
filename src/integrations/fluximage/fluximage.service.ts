@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { getApiKey } from './api.key.service';
-import { uploadFile } from './google.storage.service';
+import { getApiKey } from '../../services/api.key.service';
+import { uploadFile } from '../../services/google.storage.service';
 import { Readable } from 'stream';
 
 interface FluxImageGenerationOptions {
