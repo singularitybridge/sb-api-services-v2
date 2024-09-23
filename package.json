@@ -49,6 +49,7 @@
     "node-telegram-bot-api": "^0.66.0",
     "openai": "^4.60.0",
     "pusher": "^5.2.0",
+    "sanitize-filename": "^1.6.3",
     "swagger-ui-express": "^5.0.0",
     "ts-node": "^10.2.1",
     "tsoa": "^5.1.1",
