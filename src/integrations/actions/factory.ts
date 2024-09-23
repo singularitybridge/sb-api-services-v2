@@ -4,7 +4,9 @@ import { FunctionFactory, ActionContext, FunctionDefinition } from './types';
 import { processTemplate } from '../../services/template.service';
 
 export function sanitizeFunctionName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+             .replace(/[^a-zA-Z0-9_]/g, '_') // Replace non-alphanumeric characters (including hyphens) with underscores
+             .replace(/^_+|_+$/g, ''); // Remove leading and trailing underscores
 }
 
 export const createFunctionFactory = async (context: ActionContext, allowedActions: string[]): Promise<FunctionFactory> => {
