@@ -191,4 +191,75 @@ describe('executeFunctionCall', () => {
       ['errorFunction']
     );
   });
+
+  it('should validate arguments against function schema', async () => {
+    const mockActions = [
+      {
+        id: 'testFunction',
+        serviceName: 'TestService',
+        actionTitle: 'Test Function',
+        description: 'A test function with schema validation',
+        icon: 'test',
+        service: 'test',
+        parameters: {
+          type: 'object',
+          properties: {
+            requiredString: { type: 'string' },
+            optionalNumber: { type: 'number' },
+            enumValue: { type: 'string', enum: ['option1', 'option2'] }
+          },
+          required: ['requiredString']
+        },
+      },
+    ];
+
+    (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
+    (factory.executeFunctionCall as jest.Mock).mockImplementation(async (call, sessionId, companyId) => {
+      await discoveryService.discoverActions(companyId);
+      const action = mockActions.find(a => a.id === call.function.name);
+      if (!action) throw new Error('Function not found');
+
+      const args = JSON.parse(call.function.arguments);
+      const errors: string[] = [];
+
+      // Validate required fields
+      if (!args.requiredString) {
+        errors.push('Missing required field: requiredString');
+      }
+
+      // Validate types
+      if (args.optionalNumber !== undefined && typeof args.optionalNumber !== 'number') {
+        errors.push('Invalid type for optionalNumber: expected number');
+      }
+
+      // Validate enum
+      if (args.enumValue !== undefined && !['option1', 'option2'].includes(args.enumValue)) {
+        errors.push('Invalid value for enumValue: must be either "option1" or "option2"');
+      }
+
+      if (errors.length > 0) {
+        throw new Error(`Validation errors: ${errors.join(', ')}`);
+      }
+
+      return { result: 'success' };
+    });
+
+    // Test with invalid arguments
+    await expect(factory.executeFunctionCall(
+      { function: { name: 'testFunction', arguments: '{"optionalNumber": "not a number", "enumValue": "invalid"}' } },
+      'test-session',
+      'test-company',
+      ['testFunction']
+    )).rejects.toThrow('Validation errors: Missing required field: requiredString, Invalid type for optionalNumber: expected number, Invalid value for enumValue: must be either "option1" or "option2"');
+
+    // Test with valid arguments
+    const result = await factory.executeFunctionCall(
+      { function: { name: 'testFunction', arguments: '{"requiredString": "valid", "optionalNumber": 42, "enumValue": "option1"}' } },
+      'test-session',
+      'test-company',
+      ['testFunction']
+    );
+
+    expect(result).toEqual({ result: 'success' });
+  });
 });
