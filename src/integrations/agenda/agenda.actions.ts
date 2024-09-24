@@ -1,9 +1,9 @@
 import { ActionContext, FunctionFactory } from '../actions/types';
-import { scheduleJob, getJobs, getJob } from './agenda.service';
+import { scheduleMessage, getJobs, getJob } from './agenda.service';
 
 const createAgendaActions = (context: ActionContext): FunctionFactory => ({
   scheduleMessage: {
-    description: 'Schedule a message to be sent to an ai agent at a specified time.',
+    description: 'Schedule a message to be sent to an AI agent at a specified time.',
     parameters: {
       type: 'object',
       properties: {
@@ -20,7 +20,7 @@ const createAgendaActions = (context: ActionContext): FunctionFactory => ({
     },
     function: async ({ message, scheduledTime }: { message: string; scheduledTime: string }) => {
       try {
-        await scheduleJob('genericScheduledJob', { sessionId: context.sessionId, message }, scheduledTime);
+        await scheduleMessage(context.sessionId, message, scheduledTime);
         return { success: true, message: 'Message scheduled successfully' };
       } catch (error) {
         console.error('Error scheduling message:', error);
