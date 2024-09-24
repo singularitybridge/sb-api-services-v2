@@ -1,5 +1,5 @@
 {
-  "serviceName": "ליניאר",
+  "serviceName": "Linear משימות",
   "fetchIssues": {
     "actionTitle": "משיכת משימות",
     "description": "משיכת משימות מליניאר"

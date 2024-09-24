@@ -1,5 +1,5 @@
 {
-  "serviceName": "פרפלקסיטי",
+  "serviceName": "מחקר ברשת עם Perplexity",
   "perplexitySearch": {
     "actionTitle": "חיפוש",
     "description": "ביצוע חיפוש באמצעות ה-API של פרפלקסיטי"

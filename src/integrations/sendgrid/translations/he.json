@@ -1,5 +1,5 @@
 {
-  "serviceName": "סנדגריד",
+  "serviceName": "שירות שליחת אימייל עם SendGrid",
   "sendEmail": {
     "actionTitle": "שליחת אימייל",
     "description": "שליחת אימייל באמצעות SendGrid",

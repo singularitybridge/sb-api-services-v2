@@ -1,5 +1,5 @@
 {
-  "serviceName": "פלאקס תמונה",
+  "serviceName": "מנוע יצירת תמונות Flux",
   "generateFluxImage": {
     "actionTitle": "יצירת תמונת פלאקס",
     "description": "יצירת תמונה באמצעות Flux AI",

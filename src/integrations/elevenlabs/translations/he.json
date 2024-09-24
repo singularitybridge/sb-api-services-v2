@@ -1,5 +1,5 @@
 {
-  "serviceName": "אלבן לאבס",
+  "serviceName": "יצירת אודיו עם ElevenLabs",
   "generateElevenLabsAudio": {
     "actionTitle": "יצירת אודיו ElevenLabs",
     "description": "יצירת אודיו באמצעות שירות טקסט לדיבור של ElevenLabs"
