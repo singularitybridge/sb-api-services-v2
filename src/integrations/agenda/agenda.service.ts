@@ -1,5 +1,6 @@
 import Agenda, { Job } from 'agenda';
 import { ObjectId } from 'mongodb';
+import { toZonedTime, format } from 'date-fns-tz';
 
 const agendaClient = new Agenda({
   db: { address: `${process.env.MONGODB_URI}/agenda` },
@@ -30,8 +31,15 @@ export const rerunJob = async (jobId: string) => {
 
 export const getJobs = async () => {
   try {
-    const jobs = await agendaClient.jobs();
-    return jobs;
+    const jobs = await agendaClient.jobs({ nextRunAt: { $ne: null }, lastRunAt: null });
+    const israelTimeZone = 'Asia/Jerusalem';
+    
+    return jobs.map(job => ({
+      ...job.attrs,
+      nextRunAt: job.attrs.nextRunAt 
+        ? format(toZonedTime(job.attrs.nextRunAt, israelTimeZone), 'yyyy-MM-dd HH:mm:ss zzz', { timeZone: israelTimeZone }) 
+        : null,
+    }));
   } catch (error) {
     console.error('Error getting jobs:', error);
     throw error;

@@ -29,7 +29,7 @@ const createAgendaActions = (context: ActionContext): FunctionFactory => ({
     },
   },
   getJobs: {
-    description: 'Retrieve a list of all scheduled jobs.',
+    description: 'Retrieve a list of all scheduled jobs that have not been triggered yet. Dates are returned in Israel time zone.',
     parameters: {
       type: 'object',
       properties: {},
