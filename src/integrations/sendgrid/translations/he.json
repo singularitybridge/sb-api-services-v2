@@ -1,0 +1,21 @@
+{
+  "serviceName": "סנדגריד",
+  "sendEmail": {
+    "actionTitle": "שליחת אימייל",
+    "description": "שליחת אימייל באמצעות SendGrid",
+    "parameters": {
+      "to": "כתובת האימייל של הנמען",
+      "subject": "נושא האימייל",
+      "text": "תוכן האימייל בטקסט פשוט",
+      "html": "תוכן האימייל ב-HTML"
+    },
+    "errors": {
+      "invalidEmail": "כתובת האימייל שסופקה אינה תקינה.",
+      "invalidSubject": "הנושא חייב להיות מחרוזת לא ריקה.",
+      "invalidTextContent": "תוכן הטקסט חייב להיות מחרוזת לא ריקה.",
+      "invalidHtmlContent": "תוכן ה-HTML חייב להיות מחרוזת לא ריקה.",
+      "sendingFailed": "שליחת האימייל באמצעות ה-API של SendGrid נכשלה."
+    },
+    "success": "האימייל נשלח בהצלחה"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "serviceName": "פוטורום",
+  "removeBackground": {
+    "actionTitle": "הסרת רקע",
+    "description": "הסרת הרקע מתמונה באמצעות ה-API של פוטורום"
+  }
+}
