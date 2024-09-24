@@ -1,0 +1,17 @@
+{
+  "getAssistants": "קבל עוזרים",
+  "setAssistant": "הגדר עוזר",
+  "createNewAssistant": "צור עוזר חדש",
+  "assistantName": "שם העוזר",
+  "assistantDescription": "תיאור העוזר",
+  "assistantPrompt": "הנחיה לעוזר",
+  "assistantId": "מזהה העוזר",
+  "successGetAssistants": "העוזרים אוחזרו בהצלחה",
+  "successSetAssistant": "העוזר הוגדר בהצלחה",
+  "successCreateAssistant": "עוזר חדש נוצר בהצלחה",
+  "errorInvalidSession": "סשן לא תקין",
+  "errorAssistantNotFound": "העוזר לא נמצא",
+  "errorRetrieveAssistants": "נכשל באחזור העוזרים",
+  "errorSetAssistant": "נכשל בהגדרת העוזר",
+  "errorCreateAssistant": "נכשל ביצירת עוזר חדש"
+}

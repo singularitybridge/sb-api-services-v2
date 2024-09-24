@@ -1,0 +1,7 @@
+{
+  "name": "Assistant Integration",
+  "icon": "assistant",
+  "apiKeyName": null,
+  "actionCreator": "createAssistantActions",
+  "actionsFile": "assistant.actions.ts"
+}

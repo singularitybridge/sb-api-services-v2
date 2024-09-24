@@ -1,0 +1,17 @@
+{
+  "getAssistants": "Get Assistants",
+  "setAssistant": "Set Assistant",
+  "createNewAssistant": "Create New Assistant",
+  "assistantName": "Assistant Name",
+  "assistantDescription": "Assistant Description",
+  "assistantPrompt": "Assistant Prompt",
+  "assistantId": "Assistant ID",
+  "successGetAssistants": "Assistants retrieved successfully",
+  "successSetAssistant": "Assistant set successfully",
+  "successCreateAssistant": "New assistant created successfully",
+  "errorInvalidSession": "Invalid session",
+  "errorAssistantNotFound": "Assistant not found",
+  "errorRetrieveAssistants": "Failed to retrieve assistants",
+  "errorSetAssistant": "Failed to set assistant",
+  "errorCreateAssistant": "Failed to create new assistant"
+}

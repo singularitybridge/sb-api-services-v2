@@ -42,28 +42,6 @@ The SB Agent Portal integrates with various third-party services. The following 
 
 Each integration requires an API key, which can be managed through the Company settings. These integrations collectively enhance the capabilities of the AI agents, allowing them to perform a wide range of tasks across different domains and communication channels.
 
-### Integration Structure
-
-Each integration follows a standardized structure:
-
-- `integration.config.json`: Contains metadata about the integration (name, icon, API key name, action creator function name).
-- `index.ts`: Exports the action creator function and any other necessary exports.
-- `<integration>.actions.ts`: Defines the actions for the integration.
-- `<integration>.service.ts`: Contains the service logic that interacts with the external API.
-- `translations/`: A folder containing translation files (en.json, he.json, etc.).
-
-### Adding a New Integration
-
-To add a new integration:
-
-1. Create a new folder under `src/integrations/` with your integration name.
-2. Create an `integration.config.json` file with the necessary metadata.
-3. Implement the actions in `<integration>.actions.ts`.
-4. Implement the service logic in `<integration>.service.ts`.
-5. Add translations in the `translations/` folder.
-6. Update the API key management service to handle the new integration's API key.
-
-For more detailed instructions, please refer to our development documentation.
 
 ## Getting Started
 
