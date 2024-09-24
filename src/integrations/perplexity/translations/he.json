@@ -1,0 +1,7 @@
+{
+  "serviceName": "פרפלקסיטי",
+  "perplexitySearch": {
+    "actionTitle": "חיפוש",
+    "description": "ביצוע חיפוש באמצעות ה-API של פרפלקסיטי"
+  }
+}
