@@ -1,9 +1,11 @@
 import axios from 'axios';
 import { getCompany } from '../../services/company.service';
+import { googleStorageService } from '../../services/google.storage.service';
+import * as path from 'path';
 
 const API_URL = 'https://sdk.photoroom.com/v1/segment';
 
-export const removeBackgroundFromImage = async (companyId: string, imageUrl: string, crop: boolean = false): Promise<Buffer> => {
+export const removeBackgroundFromImage = async (companyId: string, imageUrl: string, crop: boolean = false): Promise<string> => {
   const company = await getCompany(companyId);
   const apiKey = company.api_keys.find((key: { key: string; value: string }) => key.key === 'photoroom_api_key')?.value;
 
@@ -27,14 +29,22 @@ export const removeBackgroundFromImage = async (companyId: string, imageUrl: str
       responseType: 'arraybuffer'
     });
 
-    return Buffer.from(response.data);
+    const processedImage = Buffer.from(response.data);
+
+    // Generate a unique filename for the processed image
+    const filename = `processed_${Date.now()}${path.extname(imageUrl)}`;
+    
+    // Save the processed image to Google Storage
+    const uploadedImageUrl = await googleStorageService.uploadBuffer(companyId, filename, processedImage, 'image/png');
+
+    return uploadedImageUrl;
   } catch (error) {
-    console.error('Error removing background:', error);
+    console.error('Error processing or uploading image:', error);
     if (axios.isAxiosError(error) && error.response) {
       console.error('Response data:', error.response.data.toString());
       console.error('Response status:', error.response.status);
       console.error('Response headers:', error.response.headers);
     }
-    throw new Error('Failed to remove background from image');
+    throw new Error('Failed to process and upload image');
   }
 };

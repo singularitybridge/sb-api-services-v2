@@ -11,7 +11,7 @@ describe('createFunctionFactory', () => {
         id: 'photoroom.removeBackground',
         serviceName: 'PhotoRoom',
         actionTitle: 'Remove Background',
-        description: 'Remove the background from an image using PhotoRoom API',
+        description: 'Remove the background from an image using PhotoRoom API and upload the result',
         icon: 'image',
         service: 'photoroom',
         parameters: mockFunctionDefinition.parameters,
@@ -24,7 +24,7 @@ describe('createFunctionFactory', () => {
 
     expect(factory).toHaveProperty('photoroom_removeBackground');
     expect(factory['photoroom_removeBackground']).toMatchObject({
-      description: 'Remove the background from an image using PhotoRoom API',
+      description: 'Remove the background from an image using PhotoRoom API and upload the result',
       parameters: mockFunctionDefinition.parameters,
     });
     expect(typeof factory['photoroom_removeBackground'].function).toBe('function');
@@ -36,7 +36,7 @@ describe('createFunctionFactory', () => {
         id: 'photoroom.removeBackground',
         serviceName: 'PhotoRoom',
         actionTitle: 'Remove Background',
-        description: 'Remove the background from an image using PhotoRoom API',
+        description: 'Remove the background from an image using PhotoRoom API and upload the result',
         icon: 'image',
         service: 'photoroom',
         parameters: mockFunctionDefinition.parameters,
