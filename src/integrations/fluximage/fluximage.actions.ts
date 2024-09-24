@@ -9,7 +9,7 @@ interface FluxImageArgs {
 
 export const createFluxImageActions = (context: ActionContext): FunctionFactory => ({
   generateFluxImage: {
-    description: 'Generate an image using Flux AI',
+    description: 'Generate an image using Flux AI. The width and height should be multiples of 8.',
     strict: true,
     parameters: {
       type: 'object',
@@ -20,11 +20,11 @@ export const createFluxImageActions = (context: ActionContext): FunctionFactory 
         },
         width: {
           type: 'number',
-          description: 'The width of the generated image in pixels (256 to 1280)',
+          description: 'The width of the generated image in pixels (256 to 1280). Must be a multiple of 8.',
         },
         height: {
           type: 'number',
-          description: 'The height of the generated image in pixels (256 to 1280)',
+          description: 'The height of the generated image in pixels (256 to 1280). Must be a multiple of 8.',
         }
       },
       required: ['prompt'],
@@ -45,19 +45,19 @@ export const createFluxImageActions = (context: ActionContext): FunctionFactory 
       }
 
       // Verify width and height if provided
-      if (width !== undefined && (typeof width !== 'number' || width < 256 || width > 1280)) {
+      if (width !== undefined && (typeof width !== 'number' || width < 256 || width > 1280 || width % 8 !== 0)) {
         console.error('generateFluxImage: Invalid width', width);
         return {
           error: 'Invalid width',
-          message: 'The width must be a number between 256 and 1280.',
+          message: 'The width must be a number between 256 and 1280 and a multiple of 8.',
         };
       }
 
-      if (height !== undefined && (typeof height !== 'number' || height < 256 || height > 1280)) {
+      if (height !== undefined && (typeof height !== 'number' || height < 256 || height > 1280 || height % 8 !== 0)) {
         console.error('generateFluxImage: Invalid height', height);
         return {
           error: 'Invalid height',
-          message: 'The height must be a number between 256 and 1280.',
+          message: 'The height must be a number between 256 and 1280 and a multiple of 8.',
         };
       }
 

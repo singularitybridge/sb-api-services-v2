@@ -73,25 +73,61 @@ export const createFunctionFactory = async (context: ActionContext, allowedActio
   return functionFactory;
 };
 
-export const executeFunctionCall = async (call: any, sessionId: string, companyId: string, allowedActions: string[]) => {
+interface DetailedError {
+  message: string;
+  name?: string;
+  stack?: string;
+  details?: Record<string, unknown>;
+}
+
+function extractErrorDetails(error: unknown): DetailedError {
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+      name: error.name,
+      stack: error.stack,
+      details: Object.fromEntries(Object.entries(error).filter(([key]) => !['name', 'message', 'stack'].includes(key)))
+    };
+  } else if (typeof error === 'object' && error !== null) {
+    return {
+      message: String((error as any).message || 'Unknown error'),
+      details: error as Record<string, unknown>
+    };
+  } else {
+    return { message: String(error) };
+  }
+}
+
+export const executeFunctionCall = async (
+  call: any,
+  sessionId: string,
+  companyId: string,
+  allowedActions: string[]
+): Promise<{ result?: any; error?: DetailedError }> => {
   const context: ActionContext = { sessionId, companyId };
   const functionFactory = await createFunctionFactory(context, allowedActions);
 
   const functionName = sanitizeFunctionName(call.function.name as string);
 
   if (functionName in functionFactory) {
-    let args = JSON.parse(call.function.arguments);
-    console.log('processing args', args);
-    // Process each argument with the template service
-    for (const key in args) {
-      if (typeof args[key] === 'string') {
-        args[key] = await processTemplate(args[key], sessionId);
+    try {
+      let args = JSON.parse(call.function.arguments);
+      console.log('processing args', args);
+      // Process each argument with the template service
+      for (const key in args) {
+        if (typeof args[key] === 'string') {
+          args[key] = await processTemplate(args[key], sessionId);
+        }
       }
-    }
 
-    return await functionFactory[functionName].function(args);
+      const result = await functionFactory[functionName].function(args);
+      return { result };
+    } catch (error) {
+      console.error(`Error executing function ${functionName}:`, error);
+      return { error: extractErrorDetails(error) };
+    }
   } else {
-    throw new Error(`Function ${functionName} not implemented in the factory`);
+    return { error: { message: `Function ${functionName} not implemented in the factory` } };
   }
 };
 
