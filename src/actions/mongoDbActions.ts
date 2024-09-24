@@ -1,8 +1,12 @@
-import { FunctionFactory, ActionContext, FunctionDefinition } from './types';
+import { FunctionFactory, ActionContext, FunctionDefinition } from '../integrations/actions/types';
 import { handleUserQuery } from '../services/mongodb.query.service';
 import { logger } from '../utils/logger';
 
-const runMongoDbQuery = async (args: { input: string }) => {
+interface MongoDbQueryArgs {
+  input: string;
+}
+
+const runMongoDbQuery = async (args: MongoDbQueryArgs) => {
   try {
     const results = await handleUserQuery(args.input);
     return {

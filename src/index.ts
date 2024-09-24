@@ -54,10 +54,10 @@ import { errorHandler } from './middleware/errorHandler.middleware';
 import { fileRouter } from './routes/file.routes';
 import { journalRouter } from './routes/journal.routes';
 import { jsonbinRouter } from './routes/jsonbin.routes';
-import { fluxImageRouter } from './routes/flux.image.routes';
-import { perplexityRouter } from './routes/perplexity.routes';
-import { sendgridRouter } from './routes/sendgrid.routes';
-import { photoRoomRouter } from './routes/photoroom.routes';
+import contentFileRouter from './routes/content-file.routes';
+import actionDiscoveryRouter from './routes/discovery.routes';
+import { contentRouter } from './routes/content.routes';
+import { contentTypeRouter } from './routes/content-type.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -81,18 +81,33 @@ app.use('/assistant', verifyTokenMiddleware, verifyAccess(), assistantRouter);
 app.use('/company', verifyTokenMiddleware, verifyAccess(), companyRouter);
 app.use('/user', verifyTokenMiddleware, verifyAccess(), userRouter);
 app.use('/file', verifyTokenMiddleware, verifyAccess(), fileRouter);
+app.use(
+  '/content-file',
+  verifyTokenMiddleware,
+  verifyAccess(),
+  contentFileRouter,
+);
 app.use('/inbox', verifyTokenMiddleware, verifyAccess(), inboxRouter);
 app.use('/action', verifyTokenMiddleware, verifyAccess(), actionRouter);
+app.use(
+  '/action-discovery',
+  verifyTokenMiddleware,
+  verifyAccess(),
+  actionDiscoveryRouter,
+);
 app.use('/session', verifyTokenMiddleware, verifyAccess(), sessionRouter);
 app.use('/agenda', verifyTokenMiddleware, verifyAccess(), agendaRouter);
 app.use('/api', verifyTokenMiddleware, verifyAccess(), verificationRouter);
 app.use('/journal', verifyTokenMiddleware, verifyAccess(), journalRouter);
 app.use('/onboarding', verifyTokenMiddleware, verifyAccess(), onboardingRouter);
 app.use('/jsonbin', verifyTokenMiddleware, verifyAccess(), jsonbinRouter);
-app.use('/flux-image', verifyTokenMiddleware, verifyAccess(), fluxImageRouter);
-app.use('/perplexity', verifyTokenMiddleware, verifyAccess(), perplexityRouter);
-app.use('/sendgrid', verifyTokenMiddleware, verifyAccess(), sendgridRouter);
-app.use('/photoroom', verifyTokenMiddleware, verifyAccess(), photoRoomRouter);
+app.use('/content', verifyTokenMiddleware, verifyAccess(), contentRouter);
+app.use(
+  '/content-types',
+  verifyTokenMiddleware,
+  verifyAccess(),
+  contentTypeRouter,
+);
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);

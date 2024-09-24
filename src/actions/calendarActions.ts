@@ -1,6 +1,6 @@
 import { IEventRequestBody } from '../Interfaces/eventRequest.interface';
 import { createEvent, deleteEvent, updateEvent } from '../services/google.calendar.service';
-import { FunctionFactory, ActionContext } from './types';
+import { FunctionFactory, ActionContext } from '../integrations/actions/types';
 
 export const createCalendarActions = (context: ActionContext): FunctionFactory => ({
   createEvent: {

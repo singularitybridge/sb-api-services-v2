@@ -1,0 +1,7 @@
+{
+  "name": "PhotoRoom",
+  "icon": "image",
+  "apiKeyName": "photoroom_api_key",
+  "actionCreator": "createPhotoRoomActions",
+  "actionsFile": "photoroom.actions.ts"
+}

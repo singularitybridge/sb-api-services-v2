@@ -1,0 +1,19 @@
+{
+  "sendEmail": {
+    "description": "Send an email using SendGrid",
+    "parameters": {
+      "to": "The recipient email address",
+      "subject": "The subject of the email",
+      "text": "The plain text content of the email",
+      "html": "The HTML content of the email"
+    },
+    "errors": {
+      "invalidEmail": "The provided email address is not valid.",
+      "invalidSubject": "The subject must be a non-empty string.",
+      "invalidTextContent": "The text content must be a non-empty string.",
+      "invalidHtmlContent": "The HTML content must be a non-empty string.",
+      "sendingFailed": "Failed to send the email using SendGrid API."
+    },
+    "success": "Email sent successfully"
+  }
+}

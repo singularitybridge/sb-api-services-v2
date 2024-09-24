@@ -58,9 +58,15 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
     const defaultKeys = [
       { key: 'openai_api_key', value: 'default_openai_key' },
       { key: 'labs11_api_key', value: 'default_labs11_key' },
+      { key: 'google_api_key', value: 'default_google_key' },
+      { key: 'twilio_api_key', value: 'default_twilio_key' },
       { key: 'jsonbin_api_key', value: 'default_jsonbin_key' },
+      { key: 'getimg_api_key', value: 'default_getimg_key' },
+      { key: 'perplexity_api_key', value: 'default_perplexity_key' },
+      { key: 'sendgrid_api_key', value: 'default_sendgrid_key' },
       { key: 'photoroom_api_key', value: 'default_photoroom_key' },
       { key: 'telegram_bot_api_key', value: 'default_telegram_bot_key' },
+      { key: 'linear_api_key', value: 'default_linear_key' },
     ];
 
     defaultKeys.forEach(defaultKey => {

@@ -1,0 +1,7 @@
+{
+  "name": "Linear",
+  "icon": "trello",
+  "apiKeyName": "linear_api_key",
+  "actionCreator": "createLinearActions",
+  "actionsFile": "linear.actions.ts"
+}

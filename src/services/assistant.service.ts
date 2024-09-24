@@ -9,7 +9,7 @@ import {
 import { Assistant, IAssistant } from '../models/Assistant';
 import mongoose from 'mongoose';
 import { getApiKey } from './api.key.service';
-import { createAssistant, deleteAssistantById } from './oai.assistant.service';
+import { createAssistant, deleteAssistantById, updateAssistantById } from './oai.assistant.service';
 import { processTemplate } from './template.service';
 import { findUserByIdentifier, getUserById } from './user.service';
 import { sendTelegramMessage as sendTelegramBotMessage } from './telegram.bot';
@@ -21,7 +21,6 @@ export const getOpenAIClient = (apiKey: string) => {
   });
 };
 
-
 export const getAssistants = async (companyId: string): Promise<IAssistant[]> => {
   try {
     const assistants = await Assistant.find({ companyId });
@@ -29,6 +28,85 @@ export const getAssistants = async (companyId: string): Promise<IAssistant[]> =>
   } catch (error) {
     console.error('Error retrieving assistants:', error);
     throw new Error('Error retrieving assistants');
+  }
+};
+
+export const getAssistantById = async (id: string): Promise<IAssistant | null> => {
+  try {
+    const assistant = await Assistant.findById(id);
+    return assistant;
+  } catch (error) {
+    console.error('Error retrieving assistant by id:', error);
+    throw new Error('Error retrieving assistant by id');
+  }
+};
+
+export const updateAllowedActions = async (assistantId: string, allowedActions: string[]): Promise<IAssistant | null> => {
+  let session = null;
+  try {
+    session = await mongoose.startSession();
+    session.startTransaction();
+
+    const assistant = await Assistant.findById(assistantId).session(session);
+    if (!assistant) {
+      throw new Error('Assistant not found');
+    }
+
+    // Adjust allowedActions to remove service prefixes
+    const adjustedAllowedActions = allowedActions.map(actionName => {
+      const parts = actionName.split('.');
+      return parts.length > 1 ? parts[1] : actionName;
+    });
+
+    // Update the OpenAI assistant first
+    const apiKey = await getApiKey(assistant.companyId.toString(), 'openai') as string;
+    let updatedOpenAIAssistant = await updateAssistantById(
+      apiKey,
+      assistant.assistantId,
+      assistant.name,
+      assistant.description,
+      assistant.llmModel,
+      assistant.llmPrompt,
+      adjustedAllowedActions
+    );
+
+    // Check if all allowed actions were successfully added to the OpenAI assistant
+    let updatedTools = updatedOpenAIAssistant.tools
+      .filter(tool => tool.type === 'function')
+      .map(tool => (tool as any).function.name);
+
+    // Map adjusted actions back to their original names with service prefixes for comparison
+    const updatedToolsWithPrefixes = updatedTools.map(actionName => {
+      // Find the original action name with prefix
+      const originalAction = allowedActions.find(a => a.endsWith(actionName));
+      return originalAction || actionName;
+    });
+
+    let missingActions = allowedActions.filter(action => !updatedToolsWithPrefixes.includes(action));
+
+    if (missingActions.length > 0) {
+      console.error(`Error: Failed to add the following actions: ${missingActions.join(', ')}`);
+      throw new Error(`Failed to add actions: ${missingActions.join(', ')}`);
+    }
+
+    // Update the local database only if OpenAI update was successful
+    assistant.allowedActions = allowedActions; // Keep original action names with service prefixes
+    const updatedAssistant = await assistant.save({ session });
+
+    await session.commitTransaction();
+    console.log(`Successfully updated allowed actions for assistant ${assistantId}`);
+
+    return updatedAssistant;
+  } catch (error) {
+    if (session) {
+      await session.abortTransaction();
+    }
+    console.error('Error updating allowed actions:', error);
+    throw error;
+  } finally {
+    if (session) {
+      session.endSession();
+    }
   }
 };
 
@@ -53,6 +131,7 @@ const pollRunStatus = async (
   runId: string,
   sessionId: string,
   companyId: string,
+  allowedActions: string[],
   timeout: number = 90000,
 ) => {
   const startTime = Date.now();
@@ -79,7 +158,8 @@ const pollRunStatus = async (
         runId,
         run.required_action.submit_tool_outputs.tool_calls,
         sessionId,
-        companyId
+        companyId,
+        allowedActions
       );
     }
 
@@ -181,7 +261,7 @@ export const handleSessionMessage = async (
     instructions: processedLlmPrompt,
   });
 
-  const completedRun = await pollRunStatus(apiKey, session.threadId, newRun.id, sessionId, session.companyId);
+  const completedRun = await pollRunStatus(apiKey, session.threadId, newRun.id, sessionId, session.companyId, assistant.allowedActions);
   console.log('run completed > ' + completedRun.status);
 
   const messages = await openaiClient.beta.threads.messages.list(
@@ -229,7 +309,7 @@ export async function deleteAssistant(id: string, assistantId: string): Promise<
   }
 }
 
-export async function createDefaultAssistant(companyId: string, apiKey: string): Promise<IAssistant> {
+export const createDefaultAssistant = async (companyId: string, apiKey: string): Promise<IAssistant> => {
   const defaultAssistantData = {
     name: 'Default Assistant',
     description: 'Your company\'s default AI assistant',
@@ -239,6 +319,7 @@ export async function createDefaultAssistant(companyId: string, apiKey: string):
     llmModel: 'gpt-4o',
     llmPrompt: 'You are a helpful AI assistant for {{company.name}}. Your name is {{assistant.name}}. Provide friendly and professional assistance to {{user.name}}. When referring to the user, use their name {{user.name}} or their email {{user.email}}. Always include placeholders like {{user.name}} or {{company.name}} in your responses, as they will be automatically replaced with the actual values.',
     companyId: companyId,
+    allowedActions: ['readJournal', 'writeJournal', 'searchInbox', 'sendEmail', 'scheduleEvent'], // Add default allowed actions
   };
 
   const assistant = new Assistant(defaultAssistantData);
@@ -251,14 +332,15 @@ export async function createDefaultAssistant(companyId: string, apiKey: string):
     assistant.name,
     assistant.description,
     assistant.llmModel,
-    assistant.llmPrompt
+    assistant.llmPrompt,
+    assistant.allowedActions
   );
 
   assistant.assistantId = openAIAssistant.id;
   await assistant.save();
 
   return assistant;
-}
+};
 
 export const sendMessageToAgent = async (
   sessionId: string,

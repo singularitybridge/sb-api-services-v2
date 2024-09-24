@@ -1,9 +1,9 @@
-// file path: /src/models/Journal.ts
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IJournal extends Document {
   userId: mongoose.Types.ObjectId;
   companyId: mongoose.Types.ObjectId;
+  sessionId: mongoose.Types.ObjectId;
   timestamp: Date;
   entryType: string;
   content: string;
@@ -16,6 +16,7 @@ export interface IJournal extends Document {
 const JournalSchema: Schema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true },
+  sessionId: { type: Schema.Types.ObjectId, ref: 'Session', required: true },
   timestamp: { type: Date, default: Date.now },
   entryType: { type: String, required: true },
   content: { type: String, required: true },

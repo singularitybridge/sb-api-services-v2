@@ -1,4 +1,4 @@
-import { ActionContext, FunctionFactory } from './types';
+import { ActionContext, FunctionFactory } from '../integrations/actions/types';
 import { scheduleMessage } from '../services/agenda/agenda.service';
 
 export const createAgendaActions = (context: ActionContext): FunctionFactory => ({
@@ -18,7 +18,7 @@ export const createAgendaActions = (context: ActionContext): FunctionFactory => 
       },
       required: ['message', 'scheduledTime'],
     },
-    function: async ({ message, scheduledTime }) => {
+    function: async ({ message, scheduledTime }: { message: string; scheduledTime: string }) => {
       try {
         await scheduleMessage(context.sessionId, message, scheduledTime);
         return { success: true, message: 'Message scheduled successfully' };

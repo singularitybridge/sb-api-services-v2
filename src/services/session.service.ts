@@ -71,6 +71,14 @@ export const updateSessionAssistant = async (
   return session;
 };
 
+export const getSessionById = async (sessionId: string): Promise<ISession> => {
+  const session = await Session.findById(sessionId);
+  if (!session) {
+    throw new NotFoundError('Session not found');
+  }
+  return session;
+};
+
 export const getSessionOrCreate = async (
   apiKey: string,
   userId: string,

@@ -3,7 +3,6 @@ import VoiceResponse from 'twilio/lib/twiml/VoiceResponse';
 import { Assistant } from '../../models/Assistant';
 import { Session } from '../../models/Session';
 import { User } from '../../models/User';
-import { generateAudio } from '../11labs.service';
 import { deleteThread, createNewThread } from '../oai.thread.service';
 import { transcribeAudioWhisper } from '../speech.recognition.service';
 import { getCurrentTimeAndDay } from '../context.service';
@@ -11,6 +10,7 @@ import { Twilio } from 'twilio';
 import { ApiKey } from '../verification.service';
 import Api from 'twilio/lib/rest/Api';
 import { handleSessionMessage } from '../assistant.service';
+import { generateAudio } from '../../integrations/elevenlabs/elevenlabs.service';
 
 export type TwilioKeys = {
   accountSid: string;
