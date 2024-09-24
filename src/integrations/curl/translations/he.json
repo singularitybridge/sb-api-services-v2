@@ -1,0 +1,7 @@
+{
+  "serviceName": "אינטגרציית cURL",
+  "performCurlRequest": {
+    "actionTitle": "ביצוע בקשת HTTP",
+    "description": "שלח בקשת HTTP לכתובת URL נתונה וקבל את התגובה."
+  }
+}

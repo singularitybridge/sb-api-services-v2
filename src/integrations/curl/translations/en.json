@@ -1,0 +1,7 @@
+{
+    "serviceName": "cURL Integration",
+    "performCurlRequest": {
+      "actionTitle": "Perform HTTP Request",
+      "description": "Send an HTTP request to a specified URL and get the response."
+    }
+  }
