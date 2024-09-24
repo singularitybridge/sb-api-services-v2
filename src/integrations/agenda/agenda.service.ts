@@ -1,6 +1,7 @@
 import Agenda, { Job } from 'agenda';
 import { ObjectId } from 'mongodb';
 import { toZonedTime, format } from 'date-fns-tz';
+import { sendMessageToAgent } from '../../services/assistant.service';
 
 const agendaClient = new Agenda({
   db: { address: `${process.env.MONGODB_URI}/agenda` },
@@ -68,6 +69,18 @@ agendaClient.define('genericScheduledJob', async (job: Job) => {
   }
 });
 
+agendaClient.define('sendScheduledMessage', async (job: Job) => {
+  try {
+    console.log('Scheduled message job started', job.attrs._id, job.attrs.data);
+    const { sessionId, message } = job.attrs.data;
+    await sendMessageToAgent(sessionId, message);
+    console.log('Scheduled message sent successfully');
+  } catch (error) {
+    console.error('Error sending scheduled message:', error);
+    throw error;
+  }
+});
+
 export const scheduleJob = async (
   jobName: string,
   data: any,
@@ -82,6 +95,14 @@ export const scheduleJob = async (
     console.error('Error scheduling job:', error);
     throw error;
   }
+};
+
+export const scheduleMessage = async (
+  sessionId: string,
+  message: string,
+  scheduledTime: string
+): Promise<Job> => {
+  return scheduleJob('sendScheduledMessage', { sessionId, message }, scheduledTime);
 };
 
 export { agendaClient };
