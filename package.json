@@ -1,5 +1,5 @@
 {
-  "name": "my-task-manager",
+  "name": "sb-agent-portal",
   "version": "1.0.0",
   "description": "API service for managing tasks",
   "main": "src/index.ts",

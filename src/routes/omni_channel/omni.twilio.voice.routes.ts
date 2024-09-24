@@ -1,11 +1,11 @@
-import express, { NextFunction } from 'express';
+import express from 'express';
 import {
   handleVoiceCallEnded,
   handleVoiceRecordingRequest,
   handleVoiceRequest,
 } from '../../services/twilio/voice.service';
 import VoiceResponse from 'twilio/lib/twiml/VoiceResponse';
-import { agendaClient } from '../../services/agenda/agenda.service';
+import { agendaClient, scheduleJob } from '../../integrations/agenda/agenda.service';
 import { ObjectId } from 'mongodb';
 
 const twilioVoiceRouter = express.Router();
@@ -30,7 +30,6 @@ twilioVoiceRouter.post('/', async (req, res) => {
 });
 
 twilioVoiceRouter.post('/status', async (req, res) => {
-
   const { CallStatus, From, To } = req.body;
   const apiKey = req.headers['openai-api-key'] as string;
 
@@ -39,7 +38,6 @@ twilioVoiceRouter.post('/status', async (req, res) => {
   }
   
   res.status(200).send('OK');
-  
 });
 
 twilioVoiceRouter.post('/wait', async (req, res) => {
@@ -69,23 +67,15 @@ twilioVoiceRouter.post('/wait', async (req, res) => {
   }
 });
 
-
-
-
-
 twilioVoiceRouter.post('/recording', async (req, res) => {
-
   const { CallSid, CallStatus, From, To, RecordingUrl } = req.body; 
-  const job = await agendaClient.now('processVoiceRecording', { CallSid, CallStatus, From, To, RecordingUrl });
+  const job = await scheduleJob('processVoiceRecording', { CallSid, CallStatus, From, To, RecordingUrl }, 'now');
   const twiml = new VoiceResponse();
   
   twiml.redirect(`/twilio/voice/wait?job=${job.attrs._id}`);
   console.log(`record, redirect to /twilio/voice/wait?job=${job.attrs._id}`);
   res.type('text/xml');
   res.send(twiml.toString());
-
-
 });
-
 
 export { twilioVoiceRouter };

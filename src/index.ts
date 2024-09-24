@@ -2,9 +2,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import mongoose from 'mongoose';
-import { startAgenda } from './services/agenda/agenda.service';
+import { startAgenda } from './integrations/agenda/agenda.service';
 import { initializeTelegramBots } from './services/telegram.bot';
-import { Company } from './models/Company';
 
 const initializeApp = async () => {
   try {
@@ -15,7 +14,7 @@ const initializeApp = async () => {
     console.log(`Successfully connected to MongoDB database: ${dbName}`);
 
     console.log('Starting Agenda...');
-    startAgenda();
+    await startAgenda();
     console.log('Agenda started successfully');
 
     console.log('Initializing Telegram bots...');
@@ -35,7 +34,6 @@ import policyRouter from './routes/policy.routes';
 import ttsRouter from './routes/tts.routes';
 import sttRouter from './routes/stt.routes';
 import { twilioVoiceRouter } from './routes/omni_channel/omni.twilio.voice.routes';
-import { agendaRouter } from './routes/agenda.routes';
 import { assistantRouter } from './routes/assistant.routes';
 import { sessionRouter } from './routes/session.routes';
 import { companyRouter } from './routes/company.routes';
@@ -96,7 +94,6 @@ app.use(
   actionDiscoveryRouter,
 );
 app.use('/session', verifyTokenMiddleware, verifyAccess(), sessionRouter);
-app.use('/agenda', verifyTokenMiddleware, verifyAccess(), agendaRouter);
 app.use('/api', verifyTokenMiddleware, verifyAccess(), verificationRouter);
 app.use('/journal', verifyTokenMiddleware, verifyAccess(), journalRouter);
 app.use('/onboarding', verifyTokenMiddleware, verifyAccess(), onboardingRouter);
