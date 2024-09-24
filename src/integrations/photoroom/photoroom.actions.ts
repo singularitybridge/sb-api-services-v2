@@ -9,7 +9,7 @@ export const createPhotoRoomActions = (
   context: ActionContext,
 ): FunctionFactory => ({
   removeBackground: {
-    description: 'Remove the background from an image using PhotoRoom API',
+    description: 'Remove the background from an image using PhotoRoom API and upload the result',
     strict: true,
     parameters: {
       type: 'object',
@@ -47,11 +47,11 @@ export const createPhotoRoomActions = (
         };
       }
 
-      // Verify that imageUrl is a string
-      if (typeof imageUrl !== 'string') {
+      // Verify that imageUrl is a non-empty string
+      if (typeof imageUrl !== 'string' || imageUrl.trim().length === 0) {
         return {
           error: 'Invalid imageUrl',
-          message: 'The imageUrl must be a string.',
+          message: 'The imageUrl must be a non-empty string.',
         };
       }
 
@@ -66,16 +66,23 @@ export const createPhotoRoomActions = (
       }
 
       try {
-        const result = await removeBackgroundFromImage(
+        const processedImageUrl = await removeBackgroundFromImage(
           context.companyId,
           imageUrl,
         );
-        return { result };
-      } catch (error) {
-        console.error('removeBackground: Error removing background', error);
         return {
-          error: 'Background removal failed',
-          message: 'Failed to remove background using PhotoRoom API.',
+          success: true,
+          message: 'Background removed and image uploaded successfully',
+          data: {
+            imageUrl: processedImageUrl,
+          },
+        };
+      } catch (error) {
+        console.error('removeBackground: Error processing image', error);
+        return {
+          success: false,
+          message: 'Failed to process image using PhotoRoom API',
+          error: (error as Error).message,
         };
       }
     },
