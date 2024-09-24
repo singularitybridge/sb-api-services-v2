@@ -1,7 +1,17 @@
 {
-  "getAssistants": "קבל עוזרים",
-  "setAssistant": "הגדר עוזר",
-  "createNewAssistant": "צור עוזר חדש",
+  "serviceName": "שירות עוזרים",
+  "getAssistants": {
+    "actionTitle": "קבל עוזרים",
+    "description": "קבל רשימה של כל העוזרים עבור החברה הנוכחית של המשתמש"
+  },
+  "setAssistant": {
+    "actionTitle": "הגדר עוזר",
+    "description": "הגדר את העוזר הנוכחי"
+  },
+  "createNewAssistant": {
+    "actionTitle": "צור עוזר חדש",
+    "description": "צור עוזר חדש"
+  },
   "assistantName": "שם העוזר",
   "assistantDescription": "תיאור העוזר",
   "assistantPrompt": "הנחיה לעוזר",

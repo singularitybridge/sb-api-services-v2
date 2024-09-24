@@ -1,7 +1,17 @@
 {
-  "getAssistants": "Get Assistants",
-  "setAssistant": "Set Assistant",
-  "createNewAssistant": "Create New Assistant",
+  "serviceName": "Assistant Service",
+  "getAssistants": {
+    "actionTitle": "Get Assistants",
+    "description": "Get a list of all assistants for the current user's company"
+  },
+  "setAssistant": {
+    "actionTitle": "Set Assistant",
+    "description": "Set the current assistant"
+  },
+  "createNewAssistant": {
+    "actionTitle": "Create New Assistant",
+    "description": "Create a new assistant"
+  },
   "assistantName": "Assistant Name",
   "assistantDescription": "Assistant Description",
   "assistantPrompt": "Assistant Prompt",
