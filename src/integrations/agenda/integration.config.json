@@ -1,0 +1,7 @@
+{
+  "name": "Agenda",
+  "icon": "calendar",
+  "apiKeyName": "agenda_api_key",
+  "actionCreator": "createAgendaActions",
+  "actionsFile": "agenda.actions.ts"
+}

@@ -1,0 +1,7 @@
+{
+  "serviceName": "יומן",
+  "scheduleMessage": {
+    "actionTitle": "תזמון הודעה",
+    "description": "תזמון הודעה לשליחה בזמן מוגדר."
+  }
+}

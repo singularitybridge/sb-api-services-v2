@@ -1,0 +1,7 @@
+{
+  "serviceName": "Agenda",
+  "scheduleMessage": {
+    "actionTitle": "Schedule Message",
+    "description": "Schedule a message to be sent at a specified time."
+  }
+}
