@@ -1,9 +1,9 @@
-import { Journal, IJournal } from '../models/Journal';
+import { Journal, IJournal } from '../../models/Journal';
 import mongoose from 'mongoose';
-import { getSessionOrCreate, getSessionById } from './session.service';
-import { ChannelType } from '../types/ChannelType';
-import { getUserById } from './user.service';
-import { getAssistantById } from './assistant.service';
+import { getSessionOrCreate, getSessionById } from '../../services/session.service';
+import { ChannelType } from '../../types/ChannelType';
+import { getUserById } from '../../services/user.service';
+import { getAssistantById } from '../../services/assistant.service';
 import { format, toZonedTime } from 'date-fns-tz';
 
 export async function createJournalEntry(

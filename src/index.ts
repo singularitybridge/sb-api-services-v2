@@ -50,7 +50,6 @@ import { onboardingRouter } from './routes/onboarding.routes';
 import { authRouter } from './routes/auth.routes';
 import { errorHandler } from './middleware/errorHandler.middleware';
 import { fileRouter } from './routes/file.routes';
-import { journalRouter } from './routes/journal.routes';
 import { jsonbinRouter } from './routes/jsonbin.routes';
 import contentFileRouter from './routes/content-file.routes';
 import actionDiscoveryRouter from './routes/discovery.routes';
@@ -95,7 +94,6 @@ app.use(
 );
 app.use('/session', verifyTokenMiddleware, verifyAccess(), sessionRouter);
 app.use('/api', verifyTokenMiddleware, verifyAccess(), verificationRouter);
-app.use('/journal', verifyTokenMiddleware, verifyAccess(), journalRouter);
 app.use('/onboarding', verifyTokenMiddleware, verifyAccess(), onboardingRouter);
 app.use('/jsonbin', verifyTokenMiddleware, verifyAccess(), jsonbinRouter);
 app.use('/content', verifyTokenMiddleware, verifyAccess(), contentRouter);
