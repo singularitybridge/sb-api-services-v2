@@ -1,0 +1,23 @@
+{
+  "serviceName": "AI Agent Executor",
+  "executeCommand": {
+    "actionTitle": "Execute Command",
+    "description": "Execute a command on the AI Agent Executor."
+  },
+  "getProcessStatus": {
+    "actionTitle": "Get Process Status",
+    "description": "Get the status of a background process."
+  },
+  "stopProcess": {
+    "actionTitle": "Stop Process",
+    "description": "Stop a background process."
+  },
+  "fileOperation": {
+    "actionTitle": "File Operation",
+    "description": "Perform a file operation on the AI Agent Executor."
+  },
+  "stopExecution": {
+    "actionTitle": "Stop Execution",
+    "description": "Stop all running processes and shut down the AI Agent Executor."
+  }
+}

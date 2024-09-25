@@ -1,0 +1,23 @@
+{
+  "serviceName": "מבצע סוכן AI",
+  "executeCommand": {
+    "actionTitle": "הרץ פקודה",
+    "description": "הרץ פקודה במבצע סוכן AI."
+  },
+  "getProcessStatus": {
+    "actionTitle": "קבל סטטוס תהליך",
+    "description": "קבל את הסטטוס של תהליך רקע."
+  },
+  "stopProcess": {
+    "actionTitle": "עצור תהליך",
+    "description": "עצור תהליך רקע."
+  },
+  "fileOperation": {
+    "actionTitle": "פעולת קובץ",
+    "description": "בצע פעולת קובץ במבצע סוכן AI."
+  },
+  "stopExecution": {
+    "actionTitle": "עצור ביצוע",
+    "description": "עצור את כל התהליכים הפועלים וכבה את מבצע סוכן AI."
+  }
+}

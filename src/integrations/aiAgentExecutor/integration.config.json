@@ -1,0 +1,6 @@
+{
+  "name": "AI Agent Executor",
+  "icon": "robot",
+  "actionCreator": "createAIAgentExecutorActions",
+  "actionsFile": "aiAgentExecutor.actions.ts"
+}
