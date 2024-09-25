@@ -1,0 +1,11 @@
+{
+  "journal": {
+    "createSuccess": "Journal entry created successfully.",
+    "createError": "An error occurred while creating the journal entry.",
+    "updateSuccess": "Journal entry updated successfully.",
+    "updateError": "An error occurred while updating the journal entry.",
+    "deleteSuccess": "Journal entry deleted successfully.",
+    "deleteError": "An error occurred while deleting the journal entry.",
+    "getEntriesError": "An error occurred while retrieving journal entries."
+  }
+}

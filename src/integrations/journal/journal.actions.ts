@@ -1,15 +1,15 @@
-import { ActionContext, FunctionFactory, ActionType } from '../integrations/actions/types';
+import { ActionContext, FunctionFactory, ActionType } from '../actions/types';
 import {
   createJournalEntry,
   getJournalEntries,
   updateJournalEntry,
   deleteJournalEntry,
   getFriendlyJournalEntries,
-} from '../services/journal.service';
-import { getSessionById } from '../services/session.service';
-import { ChannelType } from '../types/ChannelType';
-import { IJournal } from '../models/Journal';
-import { getApiKey } from '../services/api.key.service';
+} from './journal.service';
+import { getSessionById } from '../../services/session.service';
+import { ChannelType } from '../../types/ChannelType';
+import { IJournal } from '../../models/Journal';
+import { getApiKey } from '../../services/api.key.service';
 import { Types } from 'mongoose';
 
 interface JournalEntryArgs {
