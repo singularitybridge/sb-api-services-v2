@@ -1,11 +1,23 @@
 {
-  "journal": {
-    "createSuccess": "Journal entry created successfully.",
-    "createError": "An error occurred while creating the journal entry.",
-    "updateSuccess": "Journal entry updated successfully.",
-    "updateError": "An error occurred while updating the journal entry.",
-    "deleteSuccess": "Journal entry deleted successfully.",
-    "deleteError": "An error occurred while deleting the journal entry.",
-    "getEntriesError": "An error occurred while retrieving journal entries."
+  "serviceName": "Journal",
+  "createJournalEntry": {
+    "actionTitle": "Create Journal Entry",
+    "description": "Create a new journal entry"
+  },
+  "getJournalEntries": {
+    "actionTitle": "Get Journal Entries",
+    "description": "Retrieve journal entries"
+  },
+  "getFriendlyJournalEntries": {
+    "actionTitle": "Get Friendly Journal Entries",
+    "description": "Retrieve journal entries with user and assistant names"
+  },
+  "updateJournalEntry": {
+    "actionTitle": "Update Journal Entry",
+    "description": "Update an existing journal entry"
+  },
+  "deleteJournalEntry": {
+    "actionTitle": "Delete Journal Entry",
+    "description": "Delete a journal entry"
   }
 }
