@@ -8,22 +8,20 @@ export const summarizeText = async (
   const systemPrompt = `You are a text summarizer. Your task is to summarize the given text to be no longer than ${maxLength} characters while preserving the most important information.`;
   const userInput = `Summarize the following text:\n\n${text}`;
 
-  return getCompletionResponse(apiKey, systemPrompt, userInput, 'gpt-4o-mini', 0.7, maxLength);
+  return getCompletionResponse(apiKey, systemPrompt, userInput, 'gpt-4o-mini', 0.7);
 };
 
 export const getO1CompletionResponse = async (
   apiKey: string,
   userInput: string,
-  model: string,
-  maxTokens: number
+  model: string,  
 ): Promise<string> => {
   const openai = new OpenAI({ apiKey });
 
   try {
     const response = await openai.chat.completions.create({
       model,
-      messages: [{ role: 'user', content: userInput }],
-      max_completion_tokens: maxTokens,
+      messages: [{ role: 'user', content: userInput }],      
     });
 
     return response.choices[0].message.content || '';
@@ -38,13 +36,12 @@ export const getCompletionResponse = async (
   systemPrompt: string,
   userInput: string,
   model: string = 'gpt-4o',
-  temperature: number = 0.7,
-  maxTokens: number = 2048
+  temperature: number = 0.7,  
 ): Promise<string> => {
   const o1Models = ['o1', 'o1-mini', 'o1-preview'];
 
   if (o1Models.includes(model)) {
-    return getO1CompletionResponse(apiKey, userInput, model, maxTokens);
+    return getO1CompletionResponse(apiKey, userInput, model);
   }
 
   const openai = new OpenAI({ apiKey });
@@ -57,8 +54,7 @@ export const getCompletionResponse = async (
 
     const params: any = {
       model,
-      messages,
-      max_tokens: maxTokens,
+      messages,      
       temperature,
       top_p: 1,
       frequency_penalty: 0,

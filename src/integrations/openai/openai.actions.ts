@@ -1,10 +1,16 @@
 import { ActionContext, FunctionFactory } from '../actions/types';
-import { generateSpeech, transcribeAudioWhisperFromURL, getO1CompletionResponse } from './openai.service';
+import { generateSpeech } from '../../services/oai.speech.service';
+import { transcribeAudioWhisperFromURL } from '../../services/speech.recognition.service';
+import { getO1CompletionResponse } from '../../services/oai.completion.service';
+import { getApiKey } from '../../services/api.key.service';
+
+type OpenAIVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+type OpenAIModel = 'tts-1' | 'tts-1-hd';
 
 interface GenerateSpeechArgs {
   text: string;
-  voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
-  model?: 'tts-1' | 'tts-1-hd';
+  voice?: OpenAIVoice;
+  model?: OpenAIModel;
   textLimit?: number;
 }
 
@@ -50,21 +56,16 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
       required: ['text'],
       additionalProperties: false,
     },
-    function: async (args: GenerateSpeechArgs) => {
-      console.log('generateOpenAiSpeech called with arguments:', JSON.stringify(args, null, 2));
-
-      const { text, voice = 'alloy', model = 'tts-1-hd', textLimit = 256 } = args;
-
+    function: async ({ text, voice = 'alloy', model = 'tts-1-hd', textLimit = 256 }: GenerateSpeechArgs) => {
       try {
-        console.log('generateOpenAiSpeech: Calling generateSpeech service');
-        const audioUrl = await generateSpeech(context.companyId, text, voice, model, textLimit);
+        const apiKey = await getApiKey(context.companyId, 'openai');
+        if (!apiKey) {
+          return { error: 'OpenAI API key is missing' };
+        }
+        const audioUrl = await generateSpeech(apiKey, text, voice, model, textLimit);
         return { audioUrl };
       } catch (error) {
-        console.error('generateOpenAiSpeech: Error generating speech', error);
-        return {
-          error: 'Speech generation failed',
-          message: 'Failed to generate speech using OpenAI API.',
-        };
+        return { error: 'Failed to generate speech with OpenAI' };
       }
     },
   },
@@ -86,21 +87,16 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
       required: ['audioUrl'],
       additionalProperties: false,
     },
-    function: async (args: TranscribeAudioArgs) => {
-      console.log('transcribeAudioWhisperFromURL called with arguments:', JSON.stringify(args, null, 2));
-
-      const { audioUrl, language } = args;
-
+    function: async ({ audioUrl, language }: TranscribeAudioArgs) => {
       try {
-        console.log('transcribeAudioWhisperFromURL: Calling transcribeAudioWhisperFromURL service');
-        const transcription = await transcribeAudioWhisperFromURL(context.companyId, audioUrl, language);
+        const apiKey = await getApiKey(context.companyId, 'openai');
+        if (!apiKey) {
+          return { error: 'OpenAI API key is missing' };
+        }
+        const transcription = await transcribeAudioWhisperFromURL(apiKey, audioUrl, language);
         return { transcription };
       } catch (error) {
-        console.error('transcribeAudioWhisperFromURL: Error transcribing audio', error);
-        return {
-          error: 'Transcription failed',
-          message: 'Failed to transcribe audio using OpenAI Whisper API.',
-        };
+        return { error: 'Failed to transcribe audio with OpenAI Whisper' };
       }
     },
   },
@@ -123,21 +119,20 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
       required: ['question', 'model'],
       additionalProperties: false,
     },
-    function: async (args: AskO1ModelArgs) => {
-      console.log('askO1Model called with arguments:', JSON.stringify(args, null, 2));
-
-      const { question, model } = args;
-
+    function: async ({ question, model }: AskO1ModelArgs) => {
       try {
-        console.log('askO1Model: Calling getO1CompletionResponse service');
-        const response = await getO1CompletionResponse(context.companyId, question, model, 2048);
-        return { response };
+        const allowedModels = ['o1-preview', 'o1-mini'];
+        if (!allowedModels.includes(model)) {
+          return { error: `Invalid model specified. Allowed models are ${allowedModels.join(', ')}` };
+        }
+        const apiKey = await getApiKey(context.companyId, 'openai');
+        if (!apiKey) {
+          return { error: 'OpenAI API key is missing' };
+        }
+        const responseText = await getO1CompletionResponse(apiKey, question, model);
+        return { response: responseText };
       } catch (error) {
-        console.error('askO1Model: Error getting response from o1 model', error);
-        return {
-          error: 'Model query failed',
-          message: 'Failed to get response from OpenAI o1 model.',
-        };
+        return { error: 'Failed to get response from OpenAI o1 model' };
       }
     },
   },
