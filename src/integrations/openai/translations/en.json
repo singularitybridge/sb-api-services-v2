@@ -1,0 +1,15 @@
+{
+  "serviceName": "OpenAI",
+  "generateOpenAiSpeech": {
+    "actionTitle": "Generate OpenAI Speech",
+    "description": "Generate speech using OpenAI's text-to-speech API"
+  },
+  "transcribeAudioWhisperFromURL": {
+    "actionTitle": "Transcribe Audio (Whisper)",
+    "description": "Transcribe audio from a URL using OpenAI's Whisper API"
+  },
+  "askO1Model": {
+    "actionTitle": "Ask O1 Model",
+    "description": "Ask a question to OpenAI's O1 model"
+  }
+}
