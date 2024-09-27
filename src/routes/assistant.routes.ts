@@ -36,7 +36,6 @@ assistantRouter.post(
       userInput,
       model = 'gpt-4o',
       temperature,
-      maxTokens,
     } = req.body;
 
     const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
@@ -48,7 +47,6 @@ assistantRouter.post(
         userInput,
         model,
         temperature,
-        maxTokens,
       );
       res.json({ content: response });
     } catch (error) {
