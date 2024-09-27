@@ -1,0 +1,7 @@
+{
+  "name": "OpenAI",
+  "icon": "brain",
+  "apiKeyName": "openai_api_key",
+  "actionCreator": "createOpenAiActions",
+  "actionsFile": "openai.actions.ts"
+}

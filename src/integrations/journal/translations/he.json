@@ -1,11 +1,23 @@
 {
-  "journal": {
-    "createSuccess": "רשומת יומן נוצרה בהצלחה.",
-    "createError": "אירעה שגיאה בעת יצירת רשומת היומן.",
-    "updateSuccess": "רשומת היומן עודכנה בהצלחה.",
-    "updateError": "אירעה שגיאה בעת עדכון רשומת היומן.",
-    "deleteSuccess": "רשומת היומן נמחקה בהצלחה.",
-    "deleteError": "אירעה שגיאה בעת מחיקת רשומת היומן.",
-    "getEntriesError": "אירעה שגיאה בעת אחזור רשומות היומן."
+  "serviceName": "יומן",
+  "createJournalEntry": {
+    "actionTitle": "יצירת רשומת יומן",
+    "description": "יצירת רשומת יומן חדשה"
+  },
+  "getJournalEntries": {
+    "actionTitle": "קבלת רשומות יומן",
+    "description": "אחזור רשומות יומן"
+  },
+  "getFriendlyJournalEntries": {
+    "actionTitle": "קבלת רשומות יומן בפורמט ידידותי",
+    "description": "אחזור רשומות יומן עם שמות משתמש וסוכן"
+  },
+  "updateJournalEntry": {
+    "actionTitle": "עדכון רשומת יומן",
+    "description": "עדכון רשומת יומן קיימת"
+  },
+  "deleteJournalEntry": {
+    "actionTitle": "מחיקת רשומת יומן",
+    "description": "מחיקת רשומת יומן"
   }
 }
