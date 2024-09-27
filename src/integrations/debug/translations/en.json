@@ -1,0 +1,7 @@
+{
+  "serviceName": "Debug Integration",
+  "getSessionInfo": {
+    "actionTitle": "Get Session Info",
+    "description": "Retrieve basic session information for debugging purposes."
+  }
+}
