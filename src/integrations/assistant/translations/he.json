@@ -1,27 +1,27 @@
 {
-  "serviceName": "שירות עוזרים",
+  "serviceName": "סוכני AI",
   "getAssistants": {
-    "actionTitle": "קבל עוזרים",
-    "description": "קבל רשימה של כל העוזרים עבור החברה הנוכחית של המשתמש"
+    "actionTitle": "קבל סוכני AI",
+    "description": "קבל רשימה של כל סוכני AI עבור החברה הנוכחית של המשתמש"
   },
   "setAssistant": {
-    "actionTitle": "הגדר עוזר",
-    "description": "הגדר את העוזר הנוכחי"
+    "actionTitle": "הגדר סוכן AI",
+    "description": "הגדר את סוכן AI הנוכחי"
   },
   "createNewAssistant": {
-    "actionTitle": "צור עוזר חדש",
-    "description": "צור עוזר חדש"
+    "actionTitle": "צור סוכן AI חדש",
+    "description": "צור סוכן AI חדש"
   },
-  "assistantName": "שם העוזר",
-  "assistantDescription": "תיאור העוזר",
-  "assistantPrompt": "הנחיה לעוזר",
-  "assistantId": "מזהה העוזר",
-  "successGetAssistants": "העוזרים אוחזרו בהצלחה",
-  "successSetAssistant": "העוזר הוגדר בהצלחה",
-  "successCreateAssistant": "עוזר חדש נוצר בהצלחה",
+  "assistantName": "שם סוכן AI",
+  "assistantDescription": "תיאור סוכן AI",
+  "assistantPrompt": "הנחיה לסוכן AI",
+  "assistantId": "מזהה סוכן AI",
+  "successGetAssistants": "סוכני AI אוחזרו בהצלחה",
+  "successSetAssistant": "סוכן AI הוגדר בהצלחה",
+  "successCreateAssistant": "סוכן AI חדש נוצר בהצלחה",
   "errorInvalidSession": "סשן לא תקין",
-  "errorAssistantNotFound": "העוזר לא נמצא",
-  "errorRetrieveAssistants": "נכשל באחזור העוזרים",
-  "errorSetAssistant": "נכשל בהגדרת העוזר",
-  "errorCreateAssistant": "נכשל ביצירת עוזר חדש"
+  "errorAssistantNotFound": "סוכן AI לא נמצא",
+  "errorRetrieveAssistants": "נכשל באחזור סוכני AI",
+  "errorSetAssistant": "נכשל בהגדרת סוכן AI",
+  "errorCreateAssistant": "נכשל ביצירת סוכן AI חדש"
 }
