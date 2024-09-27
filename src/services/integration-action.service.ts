@@ -1,4 +1,4 @@
-import { discoveryService } from '../integrations/discovery.service';
+import { executeFunctionCall, sanitizeFunctionName } from '../integrations/actions/factory';
 
 export interface IntegrationActionResult {
   success: boolean;
@@ -9,26 +9,28 @@ export interface IntegrationActionResult {
 export const triggerAction = async (
   integrationName: string,
   service: string,
-  data: any
+  data: any,
+  sessionId: string,
+  companyId: string,
+  allowedActions: string[]
 ): Promise<IntegrationActionResult> => {
   try {
-    const actions = await discoveryService.discoverActions();
-    const action = actions.find(a => a.service === integrationName && a.id.endsWith(`.${service}`));
+    const fullServiceId = sanitizeFunctionName(`${integrationName}.${service}`);
+    
+    const call = {
+      function: {
+        name: fullServiceId,
+        arguments: JSON.stringify(data)
+      }
+    };
 
-    if (!action) {
-      throw new Error(`Action '${service}' not found for integration '${integrationName}'`);
+    const result = await executeFunctionCall(call, sessionId, companyId, allowedActions);
+
+    if (result.error) {
+      return { success: false, error: result.error.message };
     }
 
-    // Dynamically import the integration's action file
-    const integrationModule = await import(`../integrations/${integrationName}/${integrationName}.actions`);
-    const actionFunction = integrationModule[service];
-
-    if (typeof actionFunction !== 'function') {
-      throw new Error(`Invalid action function for '${service}' in integration '${integrationName}'`);
-    }
-
-    const result = await actionFunction(data);
-    return { success: true, data: result };
+    return { success: true, data: result.result };
   } catch (error: unknown) {
     if (error instanceof Error) {
       return { success: false, error: error.message };
