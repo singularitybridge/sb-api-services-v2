@@ -55,6 +55,7 @@ import contentFileRouter from './routes/content-file.routes';
 import actionDiscoveryRouter from './routes/discovery.routes';
 import { contentRouter } from './routes/content.routes';
 import { contentTypeRouter } from './routes/content-type.routes';
+import integrationActionRouter from './routes/integration-action.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -102,6 +103,12 @@ app.use(
   verifyTokenMiddleware,
   verifyAccess(),
   contentTypeRouter,
+);
+app.use(
+  '/integration-action',
+  verifyTokenMiddleware,
+  verifyAccess(),
+  integrationActionRouter
 );
 
 // Admin-only routes - to be added later

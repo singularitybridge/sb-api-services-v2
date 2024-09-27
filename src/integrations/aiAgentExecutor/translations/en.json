@@ -1,8 +1,8 @@
 {
-  "serviceName": "AI Agent Executor",
+  "serviceName": "Environment Command Runner",
   "executeCommand": {
     "actionTitle": "Execute Command",
-    "description": "Execute a command on the AI Agent Executor."
+    "description": "Execute a command in the user's environment or Docker."
   },
   "getProcessStatus": {
     "actionTitle": "Get Process Status",
@@ -14,10 +14,10 @@
   },
   "fileOperation": {
     "actionTitle": "File Operation",
-    "description": "Perform a file operation on the AI Agent Executor."
+    "description": "Perform a file operation in the user's environment."
   },
   "stopExecution": {
     "actionTitle": "Stop Execution",
-    "description": "Stop all running processes and shut down the AI Agent Executor."
+    "description": "Stop all running processes and shut down the Environment Command Runner."
   }
 }
