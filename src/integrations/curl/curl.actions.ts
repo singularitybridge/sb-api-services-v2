@@ -56,11 +56,6 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
           throw new Error('Invalid URL: The URL must start with http:// or https://');
         }
 
-        // Security considerations:
-        // - Prevent accessing internal networks
-        // - Optional: Implement URL whitelisting or blacklisting
-        // - Limit the timeout and response size
-
         // Properly serialize the body if it's an object, use as-is if it's a string, or use an empty string if not provided
         const serializedBody = body === undefined ? '' :
           typeof body === 'object' ? JSON.stringify(body) : String(body);
@@ -80,13 +75,20 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
           timeout
         });
 
-        return { response };
+        // Return the full response, including status, data, headers, and error if present
+        return {
+          status: response.status,
+          data: response.data,
+          headers: response.headers,
+          error: response.error
+        };
       } catch (error: any) {
         console.error('performCurlRequest: Error performing request', error);
         return {
-          error: 'Request failed',
-          message: error.message || 'Failed to perform the HTTP request.',
-          details: error.stack
+          status: 500,
+          data: null,
+          headers: {},
+          error: `Request failed: ${error.message || 'Failed to perform the HTTP request.'}`,
         };
       }
     },

@@ -124,4 +124,99 @@ Example content for en.json:
 
 8. **ES6 & TypeScript**: Utilize ES6 features and TypeScript in your implementation for better code quality and maintainability.
 
-By following these guidelines and structure, you can ensure that your new integration is consistent with existing ones and easily maintainable within the system.
+## 5. Integration with Existing System
+
+### 5.1. Allowed Actions
+
+When implementing integration actions, it's crucial to understand how allowed actions are managed:
+
+1. The `triggerAction` function in `src/services/integration-action.service.ts` is responsible for executing integration actions.
+
+2. Allowed actions are determined by sanitizing the function name:
+
+   ```typescript
+   const fullServiceId = sanitizeFunctionName(`${integrationName}.${service}`);
+   ```
+
+3. This sanitized function name is then used to check against the list of allowed actions.
+
+4. In debug or testing scenarios, you may need to explicitly allow actions. For example, in `debug.service.ts`:
+
+   ```typescript
+   const sanitizedFunctionName = sanitizeFunctionName(`${integrationName}.${service}`);
+   const allowedActions: string[] = [sanitizedFunctionName];
+   ```
+
+### 5.2. Session Context
+
+When working with integrations, be aware of how session context is managed:
+
+1. The `getSessionContextData` function from `src/services/session-context.service.ts` is used to retrieve session data.
+
+2. Session context may contain important information like user permissions and allowed actions.
+
+3. Always consider the session context when implementing integration logic to ensure proper authorization and access control.
+
+### 5.3. API Key Management
+
+If your integration requires API keys:
+
+1. Use the `getApiKey` function from `src/services/api.key.service.ts` to retrieve API keys for specific integrations.
+
+2. Ensure that your integration's API key is properly set up in the company's configuration.
+
+3. Handle cases where the API key might not be available, providing appropriate error messages.
+
+## 6. Testing and Debugging
+
+1. **Debug Integration**: Use the debug integration (`src/integrations/debug/`) as a reference for implementing and testing new integrations.
+
+2. **Logging**: Implement comprehensive logging in your integration to facilitate debugging. Use `console.log` for development and consider using a more robust logging solution for production.
+
+3. **Error Simulation**: Include ways to simulate errors in your integration for testing purposes. This can help ensure that error handling is working correctly.
+
+4. **Integration Tests**: Write integration tests that cover various scenarios, including successful operations and error cases.
+
+## 7. Updating Existing Integrations
+
+When adding new functionality or modifying existing integrations, keep the following in mind:
+
+1. **Backward Compatibility**: Ensure that changes to existing integrations don't break current functionality. If breaking changes are necessary, provide clear migration instructions.
+
+2. **Update Related Files**: Remember to update all related files when adding or modifying an integration. This includes:
+   - The integration's service file
+   - The integration's actions file
+   - Translation files (both English and Hebrew)
+   - Any relevant test files
+
+3. **Debug Integration**: When adding new general-purpose functionality, consider adding it to the debug integration as well. This can serve as both documentation and a testing tool for other developers.
+
+## 8. Best Practices for Integration Development
+
+1. **Parameterization**: Make your integration functions flexible by accepting parameters for configurable elements. This allows for easier reuse and testing.
+
+2. **Async/Await**: Use async/await syntax for asynchronous operations to improve code readability and error handling.
+
+3. **Input Validation**: Implement thorough input validation in your action functions to prevent errors caused by invalid input.
+
+4. **Descriptive Naming**: Use clear, descriptive names for your integration, actions, and functions. This improves code readability and self-documentation.
+
+5. **Comments and Documentation**: Add inline comments for complex logic and provide JSDoc comments for functions to aid in code understanding and maintenance.
+
+6. **Error Messages**: Provide detailed, user-friendly error messages that can help in troubleshooting issues.
+
+7. **Consistent Return Format**: Maintain a consistent return format across all integration functions, typically including `success`, `data`, and `error` fields.
+
+## 9. Integration with External Services
+
+When integrating with external services:
+
+1. **Rate Limiting**: Implement rate limiting mechanisms to respect the external service's usage limits.
+
+2. **Retry Logic**: Add retry logic for transient failures, using exponential backoff to avoid overwhelming the external service.
+
+3. **Timeout Handling**: Implement proper timeout handling to prevent your integration from hanging indefinitely.
+
+4. **Webhook Support**: If the external service supports webhooks, consider implementing webhook handlers for real-time updates.
+
+By following these guidelines and structure, you can ensure that your new integration is consistent with existing ones, properly integrated with the system's action and session management, and easily maintainable within the system.
