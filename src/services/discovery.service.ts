@@ -28,6 +28,10 @@ interface ActionDefinition {
 
 export type SupportedLanguage = 'en' | 'he';
 
+function toSnakeCase(str: string): string {
+  return str.toLowerCase().replace(/[^a-zA-Z0-9]+(.)/g, (_, chr) => '_' + chr.toLowerCase());
+}
+
 export const discoveryService = {
   discoverIntegrations: async (language: SupportedLanguage = 'en'): Promise<Integration[]> => {
     const integrationsPath = join(__dirname, '..', 'integrations');
@@ -75,19 +79,17 @@ export const discoveryService = {
       const translations = loadTranslations(integrationPath, language);
 
       const actions: ActionInfo[] = [];
-      const integrationId = config.name || folder;
-      const capitalizedIntegrationId = integrationId.charAt(0).toUpperCase() + integrationId.slice(1);
-      const lowercaseIntegrationId = integrationId.toLowerCase();
+      const integrationId = toSnakeCase(config.name || folder);
       for (const [key, value] of Object.entries(actionObj)) {
         const actionDef = value as ActionDefinition;
         if (typeof actionDef === 'object' && actionDef.description) {
           const action: ActionInfo = {
-            id: `${lowercaseIntegrationId}.${key}`,
+            id: `${integrationId}.${key}`,
             serviceName: translations?.serviceName || config.name || folder,
             actionTitle: key,
             description: translations?.[key]?.description || actionDef.description,
             icon: config.icon || 'help-circle',
-            service: lowercaseIntegrationId,
+            service: integrationId,
             parameters: actionDef.parameters,
           };
           actions.push(action);
@@ -97,7 +99,7 @@ export const discoveryService = {
       }
 
       const integration: Integration = {
-        id: capitalizedIntegrationId,
+        id: integrationId,
         name: translations?.serviceName || config.name || folder,
         description: translations?.serviceDescription || config.description || '',
         icon: config.icon || 'help-circle',
@@ -119,7 +121,7 @@ export const discoveryService = {
 
   getIntegrationById: async (id: string, language: SupportedLanguage = 'en'): Promise<Integration | null> => {
     const integrations = await discoveryService.discoverIntegrations(language);
-    return integrations.find(integration => integration.id === id) || null;
+    return integrations.find(integration => integration.id === toSnakeCase(id)) || null;
   },
 
   getIntegrationsLean: async (language: SupportedLanguage = 'en', fields?: (keyof Integration)[]): Promise<Partial<Integration>[]> => {
