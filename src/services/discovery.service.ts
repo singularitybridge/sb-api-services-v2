@@ -10,7 +10,7 @@ interface Integration {
   actions: ActionInfo[];
 }
 
-interface ActionInfo {
+export interface ActionInfo {
   id: string;
   serviceName: string;
   actionTitle: string;
@@ -39,7 +39,7 @@ const flattenIntegrations = (integrations: Integration[]): ActionInfo[] => {
 
 export const discoveryService = {
   discoverIntegrations: async (language: SupportedLanguage = 'en'): Promise<Integration[]> => {
-    const integrationsPath = join(__dirname);
+    const integrationsPath = join(__dirname, '..', 'integrations');
     const integrationFolders = readdirSync(integrationsPath).filter(folder =>
       existsSync(join(integrationsPath, folder, 'integration.config.json'))
     );

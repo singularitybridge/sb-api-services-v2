@@ -1,4 +1,5 @@
 import { executeFunctionCall, sanitizeFunctionName } from '../integrations/actions/factory';
+import { discoveryService, SupportedLanguage, ActionInfo } from './discovery.service';
 
 export interface IntegrationActionResult {
   success: boolean;
@@ -6,14 +7,14 @@ export interface IntegrationActionResult {
   error?: string;
 }
 
-export const triggerAction = async (
+export async function triggerAction(
   integrationName: string,
   service: string,
   data: any,
   sessionId: string,
   companyId: string,
   allowedActions: string[]
-): Promise<IntegrationActionResult> => {
+): Promise<IntegrationActionResult> {
   try {
     const fullServiceId = sanitizeFunctionName(`${integrationName}.${service}`);
     
@@ -38,4 +39,20 @@ export const triggerAction = async (
       return { success: false, error: 'An unknown error occurred' };
     }
   }
-};
+}
+
+export async function getIntegrations(language: SupportedLanguage = 'en') {
+  return discoveryService.discoverIntegrations(language);
+}
+
+export async function getIntegrationActions(language: SupportedLanguage = 'en') {
+  return discoveryService.discoverActions(language);
+}
+
+export async function getIntegrationById(id: string, language: SupportedLanguage = 'en') {
+  return discoveryService.getIntegrationById(id, language);
+}
+
+export async function getLeanIntegrationActions(language: SupportedLanguage = 'en', fields?: (keyof ActionInfo)[]) {
+  return discoveryService.getIntegrationsLean(language, fields);
+}
