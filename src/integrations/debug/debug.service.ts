@@ -1,6 +1,10 @@
 import { Session } from '../../models/Session';
 import { getUserById } from '../../services/user.service';
 import { getCompany } from '../../services/company.service';
+import { triggerAction } from '../../services/integration-action.service';
+import { ActionContext } from '../actions/types';
+import { getSessionContextData } from '../../services/session-context.service';
+import { sanitizeFunctionName } from '../actions/factory';
 
 export const getSessionInfo = async (sessionId: string, companyId: string): Promise<{ success: boolean; markdown?: string; error?: string }> => {
   try {
@@ -44,4 +48,31 @@ export const getSessionInfo = async (sessionId: string, companyId: string): Prom
 export const verifyApiKey = async (_key: string): Promise<boolean> => {
   // Debug integration doesn't require API key verification
   return true;
+};
+
+export const triggerIntegrationAction = async (
+  sessionId: string,
+  companyId: string,
+  integrationName: string,
+  service: string,
+  data: any
+): Promise<{ success: boolean; data?: any; error?: string }> => {
+  try {
+    // Sanitize the function name
+    const sanitizedFunctionName = sanitizeFunctionName(`${integrationName}.${service}`);
+
+    // Include the sanitized function name in allowedActions
+    const allowedActions: string[] = [sanitizedFunctionName];
+
+    const result = await triggerAction(integrationName, service, data, sessionId, companyId, allowedActions);
+
+    return {
+      success: result.success,
+      data: result.data,
+      error: result.error,
+    };
+  } catch (error: any) {
+    console.error('Error in triggerIntegrationAction:', error);
+    return { success: false, error: error.message || 'Failed to trigger integration action' };
+  }
 };

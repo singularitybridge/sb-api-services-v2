@@ -1,7 +1,14 @@
 {
-  "serviceName": "אינטגרציית ניפוי באגים",
+  "serviceName": "ניפוי באגים",
   "getSessionInfo": {
-    "actionTitle": "קבלת מידע על הסשן",
-    "description": "אחזור מידע בסיסי על הסשן למטרות ניפוי באגים."
+    "actionTitle": "קבל מידע על הסשן",
+    "description": "קבל מידע בסיסי על הסשן למטרות ניפוי באגים."
+  },
+  "triggerIntegrationAction": {
+    "actionTitle": "הפעל פעולת אינטגרציה",
+    "description": "הפעל פעולת אינטגרציה למטרות ניפוי באגים.",
+    "integrationName": "שם האינטגרציה",
+    "service": "שירות",
+    "data": "נתוני הפעולה"
   }
 }
