@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-This guide outlines the process of adding a new integration to the system. It covers the necessary files to be created, their structure, sample content, and important guidelines to follow.
+This guide outlines the process of adding a new integration to the system. It covers the necessary files to be created, their structure, and important guidelines to follow.
 
 ## 2. File Structure
 
@@ -23,40 +23,18 @@ src/integrations/
 
 ### 3.1. Service File (your-integration.service.ts)
 
-The service file contains the core functionality of your integration. It should include functions that interact with the external API or service.
+The service file contains the core functionality of your integration. It should include functions that implement the integration's logic.
 
 Example structure:
 
 ```typescript
-import { getApiKey } from '../../services/api.key.service';
-
-interface YourIntegrationParams {
-  // Define parameters for your integration
-}
-
-export const yourIntegrationFunction = async (companyId: string, params: YourIntegrationParams): Promise<{ success: boolean; message?: string; error?: string }> => {
+export const yourIntegrationFunction = async (sessionId: string, companyId: string, params: any): Promise<{ success: boolean; data?: any; error?: string }> => {
   try {
-    const apiKey = await getApiKey(companyId, 'your-integration');
-    if (!apiKey) {
-      throw new Error('API key not found');
-    }
-
     // Implement your integration logic here
-
-    return { success: true, message: 'Operation successful' };
+    return { success: true, data: 'Operation successful' };
   } catch (error: any) {
     console.error('Error in your integration:', error);
     return { success: false, error: error.message || 'An error occurred' };
-  }
-};
-
-export const verifyApiKey = async (key: string): Promise<boolean> => {
-  try {
-    // Implement API key verification logic
-    return true;
-  } catch (error) {
-    console.error('Error verifying API key:', error);
-    return false;
   }
 };
 ```
@@ -71,20 +49,21 @@ Example structure:
 import { ActionContext, FunctionFactory } from '../actions/types';
 import { yourIntegrationFunction } from './your-integration.service';
 
-const createYourIntegrationActions = (context: ActionContext): FunctionFactory => ({
+export const createYourIntegrationActions = (context: ActionContext): FunctionFactory => ({
   yourAction: {
     description: 'Description of what this action does',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
-        param1: { type: 'string', description: 'Description of param1' },
-        param2: { type: 'number', description: 'Description of param2' },
+        // Define your parameters here
       },
-      required: ['param1', 'param2'],
+      required: [],
+      additionalProperties: false,
     },
-    function: async ({ param1, param2 }: { param1: string; param2: number }) => {
+    function: async (params: any) => {
       try {
-        const result = await yourIntegrationFunction(context.companyId, { param1, param2 });
+        const result = await yourIntegrationFunction(context.sessionId, context.companyId, params);
         return result;
       } catch (error) {
         console.error('Error in yourAction:', error);
@@ -93,8 +72,6 @@ const createYourIntegrationActions = (context: ActionContext): FunctionFactory =
     },
   },
 });
-
-export { createYourIntegrationActions };
 ```
 
 ### 3.3. Configuration File (integration.config.json)
@@ -113,26 +90,38 @@ Example content:
 }
 ```
 
+### 3.4. Translation Files (translations/en.json and translations/he.json)
+
+Create translation files for user-facing strings in both English and Hebrew.
+
+Example content for en.json:
+
+```json
+{
+  "serviceName": "Your Integration",
+  "yourAction": {
+    "actionTitle": "Your Action Title",
+    "description": "Description of what this action does."
+  }
+}
+```
+
 ## 4. Important Guidelines
 
 1. **Error Handling**: Implement robust error handling in both service and actions files. Catch and log errors, and return meaningful error messages.
 
-2. **API Key Management**: Use the `getApiKey` function from the `api.key.service` to securely retrieve API keys. Implement a `verifyApiKey` function to validate API keys.
+2. **Type Safety**: Use TypeScript interfaces to define parameter types and return types for better type safety and code clarity.
 
-3. **Type Safety**: Use TypeScript interfaces to define parameter types and return types for better type safety and code clarity.
+3. **Modular Design**: Keep your integration modular. Separate core functionality (in the service file) from the action definitions (in the actions file).
 
-4. **Modular Design**: Keep your integration modular. Separate core functionality (in the service file) from the action definitions (in the actions file).
+4. **Documentation**: Provide clear descriptions for each action and its parameters in the actions file.
 
-5. **Documentation**: Provide clear descriptions for each action and its parameters in the actions file.
+5. **Consistency**: Follow the naming conventions and structure of existing integrations for consistency across the project.
 
-6. **Consistency**: Follow the naming conventions and structure of existing integrations for consistency across the project.
+6. **Translations**: Always include translation files (en.json and he.json) in the `translations` directory for user-facing strings.
 
-7. **Translations**: If your integration requires user-facing strings, add translation files in the `translations` directory.
+7. **Functional Programming**: Prefer functional programming approaches over classes/OOP when implementing your integration.
 
-8. **Testing**: Although not shown in this guide, consider adding unit tests for your integration in a `__tests__` directory within your integration folder.
-
-9. **Functional Programming**: Prefer functional programming approaches over classes/OOP when implementing your integration.
-
-10. **ES6 & TypeScript**: Utilize ES6 features and TypeScript in your implementation for better code quality and maintainability.
+8. **ES6 & TypeScript**: Utilize ES6 features and TypeScript in your implementation for better code quality and maintainability.
 
 By following these guidelines and structure, you can ensure that your new integration is consistent with existing ones and easily maintainable within the system.

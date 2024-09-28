@@ -1,7 +1,14 @@
 {
-  "serviceName": "Debug Integration",
+  "serviceName": "Debug",
   "getSessionInfo": {
     "actionTitle": "Get Session Info",
-    "description": "Retrieve basic session information for debugging purposes."
+    "description": "Get basic session info for debug purposes."
+  },
+  "triggerIntegrationAction": {
+    "actionTitle": "Trigger Integration Action",
+    "description": "Trigger an integration action for debug purposes.",
+    "integrationName": "Integration Name",
+    "service": "Service",
+    "data": "Action Data"
   }
 }
