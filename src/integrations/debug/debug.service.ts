@@ -1,7 +1,7 @@
 import { Session } from '../../models/Session';
 import { getUserById } from '../../services/user.service';
 import { getCompany } from '../../services/company.service';
-import { triggerAction } from '../../services/integration-action.service';
+import { triggerAction } from '../../services/integration.service';
 import { ActionContext } from '../actions/types';
 import { getSessionContextData } from '../../services/session-context.service';
 import { sanitizeFunctionName } from '../actions/factory';

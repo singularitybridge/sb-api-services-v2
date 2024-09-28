@@ -52,10 +52,9 @@ import { errorHandler } from './middleware/errorHandler.middleware';
 import { fileRouter } from './routes/file.routes';
 import { jsonbinRouter } from './routes/jsonbin.routes';
 import contentFileRouter from './routes/content-file.routes';
-import actionDiscoveryRouter from './routes/discovery.routes';
 import { contentRouter } from './routes/content.routes';
 import { contentTypeRouter } from './routes/content-type.routes';
-import integrationActionRouter from './routes/integration-action.routes';
+import integrationRouter from './routes/integration.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -87,12 +86,6 @@ app.use(
 );
 app.use('/inbox', verifyTokenMiddleware, verifyAccess(), inboxRouter);
 app.use('/action', verifyTokenMiddleware, verifyAccess(), actionRouter);
-app.use(
-  '/action-discovery',
-  verifyTokenMiddleware,
-  verifyAccess(),
-  actionDiscoveryRouter,
-);
 app.use('/session', verifyTokenMiddleware, verifyAccess(), sessionRouter);
 app.use('/api', verifyTokenMiddleware, verifyAccess(), verificationRouter);
 app.use('/onboarding', verifyTokenMiddleware, verifyAccess(), onboardingRouter);
@@ -105,10 +98,10 @@ app.use(
   contentTypeRouter,
 );
 app.use(
-  '/integration-action',
+  '/integrations',
   verifyTokenMiddleware,
   verifyAccess(),
-  integrationActionRouter
+  integrationRouter
 );
 
 // Admin-only routes - to be added later
