@@ -6,12 +6,12 @@ import { getApiKey, ApiKeyType } from '../services/api.key.service';
 import { sanitizeFunctionName } from '../integrations/actions/factory';
 import { 
   triggerAction, 
-  getIntegrations, 
+  getActions, 
   getIntegrationActions, 
   getIntegrationById, 
   getLeanIntegrationActions 
 } from '../services/integration.service';
-import { SupportedLanguage, ActionInfo } from '../services/discovery.service';
+import { SupportedLanguage, Integration } from '../services/discovery.service';
 
 const router = express.Router();
 
@@ -19,8 +19,8 @@ const router = express.Router();
 router.get('/discover', verifyAccess(), async (req: AuthenticatedRequest, res) => {
   try {
     const language = (req.query.language as SupportedLanguage) || 'en';
-    const integrations = await getIntegrations(language);
-    res.json(integrations);
+    const actions = await getActions(language);
+    res.json(actions);
   } catch (error) {
     res.status(500).json({ error: 'Failed to discover integrations' });
   }
@@ -41,7 +41,7 @@ router.get('/discover/actions', verifyAccess(), async (req: AuthenticatedRequest
 router.get('/discover/lean', verifyAccess(), async (req: AuthenticatedRequest, res) => {
   try {
     const language = (req.query.language as SupportedLanguage) || 'en';
-    const fields = req.query.fields as (keyof ActionInfo)[] | undefined;
+    const fields = req.query.fields as (keyof Integration)[] | undefined;
     const leanActions = await getLeanIntegrationActions(language, fields);
     res.json(leanActions);
   } catch (error) {

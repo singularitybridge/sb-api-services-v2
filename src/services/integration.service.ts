@@ -1,5 +1,5 @@
 import { executeFunctionCall, sanitizeFunctionName } from '../integrations/actions/factory';
-import { discoveryService, SupportedLanguage, ActionInfo } from './discovery.service';
+import { discoveryService, SupportedLanguage, ActionInfo, Integration } from './discovery.service';
 
 export interface IntegrationActionResult {
   success: boolean;
@@ -41,18 +41,18 @@ export async function triggerAction(
   }
 }
 
-export async function getIntegrations(language: SupportedLanguage = 'en') {
-  return discoveryService.discoverIntegrations(language);
-}
-
-export async function getIntegrationActions(language: SupportedLanguage = 'en') {
+export async function getActions(language: SupportedLanguage = 'en'): Promise<ActionInfo[]> {
   return discoveryService.discoverActions(language);
 }
 
-export async function getIntegrationById(id: string, language: SupportedLanguage = 'en') {
+export async function getIntegrationActions(language: SupportedLanguage = 'en'): Promise<ActionInfo[]> {
+  return discoveryService.discoverActions(language);
+}
+
+export async function getIntegrationById(id: string, language: SupportedLanguage = 'en'): Promise<Integration | null> {
   return discoveryService.getIntegrationById(id, language);
 }
 
-export async function getLeanIntegrationActions(language: SupportedLanguage = 'en', fields?: (keyof ActionInfo)[]) {
+export async function getLeanIntegrationActions(language: SupportedLanguage = 'en', fields?: (keyof Integration)[]): Promise<Partial<Integration>[]> {
   return discoveryService.getIntegrationsLean(language, fields);
 }

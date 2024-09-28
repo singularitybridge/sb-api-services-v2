@@ -2,7 +2,7 @@ import { readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { getLeanResponse } from '../utils/leanResponse';
 
-interface Integration {
+export interface Integration {
   id: string;
   name: string;
   description: string;
@@ -27,15 +27,6 @@ interface ActionDefinition {
 }
 
 export type SupportedLanguage = 'en' | 'he';
-
-const flattenIntegrations = (integrations: Integration[]): ActionInfo[] => {
-  return integrations.flatMap(integration =>
-    integration.actions.map(action => ({
-      ...action,
-      id: `${integration.id}.${action.id.split('.')[1]}`,
-    }))
-  );
-};
 
 export const discoveryService = {
   discoverIntegrations: async (language: SupportedLanguage = 'en'): Promise<Integration[]> => {
@@ -84,16 +75,19 @@ export const discoveryService = {
       const translations = loadTranslations(integrationPath, language);
 
       const actions: ActionInfo[] = [];
+      const integrationId = config.name || folder;
+      const capitalizedIntegrationId = integrationId.charAt(0).toUpperCase() + integrationId.slice(1);
+      const lowercaseIntegrationId = integrationId.toLowerCase();
       for (const [key, value] of Object.entries(actionObj)) {
         const actionDef = value as ActionDefinition;
         if (typeof actionDef === 'object' && actionDef.description) {
           const action: ActionInfo = {
-            id: `${folder}.${key}`,
+            id: `${lowercaseIntegrationId}.${key}`,
             serviceName: translations?.serviceName || config.name || folder,
-            actionTitle: translations?.[key]?.actionTitle || key,
+            actionTitle: key,
             description: translations?.[key]?.description || actionDef.description,
             icon: config.icon || 'help-circle',
-            service: folder,
+            service: lowercaseIntegrationId,
             parameters: actionDef.parameters,
           };
           actions.push(action);
@@ -103,7 +97,7 @@ export const discoveryService = {
       }
 
       const integration: Integration = {
-        id: folder,
+        id: capitalizedIntegrationId,
         name: translations?.serviceName || config.name || folder,
         description: translations?.serviceDescription || config.description || '',
         icon: config.icon || 'help-circle',
@@ -118,7 +112,9 @@ export const discoveryService = {
 
   discoverActions: async (language: SupportedLanguage = 'en'): Promise<ActionInfo[]> => {
     const integrations = await discoveryService.discoverIntegrations(language);
-    return flattenIntegrations(integrations);
+    const actions = flattenIntegrationsToActions(integrations);
+    console.log('Discovered actions:', JSON.stringify(actions, null, 2));
+    return actions;
   },
 
   getIntegrationById: async (id: string, language: SupportedLanguage = 'en'): Promise<Integration | null> => {
@@ -126,10 +122,9 @@ export const discoveryService = {
     return integrations.find(integration => integration.id === id) || null;
   },
 
-  getIntegrationsLean: async (language: SupportedLanguage = 'en', fields: (keyof ActionInfo)[] = ['id', 'serviceName', 'actionTitle', 'description']): Promise<Partial<ActionInfo>[]> => {
+  getIntegrationsLean: async (language: SupportedLanguage = 'en', fields?: (keyof Integration)[]): Promise<Partial<Integration>[]> => {
     const integrations = await discoveryService.discoverIntegrations(language);
-    const flattenedActions = flattenIntegrations(integrations);
-    return getLeanResponse(flattenedActions, fields) as Partial<ActionInfo>[];
+    return getLeanResponse(integrations, fields || ['id', 'name', 'description', 'icon', 'actions']) as Partial<Integration>[];
   },
 };
 
@@ -143,4 +138,10 @@ function loadTranslations(integrationPath: string, language: SupportedLanguage):
     }
   }
   return null;
+}
+
+function flattenIntegrationsToActions(integrations: Integration[]): ActionInfo[] {
+  return integrations.reduce((acc, integration) => {
+    return acc.concat(integration.actions);
+  }, [] as ActionInfo[]);
 }
