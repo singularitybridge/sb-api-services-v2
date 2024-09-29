@@ -7,7 +7,6 @@ import { sanitizeFunctionName } from '../integrations/actions/factory';
 import { 
   triggerAction, 
   getActions, 
-  getIntegrationActions, 
   getIntegrationById, 
   getLeanIntegrationActions 
 } from '../services/integration.service';
@@ -23,17 +22,6 @@ router.get('/discover', verifyAccess(), async (req: AuthenticatedRequest, res) =
     res.json(actions);
   } catch (error) {
     res.status(500).json({ error: 'Failed to discover integrations' });
-  }
-});
-
-// Discover actions for all integrations
-router.get('/discover/actions', verifyAccess(), async (req: AuthenticatedRequest, res) => {
-  try {
-    const language = (req.query.language as SupportedLanguage) || 'en';
-    const actions = await getIntegrationActions(language);
-    res.json(actions);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to discover actions' });
   }
 });
 
