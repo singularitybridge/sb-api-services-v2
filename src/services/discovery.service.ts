@@ -114,8 +114,7 @@ export const discoveryService = {
 
   discoverActions: async (language: SupportedLanguage = 'en'): Promise<ActionInfo[]> => {
     const integrations = await discoveryService.discoverIntegrations(language);
-    const actions = flattenIntegrationsToActions(integrations);
-    console.log('Discovered actions:', JSON.stringify(actions, null, 2));
+    const actions = flattenIntegrationsToActions(integrations);    
     return actions;
   },
 
