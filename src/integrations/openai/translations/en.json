@@ -1,5 +1,6 @@
 {
   "serviceName": "OpenAI",
+  "serviceDescription": "Integrate with OpenAI's advanced AI models for text-to-speech generation, audio transcription, and natural language processing tasks.",
   "generateOpenAiSpeech": {
     "actionTitle": "Generate OpenAI Speech",
     "description": "Generate speech using OpenAI's text-to-speech API"

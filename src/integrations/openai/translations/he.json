@@ -1,5 +1,6 @@
 {
   "serviceName": "OpenAI",
+  "serviceDescription": "אינטגרציה עם מודלים מתקדמים של OpenAI ליצירת טקסט לדיבור, תמלול אודיו ומשימות עיבוד שפה טבעית.",
   "generateOpenAiSpeech": {
     "actionTitle": "צור דיבור עם OpenAI",
     "description": "צור דיבור באמצעות ה-API של OpenAI"

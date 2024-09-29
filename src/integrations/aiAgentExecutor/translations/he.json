@@ -1,5 +1,6 @@
 {
   "serviceName": "מריץ פקודות סביבה",
+  "serviceDescription": "הרץ פקודות ובצע פעולות קבצים בסביבת המשתמש או ב-Docker, נהל תהליכי רקע ושלוט בסביבת הביצוע.",
   "executeCommand": {
     "actionTitle": "הרץ פקודה",
     "description": "הרץ פקודה במריץ פקודות סביבה."

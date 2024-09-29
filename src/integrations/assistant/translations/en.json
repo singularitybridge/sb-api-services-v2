@@ -1,5 +1,6 @@
 {
   "serviceName": "Assistant Service",
+  "serviceDescription": "Manage and interact with AI assistants, including creating new assistants, retrieving existing ones, and setting the current assistant for use.",
   "getAssistants": {
     "actionTitle": "Get Assistants",
     "description": "Get a list of all assistants for the current user's company"

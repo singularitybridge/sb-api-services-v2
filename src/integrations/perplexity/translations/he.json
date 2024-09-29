@@ -1,5 +1,6 @@
 {
   "serviceName": "מחקר ברשת עם Perplexity",
+  "serviceDescription": "אינטגרציה עם Perplexity AI לביצוע חיפושים מתקדמים ואחזור מידע באמצעות עיבוד שפה טבעית.",
   "perplexitySearch": {
     "actionTitle": "חיפוש",
     "description": "ביצוע חיפוש באמצעות ה-API של פרפלקסיטי"

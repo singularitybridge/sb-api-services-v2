@@ -1,5 +1,6 @@
 {
   "serviceName": "Journal",
+  "serviceDescription": "Manage personal journal entries, allowing users to create, retrieve, update, and delete entries for tracking thoughts, experiences, and reflections.",
   "createJournalEntry": {
     "actionTitle": "Create Journal Entry",
     "description": "Create a new journal entry"
