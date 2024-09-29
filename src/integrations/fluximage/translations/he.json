@@ -1,5 +1,6 @@
 {
   "serviceName": "מנוע יצירת תמונות Flux",
+  "serviceDescription": "יצירת תמונות מותאמות אישית באמצעות Flux AI, המאפשר יצירת ויזואליזציות ייחודיות על בסיס הנחיות טקסט עם מימדים מוגדרים.",
   "generateFluxImage": {
     "actionTitle": "יצירת תמונת פלאקס",
     "description": "יצירת תמונה באמצעות Flux AI",

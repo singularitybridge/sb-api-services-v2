@@ -1,5 +1,6 @@
 {
   "serviceName": "Agenda & Jobs",
+  "serviceDescription": "Manage scheduled tasks and jobs, allowing you to plan and automate message sending and retrieve information about scheduled activities.",
   "scheduleMessage": {
     "actionTitle": "Schedule Message",
     "description": "Schedule a message to be sent at a specified time."

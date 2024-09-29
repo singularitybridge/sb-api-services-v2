@@ -1,5 +1,6 @@
 {
   "serviceName": "Linear",
+  "serviceDescription": "Integrate with Linear project management tool, allowing users to manage issues, comments, teams, and users across projects.",
   "fetchIssues": {
     "actionTitle": "Fetch Issues",
     "description": "Fetch issues from Linear"

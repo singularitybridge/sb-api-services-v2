@@ -1,5 +1,6 @@
 {
   "serviceName": "Linear משימות",
+  "serviceDescription": "אינטגרציה עם כלי ניהול הפרויקטים Linear, המאפשרת למשתמשים לנהל משימות, תגובות, צוותים ומשתמשים בפרויקטים.",
   "fetchIssues": {
     "actionTitle": "משיכת משימות",
     "description": "משיכת משימות מליניאר"

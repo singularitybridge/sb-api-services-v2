@@ -1,5 +1,8 @@
 {
+  "serviceName": "SendGrid",
+  "serviceDescription": "Integrate with SendGrid to send emails programmatically, allowing for automated email communication within your application.",
   "sendEmail": {
+    "actionTitle": "Send Email",
     "description": "Send an email using SendGrid",
     "parameters": {
       "to": "The recipient email address",

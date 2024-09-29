@@ -1,5 +1,6 @@
 {
   "serviceName": "שירות שליחת אימייל עם SendGrid",
+  "serviceDescription": "אינטגרציה עם SendGrid לשליחת אימיילים באופן תכנותי, המאפשרת תקשורת אוטומטית באמצעות אימייל בתוך האפליקציה שלך.",
   "sendEmail": {
     "actionTitle": "שליחת אימייל",
     "description": "שליחת אימייל באמצעות SendGrid",

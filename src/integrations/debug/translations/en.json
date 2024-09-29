@@ -1,5 +1,6 @@
 {
   "serviceName": "Debug",
+  "serviceDescription": "Provides debugging tools and utilities for troubleshooting and testing integrations, including session information retrieval and action triggering.",
   "getSessionInfo": {
     "actionTitle": "Get Session Info",
     "description": "Get basic session info for debug purposes."

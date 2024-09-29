@@ -41,10 +41,14 @@ router.get('/discover/actions', verifyAccess(), async (req: AuthenticatedRequest
 router.get('/discover/lean', verifyAccess(), async (req: AuthenticatedRequest, res) => {
   try {
     const language = (req.query.language as SupportedLanguage) || 'en';
-    const fields = req.query.fields as (keyof Integration)[] | undefined;
+    const fieldsParam = req.query.fields as string | undefined;
+    const fields = fieldsParam ? fieldsParam.split(',') as (keyof Integration)[] : undefined;
+
     const leanActions = await getLeanIntegrationActions(language, fields);
+    
     res.json(leanActions);
   } catch (error) {
+    console.error('Error in /discover/lean:', error); // Log any errors
     res.status(500).json({ error: 'Failed to discover lean actions' });
   }
 });
