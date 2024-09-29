@@ -45,10 +45,6 @@ export async function getActions(language: SupportedLanguage = 'en'): Promise<Ac
   return discoveryService.discoverActions(language);
 }
 
-export async function getIntegrationActions(language: SupportedLanguage = 'en'): Promise<ActionInfo[]> {
-  return discoveryService.discoverActions(language);
-}
-
 export async function getIntegrationById(id: string, language: SupportedLanguage = 'en'): Promise<Integration | null> {
   return discoveryService.getIntegrationById(id, language);
 }
