@@ -1,0 +1,7 @@
+{
+  "name": "JSONBin",
+  "icon": "jsonbin-icon",
+  "apiKeyName": "jsonbin_api_key",
+  "actionCreator": "createJSONBinActions",
+  "actionsFile": "jsonbin.actions.ts"
+}

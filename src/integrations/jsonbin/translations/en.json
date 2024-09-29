@@ -1,0 +1,31 @@
+{
+  "serviceName": "JSONBin",
+  "createJSONBinFile": {
+    "actionTitle": "Create JSONBin File",
+    "description": "Create a new file in JSONBin"
+  },
+  "updateJSONBinFile": {
+    "actionTitle": "Update JSONBin File",
+    "description": "Update a file in JSONBin"
+  },
+  "readJSONBinFile": {
+    "actionTitle": "Read JSONBin File",
+    "description": "Read a file from JSONBin"
+  },
+  "updateJSONBinArrayElement": {
+    "actionTitle": "Update JSONBin Array Element",
+    "description": "Update a specific element in an array within a JSONBin file"
+  },
+  "deleteJSONBinArrayElement": {
+    "actionTitle": "Delete JSONBin Array Element",
+    "description": "Delete a specific element from an array within a JSONBin file"
+  },
+  "insertJSONBinArrayElement": {
+    "actionTitle": "Insert JSONBin Array Element",
+    "description": "Insert a new element into an array within a JSONBin file"
+  },
+  "cloneJSONBinFile": {
+    "actionTitle": "Clone JSONBin File",
+    "description": "Clone a JSONBin file"
+  }
+}
