@@ -1,6 +1,6 @@
 {
   "name": "MongoDB",
-  "icon": "database",
+  "icon": "mongodb",
   "apiKeyName": "mongodb_connection_string",
   "actionCreator": "createMongoDbActions",
   "actionsFile": "mongodb.actions.ts"
