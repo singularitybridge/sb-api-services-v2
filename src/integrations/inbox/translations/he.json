@@ -1,0 +1,15 @@
+{
+  "serviceName": "תיבת דואר נכנס",
+  "sendMessageToInbox": {
+    "actionTitle": "שלח הודעה לתיבת הדואר הנכנס",
+    "description": "שלח הודעה לתיבת הדואר הנכנס לסקירה או תגובה של אדם"
+  },
+  "getInboxMessages": {
+    "actionTitle": "קבל הודעות מתיבת הדואר הנכנס",
+    "description": "אחזר הודעות מתיבת הדואר הנכנס עבור החברה"
+  },
+  "updateInboxMessageStatus": {
+    "actionTitle": "עדכן סטטוס הודעה בתיבת הדואר הנכנס",
+    "description": "עדכן את הסטטוס של הודעה בתיבת הדואר הנכנס"
+  }
+}
