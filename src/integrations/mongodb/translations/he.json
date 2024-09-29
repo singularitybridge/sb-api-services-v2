@@ -1,0 +1,7 @@
+{
+  "serviceName": "מונגו די בי",
+  "runMongoDbQuery": {
+    "actionTitle": "הרץ שאילתת מונגו די בי",
+    "description": "בצע שאילתת מונגו די בי על בסיס קלט המשתמש."
+  }
+}

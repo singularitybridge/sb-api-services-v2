@@ -1,0 +1,7 @@
+{
+  "serviceName": "MongoDB",
+  "runMongoDbQuery": {
+    "actionTitle": "Run MongoDB Query",
+    "description": "Execute a MongoDB query based on user input."
+  }
+}
