@@ -46,10 +46,12 @@ export const createFunctionFactory = async (context: ActionContext, allowedActio
 
       if (typeof actionCreator === 'function') {
         const actionObj = actionCreator(context) as FunctionFactory;
+        // Use the name from integration.config.json instead of the folder name
+        const integrationName = config.name || folder;
         // Prefix the action names with the integration name and sanitize
         const prefixedActions = Object.fromEntries(
           Object.entries(actionObj).map(([actionName, funcDef]) => {
-            const fullActionName = sanitizeFunctionName(`${folder}.${actionName}`);
+            const fullActionName = sanitizeFunctionName(`${integrationName}.${actionName}`);
             return [fullActionName, funcDef as FunctionDefinition];
           })
         );

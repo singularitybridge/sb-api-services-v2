@@ -1,5 +1,5 @@
 {
-  "name": "SendGrid",
+  "name": "sendgrid",
   "icon": "email",
   "apiKeyName": "sendgrid_api_key",
   "actionCreator": "createSendGridActions",

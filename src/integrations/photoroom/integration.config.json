@@ -1,5 +1,5 @@
 {
-  "name": "PhotoRoom",
+  "name": "photoroom",
   "icon": "image",
   "apiKeyName": "photoroom_api_key",
   "actionCreator": "createPhotoRoomActions",

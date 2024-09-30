@@ -1,5 +1,5 @@
 {
-  "name": "Journal",
+  "name": "journal",
   "icon": "book",
   "apiKeyName": "journal_api_key",
   "actionCreator": "createJournalActions",

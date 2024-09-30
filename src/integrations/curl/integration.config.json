@@ -1,5 +1,5 @@
 {
-  "name": "cURL Integration",
+  "name": "curl",
   "icon": "curl-icon", 
   "actionCreator": "createCurlActions",
   "actionsFile": "curl.actions.ts"

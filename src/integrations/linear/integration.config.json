@@ -1,5 +1,5 @@
 {
-  "name": "Linear",
+  "name": "linear",
   "icon": "trello",
   "apiKeyName": "linear_api_key",
   "actionCreator": "createLinearActions",

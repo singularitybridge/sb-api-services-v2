@@ -1,5 +1,5 @@
 {
-  "name": "Flux Image",
+  "name": "fluximage",
   "icon": "image",
   "apiKeyName": "flux_api_key",
   "actionCreator": "createFluxImageActions",
