@@ -1,7 +1,6 @@
 {
-  "name": "Debug Integration",
+  "name": "Debug",
   "icon": "bug",
-  "apiKeyName": "debug_integration_api_key",
   "actionCreator": "createDebugActions",
   "actionsFile": "debug.actions.ts"
 }

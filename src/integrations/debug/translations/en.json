@@ -1,6 +1,6 @@
 {
   "serviceName": "Debug",
-  "serviceDescription": "Provides debugging tools and utilities for troubleshooting and testing integrations, including session information retrieval and action triggering.",
+  "serviceDescription": "Provides debugging tools and utilities for troubleshooting and testing integrations, including session information retrieval, action triggering, and integration discovery.",
   "getSessionInfo": {
     "actionTitle": "Get Session Info",
     "description": "Get basic session info for debug purposes."
@@ -11,5 +11,14 @@
     "integrationName": "Integration Name",
     "service": "Service",
     "data": "Action Data"
+  },
+  "discoverLeanActions": {
+    "actionTitle": "Discover Lean Actions",
+    "description": "Discover lean actions for all integrations."
+  },
+  "getIntegration": {
+    "actionTitle": "Get Integration",
+    "description": "Get a specific integration by ID.",
+    "integrationId": "Integration ID"
   }
 }
