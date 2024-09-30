@@ -1,5 +1,5 @@
 {
-  "name": "JSONBin",
+  "name": "jsonbin",
   "icon": "jsonbin-icon",
   "apiKeyName": "jsonbin_api_key",
   "actionCreator": "createJSONBinActions",

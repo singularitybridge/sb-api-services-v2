@@ -1,5 +1,5 @@
 {
-  "name": "MongoDB",
+  "name": "mongodb",
   "icon": "mongodb",
   "apiKeyName": "mongodb_connection_string",
   "actionCreator": "createMongoDbActions",

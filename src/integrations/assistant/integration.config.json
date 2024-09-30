@@ -1,5 +1,5 @@
 {
-  "name": "Assistant Integration",
+  "name": "assistant",
   "icon": "assistant",
   "apiKeyName": null,
   "actionCreator": "createAssistantActions",

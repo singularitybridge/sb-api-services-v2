@@ -1,5 +1,5 @@
 {
-  "name": "OpenAI",
+  "name": "openai",
   "icon": "brain",
   "apiKeyName": "openai_api_key",
   "actionCreator": "createOpenAiActions",

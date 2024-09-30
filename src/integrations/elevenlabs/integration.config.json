@@ -1,5 +1,5 @@
 {
-  "name": "ElevenLabs",
+  "name": "elevenlabs",
   "icon": "microphone",
   "apiKeyName": "labs11",
   "actionCreator": "createElevenLabsActions",
