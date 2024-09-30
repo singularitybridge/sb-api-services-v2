@@ -1,10 +1,11 @@
 import { Session } from '../../models/Session';
 import { getUserById } from '../../services/user.service';
 import { getCompany } from '../../services/company.service';
-import { triggerAction } from '../../services/integration.service';
+import { triggerAction, getLeanIntegrationActions, getIntegrationById } from '../../services/integration.service';
 import { ActionContext } from '../actions/types';
 import { getSessionContextData } from '../../services/session-context.service';
 import { sanitizeFunctionName } from '../actions/factory';
+import { SupportedLanguage, Integration } from '../../services/discovery.service';
 
 export const getSessionInfo = async (sessionId: string, companyId: string): Promise<{ success: boolean; markdown?: string; error?: string }> => {
   try {
@@ -74,5 +75,29 @@ export const triggerIntegrationAction = async (
   } catch (error: any) {
     console.error('Error in triggerIntegrationAction:', error);
     return { success: false, error: error.message || 'Failed to trigger integration action' };
+  }
+};
+
+export const discoverLeanActions = async (): Promise<{ success: boolean; data?: any; error?: string }> => {
+  try {
+    const leanActions = await getLeanIntegrationActions();
+    return { success: true, data: leanActions };
+  } catch (error: any) {
+    console.error('Error in discoverLeanActions:', error);
+    return { success: false, error: error.message || 'Failed to discover lean actions' };
+  }
+};
+
+export const getIntegration = async (integrationId: string): Promise<{ success: boolean; data?: any; error?: string }> => {
+  try {
+    const integration = await getIntegrationById(integrationId);
+    if (integration) {
+      return { success: true, data: integration };
+    } else {
+      return { success: false, error: 'Integration not found' };
+    }
+  } catch (error: any) {
+    console.error('Error in getIntegration:', error);
+    return { success: false, error: error.message || 'Failed to get integration' };
   }
 };
