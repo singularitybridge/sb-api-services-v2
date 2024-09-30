@@ -2,16 +2,11 @@ import { readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { FunctionFactory, ActionContext, FunctionDefinition } from './types';
 import { processTemplate } from '../../services/template.service';
-import sanitize from 'sanitize-filename';
 
-export function sanitizeFunctionName(name: string): string {
-  return sanitize(name)
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-    .replace(/[^a-zA-Z0-9_]/g, '_') // Replace special characters with underscores
-    .replace(/^_+|_+$/g, '') // Remove leading and trailing underscores
-    .replace(/\s+/g, '_'); // Replace spaces with underscores
-}
+const sanitizeFunctionName = (name: string): string => {
+  // Replace dots with underscores and remove any other non-compliant characters
+  return name.replace(/\./g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
+};
 
 export const createFunctionFactory = async (context: ActionContext, allowedActions: string[]): Promise<FunctionFactory> => {
   const integrationsPath = join(__dirname, '..');
@@ -46,13 +41,15 @@ export const createFunctionFactory = async (context: ActionContext, allowedActio
 
       if (typeof actionCreator === 'function') {
         const actionObj = actionCreator(context) as FunctionFactory;
-        // Use the name from integration.config.json instead of the folder name
         const integrationName = config.name || folder;
-        // Prefix the action names with the integration name and sanitize
         const prefixedActions = Object.fromEntries(
           Object.entries(actionObj).map(([actionName, funcDef]) => {
-            const fullActionName = sanitizeFunctionName(`${integrationName}.${actionName}`);
-            return [fullActionName, funcDef as FunctionDefinition];
+            const fullActionName = `${integrationName}.${actionName}`;
+            const sanitizedName = sanitizeFunctionName(fullActionName);
+            return [sanitizedName, {
+              ...funcDef as FunctionDefinition,
+              originalName: fullActionName // Store the original name
+            }];
           })
         );
         allActions = { ...allActions, ...prefixedActions };
@@ -64,10 +61,7 @@ export const createFunctionFactory = async (context: ActionContext, allowedActio
     }
   }
 
-  // Sanitize allowed actions
-  const sanitizedAllowedActions = allowedActions.map(actionName => sanitizeFunctionName(actionName));
-
-  // Filter allowed actions
+  const sanitizedAllowedActions = allowedActions.map(sanitizeFunctionName);
   const functionFactory = Object.fromEntries(
     Object.entries(allActions).filter(([actionName]) => sanitizedAllowedActions.includes(actionName))
   ) as FunctionFactory;
@@ -115,7 +109,6 @@ export const executeFunctionCall = async (
     try {
       let args = JSON.parse(call.function.arguments);
       console.log('processing args', args);
-      // Process each argument with the template service
       for (const key in args) {
         if (typeof args[key] === 'string') {
           args[key] = await processTemplate(args[key], sessionId);
@@ -133,4 +126,5 @@ export const executeFunctionCall = async (
   }
 };
 
+export { sanitizeFunctionName };
 export type { ActionContext, FunctionFactory, FunctionDefinition };

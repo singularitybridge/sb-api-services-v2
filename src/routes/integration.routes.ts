@@ -3,7 +3,6 @@ import { AuthenticatedRequest, verifyAccess } from '../middleware/auth.middlewar
 import { getSessionOrCreate } from '../services/session.service';
 import { ChannelType } from '../types/ChannelType';
 import { getApiKey, ApiKeyType } from '../services/api.key.service';
-import { sanitizeFunctionName } from '../integrations/actions/factory';
 import { 
   triggerAction, 
   getActions, 
@@ -11,6 +10,7 @@ import {
   getLeanIntegrationActions 
 } from '../services/integration.service';
 import { SupportedLanguage, Integration } from '../services/discovery.service';
+import { sanitizeFunctionName } from '../integrations/actions/factory';
 
 const router = express.Router();
 
@@ -97,10 +97,10 @@ router.post('/actions/:integrationName/:actionName', verifyAccess(), async (req:
     }
 
     // Sanitize the function name
-    const sanitizedFunctionName = sanitizeFunctionName(`${integrationName}.${actionName}`);
+    const fullFunctionName = sanitizeFunctionName(`${integrationName}.${actionName}`);
 
     // Include the sanitized function name in allowedActions
-    const allowedActions: string[] = [sanitizedFunctionName];
+    const allowedActions: string[] = [fullFunctionName];
 
     const result = await triggerAction(integrationName, actionName, data, session._id.toString(), companyId.toString(), allowedActions);
     

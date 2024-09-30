@@ -25,7 +25,8 @@ export async function triggerAction(
       }
     };
 
-    const result = await executeFunctionCall(call, sessionId, companyId, allowedActions);
+    const sanitizedAllowedActions = allowedActions.map(sanitizeFunctionName);
+    const result = await executeFunctionCall(call, sessionId, companyId, sanitizedAllowedActions);
 
     if (result.error) {
       return { success: false, error: result.error.message };

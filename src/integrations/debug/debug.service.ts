@@ -4,7 +4,6 @@ import { getCompany } from '../../services/company.service';
 import { triggerAction, getLeanIntegrationActions, getIntegrationById } from '../../services/integration.service';
 import { ActionContext } from '../actions/types';
 import { getSessionContextData } from '../../services/session-context.service';
-import { sanitizeFunctionName } from '../actions/factory';
 import { SupportedLanguage, Integration } from '../../services/discovery.service';
 
 export const getSessionInfo = async (sessionId: string, companyId: string): Promise<{ success: boolean; markdown?: string; error?: string }> => {
@@ -59,11 +58,11 @@ export const triggerIntegrationAction = async (
   data: any
 ): Promise<{ success: boolean; data?: any; error?: string }> => {
   try {
-    // Sanitize the function name
-    const sanitizedFunctionName = sanitizeFunctionName(`${integrationName}.${service}`);
+    // Use the original function name without sanitization
+    const fullFunctionName = `${integrationName}.${service}`;
 
-    // Include the sanitized function name in allowedActions
-    const allowedActions: string[] = [sanitizedFunctionName];
+    // Include the full function name in allowedActions
+    const allowedActions: string[] = [fullFunctionName];
 
     const result = await triggerAction(integrationName, service, data, sessionId, companyId, allowedActions);
 
