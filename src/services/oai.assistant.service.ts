@@ -55,8 +55,9 @@ export const updateAssistantById = async (
       .filter(tool => tool.type === 'function')
       .map(tool => (tool as any).function.name);
 
-    const sanitizedAllowedActions = allowedActions.map(action => sanitizeFunctionName(action));
-    const missingActions = sanitizedAllowedActions.filter(action => !updatedTools.includes(action));
+    const missingActions = allowedActions.filter(action => 
+      !updatedTools.includes(sanitizeFunctionName(action))
+    );
 
     if (missingActions.length > 0) {
       console.warn(`Warning: The following actions were not successfully added to the OpenAI assistant: ${missingActions.join(', ')}`);
@@ -122,18 +123,15 @@ const createFunctionDefinitions = async (allowedActions: string[]) => {
   // Create a dummy context to generate function definitions
   const dummyContext: ActionContext = { sessionId: 'dummy-session-id', companyId: 'dummy-company-id' };
 
-  // Sanitize allowed actions
-  const sanitizedAllowedActions = allowedActions.map(actionName => sanitizeFunctionName(actionName));
-
-  // Use sanitizedAllowedActions
-  const functionFactory = await createFunctionFactory(dummyContext, sanitizedAllowedActions);
+  // Use original allowedActions without sanitization
+  const functionFactory = await createFunctionFactory(dummyContext, allowedActions);
 
   // Create function definitions with sanitized names
   return Object.entries(functionFactory as FunctionFactory)
     .map(([funcName, funcDef]: [string, FunctionDefinition]) => ({
       type: "function" as const,
       function: {
-        name: sanitizeFunctionName(funcName),
+        name: funcName, // This is already sanitized
         description: funcDef.description,
         parameters: funcDef.parameters
       }
