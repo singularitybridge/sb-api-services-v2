@@ -97,15 +97,13 @@ function extractErrorDetails(error: unknown): DetailedError {
 }
 
 const convertOpenAIFunctionName = (name: string): string => {
-  // Convert from OpenAI format back to our format
-  let convertedName = name.replace(/_/g, '.');
-  
-  // Special handling for agent_executor
-  if (convertedName.startsWith('agent.executor.')) {
-    convertedName = 'agent_executor' + convertedName.slice('agent.executor'.length);
+  // Special handling for ai_agent_executor
+  if (name.startsWith('ai_agent_executor_')) {
+    return name.replace(/^ai_agent_executor_/, 'ai_agent_executor.');
   }
   
-  return convertedName;
+  // For other cases, convert underscores to dots
+  return name.replace(/_/g, '.');
 };
 
 export const executeFunctionCall = async (
@@ -118,13 +116,14 @@ export const executeFunctionCall = async (
   const functionFactory = await createFunctionFactory(context, allowedActions);
 
   const functionName = call.function.name as string;
-  const originalActionId = convertOpenAIFunctionName(functionName);
+  const originalActionId = functionName; // Keep the original function name
+  const convertedActionId = convertOpenAIFunctionName(functionName);
 
   if (functionName in functionFactory) {
     try {
-      const actionInfo = await discoverActionById(originalActionId);
+      const actionInfo = await discoverActionById(convertedActionId);
       if (!actionInfo) {
-        throw new Error(`Action info not found for ${originalActionId}`);
+        throw new Error(`Action info not found for ${convertedActionId}`);
       }
 
       let args = JSON.parse(call.function.arguments);
@@ -138,12 +137,13 @@ export const executeFunctionCall = async (
       // Publish start message
       await publishSessionMessage(sessionId, 'action_execution', {
         status: 'started',
-        actionId: originalActionId,
+        actionId: convertedActionId,
         serviceName: actionInfo.serviceName,
         actionTitle: actionInfo.actionTitle,
         actionDescription: actionInfo.description,
-        icon: actionInfo.icon || '', // Add icon field
-        args: args, // Include the processed arguments
+        icon: actionInfo.icon || '',
+        args: args,
+        originalActionId: originalActionId,
       });
 
       const result = await functionFactory[functionName].function(args);
@@ -151,12 +151,13 @@ export const executeFunctionCall = async (
       // Publish completion message
       await publishSessionMessage(sessionId, 'action_execution', {
         status: 'completed',
-        actionId: originalActionId,
+        actionId: convertedActionId,
         serviceName: actionInfo.serviceName,
         actionTitle: actionInfo.actionTitle,
         actionDescription: actionInfo.description,
-        icon: actionInfo.icon || '', // Add icon field
-        args: args, // Include the processed arguments
+        icon: actionInfo.icon || '',
+        args: args,
+        originalActionId: originalActionId,
       });
 
       return { result };
@@ -164,15 +165,16 @@ export const executeFunctionCall = async (
       console.error(`Error executing function ${functionName}:`, error);
 
       // Publish failure message
-      const failedActionInfo = await discoverActionById(originalActionId);
+      const failedActionInfo = await discoverActionById(convertedActionId);
       await publishSessionMessage(sessionId, 'action_execution', {
         status: 'failed',
-        actionId: originalActionId,
+        actionId: convertedActionId,
         serviceName: failedActionInfo?.serviceName || 'unknown',
         actionTitle: failedActionInfo?.actionTitle || 'unknown',
         actionDescription: failedActionInfo?.description || 'unknown',
-        icon: failedActionInfo?.icon || '', // Add icon field
-        args: JSON.parse(call.function.arguments), // Include the original arguments
+        icon: failedActionInfo?.icon || '',
+        args: JSON.parse(call.function.arguments),
+        originalActionId: originalActionId,
       });
 
       return { error: extractErrorDetails(error) };
