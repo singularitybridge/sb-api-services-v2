@@ -53,3 +53,8 @@ export async function getIntegrationById(id: string, language: SupportedLanguage
 export async function getLeanIntegrationActions(language: SupportedLanguage = 'en', fields?: (keyof Integration)[]): Promise<Partial<Integration>[]> {
   return discoveryService.getIntegrationsLean(language, fields);
 }
+
+export async function discoverActionById(actionId: string, language: SupportedLanguage = 'en'): Promise<ActionInfo | null> {
+  const actions = await getActions(language);
+  return actions.find(action => action.id === actionId) || null;
+}

@@ -2,6 +2,8 @@ import { readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { FunctionFactory, ActionContext, FunctionDefinition } from './types';
 import { processTemplate } from '../../services/template.service';
+import { publishSessionMessage } from '../../services/pusher.service';
+import { discoverActionById } from '../../services/integration.service';
 
 const sanitizeFunctionName = (name: string): string => {
   // Replace dots with underscores and remove any other non-compliant characters
@@ -94,6 +96,18 @@ function extractErrorDetails(error: unknown): DetailedError {
   }
 }
 
+const convertOpenAIFunctionName = (name: string): string => {
+  // Convert from OpenAI format back to our format
+  let convertedName = name.replace(/_/g, '.');
+  
+  // Special handling for agent_executor
+  if (convertedName.startsWith('agent.executor.')) {
+    convertedName = 'agent_executor' + convertedName.slice('agent.executor'.length);
+  }
+  
+  return convertedName;
+};
+
 export const executeFunctionCall = async (
   call: any,
   sessionId: string,
@@ -103,10 +117,16 @@ export const executeFunctionCall = async (
   const context: ActionContext = { sessionId, companyId };
   const functionFactory = await createFunctionFactory(context, allowedActions);
 
-  const functionName = sanitizeFunctionName(call.function.name as string);
+  const functionName = call.function.name as string;
+  const originalActionId = convertOpenAIFunctionName(functionName);
 
   if (functionName in functionFactory) {
     try {
+      const actionInfo = await discoverActionById(originalActionId);
+      if (!actionInfo) {
+        throw new Error(`Action info not found for ${originalActionId}`);
+      }
+
       let args = JSON.parse(call.function.arguments);
       console.log('processing args', args);
       for (const key in args) {
@@ -115,10 +135,46 @@ export const executeFunctionCall = async (
         }
       }
 
+      // Publish start message
+      await publishSessionMessage(sessionId, 'action_execution', {
+        status: 'started',
+        actionId: originalActionId,
+        serviceName: actionInfo.serviceName,
+        actionTitle: actionInfo.actionTitle,
+        actionDescription: actionInfo.description,
+        icon: actionInfo.icon || '', // Add icon field
+        args: args, // Include the processed arguments
+      });
+
       const result = await functionFactory[functionName].function(args);
+
+      // Publish completion message
+      await publishSessionMessage(sessionId, 'action_execution', {
+        status: 'completed',
+        actionId: originalActionId,
+        serviceName: actionInfo.serviceName,
+        actionTitle: actionInfo.actionTitle,
+        actionDescription: actionInfo.description,
+        icon: actionInfo.icon || '', // Add icon field
+        args: args, // Include the processed arguments
+      });
+
       return { result };
     } catch (error) {
       console.error(`Error executing function ${functionName}:`, error);
+
+      // Publish failure message
+      const failedActionInfo = await discoverActionById(originalActionId);
+      await publishSessionMessage(sessionId, 'action_execution', {
+        status: 'failed',
+        actionId: originalActionId,
+        serviceName: failedActionInfo?.serviceName || 'unknown',
+        actionTitle: failedActionInfo?.actionTitle || 'unknown',
+        actionDescription: failedActionInfo?.description || 'unknown',
+        icon: failedActionInfo?.icon || '', // Add icon field
+        args: JSON.parse(call.function.arguments), // Include the original arguments
+      });
+
       return { error: extractErrorDetails(error) };
     }
   } else {
