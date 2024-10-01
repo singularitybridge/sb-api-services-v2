@@ -52,7 +52,15 @@ export const setAssistant = async (sessionId: string, assistantId: string): Prom
   }
 };
 
-export const createNewAssistant = async (sessionId: string, name: string, description: string, prompt: string): Promise<{ success: boolean; description: string; data?: any }> => {
+export const createNewAssistant = async (
+  sessionId: string,
+  name: string,
+  description: string,
+  prompt: string,
+  language: string,
+  voice: string,
+  introMessage: string
+): Promise<{ success: boolean; description: string; data?: any }> => {
   try {
     const session = await Session.findById(sessionId);
     if (!session) {
@@ -66,6 +74,9 @@ export const createNewAssistant = async (sessionId: string, name: string, descri
       name,
       description,
       prompt,
+      language,
+      voice,
+      introMessage,
       companyId: session.companyId,
     });
 
@@ -75,6 +86,9 @@ export const createNewAssistant = async (sessionId: string, name: string, descri
       _id: newAssistant._id,
       name: newAssistant.name,
       description: newAssistant.description,
+      language: newAssistant.language,
+      voice: newAssistant.voice,
+      introMessage: newAssistant.introMessage,
     });
 
     return {
@@ -84,6 +98,9 @@ export const createNewAssistant = async (sessionId: string, name: string, descri
         _id: newAssistant._id,
         name: newAssistant.name,
         description: newAssistant.description,
+        language: newAssistant.language,
+        voice: newAssistant.voice,
+        introMessage: newAssistant.introMessage,
       },
     };
   } catch (error) {
