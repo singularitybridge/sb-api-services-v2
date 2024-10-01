@@ -1,5 +1,6 @@
 import { readdirSync, existsSync } from 'fs';
 import { join } from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import { FunctionFactory, ActionContext, FunctionDefinition } from './types';
 import { processTemplate } from '../../services/template.service';
 import { publishSessionMessage } from '../../services/pusher.service';
@@ -118,6 +119,7 @@ export const executeFunctionCall = async (
   const functionName = call.function.name as string;
   const originalActionId = functionName; // Keep the original function name
   const convertedActionId = convertOpenAIFunctionName(functionName);
+  const executionId = uuidv4(); // Generate a unique ID for this execution
 
   if (functionName in functionFactory) {
     try {
@@ -136,6 +138,7 @@ export const executeFunctionCall = async (
 
       // Publish start message
       await publishSessionMessage(sessionId, 'action_execution', {
+        id: executionId,
         status: 'started',
         actionId: convertedActionId,
         serviceName: actionInfo.serviceName,
@@ -150,6 +153,7 @@ export const executeFunctionCall = async (
 
       // Publish completion message
       await publishSessionMessage(sessionId, 'action_execution', {
+        id: executionId,
         status: 'completed',
         actionId: convertedActionId,
         serviceName: actionInfo.serviceName,
@@ -167,6 +171,7 @@ export const executeFunctionCall = async (
       // Publish failure message
       const failedActionInfo = await discoverActionById(convertedActionId);
       await publishSessionMessage(sessionId, 'action_execution', {
+        id: executionId,
         status: 'failed',
         actionId: convertedActionId,
         serviceName: failedActionInfo?.serviceName || 'unknown',
