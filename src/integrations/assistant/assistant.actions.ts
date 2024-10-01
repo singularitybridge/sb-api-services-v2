@@ -48,11 +48,45 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
           type: 'string',
           description: 'The initial prompt for the new assistant',
         },
+        language: {
+          type: 'string',
+          description: 'The language of the assistant, can be he or en',
+        },
+        voice: {
+          type: 'string',
+          description: 'The voice of the assistant',
+        },
+        introMessage: {
+          type: 'string',
+          description: 'The introductory message of the assistant',
+        },
       },
-      required: ['name', 'description', 'prompt'],
+      required: ['name', 'description', 'prompt', 'language', 'voice', 'introMessage'],
     },
-    function: async ({ name, description, prompt }: { name: string; description: string; prompt: string }) => {
-      return await createNewAssistant(context.sessionId, name, description, prompt);
+    function: async ({ 
+      name, 
+      description, 
+      prompt, 
+      language, 
+      voice, 
+      introMessage 
+    }: { 
+      name: string; 
+      description: string; 
+      prompt: string;
+      language: string;
+      voice: string;
+      introMessage: string;
+    }) => {
+      return await createNewAssistant(
+        context.sessionId, 
+        name, 
+        description, 
+        prompt, 
+        language, 
+        voice, 
+        introMessage
+      );
     },
   },
 });
