@@ -7,7 +7,8 @@ import {
   triggerAction, 
   getActions, 
   getIntegrationById, 
-  getLeanIntegrationActions 
+  getLeanIntegrationActions,
+  discoverActionById
 } from '../services/integration.service';
 import { SupportedLanguage, Integration } from '../services/discovery.service';
 import { sanitizeFunctionName } from '../integrations/actions/factory';
@@ -22,6 +23,22 @@ router.get('/discover', verifyAccess(), async (req: AuthenticatedRequest, res) =
     res.json(actions);
   } catch (error) {
     res.status(500).json({ error: 'Failed to discover integrations' });
+  }
+});
+
+// Discover a specific action by ID
+router.get('/discover/action/:actionId', verifyAccess(), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { actionId } = req.params;
+    const language = (req.query.language as SupportedLanguage) || 'en';
+    const action = await discoverActionById(actionId, language);
+    if (action) {
+      res.json(action);
+    } else {
+      res.status(404).json({ error: 'Action not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to discover action' });
   }
 });
 
