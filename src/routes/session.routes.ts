@@ -7,13 +7,39 @@ import {
   getSessionOrCreate,
   sessionFriendlyAggreationQuery,
   updateSessionAssistant,
+  updateSessionLanguage,
 } from '../services/session.service';
 import mongoose from 'mongoose';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { getApiKey, validateApiKeys } from '../services/api.key.service';
 import { BadRequestError } from '../utils/errors';
+import { SupportedLanguage } from '../services/discovery.service';
 
 const sessionRouter = Router();
+
+// Update session language
+sessionRouter.put(
+  '/:id/language',
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {    
+    const { id } = req.params;
+    const { language } = req.body;
+
+    if (!language || !['en', 'he'].includes(language)) {
+      return res.status(400).json({ error: 'Invalid language. Supported languages are "en" and "he".' });
+    }
+
+    try {
+      const updatedSession = await updateSessionLanguage(id, language as SupportedLanguage);
+      if (updatedSession) {
+        res.status(200).json({ message: 'Session language updated successfully', language: updatedSession.language });
+      } else {
+        res.status(404).json({ error: 'Session not found' });
+      }
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // Update session assistant
 sessionRouter.put(
