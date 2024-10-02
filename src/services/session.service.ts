@@ -49,6 +49,7 @@ export const sessionFriendlyAggreationQuery = [
       threadId: 1,
       active: 1,
       channel: 1,
+      language: 1,
     },
   },
 ];
@@ -61,6 +62,23 @@ export const updateSessionAssistant = async (
   const session = await Session.findOneAndUpdate(
     { _id: sessionId, companyId: companyId },
     { assistantId },
+    { new: true }
+  );
+
+  if (!session) {
+    throw new NotFoundError('Session not found');
+  }
+
+  return session;
+};
+
+export const updateSessionLanguage = async (
+  sessionId: string,
+  language: string
+): Promise<ISession | null> => {
+  const session = await Session.findByIdAndUpdate(
+    sessionId,
+    { language },
     { new: true }
   );
 
@@ -84,8 +102,9 @@ export const getSessionOrCreate = async (
   userId: string,
   companyId: string,
   channel: ChannelType = ChannelType.WEB,
+  language: string = 'en'
 ) => {
-  console.log(`Attempting to find or create session for userId: ${userId}, companyId: ${companyId}, channel: ${channel}`);
+  console.log(`Attempting to find or create session for userId: ${userId}, companyId: ${companyId}, channel: ${channel}, language: ${language}`);
 
   const findSession = async () => {
     const session = await Session.findOne({ userId, companyId, channel, active: true });
@@ -103,6 +122,7 @@ export const getSessionOrCreate = async (
       _id: session._id,
       assistantId: session.assistantId,
       channel: session.channel,
+      language: session.language,
     };
   }
 
@@ -125,6 +145,7 @@ export const getSessionOrCreate = async (
       active: true,
       threadId,
       channel,
+      language,
     });
     console.log(`New session created: ${session._id}`);
   } catch (error: any) {
@@ -146,6 +167,7 @@ export const getSessionOrCreate = async (
     _id: session._id,
     assistantId: session.assistantId,
     channel: session.channel,
+    language: session.language,
   };
 };
 

@@ -5,6 +5,8 @@ import { FunctionFactory, ActionContext, FunctionDefinition } from './types';
 import { processTemplate } from '../../services/template.service';
 import { publishSessionMessage } from '../../services/pusher.service';
 import { discoverActionById } from '../../services/integration.service';
+import { getSessionById } from '../../services/session.service';
+import { SupportedLanguage } from '../../services/discovery.service';
 
 const sanitizeFunctionName = (name: string): string => {
   // Replace dots with underscores and remove any other non-compliant characters
@@ -119,11 +121,13 @@ export const executeFunctionCall = async (
   const functionName = call.function.name as string;
   const originalActionId = functionName; // Keep the original function name
   const convertedActionId = convertOpenAIFunctionName(functionName);
-  const executionId = uuidv4(); // Generate a unique ID for this execution
+  const executionId = uuidv4(); // Generate a unique ID for this execution  
+  const session = await getSessionById(sessionId);
+  const sessionLanguage: SupportedLanguage = session.language as SupportedLanguage;
 
   if (functionName in functionFactory) {
     try {
-      const actionInfo = await discoverActionById(convertedActionId);
+      const actionInfo = await discoverActionById(convertedActionId, sessionLanguage);
       if (!actionInfo) {
         throw new Error(`Action info not found for ${convertedActionId}`);
       }
@@ -147,6 +151,7 @@ export const executeFunctionCall = async (
         icon: actionInfo.icon || '',
         args: args,
         originalActionId: originalActionId,
+        language: sessionLanguage,
       });
 
       const result = await functionFactory[functionName].function(args);
@@ -162,6 +167,7 @@ export const executeFunctionCall = async (
         icon: actionInfo.icon || '',
         args: args,
         originalActionId: originalActionId,
+        language: sessionLanguage,
       });
 
       return { result };
@@ -169,7 +175,7 @@ export const executeFunctionCall = async (
       console.error(`Error executing function ${functionName}:`, error);
 
       // Publish failure message
-      const failedActionInfo = await discoverActionById(convertedActionId);
+      const failedActionInfo = await discoverActionById(convertedActionId, sessionLanguage);
       await publishSessionMessage(sessionId, 'action_execution', {
         id: executionId,
         status: 'failed',
@@ -180,6 +186,7 @@ export const executeFunctionCall = async (
         icon: failedActionInfo?.icon || '',
         args: JSON.parse(call.function.arguments),
         originalActionId: originalActionId,
+        language: sessionLanguage,
       });
 
       return { error: extractErrorDetails(error) };
