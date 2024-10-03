@@ -72,6 +72,8 @@ export const executeFunctionCall = async (
         sessionLanguage
       );
 
+      const input = Object.keys(processedArgs).length > 0 ? processedArgs : {};
+
       const executionDetails: ExecutionDetails = {
         id: executionId,
         actionId: convertedActionId,
@@ -82,13 +84,14 @@ export const executeFunctionCall = async (
         args: processedArgs,
         originalActionId,
         language: sessionLanguage,
+        input
       };
 
       await publishActionMessage(sessionId, 'started', executionDetails);
 
       const result = await functionFactory[functionName].function(processedArgs);
 
-      await publishActionMessage(sessionId, 'completed', { ...executionDetails, result });
+      await publishActionMessage(sessionId, 'completed', { ...executionDetails, output: result });
 
       return { result };
     } catch (error) {
@@ -96,6 +99,9 @@ export const executeFunctionCall = async (
 
       const failedActionInfo = await discoverActionById(convertOpenAIFunctionName(functionName), sessionLanguage);
       const errorDetails = extractErrorDetails(error);
+      const args = JSON.parse(call.function.arguments);
+      const input = Object.keys(args).length > 0 ? args : {};
+      
       await publishActionMessage(sessionId, 'failed', {
         id: uuidv4(),
         actionId: convertOpenAIFunctionName(functionName),
@@ -103,9 +109,10 @@ export const executeFunctionCall = async (
         actionTitle: failedActionInfo?.actionTitle || 'unknown',
         actionDescription: failedActionInfo?.description || 'unknown',
         icon: failedActionInfo?.icon || '',
-        args: JSON.parse(call.function.arguments),
+        args,
         originalActionId: functionName,
         language: sessionLanguage,
+        input,
         error: errorDetails
       });
 
