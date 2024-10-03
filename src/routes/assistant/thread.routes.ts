@@ -6,6 +6,7 @@ import { createNewThread, deleteThread, getMessages } from '../../services/oai.t
 import { Session } from '../../models/Session';
 import { handleSessionMessage } from '../../services/assistant.service';
 import { ChannelType } from '../../types/ChannelType';
+import { getMessagesBySessionId, getMessageById } from '../../services/message.service'; // Add this import
 
 const threadRouter = express.Router();
 
@@ -17,6 +18,40 @@ threadRouter.get(
     const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
     const messages = await getMessages(apiKey, id);
     res.send(messages);
+  }
+);
+
+// New route to fetch messages by session ID from MongoDB
+threadRouter.get(
+  '/session/:sessionId/messages',
+  async (req: AuthenticatedRequest, res) => {
+    const { sessionId } = req.params;
+    try {
+      const messages = await getMessagesBySessionId(sessionId);
+      res.send(messages);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      res.status(500).send('An error occurred while fetching messages.');
+    }
+  }
+);
+
+// New route to fetch a specific message by ID from MongoDB
+threadRouter.get(
+  '/message/:messageId',
+  async (req: AuthenticatedRequest, res) => {
+    const { messageId } = req.params;
+    try {
+      const message = await getMessageById(messageId);
+      if (!message) {
+        res.status(404).send('Message not found');
+      } else {
+        res.send(message);
+      }
+    } catch (error) {
+      console.error('Error fetching message:', error);
+      res.status(500).send('An error occurred while fetching the message.');
+    }
   }
 );
 
