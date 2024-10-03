@@ -24,4 +24,10 @@ const MessageSchema: Schema = new Schema({
   openAIMessageId: { type: String },
 });
 
+// Add indexes for better query performance
+MessageSchema.index({ sessionId: 1 });
+MessageSchema.index({ sessionId: 1, messageType: 1 });
+MessageSchema.index({ timestamp: 1 });
+MessageSchema.index({ 'data.id': 1 }); // Index for action execution queries
+
 export const Message = mongoose.model<IMessage>('Message', MessageSchema);

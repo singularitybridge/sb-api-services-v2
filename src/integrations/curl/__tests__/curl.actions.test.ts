@@ -1,5 +1,5 @@
 import { ActionContext } from '../../actions/types';
-import { createCurlActions } from '../curl.actions';
+import { createCurlActions, CurlActionResponse } from '../curl.actions';
 
 describe('Curl Actions', () => {
   const context: ActionContext = {
@@ -14,12 +14,12 @@ describe('Curl Actions', () => {
       url: 'https://jsonplaceholder.typicode.com/todos/1',
     };
 
-    const result = await actions.performCurlRequest.function(args);
+    const result = await actions.performCurlRequest.function(args) as CurlActionResponse;
 
-    expect(result).toHaveProperty('response');
-    expect(result.response).toHaveProperty('status', 200);
-    expect(result.response.data).toHaveProperty('id', 1);
-    expect(result.response.data).toHaveProperty('title');
+    expect(result).toHaveProperty('status', 200);
+    expect(result).toHaveProperty('data');
+    expect(result.data).toHaveProperty('id', 1);
+    expect(result.data).toHaveProperty('title');
   });
 
   it('should return an error for invalid URL', async () => {
@@ -27,7 +27,7 @@ describe('Curl Actions', () => {
       url: 'ftp://invalid-url',
     };
 
-    const result = await actions.performCurlRequest.function(args);
+    const result = await actions.performCurlRequest.function(args) as CurlActionResponse;
 
     expect(result).toHaveProperty('error');
     expect(result.error).toMatch(/Invalid URL|Request failed/);

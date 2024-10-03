@@ -9,6 +9,13 @@ interface CurlRequestArgs {
   timeout?: number;
 }
 
+export interface CurlActionResponse {
+  status: number;
+  data: any;
+  headers: { [key: string]: string };
+  error?: string;
+}
+
 export const createCurlActions = (context: ActionContext): FunctionFactory => ({
   performCurlRequest: {
     description: 'Perform an HTTP request to a specified URL',
@@ -44,7 +51,7 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
       required: ['url'],
       additionalProperties: false,
     },
-    function: async (args: CurlRequestArgs) => {
+    function: async (args: CurlRequestArgs): Promise<CurlActionResponse> => {
       console.log('performCurlRequest called with arguments:', JSON.stringify(args, null, 2));
 
       try {
