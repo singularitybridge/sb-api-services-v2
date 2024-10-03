@@ -1,4 +1,3 @@
-import { readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { FunctionFactory, ActionContext, FunctionDefinition } from './types';
@@ -7,106 +6,107 @@ import { publishSessionMessage } from '../../services/pusher.service';
 import { discoverActionById } from '../../services/integration.service';
 import { getSessionById } from '../../services/session.service';
 import { SupportedLanguage } from '../../services/discovery.service';
+import {
+  sanitizeFunctionName,
+  getIntegrationFolders,
+  loadConfig,
+  createPrefixedActions,
+  filterAllowedActions,
+  convertOpenAIFunctionName,
+  extractErrorDetails,
+  DetailedError
+} from './utils';
 
-const sanitizeFunctionName = (name: string): string => {
-  // Replace dots with underscores and remove any other non-compliant characters
-  return name.replace(/\./g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
+const loadActionModule = async (actionFilePath: string, config: any, context: ActionContext): Promise<FunctionFactory> => {
+  try {
+    const module = await import(actionFilePath);
+    const actionCreator = module[config.actionCreator];
+
+    if (typeof actionCreator === 'function') {
+      return actionCreator(context) as FunctionFactory;
+    } else {
+      console.log(`No valid action creator found in ${actionFilePath}`);
+      return {};
+    }
+  } catch (error) {
+    console.error(`Failed to process ${actionFilePath}:`, error);
+    return {};
+  }
+};
+
+const processIntegrationFolder = async (folder: string, integrationsPath: string, context: ActionContext): Promise<FunctionFactory> => {
+  const integrationPath = join(integrationsPath, folder);
+  const configFilePath = join(integrationPath, 'integration.config.json');
+  const config = loadConfig(configFilePath);
+
+  if (!config) return {};
+
+  const actionFilePath = join(integrationPath, config.actionsFile || `${folder}.actions.ts`);
+  const actionObj = await loadActionModule(actionFilePath, config, context);
+  const integrationName = config.name || folder;
+
+  return createPrefixedActions(actionObj, integrationName);
 };
 
 export const createFunctionFactory = async (context: ActionContext, allowedActions: string[]): Promise<FunctionFactory> => {
   const integrationsPath = join(__dirname, '..');
-  const integrationFolders = readdirSync(integrationsPath).filter(folder =>
-    existsSync(join(integrationsPath, folder, 'integration.config.json'))
-  );
+  const integrationFolders = getIntegrationFolders(integrationsPath);
 
-  let allActions: FunctionFactory = {};
+  const allActionPromises = integrationFolders.map(folder => processIntegrationFolder(folder, integrationsPath, context));
+  const allActionResults = await Promise.all(allActionPromises);
 
-  for (const folder of integrationFolders) {
-    const integrationPath = join(integrationsPath, folder);
-    const configFilePath = join(integrationPath, 'integration.config.json');
-
-    let config: any;
-    try {
-      config = require(configFilePath);
-    } catch (error) {
-      console.error(`Failed to read config file for ${folder}:`, error);
-      continue;
-    }
-
-    const actionFilePath = join(integrationPath, config.actionsFile || `${folder}.actions.ts`);
-
-    if (!existsSync(actionFilePath)) {
-      console.log(`Action file not found for ${folder}. Skipping.`);
-      continue;
-    }
-
-    try {
-      const module = await import(actionFilePath);
-      const actionCreator = module[config.actionCreator];
-
-      if (typeof actionCreator === 'function') {
-        const actionObj = actionCreator(context) as FunctionFactory;
-        const integrationName = config.name || folder;
-        const prefixedActions = Object.fromEntries(
-          Object.entries(actionObj).map(([actionName, funcDef]) => {
-            const fullActionName = `${integrationName}.${actionName}`;
-            const sanitizedName = sanitizeFunctionName(fullActionName);
-            return [sanitizedName, {
-              ...funcDef as FunctionDefinition,
-              originalName: fullActionName // Store the original name
-            }];
-          })
-        );
-        allActions = { ...allActions, ...prefixedActions };
-      } else {
-        console.log(`No valid action creator found for ${folder}.`);
-      }
-    } catch (error) {
-      console.error(`Failed to process ${actionFilePath}:`, error);
-    }
-  }
-
-  const sanitizedAllowedActions = allowedActions.map(sanitizeFunctionName);
-  const functionFactory = Object.fromEntries(
-    Object.entries(allActions).filter(([actionName]) => sanitizedAllowedActions.includes(actionName))
-  ) as FunctionFactory;
-
-  return functionFactory;
+  const allActions = allActionResults.reduce((acc, actions) => ({ ...acc, ...actions }), {});
+  return filterAllowedActions(allActions, allowedActions);
 };
 
-interface DetailedError {
-  message: string;
-  name?: string;
-  stack?: string;
-  details?: Record<string, unknown>;
-}
+const prepareActionExecution = async (
+  functionName: string,
+  args: any,
+  sessionId: string,
+  sessionLanguage: SupportedLanguage
+) => {
+  const executionId = uuidv4();
+  const convertedActionId = convertOpenAIFunctionName(functionName);
+  const actionInfo = await discoverActionById(convertedActionId, sessionLanguage);
 
-function extractErrorDetails(error: unknown): DetailedError {
-  if (error instanceof Error) {
-    return {
-      message: error.message,
-      name: error.name,
-      stack: error.stack,
-      details: Object.fromEntries(Object.entries(error).filter(([key]) => !['name', 'message', 'stack'].includes(key)))
-    };
-  } else if (typeof error === 'object' && error !== null) {
-    return {
-      message: String((error as any).message || 'Unknown error'),
-      details: error as Record<string, unknown>
-    };
-  } else {
-    return { message: String(error) };
+  if (!actionInfo) {
+    throw new Error(`Action info not found for ${convertedActionId}`);
   }
-}
 
-const convertOpenAIFunctionName = (name: string): string => {
-  // Special handling for ai_agent_executor
-  if (name.startsWith('ai_agent_executor_')) {
-    return name.replace(/^ai_agent_executor_/, 'ai_agent_executor.');
+  const processedArgs = await Promise.all(
+    Object.entries(args).map(async ([key, value]) => [
+      key,
+      typeof value === 'string' ? await processTemplate(value, sessionId) : value
+    ])
+  );
+
+  return {
+    executionId,
+    convertedActionId,
+    actionInfo,
+    processedArgs: Object.fromEntries(processedArgs)
+  };
+};
+
+const publishActionMessage = async (
+  sessionId: string,
+  status: 'started' | 'completed' | 'failed',
+  executionDetails: {
+    id: string;
+    actionId: string;
+    serviceName: string;
+    actionTitle: string;
+    actionDescription: string;
+    icon: string;
+    args: any;
+    originalActionId: string;
+    language: SupportedLanguage;
   }
-  
-  // For other cases, convert underscores to dots
-  return name.replace(/_/g, '.');
+) => {
+  await publishSessionMessage(sessionId, 'action_execution', {
+    ...executionDetails,
+    status
+  });
 };
 
 export const executeFunctionCall = async (
@@ -119,54 +119,43 @@ export const executeFunctionCall = async (
   const functionFactory = await createFunctionFactory(context, allowedActions);
 
   const functionName = call.function.name as string;
-  const originalActionId = functionName; // Keep the original function name
-  const convertedActionId = convertOpenAIFunctionName(functionName);
-  const executionId = uuidv4(); // Generate a unique ID for this execution  
+  const originalActionId = functionName;
   const session = await getSessionById(sessionId);
-  const sessionLanguage: SupportedLanguage = session.language as SupportedLanguage;
+  const sessionLanguage = session.language as SupportedLanguage;
 
   if (functionName in functionFactory) {
     try {
-      const actionInfo = await discoverActionById(convertedActionId, sessionLanguage);
-      if (!actionInfo) {
-        throw new Error(`Action info not found for ${convertedActionId}`);
-      }
+      const args = JSON.parse(call.function.arguments);
+      const { executionId, convertedActionId, actionInfo, processedArgs } = await prepareActionExecution(
+        functionName,
+        args,
+        sessionId,
+        sessionLanguage
+      );
 
-      let args = JSON.parse(call.function.arguments);
-      console.log('processing args', args);
-      for (const key in args) {
-        if (typeof args[key] === 'string') {
-          args[key] = await processTemplate(args[key], sessionId);
-        }
-      }
-
-      // Publish start message
-      await publishSessionMessage(sessionId, 'action_execution', {
+      await publishActionMessage(sessionId, 'started', {
         id: executionId,
-        status: 'started',
         actionId: convertedActionId,
         serviceName: actionInfo.serviceName,
         actionTitle: actionInfo.actionTitle,
         actionDescription: actionInfo.description,
         icon: actionInfo.icon || '',
-        args: args,
-        originalActionId: originalActionId,
+        args: processedArgs,
+        originalActionId,
         language: sessionLanguage,
       });
 
-      const result = await functionFactory[functionName].function(args);
+      const result = await functionFactory[functionName].function(processedArgs);
 
-      // Publish completion message
-      await publishSessionMessage(sessionId, 'action_execution', {
+      await publishActionMessage(sessionId, 'completed', {
         id: executionId,
-        status: 'completed',
         actionId: convertedActionId,
         serviceName: actionInfo.serviceName,
         actionTitle: actionInfo.actionTitle,
         actionDescription: actionInfo.description,
         icon: actionInfo.icon || '',
-        args: args,
-        originalActionId: originalActionId,
+        args: processedArgs,
+        originalActionId,
         language: sessionLanguage,
       });
 
@@ -174,18 +163,16 @@ export const executeFunctionCall = async (
     } catch (error) {
       console.error(`Error executing function ${functionName}:`, error);
 
-      // Publish failure message
-      const failedActionInfo = await discoverActionById(convertedActionId, sessionLanguage);
-      await publishSessionMessage(sessionId, 'action_execution', {
-        id: executionId,
-        status: 'failed',
-        actionId: convertedActionId,
+      const failedActionInfo = await discoverActionById(convertOpenAIFunctionName(functionName), sessionLanguage);
+      await publishActionMessage(sessionId, 'failed', {
+        id: uuidv4(),
+        actionId: convertOpenAIFunctionName(functionName),
         serviceName: failedActionInfo?.serviceName || 'unknown',
         actionTitle: failedActionInfo?.actionTitle || 'unknown',
         actionDescription: failedActionInfo?.description || 'unknown',
         icon: failedActionInfo?.icon || '',
         args: JSON.parse(call.function.arguments),
-        originalActionId: originalActionId,
+        originalActionId: functionName,
         language: sessionLanguage,
       });
 
