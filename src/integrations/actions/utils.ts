@@ -10,7 +10,7 @@ export const getIntegrationFolders = (integrationsPath: string): string[] =>
     existsSync(join(integrationsPath, folder, 'integration.config.json'))
   );
 
-export const loadConfig = (configPath: string): any => {
+export const loadConfig = (configPath: string): Record<string, unknown> | null => {
   try {
     return require(configPath);
   } catch (error) {
@@ -28,7 +28,7 @@ export const createPrefixedActions = (
       const fullActionName = `${integrationName}.${actionName}`;
       const sanitizedName = sanitizeFunctionName(fullActionName);
       return [sanitizedName, {
-        ...(funcDef as FunctionDefinition),
+        ...(funcDef as FunctionDefinition<any>),
         originalName: fullActionName
       }];
     })
@@ -68,10 +68,12 @@ export const extractErrorDetails = (error: unknown): DetailedError => {
     };
   } else if (typeof error === 'object' && error !== null) {
     return {
-      message: String((error as any).message || 'Unknown error'),
+      message: String((error as Record<string, unknown>).message || 'Unknown error'),
       details: error as Record<string, unknown>
     };
   } else {
     return { message: String(error) };
   }
 };
+
+export type { ActionContext, FunctionFactory, FunctionDefinition };
