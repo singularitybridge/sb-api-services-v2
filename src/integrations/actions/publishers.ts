@@ -16,6 +16,8 @@ export const publishActionMessage = async (
     icon: executionDetails.icon,
     originalActionId: executionDetails.originalActionId,
     language: executionDetails.language,
+    input: executionDetails.input || {}, // Ensure input is always an object
+    output: executionDetails.output,
     status
   };
 
@@ -42,7 +44,6 @@ export const publishActionMessage = async (
     actionDescription: messageData.actionDescription,
     icon: messageData.icon,
     originalActionId: messageData.originalActionId,
-    language: messageData.language,
     status: messageData.status
   });
 };

@@ -44,6 +44,8 @@ export interface ExecutionDetails {
   args: Record<string, unknown>;
   originalActionId: string;
   language: string;
+  input: Record<string, unknown>;
+  output?: unknown;
   result?: unknown;
   error?: unknown;
 }
