@@ -1,6 +1,6 @@
 {
   "name": "assistant",
-  "icon": "assistant",
+  "icon": "bot",
   "apiKeyName": null,
   "actionCreator": "createAssistantActions",
   "actionsFile": "assistant.actions.ts"
