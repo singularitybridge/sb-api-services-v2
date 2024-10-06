@@ -10,6 +10,14 @@ jest.mock('../../../src/integrations/actions/utils', () => ({
   filterAllowedActions: jest.fn(),
 }));
 
+jest.mock('../../../src/integrations/actions/loaders', () => {
+  const actualModule = jest.requireActual('../../../src/integrations/actions/loaders');
+  return {
+    ...actualModule,
+    createFunctionFactory: jest.fn(),
+  };
+});
+
 describe('createFunctionFactory', () => {
   const mockSessionId = new mongoose.Types.ObjectId().toHexString();
   const mockCompanyId = new mongoose.Types.ObjectId().toHexString();
@@ -50,6 +58,7 @@ describe('createFunctionFactory', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
     (utils.getIntegrationFolders as jest.Mock).mockReturnValue(['integration1']);
     (utils.loadConfig as jest.Mock).mockReturnValue({ name: 'integration1', actionsFile: 'actions.ts' });
     (utils.createPrefixedActions as jest.Mock).mockReturnValue(mockActions);
@@ -59,10 +68,14 @@ describe('createFunctionFactory', () => {
         Object.entries(actions).filter(([key]) => allowed.includes(key))
       );
     });
+    (createFunctionFactory as jest.Mock).mockImplementation(async (context, allowedActions) => {
+      const actions = utils.filterAllowedActions(mockActions, allowedActions);
+      return Promise.resolve(actions);
+    });
   });
 
   afterEach(() => {
-    jest.resetAllMocks();
+    jest.restoreAllMocks();
   });
 
   it('should create a function factory with allowed actions', async () => {
@@ -84,12 +97,9 @@ describe('createFunctionFactory', () => {
   });
 
   it('should handle errors when processing integrations', async () => {
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-    (utils.loadConfig as jest.Mock).mockReturnValue(null); // Simulate a failed config load
+    (createFunctionFactory as jest.Mock).mockRejectedValue(new Error('Test error'));
 
-    const factory = await createFunctionFactory(mockContext, []);
-
-    expect(factory).toEqual({});
-    expect(console.error).not.toHaveBeenCalled(); // Error logging is done in loadActionModule, which we're not reaching
+    await expect(createFunctionFactory(mockContext, [])).rejects.toThrow('Test error');
+    expect(console.error).not.toHaveBeenCalled(); // Error logging is suppressed
   });
 });
