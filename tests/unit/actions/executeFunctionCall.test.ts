@@ -38,6 +38,7 @@ describe('executeFunctionCall', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
     jest.spyOn(factoryModule, 'createFunctionFactory').mockImplementation(jest.fn());
     (integrationService.discoverActionById as jest.Mock).mockResolvedValue({
       id: 'testAction',
@@ -49,6 +50,10 @@ describe('executeFunctionCall', () => {
       parameters: {},
     });
     (publishersModule.publishActionMessage as jest.Mock).mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('should execute a function call successfully', async () => {
@@ -152,7 +157,6 @@ describe('executeFunctionCall', () => {
       expect.objectContaining<ActionContext>({ sessionId: mockSessionId, companyId: mockCompanyId }),
       mockAllowedActions
     );
-    // Removed the expectation for discoverActionById as it's not called for non-existent functions
     expect(result).toEqual({
       error: { message: 'Function nonExistentAction not implemented in the factory' },
     });
