@@ -91,9 +91,16 @@ export const executeFunctionCall = async (
 
       const result = await functionFactory[functionName].function(processedArgs);
 
-      await publishActionMessage(sessionId, 'completed', { ...executionDetails, output: result });
-
-      return { result };
+      if (result && typeof result === 'object' && 'error' in result) {
+        // If the result contains an error field, treat it as a failure
+        const errorDetails = extractErrorDetails(result.error);
+        await publishActionMessage(sessionId, 'failed', { ...executionDetails, output: result, error: errorDetails });
+        return { error: errorDetails };
+      } else {
+        // If no error, publish completed message and return result
+        await publishActionMessage(sessionId, 'completed', { ...executionDetails, output: result });
+        return { result };
+      }
     } catch (error) {
       console.error(`Error executing function ${functionName}:`, error);
 
@@ -112,7 +119,7 @@ export const executeFunctionCall = async (
         args,
         originalActionId: functionName,
         language: sessionLanguage,
-        input,
+        input,        
         error: errorDetails
       });
 

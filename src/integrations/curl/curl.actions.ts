@@ -60,7 +60,12 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
 
         // Input validation
         if (!/^https?:\/\//i.test(url)) {
-          throw new Error('Invalid URL: The URL must start with http:// or https://');
+          return {
+            status: 400,
+            data: null,
+            headers: {},
+            error: 'Invalid URL: The URL must start with http:// or https://'
+          };
         }
 
         // Properly serialize the body if it's an object, use as-is if it's a string, or use an empty string if not provided
@@ -82,12 +87,21 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
           timeout
         });
 
-        // Return the full response, including status, data, headers, and error if present
+        // Return the full response, including error if status is >= 400
+        if (response.status >= 400) {
+          return {
+            status: response.status,
+            data: response.data,
+            headers: response.headers,
+            error: `HTTP ${response.status}: ${response.data?.message || 'Request failed'}`
+          };
+        }
+
+        // Return the successful response
         return {
           status: response.status,
           data: response.data,
-          headers: response.headers,
-          error: response.error
+          headers: response.headers
         };
       } catch (error: any) {
         console.error('performCurlRequest: Error performing request', error);
@@ -95,7 +109,7 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
           status: 500,
           data: null,
           headers: {},
-          error: `Request failed: ${error.message || 'Failed to perform the HTTP request.'}`,
+          error: `Request failed: ${error.message || 'An unexpected error occurred'}`
         };
       }
     },
