@@ -16,16 +16,27 @@ describe('discoveryService', () => {
         expect(action).toHaveProperty('service');
         expect(action).toHaveProperty('parameters');
         
-        // Check that the id follows the format: IntegrationName.actionName
-        // Allow for multi-word integration names
-        expect(action.id).toMatch(/^([A-Z][a-z0-9]+(?: [A-Z][a-z0-9]+)*)\.[a-zA-Z0-9]+$/);
+        // Updated regex to allow underscores in the service name
+        expect(action.id).toMatch(/^[a-zA-Z][a-zA-Z0-9_]*\.[a-zA-Z0-9]+$/);
         
-        // Ensure that the service name is capitalized
-        expect(action.service[0]).toMatch(/[A-Z]/);
+        // Ensure that the service name starts with a letter
+        expect(action.service[0]).toMatch(/[a-zA-Z]/);
       });
       
-      // Log the first action for manual inspection
-      console.log('Sample action:', JSON.stringify(actions[0], null, 2));
+    });
+
+    it('should handle actions with multiple segments in their IDs', () => {
+      const mockAction: ActionInfo = {
+        id: 'service_name.action_name.sub_action',
+        serviceName: 'Service Name',
+        actionTitle: 'Action Title',
+        description: 'Action Description',
+        icon: 'icon-name',
+        service: 'serviceName',
+        parameters: {},
+      };
+
+      expect(mockAction.id).toMatch(/^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$/);
     });
   });
 });

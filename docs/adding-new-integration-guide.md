@@ -2,221 +2,284 @@
 
 ## 1. Introduction
 
-This guide outlines the process of adding a new integration to the system. It covers the necessary files to be created, their structure, and important guidelines to follow.
+This guide explains how to add a new integration to the system, ensuring consistency, reliability, and ease of maintenance. The guide includes steps for creating the necessary files, ensuring consistent error handling, and integrating with the broader system.
+
+---
 
 ## 2. File Structure
 
-When adding a new integration, create a new directory under `src/integrations/` with the name of your integration. For example:
+To add a new integration, create a new directory under `src/integrations/` with the name of your integration in **snake_case**. For example:
 
 ```
 src/integrations/
-└── your-integration/
-    ├── your-integration.service.ts
-    ├── your-integration.actions.ts
+└── your_integration/
+    ├── your_integration.service.ts
+    ├── your_integration.actions.ts
     ├── integration.config.json
     └── translations/
         ├── en.json
         └── he.json
 ```
 
+---
+
 ## 3. Creating Integration Files
 
-### 3.1. Service File (your-integration.service.ts)
+### 3.1. Service File (`your_integration.service.ts`)
 
-The service file contains the core functionality of your integration. It should include functions that implement the integration's logic.
+The service file contains the core functionality of your integration. It includes reusable functions that execute your integration’s logic, independent of the action definitions.
 
-Example structure:
+**Example Structure:**
 
 ```typescript
-export const yourIntegrationFunction = async (sessionId: string, companyId: string, params: any): Promise<{ success: boolean; data?: any; error?: string }> => {
-  try {
-    // Implement your integration logic here
-    return { success: true, data: 'Operation successful' };
-  } catch (error: any) {
-    console.error('Error in your integration:', error);
-    return { success: false, error: error.message || 'An error occurred' };
+// src/integrations/your_integration/your_integration.service.ts
+
+export const yourIntegrationFunction = async (
+  sessionId: string,
+  companyId: string,
+  params: any
+): Promise<{ success: boolean; data?: any }> => {
+  if (!params.requiredField) {
+    throw new Error('The requiredField parameter is missing.');
   }
+
+  // Implement core logic here
+  const result = await performSomeOperation(params);
+
+  return { success: true, data: result };
 };
 ```
 
-### 3.2. Actions File (your-integration.actions.ts)
+### 3.2. Actions File (`your_integration.actions.ts`)
 
-The actions file defines the functions that can be called by the system, wrapping the core functionality from the service file.
+The actions file defines the functions that the system can call, wrapping the logic from the service file.
 
-Example structure:
+**Important:** Let errors propagate by throwing exceptions. This allows the executor to handle errors consistently across all actions.
+
+**Example Structure:**
 
 ```typescript
+// src/integrations/your_integration/your_integration.actions.ts
+
 import { ActionContext, FunctionFactory } from '../actions/types';
-import { yourIntegrationFunction } from './your-integration.service';
+import { yourIntegrationFunction } from './your_integration.service';
 
 export const createYourIntegrationActions = (context: ActionContext): FunctionFactory => ({
   yourAction: {
-    description: 'Description of what this action does',
-    strict: true,
+    description: 'Performs an action within Your Integration',
     parameters: {
       type: 'object',
       properties: {
-        // Define your parameters here
+        requiredField: { type: 'string', description: 'A required parameter for your action' },
       },
-      required: [],
+      required: ['requiredField'],
       additionalProperties: false,
     },
     function: async (params: any) => {
-      try {
-        const result = await yourIntegrationFunction(context.sessionId, context.companyId, params);
-        return result;
-      } catch (error) {
-        console.error('Error in yourAction:', error);
-        return { success: false, error: 'Failed to perform action' };
-      }
+      return await yourIntegrationFunction(context.sessionId, context.companyId, params);
     },
   },
 });
 ```
 
-### 3.3. Configuration File (integration.config.json)
+### 3.3. Configuration File (`integration.config.json`)
 
-The configuration file provides metadata about your integration.
+The configuration file provides metadata about your integration for the system to understand it properly.
 
-Example content:
+**Example Content:**
 
 ```json
 {
-  "name": "Your Integration",
+  "name": "your_integration",
   "icon": "icon-name",
-  "apiKeyName": "your_integration_api_key",
+  "apiKeyName": "YOUR_INTEGRATION_API_KEY",
   "actionCreator": "createYourIntegrationActions",
-  "actionsFile": "your-integration.actions.ts"
+  "actionsFile": "your_integration.actions.ts"
 }
 ```
 
-### 3.4. Translation Files (translations/en.json and translations/he.json)
+### 3.4. Translation Files (`translations/en.json` and `translations/he.json`)
 
-Create translation files for user-facing strings in both English and Hebrew.
+Provide user-facing strings in both English and Hebrew.
 
-Example content for en.json:
+**Example Content for `en.json`:**
 
 ```json
 {
   "serviceName": "Your Integration",
   "yourAction": {
-    "actionTitle": "Your Action Title",
-    "description": "Description of what this action does."
+    "actionTitle": "Perform Your Action",
+    "description": "A description of what this action does."
   }
 }
 ```
 
+---
+
 ## 4. Important Guidelines
 
-1. **Error Handling**: Implement robust error handling in both service and actions files. Catch and log errors, and return meaningful error messages.
+### 4.1. Error Handling
 
-2. **Type Safety**: Use TypeScript interfaces to define parameter types and return types for better type safety and code clarity.
+- **Use Exceptions for Errors:** Action functions should **throw exceptions** when errors occur.
+- **Consistent Error Handling by Executor:** The executor will handle errors uniformly by catching exceptions and publishing 'failed' statuses.
+  
+### 4.2. Naming Conventions
 
-3. **Modular Design**: Keep your integration modular. Separate core functionality (in the service file) from the action definitions (in the actions file).
+- **Integration Names:** Use **snake_case** for integration names and **camelCase** for action names.
+- **Function Names:** Use a consistent pattern for function names combining the integration and action names, e.g., `your_integration_yourAction`.
 
-4. **Documentation**: Provide clear descriptions for each action and its parameters in the actions file.
+### 4.3. Modular Design
 
-5. **Consistency**: Follow the naming conventions and structure of existing integrations for consistency across the project.
+- **Separation of Concerns:** Keep core logic in the service file (`.service.ts`) and action definitions in the actions file (`.actions.ts`).
 
-6. **Translations**: Always include translation files (en.json and he.json) in the `translations` directory for user-facing strings.
+### 4.4. Type Safety
 
-7. **Functional Programming**: Prefer functional programming approaches over classes/OOP when implementing your integration.
-
-8. **ES6 & TypeScript**: Utilize ES6 features and TypeScript in your implementation for better code quality and maintainability.
+- Use TypeScript interfaces to define the parameter and return types for improved readability and safety.
+  
+---
 
 ## 5. Integration with Existing System
 
-### 5.1. Allowed Actions
+### 5.1. Action Registration and Allowed Actions
 
-When implementing integration actions, it's crucial to understand how allowed actions are managed:
-
-1. The `triggerAction` function in `src/services/integration-action.service.ts` is responsible for executing integration actions.
-
-2. Allowed actions are determined by sanitizing the function name:
-
-   ```typescript
-   const fullServiceId = sanitizeFunctionName(`${integrationName}.${service}`);
-   ```
-
-3. This sanitized function name is then used to check against the list of allowed actions.
-
-4. In debug or testing scenarios, you may need to explicitly allow actions. For example, in `debug.service.ts`:
-
-   ```typescript
-   const sanitizedFunctionName = sanitizeFunctionName(`${integrationName}.${service}`);
-   const allowedActions: string[] = [sanitizedFunctionName];
-   ```
+- Use consistent action IDs by converting function names to `integrationName.actionName`.
+- Ensure that all actions are properly registered and allowed in the context where they're used.
 
 ### 5.2. Session Context
 
-When working with integrations, be aware of how session context is managed:
-
-1. The `getSessionContextData` function from `src/services/session-context.service.ts` is used to retrieve session data.
-
-2. Session context may contain important information like user permissions and allowed actions.
-
-3. Always consider the session context when implementing integration logic to ensure proper authorization and access control.
+- **Session Awareness:** Use the `ActionContext` for accessing `sessionId` and `companyId` in action functions.
 
 ### 5.3. API Key Management
 
-If your integration requires API keys:
+- Retrieve the integration's API key using the `getApiKey` function from the API key service.
+- Handle cases where the API key is missing by **throwing an appropriate error**.
 
-1. Use the `getApiKey` function from `src/services/api.key.service.ts` to retrieve API keys for specific integrations.
-
-2. Ensure that your integration's API key is properly set up in the company's configuration.
-
-3. Handle cases where the API key might not be available, providing appropriate error messages.
+---
 
 ## 6. Testing and Debugging
 
-1. **Debug Integration**: Use the debug integration (`src/integrations/debug/`) as a reference for implementing and testing new integrations.
+### 6.1. Comprehensive Testing
 
-2. **Logging**: Implement comprehensive logging in your integration to facilitate debugging. Use `console.log` for development and consider using a more robust logging solution for production.
+- **Unit Tests:** Write unit tests for all service functions.
+- **Integration Tests:** Ensure that your actions are tested end-to-end, including both successful and error scenarios.
 
-3. **Error Simulation**: Include ways to simulate errors in your integration for testing purposes. This can help ensure that error handling is working correctly.
+### 6.2. Logging
 
-4. **Integration Tests**: Write integration tests that cover various scenarios, including successful operations and error cases.
+- **Use Logs for Debugging:** Add `console.log()` during development for critical actions and parameters.
+- **Clean Up Logs:** Ensure unnecessary logs are removed or adjusted for production to prevent leaking sensitive information.
 
-## 7. Updating Existing Integrations
+### 6.3. Error Simulation
 
-When adding new functionality or modifying existing integrations, keep the following in mind:
+- Include test cases to simulate common error scenarios to verify proper exception handling.
 
-1. **Backward Compatibility**: Ensure that changes to existing integrations don't break current functionality. If breaking changes are necessary, provide clear migration instructions.
+---
 
-2. **Update Related Files**: Remember to update all related files when adding or modifying an integration. This includes:
-   - The integration's service file
-   - The integration's actions file
-   - Translation files (both English and Hebrew)
-   - Any relevant test files
+## 7. Best Practices for Integration Development
 
-3. **Debug Integration**: When adding new general-purpose functionality, consider adding it to the debug integration as well. This can serve as both documentation and a testing tool for other developers.
+### 7.1. Uniform Error Handling
 
-## 8. Best Practices for Integration Development
+- **Throw Exceptions:** Always throw exceptions within action functions for consistency.
+- **No Error Fields in Results:** Remove the error fields from action return objects. Rely on exceptions to indicate failures.
 
-1. **Parameterization**: Make your integration functions flexible by accepting parameters for configurable elements. This allows for easier reuse and testing.
+### 7.2. Input Validation
 
-2. **Async/Await**: Use async/await syntax for asynchronous operations to improve code readability and error handling.
+- Validate required parameters at the beginning of your functions. Throw exceptions if validation fails.
 
-3. **Input Validation**: Implement thorough input validation in your action functions to prevent errors caused by invalid input.
+### 7.3. Code Consistency
 
-4. **Descriptive Naming**: Use clear, descriptive names for your integration, actions, and functions. This improves code readability and self-documentation.
+- **Consistent Naming and Structure:** Follow the naming conventions and structure outlined in this guide for all integrations to improve readability and maintainability.
 
-5. **Comments and Documentation**: Add inline comments for complex logic and provide JSDoc comments for functions to aid in code understanding and maintenance.
+---
 
-6. **Error Messages**: Provide detailed, user-friendly error messages that can help in troubleshooting issues.
+## 8. Example Integration Setup
 
-7. **Consistent Return Format**: Maintain a consistent return format across all integration functions, typically including `success`, `data`, and `error` fields.
+### 8.1. Integration Directory Structure
 
-## 9. Integration with External Services
+```
+src/integrations/
+└── your_integration/
+    ├── your_integration.service.ts
+    ├── your_integration.actions.ts
+    ├── integration.config.json
+    └── translations/
+        ├── en.json
+        └── he.json
+```
 
-When integrating with external services:
+### 8.2. Example of an Action Function
 
-1. **Rate Limiting**: Implement rate limiting mechanisms to respect the external service's usage limits.
+```typescript
+// src/integrations/your_integration/your_integration.actions.ts
 
-2. **Retry Logic**: Add retry logic for transient failures, using exponential backoff to avoid overwhelming the external service.
+export const createYourIntegrationActions = (context: ActionContext): FunctionFactory => ({
+  yourAction: {
+    description: 'Performs an operation within Your Integration.',
+    parameters: {
+      type: 'object',
+      properties: {
+        parameter1: { type: 'string', description: 'Description of parameter1' },
+      },
+      required: ['parameter1'],
+      additionalProperties: false,
+    },
+    function: async (params: { parameter1: string }) => {
+      // Validate input
+      if (!params.parameter1) {
+        throw new Error('The parameter1 is required.');
+      }
 
-3. **Timeout Handling**: Implement proper timeout handling to prevent your integration from hanging indefinitely.
+      // Call the service function
+      const result = await yourIntegrationFunction(
+        context.sessionId,
+        context.companyId,
+        params
+      );
 
-4. **Webhook Support**: If the external service supports webhooks, consider implementing webhook handlers for real-time updates.
+      // Return the result
+      return result;
+    },
+  },
+});
+```
 
-By following these guidelines and structure, you can ensure that your new integration is consistent with existing ones, properly integrated with the system's action and session management, and easily maintainable within the system.
+---
+
+## 9. Integrating External Services
+
+### 9.1. API Errors and Retry Logic
+
+- **Handle HTTP Errors:** Throw exceptions for non-2xx HTTP responses.
+- **Retry Mechanism:** Implement retry logic for transient errors (e.g., network issues) with exponential backoff.
+
+### 9.2. Security Considerations
+
+- **API Keys:** Retrieve and store API keys securely. **Do not log API keys** in any environment.
+- **Input Sanitization:** Always sanitize inputs before sending them to external services.
+
+---
+
+## 10. Updating the Executor
+
+### 10.1. Consistent Error Handling
+
+- The executor will catch all exceptions thrown by action functions and handle them uniformly.
+- Publish 'started', 'completed', or 'failed' status messages accordingly.
+
+### 10.2. Removing Unnecessary Error Checks
+
+- Do not check for an `error` field in results. Instead, use exceptions to indicate failures.
+
+---
+
+## 11. Testing Your Integration
+
+### 11.1. Simulate Error Scenarios
+
+- **Invalid Inputs:** Test your action with invalid inputs to ensure it throws appropriate errors.
+- **API Failures:** Simulate API failures (e.g., HTTP 404) to verify proper error propagation.
+
+### 11.2. Verify Executor Behavior
+
+- **Action Status Handling:** Ensure that actions are marked as 'failed' when exceptions occur.
+- **Proper Error Messages:** Verify that detailed error messages are included in the action’s failure details.
+
