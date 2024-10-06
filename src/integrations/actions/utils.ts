@@ -46,10 +46,26 @@ export const filterAllowedActions = (
   ) as FunctionFactory;
 };
 
-export const convertOpenAIFunctionName = (name: string): string =>
-  name.startsWith('ai_agent_executor_')
-    ? name.replace(/^ai_agent_executor_/, 'ai_agent_executor.')
-    : name.replace(/_/g, '.');
+export const convertOpenAIFunctionName = (name: string): string => {
+  // Split the function name into parts separated by underscores
+  const nameParts = name.split('_');
+
+  if (nameParts.length < 2) {
+    // If there's no underscore or only one part, return the name as-is
+    return name;
+  }
+
+  // Assume the integration name is everything up to the second-to-last part
+  const integrationName = nameParts.slice(0, -1).join('_');
+  const actionName = nameParts[nameParts.length - 1];
+
+  // Replace any remaining underscores in the action name with dots
+  const formattedActionName = actionName.replace(/_/g, '.');
+
+  return `${integrationName}.${formattedActionName}`;
+};
+
+
 
 export interface DetailedError {
   message: string;
