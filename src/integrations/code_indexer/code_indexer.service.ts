@@ -75,6 +75,30 @@ export const scanCodeProject = async (params: {
   }
 };
 
+export const dryRunScanCodeProject = async (params: {
+  directoryPath: string;
+  includePatterns?: string[];
+  excludePatterns?: string[];
+  maxFileSize?: number;
+  companyId: string;
+}): Promise<string[]> => {
+  const { directoryPath, includePatterns, excludePatterns, maxFileSize } = params;
+
+  const globPattern = includePatterns && includePatterns.length > 0 
+    ? path.join(directoryPath, '**', `{${includePatterns.join(',')}}`)
+    : path.join(directoryPath, '**', '*');
+
+  const files: string[] = glob.sync(globPattern, {
+    ignore: excludePatterns,
+    nodir: true,
+  });
+
+  return files.filter(file => {
+    const stats = fs.statSync(file);
+    return !maxFileSize || stats.size <= maxFileSize;
+  });
+};
+
 export const summarizeFile = async (filePath: string, companyId: string): Promise<string> => {
   const content = fs.readFileSync(filePath, 'utf-8');
   const systemPrompt = "You are a helpful assistant that summarizes code files.";

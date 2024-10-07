@@ -13,7 +13,7 @@ export const summarizeText = async (
 
 export const getO1CompletionResponse = async (
   apiKey: string,
-  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
   model: string,  
 ): Promise<string> => {
   const openai = new OpenAI({ apiKey });
@@ -42,8 +42,7 @@ export const getCompletionResponse = async (
 
   if (o1Models.includes(model)) {
     return getO1CompletionResponse(apiKey, [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userInput }
+      { role: 'user', content: `${systemPrompt}\n\n${userInput}` }
     ], model);
   }
 

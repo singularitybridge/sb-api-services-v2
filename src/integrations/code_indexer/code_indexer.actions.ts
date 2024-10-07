@@ -6,7 +6,8 @@ import {
   editAndSaveFile,
   CodeFileSummary,
   listIndexedFiles,
-  clearIndexedFiles
+  clearIndexedFiles,
+  dryRunScanCodeProject
 } from './code_indexer.service';
 
 export const createCodeIndexerActions = (context: ActionContext): FunctionFactory => ({
@@ -46,6 +47,47 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
         return { success: true };
       } catch (error) {
         console.error('Error scanning code project:', error);
+        return { success: false, error: (error as Error).message };
+      }
+    },
+  },
+
+  dryRunScanCodeProject: {
+    description: 'Perform a dry run scan of a code project directory and return the list of files that would be scanned',
+    parameters: {
+      type: 'object',
+      properties: {
+        directoryPath: { type: 'string', description: 'Path to the code project directory' },
+        includePatterns: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Glob patterns to include',
+          optional: true,
+        },
+        excludePatterns: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Glob patterns to exclude',
+          optional: true,
+        },
+        maxFileSize: {
+          type: 'number',
+          description: 'Maximum file size in bytes to process',
+          optional: true,
+        },
+      },
+      required: ['directoryPath'],
+      additionalProperties: false,
+    },
+    function: async (params) => {
+      try {
+        const scannedFiles = await dryRunScanCodeProject({
+          ...params,
+          companyId: context.companyId,
+        });
+        return { success: true, scannedFiles };
+      } catch (error) {
+        console.error('Error performing dry run scan of code project:', error);
         return { success: false, error: (error as Error).message };
       }
     },
