@@ -7,6 +7,16 @@ export interface IntegrationActionResult {
   error?: string;
 }
 
+export interface LeanAction {
+  id: string;
+  title: string;
+  description: string;
+}
+
+export type LeanIntegration = Omit<Partial<Integration>, 'actions'> & {
+  actions?: LeanAction[];
+};
+
 export async function triggerAction(
   integrationName: string,
   service: string,
@@ -50,8 +60,25 @@ export async function getIntegrationById(id: string, language: SupportedLanguage
   return discoveryService.getIntegrationById(id, language);
 }
 
-export async function getLeanIntegrationActions(language: SupportedLanguage = 'en', fields?: (keyof Integration)[]): Promise<Partial<Integration>[]> {
-  return discoveryService.getIntegrationsLean(language, fields);
+export async function getLeanIntegrationActions(language: SupportedLanguage = 'en', fields?: (keyof Integration)[]): Promise<LeanIntegration[]> {
+  const leanIntegrations = await discoveryService.getIntegrationsLean(language, fields);
+  
+  if (fields && fields.includes('actions')) {
+    const actions = await getActions(language);
+    
+    return leanIntegrations.map(integration => ({
+      ...integration,
+      actions: actions
+        .filter(action => action.service === integration.id)
+        .map(action => ({
+          id: action.id,
+          title: action.actionTitle,
+          description: action.description
+        }))
+    })) as LeanIntegration[];
+  }
+  
+  return leanIntegrations as LeanIntegration[];
 }
 
 export async function discoverActionById(actionId: string, language: SupportedLanguage = 'en'): Promise<ActionInfo | null> {

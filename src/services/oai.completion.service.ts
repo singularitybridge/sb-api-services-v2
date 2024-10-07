@@ -13,7 +13,7 @@ export const summarizeText = async (
 
 export const getO1CompletionResponse = async (
   apiKey: string,
-  userInput: string,
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
   model: string,  
 ): Promise<string> => {
   const openai = new OpenAI({ apiKey });
@@ -21,7 +21,7 @@ export const getO1CompletionResponse = async (
   try {
     const response = await openai.chat.completions.create({
       model,
-      messages: [{ role: 'user', content: userInput }],      
+      messages,      
     });
 
     return response.choices[0].message.content || '';
@@ -41,7 +41,10 @@ export const getCompletionResponse = async (
   const o1Models = ['o1', 'o1-mini', 'o1-preview'];
 
   if (o1Models.includes(model)) {
-    return getO1CompletionResponse(apiKey, userInput, model);
+    return getO1CompletionResponse(apiKey, [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userInput }
+    ], model);
   }
 
   const openai = new OpenAI({ apiKey });
