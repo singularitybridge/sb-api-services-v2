@@ -273,3 +273,12 @@ export const deleteContentType = async (
   const result = await ContentType.deleteOne({ _id: id, companyId });
   return result.deletedCount === 1;
 };
+
+export const deleteContentItemsByType = async (
+  companyId: string,
+  contentTypeId: string
+): Promise<number> => {
+  console.log(`Deleting all content items for companyId: ${companyId}, contentTypeId: ${contentTypeId}`);
+  const result = await ContentItem.deleteMany({ companyId, contentTypeId });
+  return result.deletedCount;
+};
