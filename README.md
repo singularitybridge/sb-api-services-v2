@@ -39,9 +39,19 @@ The SB Agent Portal integrates with various third-party services. The following 
 9. PhotoRoom
 10. Telegram Bot
 11. Linear
+12. Code Indexer
 
 Each integration requires an API key, which can be managed through the Company settings. These integrations collectively enhance the capabilities of the AI agents, allowing them to perform a wide range of tasks across different domains and communication channels.
 
+### Code Indexer Integration
+
+The Code Indexer integration allows AI agents to scan, index, and interact with code repositories. It provides the following capabilities:
+
+- Scan code projects and create summaries of code files
+- Query relevant files based on task descriptions
+- Retrieve and edit file contents
+
+This integration is particularly useful for tasks involving code analysis, refactoring, and development assistance.
 
 ## Getting Started
 

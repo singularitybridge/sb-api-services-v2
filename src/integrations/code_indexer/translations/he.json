@@ -1,0 +1,20 @@
+{
+  "integration_name": "מפתח קוד",
+  "integration_description": "סריקה, מפתוח ואינטראקציה עם מאגרי קוד",
+  "action_scanCodeProject_name": "סריקת פרויקט קוד",
+  "action_scanCodeProject_description": "סריקת ספריית פרויקט קוד ומפתוח תקצירי קבצים",
+  "action_queryRelevantFiles_name": "שאילתת קבצים רלוונטיים",
+  "action_queryRelevantFiles_description": "שאילתת קבצים מאונדקסים הרלוונטיים למשימה",
+  "action_getFileContent_name": "קבלת תוכן קובץ",
+  "action_getFileContent_description": "קבלת התוכן של קובץ ספציפי",
+  "action_editAndSaveFile_name": "עריכה ושמירת קובץ",
+  "action_editAndSaveFile_description": "עריכה ושמירה של קובץ ספציפי",
+  "param_directoryPath": "נתיב ספרייה",
+  "param_includePatterns": "תבניות הכללה",
+  "param_excludePatterns": "תבניות אי-הכללה",
+  "param_maxFileSize": "גודל קובץ מקסימלי",
+  "param_taskDescription": "תיאור משימה",
+  "param_limit": "מגבלה",
+  "param_filePath": "נתיב קובץ",
+  "param_newContent": "תוכן חדש"
+}
