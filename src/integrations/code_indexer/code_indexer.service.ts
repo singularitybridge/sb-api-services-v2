@@ -123,8 +123,8 @@ export const queryRelevantFiles = async (taskDescription: string, companyId: str
   const contentType = await getOrCreateContentType(companyId, 'CodeFileSummary');
   const summaries = await getContentItemsByType(companyId, contentType._id.toString());
   
-  const systemPrompt = "You are a helpful assistant that ranks code files based on relevance to a task.";
-  const userInput = `Rank the following code file summaries based on their relevance to this task: "${taskDescription}". Respond with a JSON array of indices, most relevant first.\n\n${JSON.stringify(summaries)}`;
+  const systemPrompt = "You are a helpful assistant that ranks code files based on relevance to a task. Respond with a JSON array of indices, most relevant first.";
+  const userInput = `Rank the following code file summaries based on their relevance to this task: "${taskDescription}".\n\n${JSON.stringify(summaries)}`;
   
   const apiKey = await getApiKey(companyId, 'openai');
   if (!apiKey) {
@@ -133,8 +133,28 @@ export const queryRelevantFiles = async (taskDescription: string, companyId: str
   
   const response = await getCompletionResponse(apiKey, systemPrompt, userInput, "gpt-4o-mini");
 
-  const rankedIndices = JSON.parse(response || '[]');
-  return rankedIndices.slice(0, limit).map((index: number) => summaries[index].data as CodeFileSummary);
+  if (!response) {
+    throw new Error('Received empty response from OpenAI API');
+  }
+
+  let cleanedResponse = response.replace(/```json\n?|\n?```/g, '').trim();
+
+  try {
+    const rankedIndices = JSON.parse(cleanedResponse);
+    if (!Array.isArray(rankedIndices)) {
+      throw new Error('Response is not an array');
+    }
+    return rankedIndices.slice(0, limit).map((index: number) => summaries[index].data as CodeFileSummary);
+  } catch (error: unknown) {
+    console.error('Error parsing response:', error);
+    console.error('Raw response:', response);
+    console.error('Cleaned response:', cleanedResponse);
+    if (error instanceof Error) {
+      throw new Error(`Failed to parse API response: ${error.message}`);
+    } else {
+      throw new Error('An unknown error occurred while parsing the API response');
+    }
+  }
 };
 
 export const getFileContent = async (filePath: string): Promise<string> => {
