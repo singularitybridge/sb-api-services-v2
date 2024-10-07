@@ -3,9 +3,12 @@ import { generateSpeech } from '../../services/oai.speech.service';
 import { transcribeAudioWhisperFromURL } from '../../services/speech.recognition.service';
 import { getO1CompletionResponse } from '../../services/oai.completion.service';
 import { getApiKey } from '../../services/api.key.service';
+import { getFileContent } from '../code_indexer/code_indexer.service';
+import OpenAI from 'openai';
 
 type OpenAIVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 type OpenAIModel = 'tts-1' | 'tts-1-hd';
+type O1Model = 'o1-preview' | 'o1-mini';
 
 interface GenerateSpeechArgs {
   text: string;
@@ -19,9 +22,20 @@ interface TranscribeAudioArgs {
   language?: string;
 }
 
+interface Message {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
 interface AskO1ModelArgs {
   question: string;
-  model: 'o1-preview' | 'o1-mini';
+  model: O1Model;
+}
+
+interface AskO1ModelWithFilesArgs {
+  question: string;
+  model: O1Model;
+  filePaths: string[];
 }
 
 export const createOpenAiActions = (context: ActionContext): FunctionFactory => ({
@@ -121,7 +135,7 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
     },
     function: async ({ question, model }: AskO1ModelArgs) => {
       try {
-        const allowedModels = ['o1-preview', 'o1-mini'];
+        const allowedModels: O1Model[] = ['o1-preview', 'o1-mini'];
         if (!allowedModels.includes(model)) {
           return { error: `Invalid model specified. Allowed models are ${allowedModels.join(', ')}` };
         }
@@ -129,11 +143,103 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
         if (!apiKey) {
           return { error: 'OpenAI API key is missing' };
         }
-        const responseText = await getO1CompletionResponse(apiKey, question, model);
+        const messages: Message[] = [{ role: 'user', content: question }];
+        const responseText = await getO1CompletionResponse(apiKey, messages, model);
         return { response: responseText };
       } catch (error) {
         return { error: 'Failed to get response from OpenAI o1 model' };
       }
     },
   },
+  askO1ModelWithFiles: {
+    description: 'Ask a question to the OpenAI O1 models with additional code files as context',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        question: {
+          type: 'string',
+          description: 'The question or input to send to the model',
+        },
+        model: {
+          type: 'string',
+          enum: ['o1-preview', 'o1-mini'],
+          description: 'The OpenAI O1 model to use',
+        },
+        filePaths: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'List of file paths to include as context',
+        },
+      },
+      required: ['question', 'model', 'filePaths'],
+      additionalProperties: false,
+    },
+    function: async ({ question, model, filePaths }: AskO1ModelWithFilesArgs) => {
+      try {
+        const allowedModels: O1Model[] = ['o1-preview', 'o1-mini'];
+        if (!allowedModels.includes(model)) {
+          return { error: `Invalid model specified. Allowed models are ${allowedModels.join(', ')}` };
+        }
+
+        const apiKey = await getApiKey(context.companyId, 'openai');
+        if (!apiKey) {
+          return { error: 'OpenAI API key is missing' };
+        }
+
+        let combinedContext = await loadAndProcessFiles(filePaths);
+        combinedContext = truncateContextIfNecessary(combinedContext, question);
+
+        const messages: Message[] = [];
+        if (combinedContext) {
+          messages.push({ role: 'system', content: combinedContext });
+        }
+        messages.push({ role: 'user', content: question });
+
+        const responseText = await getO1CompletionResponse(apiKey, messages, model);
+
+        return { response: responseText };
+      } catch (error) {
+        console.error('Error in askO1ModelWithFiles:', error);
+        return { error: 'Failed to get response from OpenAI O1 model' };
+      }
+    },
+  },
 });
+
+async function loadAndProcessFiles(filePaths: string[]): Promise<string> {
+  let combinedContext = '';
+
+  for (const filePath of filePaths) {
+    try {
+      const content = await getFileContent(filePath);
+      const processedContent = await processFileContent(content, filePath);
+      combinedContext += `File: ${filePath}\n${processedContent}\n\n`;
+    } catch (error) {
+      console.error(`Error loading file ${filePath}:`, error);
+      combinedContext += `File: ${filePath}\nError loading file content.\n\n`;
+    }
+  }
+
+  return combinedContext;
+}
+
+async function processFileContent(content: string, filePath: string): Promise<string> {
+  // For now, we'll return the content as is
+  // In the future, you might want to implement summarization or preprocessing here
+  return content;
+}
+
+function truncateContextIfNecessary(context: string, question: string): string {
+  const MAX_TOKENS = 4096; // Adjust based on the model's max tokens
+  const ESTIMATED_TOKENS_PER_CHAR = 0.5; // Rough estimate
+
+  const totalEstimatedTokens = (context.length + question.length) * ESTIMATED_TOKENS_PER_CHAR;
+
+  if (totalEstimatedTokens > MAX_TOKENS) {
+    const allowedContextLength = (MAX_TOKENS - question.length * ESTIMATED_TOKENS_PER_CHAR) / ESTIMATED_TOKENS_PER_CHAR;
+    context = context.slice(-Math.floor(allowedContextLength));
+  }
+
+  return context;
+}
