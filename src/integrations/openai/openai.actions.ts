@@ -22,8 +22,8 @@ interface TranscribeAudioArgs {
   language?: string;
 }
 
-interface Message {
-  role: 'system' | 'user' | 'assistant';
+interface O1Message {
+  role: 'user' | 'assistant';
   content: string;
 }
 
@@ -143,7 +143,7 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
         if (!apiKey) {
           return { error: 'OpenAI API key is missing' };
         }
-        const messages: Message[] = [{ role: 'user', content: question }];
+        const messages: O1Message[] = [{ role: 'user', content: question }];
         const responseText = await getO1CompletionResponse(apiKey, messages, model);
         return { response: responseText };
       } catch (error) {
@@ -190,11 +190,7 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
         let combinedContext = await loadAndProcessFiles(filePaths);
         combinedContext = truncateContextIfNecessary(combinedContext, question);
 
-        const messages: Message[] = [];
-        if (combinedContext) {
-          messages.push({ role: 'system', content: combinedContext });
-        }
-        messages.push({ role: 'user', content: question });
+        const messages: O1Message[] = [{ role: 'user', content: `${combinedContext}\n\nQuestion: ${question}` }];
 
         const responseText = await getO1CompletionResponse(apiKey, messages, model);
 
