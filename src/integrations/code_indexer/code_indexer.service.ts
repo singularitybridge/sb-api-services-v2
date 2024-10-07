@@ -1,11 +1,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import glob from 'glob';
-import { createContentItem, getContentItemsByType } from '../../services/content.service';
+import { createContentItem, getContentItemsByType, deleteContentItemsByType } from '../../services/content.service';
 import OpenAI from 'openai';
 import { ContentType } from '../../models/ContentType';
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import { getCompletionResponse } from '../../services/oai.completion.service';
+import { getApiKey } from '../../services/api.key.service';
 
 export interface CodeFileSummary {
   filename: string;
@@ -62,7 +62,7 @@ export const scanCodeProject = async (params: {
     const stats = fs.statSync(file);
     if (maxFileSize && stats.size > maxFileSize) continue;
 
-    const summary = await summarizeFile(file);
+    const summary = await summarizeFile(file, companyId);
     await storeFileSummary({
       filename: path.basename(file),
       filepath: file,
@@ -75,16 +75,17 @@ export const scanCodeProject = async (params: {
   }
 };
 
-export const summarizeFile = async (filePath: string): Promise<string> => {
+export const summarizeFile = async (filePath: string, companyId: string): Promise<string> => {
   const content = fs.readFileSync(filePath, 'utf-8');
-  const response = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
-    messages: [
-      { role: "system", content: "You are a helpful assistant that summarizes code files." },
-      { role: "user", content: `Summarize the following code:\n\n${content}` }
-    ],
-  });
-  return response.choices[0].message?.content || '';
+  const systemPrompt = "You are a helpful assistant that summarizes code files.";
+  const userInput = `Summarize the following code:\n\n${content}`;
+  
+  const apiKey = await getApiKey(companyId, 'openai');
+  if (!apiKey) {
+    throw new Error('OpenAI API key is missing');
+  }
+  
+  return getCompletionResponse(apiKey, systemPrompt, userInput, "gpt-4o-mini");
 };
 
 export const storeFileSummary = async (summaryData: CodeFileSummary, companyId: string, contentTypeId: string): Promise<void> => {
@@ -98,15 +99,17 @@ export const queryRelevantFiles = async (taskDescription: string, companyId: str
   const contentType = await getOrCreateContentType(companyId, 'CodeFileSummary');
   const summaries = await getContentItemsByType(companyId, contentType._id.toString());
   
-  const response = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
-    messages: [
-      { role: "system", content: "You are a helpful assistant that ranks code files based on relevance to a task." },
-      { role: "user", content: `Rank the following code file summaries based on their relevance to this task: "${taskDescription}". Respond with a JSON array of indices, most relevant first.\n\n${JSON.stringify(summaries)}` }
-    ],
-  });
+  const systemPrompt = "You are a helpful assistant that ranks code files based on relevance to a task.";
+  const userInput = `Rank the following code file summaries based on their relevance to this task: "${taskDescription}". Respond with a JSON array of indices, most relevant first.\n\n${JSON.stringify(summaries)}`;
+  
+  const apiKey = await getApiKey(companyId, 'openai');
+  if (!apiKey) {
+    throw new Error('OpenAI API key is missing');
+  }
+  
+  const response = await getCompletionResponse(apiKey, systemPrompt, userInput, "gpt-4o-mini");
 
-  const rankedIndices = JSON.parse(response.choices[0].message?.content || '[]');
+  const rankedIndices = JSON.parse(response || '[]');
   return rankedIndices.slice(0, limit).map((index: number) => summaries[index].data as CodeFileSummary);
 };
 
@@ -118,4 +121,20 @@ export const getFileContent = async (filePath: string): Promise<string> => {
 export const editAndSaveFile = async (filePath: string, newContent: string): Promise<void> => {
   if (!fs.existsSync(filePath)) throw new Error('File not found');
   fs.writeFileSync(filePath, newContent, 'utf-8');
+};
+
+export const listIndexedFiles = async (companyId: string, limit?: number): Promise<CodeFileSummary[]> => {
+  const contentType = await getOrCreateContentType(companyId, 'CodeFileSummary');
+  const summaries = await getContentItemsByType(companyId, contentType._id.toString());
+  return summaries.slice(0, limit).map(item => item.data as CodeFileSummary);
+};
+
+export const clearIndexedFiles = async (companyId: string): Promise<void> => {
+  const contentType = await getOrCreateContentType(companyId, 'CodeFileSummary');
+  
+  console.log(`Clearing indexed files for companyId: ${companyId}`);
+  
+  const deletedCount = await deleteContentItemsByType(companyId, contentType._id.toString());
+  
+  console.log(`Deleted ${deletedCount} indexed files for companyId: ${companyId}`);
 };
