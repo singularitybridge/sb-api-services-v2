@@ -1,6 +1,6 @@
 import { ContentItem, IContentItem } from '../../models/ContentItem';
 import { validateContentData } from './validation';
-import { buildQuery, buildSort } from './utils';
+import { generateEmbedding } from './utils';
 
 type ContentItemOperation = 'create' | 'update';
 
@@ -10,7 +10,8 @@ const handleContentItemOperation = async (
   contentTypeId: string,
   data: any,
   artifactKey: string,
-  existingItem?: IContentItem
+  existingItem?: IContentItem,
+  embedding?: number[]
 ): Promise<IContentItem | { error: string; details: any }> => {
   const validation = await validateContentData(contentTypeId, data);
 
@@ -25,15 +26,33 @@ const handleContentItemOperation = async (
     };
   }
 
+  // Exclude 'embedding' from 'data' when generating the embedding
+  const { embedding: _, ...dataWithoutEmbedding } = data;
+
+  const textToEmbed =
+    dataWithoutEmbedding.text ||
+    dataWithoutEmbedding.content ||
+    JSON.stringify(dataWithoutEmbedding);
+
+  // Use the provided embedding or generate a new one
+  const embeddingToUse = embedding || (await generateEmbedding(textToEmbed));
+
   if (operation === 'create') {
-    const contentItem = new ContentItem({ companyId, contentTypeId, artifactKey, data });
+    const contentItem = new ContentItem({
+      companyId,
+      contentTypeId,
+      artifactKey,
+      data: dataWithoutEmbedding,
+      embedding: embeddingToUse,
+    });
     return await contentItem.save();
   } else {
     if (!existingItem) {
       return { error: 'Not Found', details: { message: 'Content item not found' } };
     }
-    existingItem.data = data;
+    existingItem.data = dataWithoutEmbedding;
     existingItem.artifactKey = artifactKey;
+    existingItem.embedding = embeddingToUse;
     return await existingItem.save();
   }
 };
@@ -42,63 +61,27 @@ export const createContentItem = async (
   companyId: string,
   contentTypeId: string,
   data: any,
-  artifactKey: string
+  artifactKey: string,
+  embedding?: number[]
 ): Promise<IContentItem | { error: string; details: any }> => {
-  return handleContentItemOperation('create', companyId, contentTypeId, data, artifactKey);
+  console.log('creating content item ... ');
+  console.log(data);
+
+  return handleContentItemOperation('create', companyId, contentTypeId, data, artifactKey, undefined, embedding);
 };
 
 export const updateContentItem = async (
   id: string,
   companyId: string,
   data: any,
-  artifactKey: string
+  artifactKey: string,
+  embedding?: number[]
 ): Promise<IContentItem | { error: string; details: any }> => {
   const existingItem = await ContentItem.findOne({ _id: id, companyId });
   if (!existingItem) {
     return { error: 'Not Found', details: { message: 'Content item not found' } };
   }
-  return handleContentItemOperation('update', companyId, existingItem.contentTypeId.toString(), data, artifactKey, existingItem);
-};
-
-export const getContentItems = async (
-  companyId: string,
-  contentTypeId?: string,
-  artifactKey?: string,
-  orderBy?: string,
-  limit?: number,
-  skip?: number
-): Promise<IContentItem[]> => {
-  const query = buildQuery({ companyId, contentTypeId, artifactKey });
-  const sort = buildSort(orderBy);
-
-  return await ContentItem.find(query)
-    .sort(sort)
-    .limit(limit || 10)
-    .skip(skip || 0);
-};
-
-export const getContentItem = async (
-  id: string,
-  companyId: string
-): Promise<IContentItem | null> => {
-  return await ContentItem.findOne({ _id: id, companyId });
-};
-
-export const getContentItemsByArtifactKey = async (
-  companyId: string,
-  artifactKey: string,
-  contentTypeId?: string,
-  orderBy?: string,
-  limit?: number,
-  skip?: number
-): Promise<IContentItem[]> => {
-  const query = buildQuery({ companyId, artifactKey, contentTypeId });
-  const sort = buildSort(orderBy);
-
-  return await ContentItem.find(query)
-    .sort(sort)
-    .limit(limit || 10)
-    .skip(skip || 0);
+  return handleContentItemOperation('update', companyId, existingItem.contentTypeId.toString(), data, artifactKey, existingItem, embedding);
 };
 
 export const deleteContentItem = async (
@@ -107,22 +90,6 @@ export const deleteContentItem = async (
 ): Promise<boolean> => {
   const result = await ContentItem.deleteOne({ _id: id, companyId });
   return result.deletedCount === 1;
-};
-
-export const getContentItemsByType = async (
-  companyId: string,
-  contentTypeId: string,
-  orderBy?: string,
-  limit?: number,
-  skip?: number
-): Promise<IContentItem[]> => {
-  const query = buildQuery({ companyId, contentTypeId });
-  const sort = buildSort(orderBy);
-
-  return await ContentItem.find(query)
-    .sort(sort)
-    .limit(limit || 10)
-    .skip(skip || 0);
 };
 
 export const deleteContentItemsByType = async (

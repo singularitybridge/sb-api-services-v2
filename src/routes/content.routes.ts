@@ -99,6 +99,30 @@ contentRouter.get('/', verifyAccess(), async (req: AuthenticatedRequest, res) =>
   }
 });
 
+// Vector search
+contentRouter.get('/search', verifyAccess(), async (req: AuthenticatedRequest, res) => {
+  const { query, contentTypeId, limit } = req.query;
+  if (!req.company?._id) {
+    return res.status(400).json({ error: 'Company ID is required' });
+  }
+  if (!query) {
+    return res.status(400).json({ error: 'Search query is required' });
+  }
+
+  try {
+    const searchResults = await ContentService.searchContentItems(
+      req.company._id,
+      query as string,
+      contentTypeId as string | undefined,
+      limit ? parseInt(limit as string) : undefined
+    );
+    res.status(200).json(searchResults);
+  } catch (error) {
+    console.error('Error performing vector search:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get a specific content item
 contentRouter.get('/:id', verifyAccess(), async (req: AuthenticatedRequest, res) => {
   const { id } = req.params;
