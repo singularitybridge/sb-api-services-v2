@@ -1,321 +1,164 @@
-import { mockFunctionDefinition } from './factory.imports';
-import * as factory from '../../../src/integrations/actions/factory';
-import { discoveryService } from '../../../src/integrations/discovery.service';
+import mongoose from 'mongoose';
+import * as factoryModule from '../../../src/integrations/actions/loaders';
+import { executeFunctionCall } from '../../../src/integrations/actions/executors';
+import { processTemplate } from '../../../src/services/template.service';
+import { ActionContext, FunctionFactory, FunctionDefinition } from '../../../src/integrations/actions/types';
+import * as integrationService from '../../../src/services/integration.service';
+import * as publishersModule from '../../../src/integrations/actions/publishers';
 
-jest.mock('../../../src/integrations/discovery.service');
-jest.mock('../../../src/integrations/actions/factory', () => {
-  const originalModule = jest.requireActual('../../../src/integrations/actions/factory');
-  return {
-    ...originalModule,
-    executeFunctionCall: jest.fn(),
-  };
-});
+// Mock the template service
+jest.mock('../../../src/services/template.service', () => ({
+  processTemplate: jest.fn(),
+}));
+
+// Mock the session service
+jest.mock('../../../src/services/session.service', () => ({
+  getSessionById: jest.fn().mockResolvedValue({ 
+    id: 'mockSessionId',
+    userId: 'mockUserId',
+    companyId: 'mockCompanyId',
+    language: 'en',
+  }),
+}));
+
+// Mock the integration service
+jest.mock('../../../src/services/integration.service', () => ({
+  discoverActionById: jest.fn(),
+}));
+
+// Mock the publishers module
+jest.mock('../../../src/integrations/actions/publishers', () => ({
+  publishActionMessage: jest.fn(),
+}));
 
 describe('executeFunctionCall', () => {
+  const mockSessionId = new mongoose.Types.ObjectId().toHexString();
+  const mockCompanyId = new mongoose.Types.ObjectId().toHexString();
+  const mockAllowedActions = ['testAction', 'errorAction'];
+
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(factoryModule, 'createFunctionFactory').mockImplementation(jest.fn());
+    (integrationService.discoverActionById as jest.Mock).mockResolvedValue({
+      id: 'testAction',
+      serviceName: 'Mock Service',
+      actionTitle: 'Test Action',
+      description: 'Mock action description',
+      icon: 'mock-icon',
+      service: 'mock-service',
+      parameters: {},
+    });
+    (publishersModule.publishActionMessage as jest.Mock).mockResolvedValue(undefined);
   });
 
-  it('should execute the correct function', async () => {
-    const mockActions = [
-      {
-        id: 'photoroom.removeBackground',
-        serviceName: 'PhotoRoom',
-        actionTitle: 'Remove Background',
-        description: 'Remove the background from an image using PhotoRoom API',
-        icon: 'image',
-        service: 'photoroom',
-        parameters: mockFunctionDefinition.parameters,
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('should execute a function call successfully', async () => {
+    const mockCall = {
+      function: {
+        name: 'testAction',
+        arguments: JSON.stringify({ param1: 'value1' }),
       },
-    ];
+    };
 
-    (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
-    (factory.executeFunctionCall as jest.Mock).mockImplementation(async (call, sessionId, companyId) => {
-      await discoveryService.discoverActions(companyId);
-      return { result: 'success' };
-    });
-
-    const result = await factory.executeFunctionCall(
-      { function: { name: 'photoroom.removeBackground', arguments: '{"imageUrl": "http://example.com/image.jpg"}' } },
-      'test-session',
-      'test-company',
-      ['photoroom.removeBackground']
-    );
-
-    expect(result).toEqual({ result: 'success' });
-    expect(discoveryService.discoverActions).toHaveBeenCalledWith('test-company');
-    expect(factory.executeFunctionCall).toHaveBeenCalledWith(
-      { function: { name: 'photoroom.removeBackground', arguments: '{"imageUrl": "http://example.com/image.jpg"}' } },
-      'test-session',
-      'test-company',
-      ['photoroom.removeBackground']
-    );
-  });
-
-  it('should throw an error when function name is not present in the function factory', async () => {
-    const mockActions: any[] = [];
-    (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
-    (factory.executeFunctionCall as jest.Mock).mockImplementation(async (call, sessionId, companyId) => {
-      await discoveryService.discoverActions(companyId);
-      throw new Error(`Function ${call.function.name} not implemented in the factory`);
-    });
-
-    await expect(factory.executeFunctionCall(
-      { function: { name: 'nonExistentFunction', arguments: '{}' } },
-      'test-session',
-      'test-company',
-      ['nonExistentFunction']
-    )).rejects.toThrow('Function nonExistentFunction not implemented in the factory');
-
-    expect(discoveryService.discoverActions).toHaveBeenCalledWith('test-company');
-  });
-
-  it('should throw an error when function name is not in allowedActions', async () => {
-    const mockActions = [
-      {
-        id: 'testFunction',
-        serviceName: 'TestService',
-        actionTitle: 'Test Function',
-        description: 'A test function',
-        icon: 'test',
-        service: 'test',
+    const mockFunctionFactory: FunctionFactory = {
+      testAction: {
+        description: 'Test action',
         parameters: {
           type: 'object',
           properties: {
-            testParam: { type: 'string' }
-          }
-        },
-      },
-    ];
-
-    (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
-    (factory.executeFunctionCall as jest.Mock).mockImplementation(async (call, sessionId, companyId, allowedActions) => {
-      await discoveryService.discoverActions(companyId);
-      if (!allowedActions.includes(call.function.name)) {
-        throw new Error(`Function ${call.function.name} is not allowed`);
-      }
-      return { result: 'success' };
-    });
-
-    await expect(factory.executeFunctionCall(
-      { function: { name: 'testFunction', arguments: '{"testParam": "testValue"}' } },
-      'test-session',
-      'test-company',
-      ['otherFunction']
-    )).rejects.toThrow('Function testFunction is not allowed');
-
-    expect(discoveryService.discoverActions).toHaveBeenCalledWith('test-company');
-  });
-
-  it('should execute valid function call and return expected result', async () => {
-    const mockActions = [
-      {
-        id: 'testFunction',
-        serviceName: 'TestService',
-        actionTitle: 'Test Function',
-        description: 'A test function',
-        icon: 'test',
-        service: 'test',
-        parameters: {
-          type: 'object',
-          properties: {
-            testParam: { type: 'string' }
-          }
-        },
-      },
-    ];
-
-    const expectedResult = { success: true, message: 'Test function executed successfully' };
-
-    (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
-    (factory.executeFunctionCall as jest.Mock).mockImplementation(async (call, sessionId, companyId) => {
-      await discoveryService.discoverActions(companyId);
-      return expectedResult;
-    });
-
-    const result = await factory.executeFunctionCall(
-      { function: { name: 'testFunction', arguments: '{"testParam": "testValue"}' } },
-      'test-session',
-      'test-company',
-      ['testFunction']
-    );
-
-    expect(result).toEqual(expectedResult);
-    expect(discoveryService.discoverActions).toHaveBeenCalledWith('test-company');
-    expect(factory.executeFunctionCall).toHaveBeenCalledWith(
-      { function: { name: 'testFunction', arguments: '{"testParam": "testValue"}' } },
-      'test-session',
-      'test-company',
-      ['testFunction']
-    );
-  });
-
-  it('should handle function execution errors', async () => {
-    const mockActions = [
-      {
-        id: 'errorFunction',
-        serviceName: 'ErrorService',
-        actionTitle: 'Error Function',
-        description: 'A function that throws an error',
-        icon: 'error',
-        service: 'error',
-        parameters: {
-          type: 'object',
-          properties: {
-            errorParam: { type: 'string' }
-          }
-        },
-      },
-    ];
-
-    const errorMessage = 'Test error during function execution';
-
-    (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
-    (factory.executeFunctionCall as jest.Mock).mockImplementation(async (call, sessionId, companyId) => {
-      await discoveryService.discoverActions(companyId);
-      throw new Error(errorMessage);
-    });
-
-    await expect(factory.executeFunctionCall(
-      { function: { name: 'errorFunction', arguments: '{"errorParam": "errorValue"}' } },
-      'test-session',
-      'test-company',
-      ['errorFunction']
-    )).rejects.toThrow(errorMessage);
-
-    expect(discoveryService.discoverActions).toHaveBeenCalledWith('test-company');
-    expect(factory.executeFunctionCall).toHaveBeenCalledWith(
-      { function: { name: 'errorFunction', arguments: '{"errorParam": "errorValue"}' } },
-      'test-session',
-      'test-company',
-      ['errorFunction']
-    );
-  });
-
-  it('should validate arguments against function schema', async () => {
-    const mockActions = [
-      {
-        id: 'testFunction',
-        serviceName: 'TestService',
-        actionTitle: 'Test Function',
-        description: 'A test function with schema validation',
-        icon: 'test',
-        service: 'test',
-        parameters: {
-          type: 'object',
-          properties: {
-            requiredString: { type: 'string' },
-            optionalNumber: { type: 'number' },
-            enumValue: { type: 'string', enum: ['option1', 'option2'] }
+            param1: { type: 'string' },
           },
-          required: ['requiredString']
+          required: ['param1'],
         },
-      },
-    ];
+        function: jest.fn().mockResolvedValue('Test result'),
+      } as FunctionDefinition,
+    };
 
-    (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
-    (factory.executeFunctionCall as jest.Mock).mockImplementation(async (call, sessionId, companyId) => {
-      await discoveryService.discoverActions(companyId);
-      const action = mockActions.find(a => a.id === call.function.name);
-      if (!action) throw new Error('Function not found');
+    (factoryModule.createFunctionFactory as jest.Mock).mockResolvedValue(mockFunctionFactory);
+    (processTemplate as jest.Mock).mockImplementation((value) => Promise.resolve(value));
 
-      const args = JSON.parse(call.function.arguments);
-      const errors: string[] = [];
+    const result = await executeFunctionCall(mockCall, mockSessionId, mockCompanyId, mockAllowedActions);
 
-      // Validate required fields
-      if (!args.requiredString) {
-        errors.push('Missing required field: requiredString');
-      }
-
-      // Validate types
-      if (args.optionalNumber !== undefined && typeof args.optionalNumber !== 'number') {
-        errors.push('Invalid type for optionalNumber: expected number');
-      }
-
-      // Validate enum
-      if (args.enumValue !== undefined && !['option1', 'option2'].includes(args.enumValue)) {
-        errors.push('Invalid value for enumValue: must be either "option1" or "option2"');
-      }
-
-      if (errors.length > 0) {
-        throw new Error(`Validation errors: ${errors.join(', ')}`);
-      }
-
-      return { result: 'success' };
-    });
-
-    // Test with invalid arguments
-    await expect(factory.executeFunctionCall(
-      { function: { name: 'testFunction', arguments: '{"optionalNumber": "not a number", "enumValue": "invalid"}' } },
-      'test-session',
-      'test-company',
-      ['testFunction']
-    )).rejects.toThrow('Validation errors: Missing required field: requiredString, Invalid type for optionalNumber: expected number, Invalid value for enumValue: must be either "option1" or "option2"');
-
-    // Test with valid arguments
-    const result = await factory.executeFunctionCall(
-      { function: { name: 'testFunction', arguments: '{"requiredString": "valid", "optionalNumber": 42, "enumValue": "option1"}' } },
-      'test-session',
-      'test-company',
-      ['testFunction']
+    expect(factoryModule.createFunctionFactory).toHaveBeenCalledWith(
+      expect.objectContaining<ActionContext>({ sessionId: mockSessionId, companyId: mockCompanyId }),
+      mockAllowedActions
     );
+    expect(processTemplate).toHaveBeenCalledWith('value1', mockSessionId);
+    expect(mockFunctionFactory.testAction.function).toHaveBeenCalledWith({ param1: 'value1' });
+    expect(integrationService.discoverActionById).toHaveBeenCalledWith('testAction', 'en');
+    expect(publishersModule.publishActionMessage).toHaveBeenCalled();
+    expect(result).toEqual({ result: 'Test result' });
+  }, 10000);
 
-    expect(result).toEqual({ result: 'success' });
-  });
+  it('should handle errors during function execution', async () => {
+    const mockCall = {
+      function: {
+        name: 'errorAction',
+        arguments: JSON.stringify({ param1: 'value1' }),
+      },
+    };
 
-  it('should handle missing required arguments', async () => {
-    const mockActions = [
-      {
-        id: 'testFunctionWithRequiredArgs',
-        serviceName: 'TestService',
-        actionTitle: 'Test Function with Required Args',
-        description: 'A test function with required arguments',
-        icon: 'test',
-        service: 'test',
+    const mockError = new Error('Test error');
+    const mockFunctionFactory: FunctionFactory = {
+      errorAction: {
+        description: 'Error action',
         parameters: {
           type: 'object',
           properties: {
-            requiredArg1: { type: 'string' },
-            requiredArg2: { type: 'number' },
-            optionalArg: { type: 'boolean' }
+            param1: { type: 'string' },
           },
-          required: ['requiredArg1', 'requiredArg2']
+          required: ['param1'],
         },
-      },
-    ];
+        function: jest.fn().mockRejectedValue(mockError),
+      } as FunctionDefinition,
+    };
 
-    (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
-    (factory.executeFunctionCall as jest.Mock).mockImplementation(async (call, sessionId, companyId) => {
-      await discoveryService.discoverActions(companyId);
-      const action = mockActions.find(a => a.id === call.function.name);
-      if (!action) throw new Error('Function not found');
+    (factoryModule.createFunctionFactory as jest.Mock).mockResolvedValue(mockFunctionFactory);
+    (processTemplate as jest.Mock).mockImplementation((value) => Promise.resolve(value));
 
-      const args = JSON.parse(call.function.arguments);
-      const missingArgs = action.parameters.required.filter(arg => !(arg in args));
+    const result = await executeFunctionCall(mockCall, mockSessionId, mockCompanyId, mockAllowedActions);
 
-      if (missingArgs.length > 0) {
-        throw new Error(`Missing required parameters: ${missingArgs.join(', ')}`);
-      }
-
-      return { result: 'success' };
-    });
-
-    // Test with missing required arguments
-    await expect(factory.executeFunctionCall(
-      { function: { name: 'testFunctionWithRequiredArgs', arguments: '{"requiredArg1": "value"}' } },
-      'test-session',
-      'test-company',
-      ['testFunctionWithRequiredArgs']
-    )).rejects.toThrow('Missing required parameters: requiredArg2');
-
-    // Test with all required arguments provided
-    const result = await factory.executeFunctionCall(
-      { function: { name: 'testFunctionWithRequiredArgs', arguments: '{"requiredArg1": "value", "requiredArg2": 42}' } },
-      'test-session',
-      'test-company',
-      ['testFunctionWithRequiredArgs']
+    expect(factoryModule.createFunctionFactory).toHaveBeenCalledWith(
+      expect.objectContaining<ActionContext>({ sessionId: mockSessionId, companyId: mockCompanyId }),
+      mockAllowedActions
     );
+    expect(processTemplate).toHaveBeenCalledWith('value1', mockSessionId);
+    expect(mockFunctionFactory.errorAction.function).toHaveBeenCalledWith({ param1: 'value1' });
+    expect(integrationService.discoverActionById).toHaveBeenCalledWith('errorAction', 'en');
+    expect(publishersModule.publishActionMessage).toHaveBeenCalled();
+    expect(result).toEqual({
+      error: expect.objectContaining({
+        message: 'Test error',
+        name: 'Error',
+        stack: expect.any(String),
+      }),
+    });
+  }, 10000);
 
-    expect(result).toEqual({ result: 'success' });
-  });
+  it('should return an error for non-existent functions', async () => {
+    const mockCall = {
+      function: {
+        name: 'nonExistentAction',
+        arguments: JSON.stringify({}),
+      },
+    };
+
+    const mockFunctionFactory: FunctionFactory = {};
+
+    (factoryModule.createFunctionFactory as jest.Mock).mockResolvedValue(mockFunctionFactory);
+
+    const result = await executeFunctionCall(mockCall, mockSessionId, mockCompanyId, mockAllowedActions);
+
+    expect(factoryModule.createFunctionFactory).toHaveBeenCalledWith(
+      expect.objectContaining<ActionContext>({ sessionId: mockSessionId, companyId: mockCompanyId }),
+      mockAllowedActions
+    );
+    expect(result).toEqual({
+      error: { message: 'Function nonExistentAction not implemented in the factory' },
+    });
+  }, 10000);
 });

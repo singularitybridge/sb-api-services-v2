@@ -1,0 +1,14 @@
+{
+  "serviceName": "יצירת אודיו עם ElevenLabs",
+  "serviceDescription": "יצירת אודיו באיכות גבוהה מטקסט לדיבור באמצעות קולות AI של ElevenLabs, המאפשר סינתזת קול דינמית וריאליסטית.",
+  "actions": {
+    "generateElevenLabsAudio": {
+      "actionTitle": "יצירת אודיו ElevenLabs",
+      "description": "יצירת אודיו באמצעות שירות טקסט לדיבור של ElevenLabs",
+      "parameters": {
+        "text": "הטקסט להמרה לדיבור",
+        "voiceId": "המזהה של הקול לשימוש ביצירת הדיבור"
+      }
+    }
+  }
+}

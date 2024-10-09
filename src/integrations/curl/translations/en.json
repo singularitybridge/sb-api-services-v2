@@ -1,0 +1,8 @@
+{
+  "serviceName": "cURL Integration",
+  "serviceDescription": "Perform HTTP requests to external APIs and services, allowing for data retrieval and interaction with web resources.",
+  "performCurlRequest": {
+    "actionTitle": "Perform HTTP Request",
+    "description": "Send an HTTP request to a specified URL and get the response."
+  }
+}

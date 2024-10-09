@@ -15,7 +15,7 @@ export const fetchIssues = async (companyId: string, first: number = 50): Promis
     const issues = await linearClient.issues({ first });
     return issues.nodes;
   } catch (error) {    
-    throw new Error('Error fetching issues');
+    throw error instanceof Error ? error : new Error(`Error fetching issues: ${error}`);
   }
 };
 
@@ -25,7 +25,7 @@ export const createIssue = async (companyId: string, title: string, description:
     return await linearClient.createIssue({ title, description, teamId });
   } catch (error) {    
     console.log(error);
-    throw new Error('Error creating issue');
+    throw error instanceof Error ? error : new Error(`Error creating issue: ${error}`);
   }
 };
 
@@ -59,7 +59,7 @@ export const updateIssue = async (companyId: string, issueId: string, updateData
 
     await issue.update(updatePayload);
   } catch (error) {    
-    throw new Error('Error updating issue');
+    throw error instanceof Error ? error : new Error(`Error updating issue: ${error}`);
   }
 };
 
@@ -68,7 +68,7 @@ export const deleteIssue = async (companyId: string, issueId: string): Promise<v
     const linearClient = await createLinearClient(companyId);
     await linearClient.deleteIssue(issueId);
   } catch (error) {    
-    throw new Error('Error deleting issue');
+    throw error instanceof Error ? error : new Error(`Error deleting issue: ${error}`);
   }
 };
 
@@ -86,7 +86,7 @@ export const fetchAllIssues = async (companyId: string): Promise<Issue[]> => {
     }
     return allIssues;
   } catch (error) {    
-    throw new Error('Error fetching all issues');
+    throw error instanceof Error ? error : new Error(`Error fetching all issues: ${error}`);
   }
 };
 
@@ -100,7 +100,7 @@ export const fetchIssuesByUser = async (companyId: string, userId: string): Prom
     });
     return result.nodes;
   } catch (error) {    
-    throw new Error('Error fetching issues by user');
+    throw error instanceof Error ? error : new Error(`Error fetching issues by user: ${error}`);
   }
 };
 
@@ -120,7 +120,7 @@ export const fetchIssuesByDate = async (companyId: string, days: number): Promis
     });
     return result.nodes;
   } catch (error) {    
-    throw new Error('Error fetching issues by date');
+    throw error instanceof Error ? error : new Error(`Error fetching issues by date: ${error}`);
   }
 };
 
@@ -130,7 +130,7 @@ export const fetchUserList = async (companyId: string): Promise<User[]> => {
     const result: UserConnection = await linearClient.users();
     return result.nodes;
   } catch (error) {    
-    throw new Error('Error fetching user list');
+    throw error instanceof Error ? error : new Error(`Error fetching user list: ${error}`);
   }
 };
 
@@ -141,7 +141,7 @@ export const fetchTeams = async (companyId: string): Promise<Team[]> => {
     return teams.nodes;
   } catch (error) {
     console.error("Error fetching Linear teams:", error);
-    throw new Error('Error fetching teams');
+    throw error instanceof Error ? error : new Error(`Error fetching teams: ${error}`);
   }
 };
 
@@ -151,7 +151,7 @@ export const fetchIssueStatuses = async (companyId: string): Promise<WorkflowSta
     const states: WorkflowStateConnection = await linearClient.workflowStates();
     return states.nodes;
   } catch (error) {
-    throw new Error('Error fetching issue statuses');
+    throw error instanceof Error ? error : new Error(`Error fetching issue statuses: ${error}`);
   }
 };
 
@@ -165,6 +165,6 @@ export const createComment = async (companyId: string, issueId: string, body: st
     return commentPayload;
   } catch (error) {
     console.error("Error creating comment:", error);
-    throw new Error('Error creating comment');
+    throw error instanceof Error ? error : new Error(`Error creating comment: ${error}`);
   }
 };

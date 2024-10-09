@@ -1,0 +1,6 @@
+{
+  "name": "code_indexer",
+  "icon": "code",
+  "actionCreator": "createCodeIndexerActions",
+  "actionsFile": "code_indexer.actions.ts"
+}

@@ -1,0 +1,15 @@
+{
+  "serviceName": "Inbox",
+  "sendMessageToInbox": {
+    "actionTitle": "Send Message to Inbox",
+    "description": "Send a message to the inbox for human review or response"
+  },
+  "getInboxMessages": {
+    "actionTitle": "Get Inbox Messages",
+    "description": "Retrieve inbox messages for the company"
+  },
+  "updateInboxMessageStatus": {
+    "actionTitle": "Update Inbox Message Status",
+    "description": "Update the status of an inbox message"
+  }
+}

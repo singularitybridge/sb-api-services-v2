@@ -1,0 +1,35 @@
+{
+  "serviceName": "MongoDB",
+  "runMongoDbQuery": {
+    "actionTitle": "הרץ שאילתת MongoDB",
+    "description": "בצע שאילתה או פקודה של MongoDB."
+  },
+  "getCurrentDatabase": {
+    "actionTitle": "קבל מסד נתונים נוכחי",
+    "description": "אחזר את שם מסד הנתונים הנוכחי של MongoDB."
+  },
+  "listDatabases": {
+    "actionTitle": "רשימת מסדי נתונים",
+    "description": "הצג רשימה של כל מסדי הנתונים הזמינים ב-MongoDB."
+  },
+  "useDatabase": {
+    "actionTitle": "השתמש במסד נתונים",
+    "description": "עבור למסד נתונים אחר של MongoDB."
+  },
+  "listCollections": {
+    "actionTitle": "רשימת אוספים",
+    "description": "הצג רשימה של כל האוספים במסד הנתונים הנוכחי של MongoDB."
+  },
+  "describeCollection": {
+    "actionTitle": "תאר אוסף",
+    "description": "קבל מידע מפורט על אוסף ספציפי ב-MongoDB."
+  },
+  "countDocuments": {
+    "actionTitle": "ספור מסמכים",
+    "description": "ספור את מספר המסמכים באוסף ספציפי של MongoDB."
+  },
+  "runAggregation": {
+    "actionTitle": "הרץ צבירה",
+    "description": "הרץ צינור צבירה על אוסף ספציפי של MongoDB."
+  }
+}

@@ -1,5 +1,6 @@
 {
   "serviceName": "PhotoRoom",
+  "serviceDescription": "Integrate with PhotoRoom API to perform advanced image editing tasks, such as removing backgrounds from images.",
   "removeBackground": {
     "actionTitle": "Remove Background",
     "description": "Remove the background from an image using PhotoRoom API"

@@ -1,0 +1,6 @@
+{
+  "name": "curl",
+  "icon": "square-terminal", 
+  "actionCreator": "createCurlActions",
+  "actionsFile": "curl.actions.ts"
+}

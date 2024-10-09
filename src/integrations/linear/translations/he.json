@@ -1,0 +1,48 @@
+{
+  "serviceName": "Linear משימות",
+  "serviceDescription": "אינטגרציה עם כלי ניהול הפרויקטים Linear, המאפשרת למשתמשים לנהל משימות, תגובות, צוותים ומשתמשים בפרויקטים.",
+  "fetchIssues": {
+    "actionTitle": "משיכת משימות",
+    "description": "משיכת משימות מליניאר"
+  },
+  "createLinearIssue": {
+    "actionTitle": "יצירת משימה",
+    "description": "יצירת משימה חדשה בליניאר"
+  },
+  "updateLinearIssue": {
+    "actionTitle": "עדכון משימה",
+    "description": "עדכון משימה קיימת בליניאר"
+  },
+  "deleteLinearIssue": {
+    "actionTitle": "מחיקת משימה",
+    "description": "מחיקת משימה מליניאר"
+  },
+  "fetchAllLinearIssues": {
+    "actionTitle": "משיכת כל המשימות",
+    "description": "משיכת כל המשימות מליניאר"
+  },
+  "fetchLinearIssuesByUser": {
+    "actionTitle": "משיכת משימות לפי משתמש",
+    "description": "משיכת משימות שהוקצו למשתמש ספציפי מליניאר"
+  },
+  "fetchLinearIssuesByDate": {
+    "actionTitle": "משיכת משימות לפי תאריך",
+    "description": "משיכת משימות שנוצרו או עודכנו במספר ימים מסוים"
+  },
+  "fetchLinearUserList": {
+    "actionTitle": "משיכת רשימת משתמשים",
+    "description": "משיכת רשימת משתמשים מליניאר"
+  },
+  "fetchLinearTeams": {
+    "actionTitle": "משיכת צוותים",
+    "description": "משיכת רשימת צוותים מליניאר"
+  },
+  "fetchIssueStatuses": {
+    "actionTitle": "משיכת סטטוסי משימות",
+    "description": "משיכת סטטוסי משימות מליניאר"
+  },
+  "createLinearComment": {
+    "actionTitle": "יצירת תגובה",
+    "description": "יצירת תגובה חדשה למשימה בליניאר"
+  }
+}

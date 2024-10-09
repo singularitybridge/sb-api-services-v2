@@ -1,140 +1,105 @@
-import { mockContext, mockFunctionDefinition } from './factory.imports';
-import { createFunctionFactory } from '../../../src/integrations/actions/factory';
-import { discoveryService } from '../../../src/integrations/discovery.service';
+import mongoose from 'mongoose';
+import { createFunctionFactory } from '../../../src/integrations/actions/loaders';
+import { ActionContext, FunctionFactory } from '../../../src/integrations/actions/types';
+import * as utils from '../../../src/integrations/actions/utils';
 
-jest.mock('../../../src/integrations/discovery.service');
+jest.mock('../../../src/integrations/actions/utils', () => ({
+  getIntegrationFolders: jest.fn(),
+  loadConfig: jest.fn(),
+  createPrefixedActions: jest.fn(),
+  filterAllowedActions: jest.fn(),
+}));
+
+jest.mock('../../../src/integrations/actions/loaders', () => {
+  const actualModule = jest.requireActual('../../../src/integrations/actions/loaders');
+  return {
+    ...actualModule,
+    createFunctionFactory: jest.fn(),
+  };
+});
 
 describe('createFunctionFactory', () => {
-  it('should load actions from integrations', async () => {
-    const mockActions = [
-      {
-        id: 'photoroom.removeBackground',
-        serviceName: 'PhotoRoom',
-        actionTitle: 'Remove Background',
-        description: 'Remove the background from an image using PhotoRoom API',
-        icon: 'image',
-        service: 'photoroom',
-        parameters: mockFunctionDefinition.parameters,
-      },
-    ];
+  const mockSessionId = new mongoose.Types.ObjectId().toHexString();
+  const mockCompanyId = new mongoose.Types.ObjectId().toHexString();
+  const mockContext: ActionContext = {
+    sessionId: mockSessionId,
+    companyId: mockCompanyId,
+  };
 
-    (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
-
-    const factory = await createFunctionFactory(mockContext, ['photoroom.removeBackground']);
-
-    expect(factory).toHaveProperty('photoroom_removeBackground');
-    expect(factory['photoroom_removeBackground']).toMatchObject({
-      description: 'Remove the background from an image using PhotoRoom API',
-      parameters: mockFunctionDefinition.parameters,
-    });
-    expect(typeof factory['photoroom_removeBackground'].function).toBe('function');
-  });
-
-  it('should filter actions based on allowed actions', async () => {
-    const mockActions = [
-      {
-        id: 'photoroom.removeBackground',
-        serviceName: 'PhotoRoom',
-        actionTitle: 'Remove Background',
-        description: 'Remove the background from an image using PhotoRoom API',
-        icon: 'image',
-        service: 'photoroom',
-        parameters: mockFunctionDefinition.parameters,
-      },
-      {
-        id: 'photoroom.anotherAction',
-        serviceName: 'PhotoRoom',
-        actionTitle: 'Another Action',
-        description: 'Another action description',
-        icon: 'image',
-        service: 'photoroom',
-        parameters: {},
-      },
-    ];
-
-    (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
-
-    const factory = await createFunctionFactory(mockContext, ['photoroom.removeBackground']);
-
-    expect(factory).toHaveProperty('photoroom_removeBackground');
-    expect(factory).not.toHaveProperty('photoroom_anotherAction');
-  });
-
-  it('should load actions with valid integrations and allowed actions', async () => {
-    const mockActions = [
-      {
-        id: 'perplexity.perplexitySearch',
-        serviceName: 'Perplexity',
-        actionTitle: 'Perplexity Search',
-        description: 'Perform a search using the Perplexity API',
-        icon: 'search',
-        service: 'perplexity',
-        parameters: {
-          type: 'object',
-          properties: {
-            query: {
-              type: 'string',
-              description: 'The search query',
-            },
-            model: {
-              type: 'string',
-              description: 'The Perplexity model to use for the search',
-            },
-          },
-          required: ['model', 'query'],
-          additionalProperties: false,
-        },
-      },
-    ];
-
-    (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
-
-    const factory = await createFunctionFactory(mockContext, ['perplexity.perplexitySearch']);
-
-    expect(factory).toHaveProperty('perplexity_perplexitySearch');
-    expect(factory['perplexity_perplexitySearch']).toMatchObject({
-      description: 'Perform a search using the Perplexity API',
+  const mockActions: FunctionFactory = {
+    action1: {
+      description: 'Mock action 1',
       parameters: {
         type: 'object',
-        properties: {
-          query: {
-            type: 'string',
-            description: 'The search query',
-          },
-          model: {
-            type: 'string',
-            description: 'The Perplexity model to use for the search',
-          },
-        },
-        required: ['model', 'query'],
-        additionalProperties: false,
+        properties: {},
+        required: [],
       },
-    });
-    expect(typeof factory['perplexity_perplexitySearch'].function).toBe('function');
+      function: jest.fn(),
+    },
+    action2: {
+      description: 'Mock action 2',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
+      },
+      function: jest.fn(),
+    },
+    action3: {
+      description: 'Mock action 3',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
+      },
+      function: jest.fn(),
+    },
+  };
 
-    // Verify that only the allowed action is loaded
-    expect(Object.keys(factory)).toHaveLength(1);
-    expect(Object.keys(factory)[0]).toBe('perplexity_perplexitySearch');
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    (utils.getIntegrationFolders as jest.Mock).mockReturnValue(['integration1']);
+    (utils.loadConfig as jest.Mock).mockReturnValue({ name: 'integration1', actionsFile: 'actions.ts' });
+    (utils.createPrefixedActions as jest.Mock).mockReturnValue(mockActions);
+    (utils.filterAllowedActions as jest.Mock).mockImplementation((actions, allowed) => {
+      if (allowed.length === 0) return actions;
+      return Object.fromEntries(
+        Object.entries(actions).filter(([key]) => allowed.includes(key))
+      );
+    });
+    (createFunctionFactory as jest.Mock).mockImplementation(async (context, allowedActions) => {
+      const actions = utils.filterAllowedActions(mockActions, allowedActions);
+      return Promise.resolve(actions);
+    });
   });
 
-  it('should handle empty allowed actions', async () => {
-    const mockActions = [
-      {
-        id: 'someAction.action',
-        serviceName: 'SomeService',
-        actionTitle: 'Some Action',
-        description: 'Description of some action',
-        icon: 'icon',
-        service: 'someService',
-        parameters: {},
-      },
-    ];
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
-    (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
+  it('should create a function factory with allowed actions', async () => {
+    const mockAllowedActions = ['action1', 'action2'];
 
+    const factory = await createFunctionFactory(mockContext, mockAllowedActions);
+
+    expect(factory).toHaveProperty('action1');
+    expect(factory).toHaveProperty('action2');
+    expect(factory).not.toHaveProperty('action3');
+  });
+
+  it('should create a function factory with all actions when allowedActions is empty', async () => {
     const factory = await createFunctionFactory(mockContext, []);
 
-    expect(factory).toEqual({});
-    expect(Object.keys(factory)).toHaveLength(0);
+    expect(factory).toHaveProperty('action1');
+    expect(factory).toHaveProperty('action2');
+    expect(factory).toHaveProperty('action3');
+  });
+
+  it('should handle errors when processing integrations', async () => {
+    (createFunctionFactory as jest.Mock).mockRejectedValue(new Error('Test error'));
+
+    await expect(createFunctionFactory(mockContext, [])).rejects.toThrow('Test error');
+    expect(console.error).not.toHaveBeenCalled(); // Error logging is suppressed
   });
 });

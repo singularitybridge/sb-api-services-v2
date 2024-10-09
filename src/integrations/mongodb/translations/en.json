@@ -1,0 +1,35 @@
+{
+  "serviceName": "MongoDB",
+  "runMongoDbQuery": {
+    "actionTitle": "Run MongoDB Query",
+    "description": "Execute a MongoDB query or command."
+  },
+  "getCurrentDatabase": {
+    "actionTitle": "Get Current Database",
+    "description": "Retrieve the name of the current MongoDB database."
+  },
+  "listDatabases": {
+    "actionTitle": "List Databases",
+    "description": "List all available MongoDB databases."
+  },
+  "useDatabase": {
+    "actionTitle": "Use Database",
+    "description": "Switch to a different MongoDB database."
+  },
+  "listCollections": {
+    "actionTitle": "List Collections",
+    "description": "List all collections in the current MongoDB database."
+  },
+  "describeCollection": {
+    "actionTitle": "Describe Collection",
+    "description": "Get detailed information about a specific MongoDB collection."
+  },
+  "countDocuments": {
+    "actionTitle": "Count Documents",
+    "description": "Count the number of documents in a specific MongoDB collection."
+  },
+  "runAggregation": {
+    "actionTitle": "Run Aggregation",
+    "description": "Run an aggregation pipeline on a specific MongoDB collection."
+  }
+}

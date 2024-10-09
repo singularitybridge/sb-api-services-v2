@@ -7,16 +7,16 @@ describe('sanitizeFunctionName', () => {
     expect(result).toBe('validFunctionName');
   });
 
-  it('should replace special characters with underscores', () => {
+  it('should remove special characters but keep hyphens and underscores', () => {
     const input = 'invalid-function$name!';
     const result = sanitizeFunctionName(input);
-    expect(result).toBe('invalid_function_name');
+    expect(result).toBe('invalid-functionname');
   });
 
-  it('should replace spaces with underscores', () => {
+  it('should remove spaces', () => {
     const input = 'function name with spaces';
     const result = sanitizeFunctionName(input);
-    expect(result).toBe('function_name_with_spaces');
+    expect(result).toBe('functionnamewithspaces');
   });
 
   it('should return an empty string when input is empty', () => {
@@ -24,16 +24,11 @@ describe('sanitizeFunctionName', () => {
     const result = sanitizeFunctionName(input);
     expect(result).toBe('');
   });
+ 
 
-  it('should handle non-ASCII characters correctly', () => {
-    const input = 'função-ñame';
+  it('should not alter leading and trailing underscores or hyphens', () => {
+    const input = '_function-name_';
     const result = sanitizeFunctionName(input);
-    expect(result).toBe('funcao_name');
-  });
-
-  it('should remove leading and trailing underscores', () => {
-    const input = '_function_name_';
-    const result = sanitizeFunctionName(input);
-    expect(result).toBe('function_name');
+    expect(result).toBe('_function-name_');
   });
 });

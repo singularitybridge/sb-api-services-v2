@@ -5,44 +5,44 @@ export const hebrewTranslations = {
     description: 'פעולה לתזמון הודעה בשירות היומן'
   },
   'aiAgentExecutor.EXECUTE_COMMAND': {
-    serviceName: 'מבצע סוכן AI',
+    serviceName: 'מריץ פקודות סביבה',
     actionTitle: 'הפעלת פקודה',
-    description: 'פעולה להפעלת פקודה במבצע סוכן AI'
+    description: 'פעולה להפעלת פקודה במריץ פקודות סביבה'
   },
   'aiAgentExecutor.GET_PROCESS_STATUS': {
-    serviceName: 'מבצע סוכן AI',
+    serviceName: 'מריץ פקודות סביבה',
     actionTitle: 'קבלת סטטוס תהליך',
     description: 'פעולה לקבלת סטטוס של תהליך רקע'
   },
   'aiAgentExecutor.STOP_PROCESS': {
-    serviceName: 'מבצע סוכן AI',
+    serviceName: 'מריץ פקודות סביבה',
     actionTitle: 'עצירת תהליך',
     description: 'פעולה לעצירת תהליך רקע'
   },
   'aiAgentExecutor.FILE_OPERATION': {
-    serviceName: 'מבצע סוכן AI',
+    serviceName: 'מריץ פקודות סביבה',
     actionTitle: 'פעולת קובץ',
     description: 'פעולה לביצוע פעולות על קבצים'
   },
   'aiAgentExecutor.STOP_EXECUTION': {
-    serviceName: 'מבצע סוכן AI',
+    serviceName: 'מריץ פקודות סביבה',
     actionTitle: 'עצירת ביצוע',
-    description: 'פעולה לעצירת כל התהליכים וכיבוי מבצע סוכן AI'
+    description: 'פעולה לעצירת כל התהליכים וכיבוי מריץ פקודות סביבה'
   },
   'assistant.getAssistants': {
-    serviceName: 'עוזר',
-    actionTitle: 'קבלת רשימת עוזרים',
-    description: 'קבלת רשימה של כל העוזרים עבור החברה של המשתמש הנוכחי'
+    serviceName: 'סוכני AI',
+    actionTitle: 'קבלת רשימת סוכני AI',
+    description: 'קבלת רשימה של כל סוכני AI עבור החברה של המשתמש הנוכחי'
   },
   'assistant.setAssistant': {
-    serviceName: 'עוזר',
-    actionTitle: 'הגדרת עוזר נוכחי',
-    description: 'הגדרת העוזר הנוכחי'
+    serviceName: 'סוכני AI',
+    actionTitle: 'הגדרת סוכן AI נוכחי',
+    description: 'הגדרת סוכן AI הנוכחי'
   },
   'assistant.createNewAssistant': {
-    serviceName: 'עוזר',
-    actionTitle: 'יצירת עוזר חדש',
-    description: 'פעולה ליצירת עוזר חדש'
+    serviceName: 'סוכני AI',
+    actionTitle: 'יצירת סוכן AI חדש',
+    description: 'פעולה ליצירת סוכן AI חדש'
   },
   'content.createContentItem': {
     serviceName: 'תוכן',
@@ -127,7 +127,7 @@ export const hebrewTranslations = {
   'journal.getFriendlyJournalEntries': {
     serviceName: 'יומן',
     actionTitle: 'קבלת רשומות יומן בפורמט ידידותי',
-    description: 'קבלת רשומות יומן בפורמט ידידותי עם שמות משתמש וסוכן'
+    description: 'קבלת רשומות יומן בפורמט ידידותי עם שמות משתמש וסוכן AI'
   },
   'journal.updateJournalEntry': {
     serviceName: 'יומן',

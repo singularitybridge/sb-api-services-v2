@@ -1,0 +1,24 @@
+{
+  "serviceName": "Journal",
+  "serviceDescription": "Manage personal journal entries, allowing users to create, retrieve, update, and delete entries for tracking thoughts, experiences, and reflections.",
+  "createJournalEntry": {
+    "actionTitle": "Create Journal Entry",
+    "description": "Create a new journal entry"
+  },
+  "getJournalEntries": {
+    "actionTitle": "Get Journal Entries",
+    "description": "Retrieve journal entries"
+  },
+  "getFriendlyJournalEntries": {
+    "actionTitle": "Get Friendly Journal Entries",
+    "description": "Retrieve journal entries with user and assistant names"
+  },
+  "updateJournalEntry": {
+    "actionTitle": "Update Journal Entry",
+    "description": "Update an existing journal entry"
+  },
+  "deleteJournalEntry": {
+    "actionTitle": "Delete Journal Entry",
+    "description": "Delete a journal entry"
+  }
+}

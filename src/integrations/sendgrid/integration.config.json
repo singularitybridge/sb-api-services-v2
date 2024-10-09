@@ -1,6 +1,6 @@
 {
-  "name": "SendGrid",
-  "icon": "email",
+  "name": "sendgrid",
+  "icon": "mail",
   "apiKeyName": "sendgrid_api_key",
   "actionCreator": "createSendGridActions",
   "actionsFile": "sendgrid.actions.ts"

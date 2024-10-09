@@ -1,0 +1,24 @@
+{
+  "serviceName": "יומן",
+  "serviceDescription": "ניהול רשומות יומן אישיות, המאפשר למשתמשים ליצור, לאחזר, לעדכן ולמחוק רשומות לתיעוד מחשבות, חוויות ורפלקציות.",
+  "createJournalEntry": {
+    "actionTitle": "יצירת רשומת יומן",
+    "description": "יצירת רשומת יומן חדשה"
+  },
+  "getJournalEntries": {
+    "actionTitle": "קבלת רשומות יומן",
+    "description": "אחזור רשומות יומן"
+  },
+  "getFriendlyJournalEntries": {
+    "actionTitle": "קבלת רשומות יומן בפורמט ידידותי",
+    "description": "אחזור רשומות יומן עם שמות משתמש וסוכן"
+  },
+  "updateJournalEntry": {
+    "actionTitle": "עדכון רשומת יומן",
+    "description": "עדכון רשומת יומן קיימת"
+  },
+  "deleteJournalEntry": {
+    "actionTitle": "מחיקת רשומת יומן",
+    "description": "מחיקת רשומת יומן"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "debug",
+  "icon": "bug",
+  "actionCreator": "createDebugActions",
+  "actionsFile": "debug.actions.ts"
+}

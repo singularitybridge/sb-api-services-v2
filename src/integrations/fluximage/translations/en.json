@@ -1,5 +1,8 @@
 {
+  "serviceName": "Flux Image Generation",
+  "serviceDescription": "Generate custom images using Flux AI, allowing for creation of unique visuals based on text prompts with specified dimensions.",
   "generateFluxImage": {
+    "actionTitle": "Generate Flux Image",
     "description": "Generate an image using Flux AI",
     "parameters": {
       "prompt": "Text input required to guide the image generation",

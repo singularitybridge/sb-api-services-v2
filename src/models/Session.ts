@@ -9,6 +9,7 @@ export interface ISession extends Document {
     companyId: string;
     channel: ChannelType;
     createdAt: Date;
+    language: string;
 }
 
 export interface ISessionExtended extends ISession {
@@ -25,6 +26,7 @@ export const SessionSchema: Schema = new Schema({
     companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
     channel: { type: String, required: true, enum: Object.values(ChannelType), default: ChannelType.WEB },
     createdAt: { type: Date, default: Date.now },
+    language: { type: String, required: true, default: 'en' },
 });
 
 SessionSchema.index({ companyId: 1, userId: 1, channel: 1 }, { unique: true, partialFilterExpression: { active: true } });

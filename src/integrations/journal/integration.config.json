@@ -1,0 +1,7 @@
+{
+  "name": "journal",
+  "icon": "book",
+  "apiKeyName": "journal_api_key",
+  "actionCreator": "createJournalActions",
+  "actionsFile": "journal.actions.ts"
+}

@@ -1,0 +1,16 @@
+{
+  "serviceName": "OpenAI",
+  "serviceDescription": "אינטגרציה עם מודלים מתקדמים של OpenAI ליצירת טקסט לדיבור, תמלול אודיו ומשימות עיבוד שפה טבעית.",
+  "generateOpenAiSpeech": {
+    "actionTitle": "צור דיבור עם OpenAI",
+    "description": "צור דיבור באמצעות ה-API של OpenAI"
+  },
+  "transcribeAudioWhisperFromURL": {
+    "actionTitle": "תמלל קול (Whisper)",
+    "description": "תמלל קובץ קול מ-URL באמצעות Whisper API של OpenAI"
+  },
+  "askO1Model": {
+    "actionTitle": "שאל את מודל O1",
+    "description": "שאל שאלה למודל O1 של OpenAI"
+  }
+}

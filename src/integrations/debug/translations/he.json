@@ -1,0 +1,24 @@
+{
+  "serviceName": "ניפוי באגים",
+  "serviceDescription": "מספק כלים ושירותים לניפוי באגים ובדיקת אינטגרציות, כולל אחזור מידע על הסשן, הפעלת פעולות וגילוי אינטגרציות.",
+  "getSessionInfo": {
+    "actionTitle": "קבל מידע על הסשן",
+    "description": "קבל מידע בסיסי על הסשן למטרות ניפוי באגים."
+  },
+  "triggerIntegrationAction": {
+    "actionTitle": "הפעל פעולת אינטגרציה",
+    "description": "הפעל פעולת אינטגרציה למטרות ניפוי באגים.",
+    "integrationName": "שם האינטגרציה",
+    "service": "שירות",
+    "data": "נתוני הפעולה"
+  },
+  "discoverLeanActions": {
+    "actionTitle": "גלה פעולות רזות",
+    "description": "גלה פעולות רזות עבור כל האינטגרציות."
+  },
+  "getIntegration": {
+    "actionTitle": "קבל אינטגרציה",
+    "description": "קבל אינטגרציה ספציפית לפי מזהה.",
+    "integrationId": "מזהה אינטגרציה"
+  }
+}

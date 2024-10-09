@@ -1,0 +1,6 @@
+{
+  "name": "inbox",
+  "icon": "inbox",
+  "actionCreator": "createInboxActions",
+  "actionsFile": "inbox.actions.ts"
+}

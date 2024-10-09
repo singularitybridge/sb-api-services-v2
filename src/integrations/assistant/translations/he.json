@@ -1,0 +1,28 @@
+{
+  "serviceName": "סוכני AI",
+  "serviceDescription": "ניהול ואינטראקציה עם סוכני AI, כולל יצירת סוכנים חדשים, אחזור סוכנים קיימים והגדרת הסוכן הנוכחי לשימוש.",
+  "getAssistants": {
+    "actionTitle": "קבל סוכני AI",
+    "description": "קבל רשימה של כל סוכני AI עבור החברה הנוכחית של המשתמש"
+  },
+  "setAssistant": {
+    "actionTitle": "הגדר סוכן AI",
+    "description": "הגדר את סוכן AI הנוכחי"
+  },
+  "createNewAssistant": {
+    "actionTitle": "צור סוכן AI חדש",
+    "description": "צור סוכן AI חדש"
+  },
+  "assistantName": "שם סוכן AI",
+  "assistantDescription": "תיאור סוכן AI",
+  "assistantPrompt": "הנחיה לסוכן AI",
+  "assistantId": "מזהה סוכן AI",
+  "successGetAssistants": "סוכני AI אוחזרו בהצלחה",
+  "successSetAssistant": "סוכן AI הוגדר בהצלחה",
+  "successCreateAssistant": "סוכן AI חדש נוצר בהצלחה",
+  "errorInvalidSession": "סשן לא תקין",
+  "errorAssistantNotFound": "סוכן AI לא נמצא",
+  "errorRetrieveAssistants": "נכשל באחזור סוכני AI",
+  "errorSetAssistant": "נכשל בהגדרת סוכן AI",
+  "errorCreateAssistant": "נכשל ביצירת סוכן AI חדש"
+}

@@ -1,0 +1,8 @@
+{
+  "serviceName": "עיבוד תמונה עם Photoroom",
+  "serviceDescription": "אינטגרציה עם ה-API של PhotoRoom לביצוע משימות עריכת תמונה מתקדמות, כגון הסרת רקע מתמונות.",
+  "removeBackground": {
+    "actionTitle": "הסרת רקע",
+    "description": "הסרת הרקע מתמונה באמצעות ה-API של פוטורום"
+  }
+}

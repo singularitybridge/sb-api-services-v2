@@ -1,0 +1,24 @@
+{
+  "serviceName": "מריץ פקודות סביבה",
+  "serviceDescription": "הרץ פקודות ובצע פעולות קבצים בסביבת המשתמש או ב-Docker, נהל תהליכי רקע ושלוט בסביבת הביצוע.",
+  "executeCommand": {
+    "actionTitle": "הרץ פקודה",
+    "description": "הרץ פקודה במריץ פקודות סביבה."
+  },
+  "getProcessStatus": {
+    "actionTitle": "קבל סטטוס תהליך",
+    "description": "קבל את הסטטוס של תהליך רקע."
+  },
+  "stopProcess": {
+    "actionTitle": "עצור תהליך",
+    "description": "עצור תהליך רקע."
+  },
+  "fileOperation": {
+    "actionTitle": "פעולת קובץ",
+    "description": "בצע פעולת קובץ במריץ פקודות סביבה."
+  },
+  "stopExecution": {
+    "actionTitle": "עצור ביצוע",
+    "description": "עצור את כל התהליכים הפועלים וכבה את מריץ פקודות סביבה."
+  }
+}

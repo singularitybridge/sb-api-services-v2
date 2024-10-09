@@ -1,6 +1,6 @@
 {
-  "name": "ElevenLabs",
-  "icon": "microphone",
+  "name": "elevenlabs",
+  "icon": "audio-waveform",
   "apiKeyName": "labs11",
   "actionCreator": "createElevenLabsActions",
   "actionsFile": "elevenlabs.actions.ts"

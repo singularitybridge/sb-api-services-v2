@@ -1,0 +1,24 @@
+{
+  "serviceName": "Environment Command Runner",
+  "serviceDescription": "Execute commands and perform file operations in the user's environment or Docker, manage background processes, and control the execution environment.",
+  "executeCommand": {
+    "actionTitle": "Execute Command",
+    "description": "Execute a command in the user's environment or Docker."
+  },
+  "getProcessStatus": {
+    "actionTitle": "Get Process Status",
+    "description": "Get the status of a background process."
+  },
+  "stopProcess": {
+    "actionTitle": "Stop Process",
+    "description": "Stop a background process."
+  },
+  "fileOperation": {
+    "actionTitle": "File Operation",
+    "description": "Perform a file operation in the user's environment."
+  },
+  "stopExecution": {
+    "actionTitle": "Stop Execution",
+    "description": "Stop all running processes and shut down the Environment Command Runner."
+  }
+}

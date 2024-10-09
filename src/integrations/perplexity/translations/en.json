@@ -1,5 +1,6 @@
 {
   "serviceName": "Perplexity",
+  "serviceDescription": "Integrate with Perplexity AI to perform advanced searches and retrieve information using natural language processing.",
   "perplexitySearch": {
     "actionTitle": "Search",
     "description": "Perform a search using the Perplexity API"
