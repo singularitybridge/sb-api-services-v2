@@ -27,13 +27,15 @@ console.error = (...args) => {
 
 // Mock OpenAI for tests
 jest.mock('openai', () => {
-  return {
-    OpenAI: jest.fn().mockImplementation(() => {
-      return {
-        // Add any methods you need to mock here
-      };
-    }),
-  };
+  const OpenAIMock = jest.fn().mockImplementation(() => ({
+    embeddings: {
+      create: jest.fn().mockResolvedValue({
+        data: [{ embedding: [0.1, 0.2, 0.3] }]
+      })
+    },
+    // Add any other methods you need to mock here
+  }));
+  return OpenAIMock;
 });
 
 // Set a dummy OPENAI_API_KEY for tests
