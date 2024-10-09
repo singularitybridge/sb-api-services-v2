@@ -1,26 +1,30 @@
-/**
- * Builds a query object from a set of parameters, excluding undefined values.
- * @param params An object containing query parameters
- * @returns A new object with only defined values from the input
- */
-export const buildQuery = (params: Record<string, any>): Record<string, any> => {
-  return Object.entries(params).reduce((acc, [key, value]) => {
-    if (value !== undefined) {
-      acc[key] = value;
-    }
-    return acc;
-  }, {} as Record<string, any>);
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export const generateEmbedding = async (text: string): Promise<number[]> => {
+  const response = await openai.embeddings.create({
+    model: 'text-embedding-ada-002',
+    input: text,
+  });
+  return response.data[0].embedding;
 };
 
-/**
- * Builds a sort object for MongoDB queries based on the provided orderBy string.
- * @param orderBy Optional string in the format "field:order" (e.g., "createdAt:desc")
- * @returns A sort object for MongoDB queries
- */
-export const buildSort = (orderBy?: string): Record<string, 1 | -1> => {
-  if (orderBy) {
-    const [field, order] = orderBy.split(':');
-    return { [`data.${field}`]: order === 'desc' ? -1 : 1 };
-  }
-  return { createdAt: -1 };
+export const buildQuery = (params: {
+  companyId: string;
+  contentTypeId?: string;
+  artifactKey?: string;
+}) => {
+  const query: any = { companyId: params.companyId };
+  if (params.contentTypeId) query.contentTypeId = params.contentTypeId;
+  if (params.artifactKey) query.artifactKey = params.artifactKey;
+  return query;
+};
+
+export const buildSort = (orderBy?: string) => {
+  if (!orderBy) return {};
+  const [field, direction] = orderBy.split(':');
+  return { [field]: direction === 'desc' ? -1 : 1 };
 };

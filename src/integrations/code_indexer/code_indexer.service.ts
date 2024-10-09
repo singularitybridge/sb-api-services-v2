@@ -1,165 +1,127 @@
 import * as fs from 'fs';
-import * as path from 'path';
-import glob from 'glob';
-import { createContentItem, getContentItemsByType, deleteContentItemsByType } from '../../services/content.service';
 import OpenAI from 'openai';
-import { ContentType } from '../../models/ContentType';
-import { getCompletionResponse } from '../../services/oai.completion.service';
+import { createContentItem, getContentItemsByType, deleteContentItemsByType } from '../../services/content.service';
 import { getApiKey } from '../../services/api.key.service';
+import { CodeFileSummary } from './code_indexer.types';
+import {
+  getOrCreateContentType,
+  getFilesFromGlob,
+  readFileContent
+} from './code_indexer.utils';
+import { ContentItem } from '../../models/ContentItem';
 
-export interface CodeFileSummary {
-  filename: string;
-  filepath: string;
-  summary: string;
-  lastModified: Date;
-  fileSize: number;
-  language: string;
-  linesOfCode: number;
-}
+const EMBEDDING_MODEL = 'text-embedding-3-small';
 
-const getOrCreateContentType = async (companyId: string, name: string) => {
-  let contentType = await ContentType.findOne({ companyId, name });
-  if (!contentType) {
-    contentType = new ContentType({
-      companyId,
-      name,
-      fields: [
-        { name: 'filename', type: 'string', required: true },
-        { name: 'filepath', type: 'string', required: true },
-        { name: 'summary', type: 'string', required: true },
-        { name: 'lastModified', type: 'date', required: true },
-        { name: 'fileSize', type: 'number', required: true },
-        { name: 'language', type: 'string', required: true },
-        { name: 'linesOfCode', type: 'number', required: true },
-      ],
-    });
-    await contentType.save();
-  }
-  return contentType;
-};
-
-export const scanCodeProject = async (params: {
+type ScanCodeProjectParams = {
   directoryPath: string;
   includePatterns?: string[];
   excludePatterns?: string[];
-  maxFileSize?: number;
   companyId: string;
-}): Promise<void> => {
-  const { directoryPath, includePatterns, excludePatterns, maxFileSize, companyId } = params;
+};
 
+export const scanCodeProject = async (params: ScanCodeProjectParams): Promise<void> => {
+
+  const { directoryPath, includePatterns, excludePatterns, companyId } = params;
+  console.log(`Starting scanCodeProject for directory: ${directoryPath}`);
   const contentType = await getOrCreateContentType(companyId, 'CodeFileSummary');
+  const files = getFilesFromGlob(directoryPath, includePatterns, excludePatterns);
+  console.log(`Found ${files.length} files to process`);
 
-  const globPattern = includePatterns && includePatterns.length > 0 
-    ? path.join(directoryPath, '**', `{${includePatterns.join(',')}}`)
-    : path.join(directoryPath, '**', '*');
+  const apiKey = await getApiKey(companyId, 'openai');
+  if (!apiKey) throw new Error('OpenAI API key is missing');
 
-  const files: string[] = glob.sync(globPattern, {
-    ignore: excludePatterns,
-    nodir: true,
-  });
+  const openai = new OpenAI({ apiKey });
 
   for (const file of files) {
-    const stats = fs.statSync(file);
-    if (maxFileSize && stats.size > maxFileSize) continue;
-
-    const summary = await summarizeFile(file, companyId);
-    await storeFileSummary({
-      filename: path.basename(file),
-      filepath: file,
-      summary,
-      lastModified: stats.mtime,
-      fileSize: stats.size,
-      language: path.extname(file).slice(1),
-      linesOfCode: fs.readFileSync(file, 'utf-8').split('\n').length,
-    }, companyId, contentType._id.toString());
+    await processFile(file, openai, companyId, contentType._id);
   }
+  
+  console.log('scanCodeProject completed successfully');
 };
 
-export const dryRunScanCodeProject = async (params: {
-  directoryPath: string;
-  includePatterns?: string[];
-  excludePatterns?: string[];
-  maxFileSize?: number;
-  companyId: string;
-}): Promise<string[]> => {
-  const { directoryPath, includePatterns, excludePatterns, maxFileSize } = params;
-
-  const globPattern = includePatterns && includePatterns.length > 0 
-    ? path.join(directoryPath, '**', `{${includePatterns.join(',')}}`)
-    : path.join(directoryPath, '**', '*');
-
-  const files: string[] = glob.sync(globPattern, {
-    ignore: excludePatterns,
-    nodir: true,
-  });
-
-  return files.filter(file => {
-    const stats = fs.statSync(file);
-    return !maxFileSize || stats.size <= maxFileSize;
-  });
-};
-
-export const summarizeFile = async (filePath: string, companyId: string): Promise<string> => {
-  const content = fs.readFileSync(filePath, 'utf-8');
-  const systemPrompt = "You are a helpful assistant that summarizes code files.";
-  const userInput = `Summarize the following code:\n\n${content}`;
-  
-  const apiKey = await getApiKey(companyId, 'openai');
-  if (!apiKey) {
-    throw new Error('OpenAI API key is missing');
-  }
-  
-  return getCompletionResponse(apiKey, systemPrompt, userInput, "gpt-4o-mini");
-};
-
-export const storeFileSummary = async (summaryData: CodeFileSummary, companyId: string, contentTypeId: string): Promise<void> => {
-  const result = await createContentItem(companyId, contentTypeId, summaryData, summaryData.filepath);
-  if ('error' in result) {
-    throw new Error(`Failed to store file summary: ${result.error}`);
-  }
-};
-
-export const queryRelevantFiles = async (taskDescription: string, companyId: string, limit = 10): Promise<CodeFileSummary[]> => {
-  const contentType = await getOrCreateContentType(companyId, 'CodeFileSummary');
-  const summaries = await getContentItemsByType(companyId, contentType._id.toString());
-  
-  const systemPrompt = "You are a helpful assistant that ranks code files based on relevance to a task. Respond with a JSON array of indices, most relevant first.";
-  const userInput = `Rank the following code file summaries based on their relevance to this task: "${taskDescription}".\n\n${JSON.stringify(summaries)}`;
-  
-  const apiKey = await getApiKey(companyId, 'openai');
-  if (!apiKey) {
-    throw new Error('OpenAI API key is missing');
-  }
-  
-  const response = await getCompletionResponse(apiKey, systemPrompt, userInput, "gpt-4o-mini");
-
-  if (!response) {
-    throw new Error('Received empty response from OpenAI API');
-  }
-
-  let cleanedResponse = response.replace(/```json\n?|\n?```/g, '').trim();
-
+const processFile = async (
+  file: string,
+  openai: OpenAI,
+  companyId: string,
+  contentTypeId: string
+): Promise<void> => {
   try {
-    const rankedIndices = JSON.parse(cleanedResponse);
-    if (!Array.isArray(rankedIndices)) {
-      throw new Error('Response is not an array');
+    console.log(`Processing file: ${file}`);
+    const fileContent = readFileContent(file);
+    const embedding = await generateEmbedding(fileContent, openai);
+    
+    const codeSummary: CodeFileSummary = {
+      filename: file.split('/').pop() || '',
+      filepath: file,
+      summary: `File ${file.split('/').pop() || ''} indexed`,
+      lastModified: fs.statSync(file).mtime,
+      fileSize: fs.statSync(file).size,
+      language: file.split('.').pop() || '',
+      linesOfCode: fileContent.split('\n').length,
+    };
+    
+    const result = await createContentItem(companyId, contentTypeId, codeSummary, file, embedding);
+    if ('error' in result) {
+      throw new Error(`Failed to store file summary: ${result.error}`);
     }
-    return rankedIndices.slice(0, limit).map((index: number) => summaries[index].data as CodeFileSummary);
-  } catch (error: unknown) {
-    console.error('Error parsing response:', error);
-    console.error('Raw response:', response);
-    console.error('Cleaned response:', cleanedResponse);
-    if (error instanceof Error) {
-      throw new Error(`Failed to parse API response: ${error.message}`);
-    } else {
-      throw new Error('An unknown error occurred while parsing the API response');
-    }
+    console.log(`File processed successfully: ${file}`);
+  } catch (error) {
+    console.error(`Error processing file ${file}:`, error);
   }
+};
+
+export const  generateEmbedding = async (text: string, openai: OpenAI): Promise<number[]> => {
+  try {
+    const response = await openai.embeddings.create({
+      model: EMBEDDING_MODEL,
+      input: text,
+    });
+    return response.data[0].embedding;
+  } catch (error) {
+    console.error('Error generating embedding:', error);
+    throw error;
+  }
+};
+
+export const queryRelevantFiles = async (
+  taskDescription: string,
+  companyId: string,
+  limit = 10
+): Promise<CodeFileSummary[]> => {
+  const contentType = await getOrCreateContentType(companyId, 'CodeFileSummary');
+  
+  const apiKey = await getApiKey(companyId, 'openai');
+  if (!apiKey) throw new Error('OpenAI API key is missing');
+
+  const openai = new OpenAI({ apiKey });
+  
+  const queryEmbedding = await generateEmbedding(taskDescription, openai);
+
+  // Perform similarity search using MongoDB aggregation
+  const relevantFiles = await ContentItem.aggregate([
+    { $match: { companyId, contentTypeId: contentType._id } },
+    {
+      $addFields: {
+        similarity: {
+          $reduce: {
+            input: { $zip: { inputs: ["$embedding", queryEmbedding] } },
+            initialValue: 0,
+            in: { $add: ["$$value", { $multiply: [{ $arrayElemAt: ["$$this", 0] }, { $arrayElemAt: ["$$this", 1] }] }] }
+          }
+        }
+      }
+    },
+    { $sort: { similarity: -1 } },
+    { $limit: limit },
+    { $project: { _id: 0, data: 1, similarity: 1 } }
+  ]);
+
+  return relevantFiles.map(item => item.data as CodeFileSummary);
 };
 
 export const getFileContent = async (filePath: string): Promise<string> => {
   if (!fs.existsSync(filePath)) throw new Error('File not found');
-  return fs.readFileSync(filePath, 'utf-8');
+  return readFileContent(filePath);
 };
 
 export const editAndSaveFile = async (filePath: string, newContent: string): Promise<void> => {
@@ -169,16 +131,17 @@ export const editAndSaveFile = async (filePath: string, newContent: string): Pro
 
 export const listIndexedFiles = async (companyId: string, limit?: number): Promise<CodeFileSummary[]> => {
   const contentType = await getOrCreateContentType(companyId, 'CodeFileSummary');
-  const summaries = await getContentItemsByType(companyId, contentType._id.toString());
+  const summaries = await getContentItemsByType(companyId, contentType._id);
   return summaries.slice(0, limit).map(item => item.data as CodeFileSummary);
 };
 
 export const clearIndexedFiles = async (companyId: string): Promise<void> => {
-  const contentType = await getOrCreateContentType(companyId, 'CodeFileSummary');
-  
-  console.log(`Clearing indexed files for companyId: ${companyId}`);
-  
-  const deletedCount = await deleteContentItemsByType(companyId, contentType._id.toString());
-  
+  const contentType = await getOrCreateContentType(companyId, 'CodeFileSummary');  
+  const deletedCount = await deleteContentItemsByType(companyId, contentType._id);
   console.log(`Deleted ${deletedCount} indexed files for companyId: ${companyId}`);
+};
+
+export const dryRunScanCodeProject = async (params: Omit<ScanCodeProjectParams, 'companyId'>): Promise<string[]> => {
+  const { directoryPath, includePatterns, excludePatterns } = params;
+  return getFilesFromGlob(directoryPath, includePatterns, excludePatterns);
 };

@@ -4,11 +4,16 @@ import {
   queryRelevantFiles,
   getFileContent,
   editAndSaveFile,
-  CodeFileSummary,
   listIndexedFiles,
   clearIndexedFiles,
-  dryRunScanCodeProject
+  dryRunScanCodeProject,
 } from './code_indexer.service';
+import { CodeFileSummary } from './code_indexer.types';
+
+const handleError = (error: unknown, errorMessage: string) => ({
+  success: false,
+  error: error instanceof Error ? error.message : errorMessage,
+});
 
 export const createCodeIndexerActions = (context: ActionContext): FunctionFactory => ({
   scanCodeProject: {
@@ -40,14 +45,11 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
     },
     function: async (params) => {
       try {
-        await scanCodeProject({
-          ...params,
-          companyId: context.companyId,
-        });
+        await scanCodeProject({ ...params, companyId: context.companyId });
         return { success: true };
       } catch (error) {
         console.error('Error scanning code project:', error);
-        return { success: false, error: (error as Error).message };
+        return handleError(error, 'Error scanning code project');
       }
     },
   },
@@ -81,14 +83,11 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
     },
     function: async (params) => {
       try {
-        const scannedFiles = await dryRunScanCodeProject({
-          ...params,
-          companyId: context.companyId,
-        });
+        const scannedFiles = await dryRunScanCodeProject(params);
         return { success: true, scannedFiles };
       } catch (error) {
         console.error('Error performing dry run scan of code project:', error);
-        return { success: false, error: (error as Error).message };
+        return handleError(error, 'Error performing dry run scan of code project');
       }
     },
   },
@@ -106,15 +105,11 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
     },
     function: async (params) => {
       try {
-        const files = await queryRelevantFiles(
-          params.taskDescription,
-          context.companyId,
-          params.limit
-        );
+        const files = await queryRelevantFiles(params.taskDescription, context.companyId, params.limit);
         return { success: true, files };
       } catch (error) {
         console.error('Error querying relevant files:', error);
-        return { success: false, error: (error as Error).message };
+        return handleError(error, 'Error querying relevant files');
       }
     },
   },
@@ -135,7 +130,7 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
         return { success: true, content };
       } catch (error) {
         console.error('Error getting file content:', error);
-        return { success: false, error: (error as Error).message };
+        return handleError(error, 'Error getting file content');
       }
     },
   },
@@ -157,7 +152,7 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
         return { success: true };
       } catch (error) {
         console.error('Error editing and saving file:', error);
-        return { success: false, error: (error as Error).message };
+        return handleError(error, 'Error editing and saving file');
       }
     },
   },
@@ -178,7 +173,7 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
         return { success: true, files };
       } catch (error) {
         console.error('Error listing indexed files:', error);
-        return { success: false, error: (error as Error).message };
+        return handleError(error, 'Error listing indexed files');
       }
     },
   },
@@ -197,7 +192,7 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
         return { success: true, message: 'Indexed files cleared successfully' };
       } catch (error) {
         console.error('Error clearing indexed files:', error);
-        return { success: false, error: (error as Error).message };
+        return handleError(error, 'Error clearing indexed files');
       }
     },
   },
