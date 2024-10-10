@@ -51,7 +51,27 @@ export const readFileContent = (filePath: string): string =>
 export const writeFileContent = (filePath: string, content: string): void =>
   fs.writeFileSync(filePath, content, 'utf-8');
 
-
-
-
-
+export const validateCodeFileSummary = (summary: CodeFileSummary): string | null => {
+  if (!summary.filename || typeof summary.filename !== 'string') {
+    return 'Invalid or missing filename';
+  }
+  if (!summary.filepath || typeof summary.filepath !== 'string') {
+    return 'Invalid or missing filepath';
+  }
+  if (!summary.summary || typeof summary.summary !== 'string') {
+    return 'Invalid or missing summary';
+  }
+  if (!(summary.lastModified instanceof Date)) {
+    return 'Invalid or missing lastModified date';
+  }
+  if (typeof summary.fileSize !== 'number' || summary.fileSize < 0) {
+    return 'Invalid or missing fileSize';
+  }
+  if (!summary.language || typeof summary.language !== 'string') {
+    return 'Invalid or missing language';
+  }
+  if (typeof summary.linesOfCode !== 'number' || summary.linesOfCode < 0) {
+    return 'Invalid or missing linesOfCode';
+  }
+  return null;
+};
