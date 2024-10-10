@@ -89,6 +89,27 @@ export const executeFunctionCall = async (
 
       await publishActionMessage(sessionId, 'started', executionDetails);
 
+      // Improved file search detection
+      const isFileSearch = functionName === 'file_search' ||
+                           actionInfo.actionTitle.toLowerCase().includes('file search') || 
+                           actionInfo.description.toLowerCase().includes('file search');
+
+      if (isFileSearch) {
+        // Publish a notification for file search detection
+        await publishActionMessage(sessionId, 'started', {
+          id: uuidv4(),
+          actionId: 'file_search_notification',
+          serviceName: 'File Search Notification',
+          actionTitle: 'File Search In Progress',
+          actionDescription: 'File search operation in progress',
+          icon: 'search',
+          args: {},
+          originalActionId: 'file_search_notification',
+          language: sessionLanguage,
+          input: { message: 'File search operation detected and in progress. Retrieving relevant information...' }
+        });
+      }
+
       const result = await functionFactory[functionName].function(processedArgs);
 
       if (result && typeof result === 'object' && 'error' in result) {
@@ -99,6 +120,21 @@ export const executeFunctionCall = async (
       } else {
         // If no error, publish completed message and return result
         await publishActionMessage(sessionId, 'completed', { ...executionDetails, output: result });
+        if (isFileSearch) {
+          // Complete the file search notification
+          await publishActionMessage(sessionId, 'completed', {
+            id: uuidv4(),
+            actionId: 'file_search_notification',
+            serviceName: 'File Search Notification',
+            actionTitle: 'File Search Completed',
+            actionDescription: 'File search operation completed',
+            icon: 'search',
+            args: {},
+            originalActionId: 'file_search_notification',
+            language: sessionLanguage,
+            input: { message: 'File search completed. Results retrieved and incorporated into the response.' }
+          });
+        }
         return { result };
       }
     } catch (error) {

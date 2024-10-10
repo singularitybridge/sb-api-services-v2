@@ -47,7 +47,7 @@ export const updateAssistantById = async (
   description: string,
   model: string,
   instructions: string,
-  allowedActions: string[],
+  allowedActions: string[]
 ) => {
   const openaiClient = getOpenAIClient(apiKey);
 
@@ -97,7 +97,7 @@ export const createAssistant = async (
   description: string,
   model: string,
   instructions: string,
-  allowedActions: string[],
+  allowedActions: string[]
 ) => {
   console.log('Creating assistant');
 

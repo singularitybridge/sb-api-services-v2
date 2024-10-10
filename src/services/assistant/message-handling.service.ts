@@ -1,21 +1,3 @@
-/**
- * Message Handling Service
- * 
- * This service manages the storage and retrieval of messages in the AI Assistant system.
- * It supports various message types, including user messages, assistant responses,
- * and custom system messages such as integration action updates and product offers.
- * 
- * Key features:
- * - Stores all messages locally in MongoDB
- * - Supports custom message types with flexible data structure
- * - Provides functions for handling different types of messages
- * 
- * Usage:
- * - Use handleSessionMessage for processing user inputs and assistant responses
- * - Use handleCustomMessage for creating custom system messages
- * - Use handleIntegrationActionUpdate and handleProductOffer as examples for specific message types
- */
-
 import { Session } from '../../models/Session';
 import { Assistant } from '../../models/Assistant';
 import { Message } from '../../models/Message';
@@ -70,7 +52,6 @@ export const handleCustomMessage = async (
   await customMessage.save();
 };
 
-// Example usage of handleCustomMessage for integration action execution update
 export const handleIntegrationActionUpdate = async (
   sessionId: string,
   actionName: string,
@@ -81,7 +62,6 @@ export const handleIntegrationActionUpdate = async (
   await handleCustomMessage(sessionId, 'integration_action_update', content, { actionName, status, result });
 };
 
-// Example usage of handleCustomMessage for product offer
 export const handleProductOffer = async (
   sessionId: string,
   productName: string,
@@ -116,7 +96,6 @@ export const handleSessionMessage = async (
   const messageCount = (await getOpenAIClient(apiKey).beta.threads.messages.list(session.threadId)).data.length;
   const openaiClient = getOpenAIClient(apiKey);
 
-  // Save user message to MongoDB
   const userMessage = new Message({
     sessionId: session._id,
     sender: 'user',
@@ -135,7 +114,6 @@ export const handleSessionMessage = async (
     metadata,
   });
 
-  // Update the user message with OpenAI message ID
   await Message.findByIdAndUpdate(userMessage._id, { openAIMessageId: createdMessage.id });
 
   console.log('create new run', session.threadId, session.assistantId);
@@ -155,9 +133,6 @@ export const handleSessionMessage = async (
   const completedRun = await pollRunStatus(apiKey, session.threadId, newRun.id, sessionId, session.companyId, assistant.allowedActions);
   console.log('run completed > ' + completedRun.status);
 
-  // Check for agent switch (Note: This is a placeholder as the current API doesn't support agent switching)
-  // If agent switching is implemented in the future, you would handle it here
-
   const messages = await openaiClient.beta.threads.messages.list(
     session.threadId,
   );
@@ -166,7 +141,6 @@ export const handleSessionMessage = async (
   
   const processedResponse = await processTemplate(response, sessionId);
 
-  // Save assistant message to MongoDB
   const assistantMessage = new Message({
     sessionId: session._id,
     sender: 'assistant',
@@ -178,9 +152,6 @@ export const handleSessionMessage = async (
     openAIMessageId: messages.data[0].id,
   });
   await assistantMessage.save();
-
-  // Note: The current API doesn't provide events or system messages
-  // If this feature is added in the future, you would handle it here
 
   return processedResponse;
 };
