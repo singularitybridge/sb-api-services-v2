@@ -1,7 +1,10 @@
 import { getOpenAIClient } from './openai-client.service';
 import { submitToolOutputs } from '../oai.thread.service';
 import { publishActionMessage } from '../../integrations/actions/publishers';
+import { getSessionById } from '../../services/session.service';
+import { SupportedLanguage } from '../../services/discovery.service';
 import { v4 as uuidv4 } from 'uuid';
+import heKnowledgeRetrieval from '../../translations/he-knowledge-retrieval';
 
 interface RunStep {
   id: string;
@@ -48,6 +51,13 @@ const checkFileToolUsage = async (openaiClient: any, threadId: string, runId: st
   return fileToolUsed;
 };
 
+const getTranslation = (language: SupportedLanguage, key: string, defaultValue: string): string => {
+  if (language === 'he' && key in heKnowledgeRetrieval) {
+    return heKnowledgeRetrieval[key as keyof typeof heKnowledgeRetrieval];
+  }
+  return defaultValue;
+};
+
 export const pollRunStatus = async (
   apiKey: string,
   threadId: string,
@@ -59,8 +69,12 @@ export const pollRunStatus = async (
 ) => {
   const startTime = Date.now();
   let lastRun;
-  const fileSearchNotificationId = uuidv4();
-  let fileSearchNotificationSent = false;
+  const knowledgeRetrievalNotificationId = uuidv4();
+  let knowledgeRetrievalNotificationSent = false;
+
+  // Get session language
+  const session = await getSessionById(sessionId);
+  const sessionLanguage = session.language as SupportedLanguage;
 
   while (Date.now() - startTime < timeout) {
     const openaiClient = getOpenAIClient(apiKey);
@@ -68,21 +82,23 @@ export const pollRunStatus = async (
     console.log(`Run ID: ${runId}, Status: ${run.status}`);
 
     const fileToolUsed = await checkFileToolUsage(openaiClient, threadId, runId);
-    if (fileToolUsed && !fileSearchNotificationSent) {
+    if (fileToolUsed && !knowledgeRetrievalNotificationSent) {
       console.log(`File tool usage confirmed for run id: ${runId}`);
       await publishActionMessage(sessionId, 'started', {
-        id: fileSearchNotificationId,
-        actionId: 'file_search_notification',
-        serviceName: 'File Search Notification',
-        actionTitle: 'File Search In Progress',
-        actionDescription: 'File search operation in progress',
-        icon: 'search',
+        id: knowledgeRetrievalNotificationId,
+        actionId: 'knowledge_retrieval_notification',
+        serviceName: getTranslation(sessionLanguage, 'knowledge', 'Knowledge'),
+        actionTitle: getTranslation(sessionLanguage, 'knowledge_retrieval_in_progress', 'Knowledge Retrieval In Progress'),
+        actionDescription: getTranslation(sessionLanguage, 'knowledge_retrieval_in_progress_description', 'Knowledge retrieval operation in progress'),
+        icon: 'book-text',
         args: {},
-        originalActionId: 'file_search_notification',
-        language: 'en',
-        input: { message: 'File search in progress. Retrieving relevant information...' }
+        originalActionId: 'knowledge_retrieval_notification',
+        language: sessionLanguage,
+        input: { 
+          message: getTranslation(sessionLanguage, 'knowledge_retrieval_in_progress_message', 'Knowledge retrieval in progress. Retrieving relevant information...')
+        }
       });
-      fileSearchNotificationSent = true;
+      knowledgeRetrievalNotificationSent = true;
     }
 
     const completedStatuses = ['completed', 'cancelled', 'failed', 'expired'];
@@ -91,18 +107,20 @@ export const pollRunStatus = async (
         console.log(`Run id: ${runId} used ${run.usage.prompt_tokens} prompt tokens`);
       }
 
-      if (fileSearchNotificationSent) {
+      if (knowledgeRetrievalNotificationSent) {
         await publishActionMessage(sessionId, 'completed', {
-          id: fileSearchNotificationId,
-          actionId: 'file_search_notification',
-          serviceName: 'File Search Notification',
-          actionTitle: 'File Search Completed',
-          actionDescription: 'File search operation completed',
-          icon: 'search',
+          id: knowledgeRetrievalNotificationId,
+          actionId: 'knowledge_retrieval_notification',
+          serviceName: getTranslation(sessionLanguage, 'knowledge', 'Knowledge'),
+          actionTitle: getTranslation(sessionLanguage, 'knowledge_retrieval_completed', 'Knowledge Retrieval Completed'),
+          actionDescription: getTranslation(sessionLanguage, 'knowledge_retrieval_completed_description', 'Knowledge retrieval operation completed'),
+          icon: 'book-text',
           args: {},
-          originalActionId: 'file_search_notification',
-          language: 'en',
-          input: { message: 'File search completed. Results retrieved.' }
+          originalActionId: 'knowledge_retrieval_notification',
+          language: sessionLanguage,
+          input: { 
+            message: getTranslation(sessionLanguage, 'knowledge_retrieval_completed_message', 'Knowledge retrieval completed. Results retrieved.')
+          }
         });
       }
 
