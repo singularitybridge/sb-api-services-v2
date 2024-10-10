@@ -1,14 +1,8 @@
 {
-  "serviceName": "ElevenLabs",
-  "serviceDescription": "Generate high-quality text-to-speech audio using ElevenLabs AI voices, allowing for dynamic and realistic voice synthesis.",
-  "actions": {
-    "generateElevenLabsAudio": {
-      "actionTitle": "Generate ElevenLabs Audio",
-      "description": "Generate audio using ElevenLabs text-to-speech service",
-      "parameters": {
-        "text": "The text to convert to speech",
-        "voiceId": "The ID of the voice to use for speech generation"
-      }
-    }
+  "serviceName": "Create Audio with ElevenLabs",
+  "serviceDescription": "Generate high-quality audio from text-to-speech using ElevenLabs AI voices, enabling dynamic and realistic voice synthesis.",
+  "generateElevenLabsAudio": {
+    "name": "Generate ElevenLabs Audio",
+    "description": "Generate audio using ElevenLabs text-to-speech service"
   }
 }

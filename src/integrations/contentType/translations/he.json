@@ -19,5 +19,9 @@
   "deleteContentType": {
     "actionTitle": "מחק סוג תוכן",
     "description": "מחק סוג תוכן"
+  },
+  "getContentTypes": {
+    "actionTitle": "קבל סוגי תוכן",
+    "description": "קבל את כל סוגי התוכן של החברה"
   }
 }
