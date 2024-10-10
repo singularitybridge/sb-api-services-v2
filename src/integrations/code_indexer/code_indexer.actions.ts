@@ -18,6 +18,7 @@ const handleError = (error: unknown, errorMessage: string) => ({
 export const createCodeIndexerActions = (context: ActionContext): FunctionFactory => ({
   scanCodeProject: {
     description: 'Scan a code project directory and index file summaries',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -56,6 +57,7 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
 
   dryRunScanCodeProject: {
     description: 'Perform a dry run scan of a code project directory and return the list of files that would be scanned',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -94,6 +96,7 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
 
   queryRelevantFiles: {
     description: 'Query indexed files relevant to a task',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -116,6 +119,7 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
 
   getFileContent: {
     description: 'Get the content of a specific file',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -137,6 +141,7 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
 
   editAndSaveFile: {
     description: 'Edit and save a specific file',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -159,6 +164,7 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
 
   listIndexedFiles: {
     description: 'List indexed files (file name, path, summary)',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -180,6 +186,7 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
 
   clearIndexedFiles: {
     description: 'Clear indexed files to allow re-indexing later',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {},
