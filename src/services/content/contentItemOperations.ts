@@ -64,9 +64,6 @@ export const createContentItem = async (
   artifactKey: string,
   embedding?: number[]
 ): Promise<IContentItem | { error: string; details: any }> => {
-  console.log('creating content item ... ');
-  console.log(data);
-
   return handleContentItemOperation('create', companyId, contentTypeId, data, artifactKey, undefined, embedding);
 };
 
