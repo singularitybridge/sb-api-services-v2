@@ -3,6 +3,8 @@ import { ISession, Session } from '../models/Session';
 import { CustomError, NotFoundError } from '../utils/errors';
 import { createNewThread, deleteThread } from './oai.thread.service';
 import { ChannelType } from '../types/ChannelType';
+import { getApiKey, ApiKeyType } from './api.key.service';
+import { SupportedLanguage } from './discovery.service';
 
 export const sessionFriendlyAggreationQuery = [
   {
@@ -204,3 +206,32 @@ export const ensureSessionIndex = async () => {
     console.error('Error updating session index:', error);
   }
 };
+
+// Moved from integration.routes.ts
+export async function getSessionLanguage(
+  userId: string,
+  companyId: string,
+): Promise<SupportedLanguage> {
+  try {
+    const apiKey = await getApiKey(companyId, 'openai' as ApiKeyType);
+
+    if (!apiKey) {
+      console.log('OpenAI API key not found, defaulting to English');
+      return 'en';
+    }
+
+    const session = await getSessionOrCreate(
+      apiKey,
+      userId,
+      companyId,
+      ChannelType.WEB,
+      'en', // Default language
+    );
+
+    console.log(`Session found:`, session);
+    return session.language as SupportedLanguage;
+  } catch (error) {
+    console.error('Error getting session language:', error);
+    return 'en'; // Default to English if there's an error
+  }
+}
