@@ -24,8 +24,8 @@ export const getAssistants = async (companyId: string): Promise<IAssistant[]> =>
     const updatedAssistants = assistants.map((assistant) => {
       const assistantObj = assistant.toObject();
       if (assistantHasFilesMap.get(assistant._id.toString())) {
-        if (!assistantObj.allowedActions.includes('knowledge & files')) {
-          assistantObj.allowedActions.push('knowledge & files');
+        if (!assistantObj.allowedActions.includes('knowledge.searchFiles')) {
+          assistantObj.allowedActions.push('knowledge.searchFiles');
         }
       }
       return assistantObj;

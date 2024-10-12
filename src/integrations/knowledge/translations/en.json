@@ -1,0 +1,7 @@
+{
+  "serviceName": "Knowledge Files",
+  "searchFiles": {
+    "actionTitle": "Search Files",
+    "description": "Search for files in the knowledge base"
+  }
+}
