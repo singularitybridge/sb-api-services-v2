@@ -1,0 +1,7 @@
+{
+  "name": "knowledge",
+  "icon": "book",
+  "apiKeyName": "KNOWLEDGE_API_KEY",
+  "actionCreator": "createKnowledgeActions",
+  "actionsFile": "knowledge.actions.ts"
+}
