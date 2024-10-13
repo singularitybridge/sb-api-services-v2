@@ -12,5 +12,9 @@
   "askO1Model": {
     "actionTitle": "שאל את מודל O1",
     "description": "שאל שאלה למודל O1 של OpenAI"
+  },
+  "askO1ModelWithFiles": {
+    "actionTitle": "שאל את מודל O1 עם קבצים",
+    "description": "שאל שאלה למודל O1 של OpenAI עם קבצי קוד נוספים כהקשר"
   }
 }

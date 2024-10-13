@@ -3,7 +3,7 @@ import {
   AuthenticatedRequest,
   verifyAccess,
 } from '../middleware/auth.middleware';
-import { getSessionOrCreate } from '../services/session.service';
+import { getSessionOrCreate, getSessionLanguage } from '../services/session.service';
 import { ChannelType } from '../types/ChannelType';
 import { getApiKey, ApiKeyType } from '../services/api.key.service';
 import {
@@ -17,35 +17,6 @@ import { SupportedLanguage, Integration } from '../services/discovery.service';
 import { sanitizeFunctionName } from '../integrations/actions/factory';
 
 const router = express.Router();
-
-// Helper function to get session language
-export async function getSessionLanguage(
-  userId: string,
-  companyId: string,
-): Promise<SupportedLanguage> {
-  try {
-    const apiKey = await getApiKey(companyId, 'openai' as ApiKeyType);
-
-    if (!apiKey) {
-      console.log('OpenAI API key not found, defaulting to English');
-      return 'en';
-    }
-
-    const session = await getSessionOrCreate(
-      apiKey,
-      userId,
-      companyId,
-      ChannelType.WEB,
-      'en', // Default language
-    );
-
-    console.log(`Session found:`, session);
-    return session.language as SupportedLanguage;
-  } catch (error) {
-    console.error('Error getting session language:', error);
-    return 'en'; // Default to English if there's an error
-  }
-}
 
 // Discover all integrations
 router.get(
@@ -75,7 +46,12 @@ router.get(
   async (req: AuthenticatedRequest, res) => {
     try {
       const { actionId } = req.params;
-      const language = (req.query.language as SupportedLanguage) || 'en';
+      const userId = req.user?._id.toString();
+      const companyId = req.user?.companyId.toString();
+      if (!userId || !companyId) {
+        throw new Error('User ID or Company ID not found');
+      }
+      const language = await getSessionLanguage(userId, companyId);
       const action = await discoverActionById(actionId, language);
       if (action) {
         res.json(action);
@@ -94,7 +70,12 @@ router.get(
   verifyAccess(),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const language = (req.query.language as SupportedLanguage) || 'en';
+      const userId = req.user?._id.toString();
+      const companyId = req.user?.companyId.toString();
+      if (!userId || !companyId) {
+        throw new Error('User ID or Company ID not found');
+      }
+      const language = await getSessionLanguage(userId, companyId);
       const fieldsParam = req.query.fields as string | undefined;
       const fields = fieldsParam
         ? (fieldsParam.split(',') as (keyof Integration)[])
@@ -117,7 +98,12 @@ router.get(
   async (req: AuthenticatedRequest, res) => {
     try {
       const { integrationId } = req.params;
-      const language = (req.query.language as SupportedLanguage) || 'en';
+      const userId = req.user?._id.toString();
+      const companyId = req.user?.companyId.toString();
+      if (!userId || !companyId) {
+        throw new Error('User ID or Company ID not found');
+      }
+      const language = await getSessionLanguage(userId, companyId);
       const integration = await getIntegrationById(integrationId, language);
       if (integration) {
         res.json(integration);

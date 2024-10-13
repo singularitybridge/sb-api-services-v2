@@ -1,4 +1,3 @@
-// File : src/services/googleAuth.service.ts
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import { IUser, User } from '../models/User';
@@ -49,8 +48,11 @@ export const googleLogin = async (token: string): Promise<{ user: IUser; company
             user = await User.create(newUser);
         } else {
             // Update existing user information
-            user.name = payload['name'];
             user.email = payload['email'];
+            // Only set the name if it's not already set
+            if (!user.name) {
+                user.name = payload['name'];
+            }
             await user.save();
 
             const foundCompany = await Company.findById(user.companyId);
@@ -78,8 +80,6 @@ export const googleLogin = async (token: string): Promise<{ user: IUser; company
         throw error;
     }
 }
-
-
 
 export const verifyBetaKey = async (betaKey: string) => {
     if (betaKey === process.env.BETA_INVITE_KEY) {

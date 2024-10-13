@@ -79,7 +79,7 @@ export const triggerIntegrationAction = async (
 
 export const discoverLeanActions = async (): Promise<{ success: boolean; data?: any; error?: string }> => {
   try {
-    const leanActions = await getLeanIntegrationActions();
+    const leanActions = await getLeanIntegrationActions('en', ['id', 'name', 'description'])
     return { success: true, data: leanActions };
   } catch (error: any) {
     console.error('Error in discoverLeanActions:', error);

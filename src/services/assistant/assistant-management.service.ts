@@ -1,4 +1,5 @@
 import { Assistant, IAssistant } from '../../models/Assistant';
+import { File } from '../../models/File';
 import mongoose from 'mongoose';
 import { getApiKey } from '../api.key.service';
 import { createAssistant, deleteAssistantById, updateAssistantById } from '../oai.assistant.service';
@@ -6,7 +7,31 @@ import { createAssistant, deleteAssistantById, updateAssistantById } from '../oa
 export const getAssistants = async (companyId: string): Promise<IAssistant[]> => {
   try {
     const assistants = await Assistant.find({ companyId });
-    return assistants;
+
+    // Fetch all files for these assistants in one query
+    const assistantIds = assistants.map((assistant) => assistant._id);
+    const files = await File.find({
+      assistantId: { $in: assistantIds },
+    }).select('assistantId');
+
+    // Create a map of assistantId to hasFiles
+    const assistantHasFilesMap = new Map();
+    files.forEach((file) => {
+      assistantHasFilesMap.set(file.assistantId.toString(), true);
+    });
+
+    // Add 'knowledge & files' to allowedActions if assistant has files
+    const updatedAssistants = assistants.map((assistant) => {
+      const assistantObj = assistant.toObject();
+      if (assistantHasFilesMap.get(assistant._id.toString())) {
+        if (!assistantObj.allowedActions.includes('knowledge.searchFiles')) {
+          assistantObj.allowedActions.push('knowledge.searchFiles');
+        }
+      }
+      return assistantObj;
+    });
+
+    return updatedAssistants;
   } catch (error) {
     console.error('Error retrieving assistants:', error);
     throw new Error('Error retrieving assistants');
@@ -40,6 +65,7 @@ export const updateAllowedActions = async (assistantId: string, allowedActions: 
     });
 
     const apiKey = await getApiKey(assistant.companyId.toString(), 'openai') as string;
+
     let updatedOpenAIAssistant = await updateAssistantById(
       apiKey,
       assistant.assistantId,
