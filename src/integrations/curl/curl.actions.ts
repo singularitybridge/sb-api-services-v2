@@ -7,6 +7,7 @@ interface CurlRequestArgs {
   headers?: { [key: string]: string };
   body?: string | object;
   timeout?: number;
+  max_response_chars?: number;
 }
 
 export interface CurlActionResponse {
@@ -14,6 +15,7 @@ export interface CurlActionResponse {
   data: any;
   headers: { [key: string]: string };
   error?: string;
+  truncated?: boolean;
 }
 
 export const createCurlActions = (context: ActionContext): FunctionFactory => ({
@@ -47,6 +49,10 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
           type: 'number',
           description: 'Request timeout in milliseconds',
         },
+        max_response_chars: {
+          type: 'number',
+          description: 'Maximum number of characters in the response. Responses longer than this will be truncated.',
+        },
       },
       required: ['url'],
       additionalProperties: false,
@@ -56,7 +62,7 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
 
       try {
         // Validate required parameters
-        const { url, method = 'GET', headers = {}, body, timeout = 5000 } = args;
+        const { url, method = 'GET', headers = {}, body, timeout = 5000, max_response_chars } = args;
 
         // Input validation
         if (!/^https?:\/\//i.test(url)) {
@@ -64,7 +70,8 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
             status: 400,
             data: null,
             headers: {},
-            error: 'Invalid URL: The URL must start with http:// or https://'
+            error: 'Invalid URL: The URL must start with http:// or https://',
+            truncated: false
           };
         }
 
@@ -84,7 +91,8 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
           method,
           headers: sanitizedHeaders,
           body: serializedBody,
-          timeout
+          timeout,
+          max_response_chars
         });
 
         // Return the full response, including error if status is >= 400
@@ -93,7 +101,8 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
             status: response.status,
             data: response.data,
             headers: response.headers,
-            error: `HTTP ${response.status}: ${response.data?.message || 'Request failed'}`
+            error: `HTTP ${response.status}: ${response.data?.message || 'Request failed'}`,
+            truncated: response.truncated
           };
         }
 
@@ -101,7 +110,8 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
         return {
           status: response.status,
           data: response.data,
-          headers: response.headers
+          headers: response.headers,
+          truncated: response.truncated
         };
       } catch (error: any) {
         console.error('performCurlRequest: Error performing request', error);
@@ -109,7 +119,8 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
           status: 500,
           data: null,
           headers: {},
-          error: `Request failed: ${error.message || 'An unexpected error occurred'}`
+          error: `Request failed: ${error.message || 'An unexpected error occurred'}`,
+          truncated: false
         };
       }
     },

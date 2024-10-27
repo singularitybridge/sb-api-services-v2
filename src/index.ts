@@ -92,7 +92,7 @@ app.use('/onboarding', verifyTokenMiddleware, verifyAccess(), onboardingRouter);
 app.use('/jsonbin', verifyTokenMiddleware, verifyAccess(), jsonbinRouter);
 app.use('/content', verifyTokenMiddleware, verifyAccess(), contentRouter);
 app.use(
-  '/content-types',
+  '/content-type',
   verifyTokenMiddleware,
   verifyAccess(),
   contentTypeRouter,
