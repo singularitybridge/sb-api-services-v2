@@ -7,6 +7,7 @@ interface CurlRequestArgs {
   headers?: { [key: string]: string };
   body?: string | object;
   timeout?: number;
+  max_response_chars?: number;
 }
 
 export interface CurlActionResponse {
@@ -14,7 +15,27 @@ export interface CurlActionResponse {
   data: any;
   headers: { [key: string]: string };
   error?: string;
+  truncated?: boolean;
 }
+
+const processBody = (body: string | object | undefined): string => {
+  if (body === undefined) {
+    return '';
+  }
+  
+  if (typeof body === 'string') {
+    try {
+      // Check if it's already a JSON string
+      JSON.parse(body);
+      return body; // If it parses successfully, it's already JSON, return as-is
+    } catch {
+      return body; // If parsing fails, it's a regular string, return as-is
+    }
+  }
+  
+  // If it's an object, stringify it
+  return JSON.stringify(body);
+};
 
 export const createCurlActions = (context: ActionContext): FunctionFactory => ({
   performCurlRequest: {
@@ -47,6 +68,10 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
           type: 'number',
           description: 'Request timeout in milliseconds',
         },
+        max_response_chars: {
+          type: 'number',
+          description: 'Maximum number of characters in the response. Responses longer than this will be truncated.',
+        },
       },
       required: ['url'],
       additionalProperties: false,
@@ -56,7 +81,7 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
 
       try {
         // Validate required parameters
-        const { url, method = 'GET', headers = {}, body, timeout = 5000 } = args;
+        const { url, method = 'GET', headers = {}, body, timeout = 5000, max_response_chars } = args;
 
         // Input validation
         if (!/^https?:\/\//i.test(url)) {
@@ -64,27 +89,31 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
             status: 400,
             data: null,
             headers: {},
-            error: 'Invalid URL: The URL must start with http:// or https://'
+            error: 'Invalid URL: The URL must start with http:// or https://',
+            truncated: false
           };
         }
 
-        // Properly serialize the body if it's an object, use as-is if it's a string, or use an empty string if not provided
-        const serializedBody = body === undefined ? '' :
-          typeof body === 'object' ? JSON.stringify(body) : String(body);
+        // Process the body to prevent double serialization
+        const processedBody = processBody(body);
 
         // Ensure headers are properly handled
-        const sanitizedHeaders: { [key: string]: string } = {};
-        for (const [key, value] of Object.entries(headers)) {
-          sanitizedHeaders[key] = String(value); // Ensure all header values are strings
-        }
+        const sanitizedHeaders: { [key: string]: string } = {
+          'Content-Type': 'application/json',
+          ...Object.entries(headers).reduce((acc, [key, value]) => ({
+            ...acc,
+            [key]: String(value) // Ensure all header values are strings
+          }), {})
+        };
 
         // Call the service to perform the request
         const response = await performCurlRequest(context, {
           url,
           method,
           headers: sanitizedHeaders,
-          body: serializedBody,
-          timeout
+          body: processedBody,
+          timeout,
+          max_response_chars
         });
 
         // Return the full response, including error if status is >= 400
@@ -93,7 +122,8 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
             status: response.status,
             data: response.data,
             headers: response.headers,
-            error: `HTTP ${response.status}: ${response.data?.message || 'Request failed'}`
+            error: `HTTP ${response.status}: ${response.data?.message || 'Request failed'}`,
+            truncated: response.truncated
           };
         }
 
@@ -101,7 +131,8 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
         return {
           status: response.status,
           data: response.data,
-          headers: response.headers
+          headers: response.headers,
+          truncated: response.truncated
         };
       } catch (error: any) {
         console.error('performCurlRequest: Error performing request', error);
@@ -109,7 +140,8 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
           status: 500,
           data: null,
           headers: {},
-          error: `Request failed: ${error.message || 'An unexpected error occurred'}`
+          error: `Request failed: ${error.message || 'An unexpected error occurred'}`,
+          truncated: false
         };
       }
     },
