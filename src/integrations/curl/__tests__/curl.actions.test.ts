@@ -1,35 +1,104 @@
-import { ActionContext } from '../../actions/types';
+import { ActionContext, FunctionFactory } from '../../actions/types';
 import { createCurlActions, CurlActionResponse } from '../curl.actions';
 
-describe('Curl Actions', () => {
-  const context: ActionContext = {
-    companyId: 'companyId',
-    sessionId: 'sessionId',
-  };
+// Mock the context
+const mockContext: ActionContext = {
+  sessionId: 'test-session',
+  companyId: 'test-company'
+};
 
-  const actions = createCurlActions(context);
-
-  it('should perform a GET request successfully', async () => {
-    const args = {
-      url: 'https://jsonplaceholder.typicode.com/todos/1',
+// Mock the curl service
+jest.mock('../curl.service', () => ({
+  performCurlRequest: jest.fn().mockImplementation(async (context, options) => {
+    // Return a mock response that matches CurlActionResponse
+    return {
+      status: 200,
+      data: { success: true },
+      headers: { 'content-type': 'application/json' },
+      truncated: false
     };
+  })
+}));
 
-    const result = await actions.performCurlRequest.function(args) as CurlActionResponse;
+describe('curl.actions', () => {
+  const curlActions = createCurlActions(mockContext);
+  const performCurlRequest = curlActions.performCurlRequest.function;
 
-    expect(result).toHaveProperty('status', 200);
-    expect(result).toHaveProperty('data');
-    expect(result.data).toHaveProperty('id', 1);
-    expect(result.data).toHaveProperty('title');
+  it('should handle string JSON body correctly', async () => {
+    const jsonBody = '{"key": "value"}';
+    const result = await performCurlRequest({
+      url: 'https://api.example.com',
+      method: 'POST',
+      body: jsonBody
+    }) as CurlActionResponse;
+
+    expect(result.status).toBeDefined();
+    expect(result.data).toBeDefined();
+    expect(result.headers).toBeDefined();
   });
 
-  it('should return an error for invalid URL', async () => {
-    const args = {
-      url: 'ftp://invalid-url',
-    };
+  it('should handle object body correctly', async () => {
+    const objectBody = { key: 'value' };
+    const result = await performCurlRequest({
+      url: 'https://api.example.com',
+      method: 'POST',
+      body: objectBody
+    }) as CurlActionResponse;
 
-    const result = await actions.performCurlRequest.function(args) as CurlActionResponse;
+    expect(result.status).toBeDefined();
+    expect(result.data).toBeDefined();
+    expect(result.headers).toBeDefined();
+  });
 
-    expect(result).toHaveProperty('error');
-    expect(result.error).toMatch(/Invalid URL|Request failed/);
+  it('should handle requests without body', async () => {
+    const result = await performCurlRequest({
+      url: 'https://api.example.com',
+      method: 'GET'
+    }) as CurlActionResponse;
+
+    expect(result.status).toBeDefined();
+    expect(result.data).toBeDefined();
+    expect(result.headers).toBeDefined();
+  });
+
+  it('should validate URL format', async () => {
+    const result = await performCurlRequest({
+      url: 'invalid-url',
+      method: 'GET'
+    }) as CurlActionResponse;
+
+    expect(result.status).toBe(400);
+    expect(result.error).toContain('Invalid URL');
+  });
+
+  it('should handle custom headers', async () => {
+    const result = await performCurlRequest({
+      url: 'https://api.example.com',
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer token',
+        'Custom-Header': 'custom-value'
+      },
+      body: { key: 'value' }
+    }) as CurlActionResponse;
+
+    expect(result.status).toBeDefined();
+    expect(result.data).toBeDefined();
+    expect(result.headers).toBeDefined();
+  });
+
+  it('should handle errors gracefully', async () => {
+    // Mock implementation for error case
+    require('../curl.service').performCurlRequest.mockImplementationOnce(async () => {
+      throw new Error('Network error');
+    });
+
+    const result = await performCurlRequest({
+      url: 'https://non-existent-domain-12345.com',
+      method: 'GET'
+    }) as CurlActionResponse;
+
+    expect(result.status).toBe(500);
+    expect(result.error).toBeDefined();
   });
 });

@@ -18,6 +18,25 @@ export interface CurlActionResponse {
   truncated?: boolean;
 }
 
+const processBody = (body: string | object | undefined): string => {
+  if (body === undefined) {
+    return '';
+  }
+  
+  if (typeof body === 'string') {
+    try {
+      // Check if it's already a JSON string
+      JSON.parse(body);
+      return body; // If it parses successfully, it's already JSON, return as-is
+    } catch {
+      return body; // If parsing fails, it's a regular string, return as-is
+    }
+  }
+  
+  // If it's an object, stringify it
+  return JSON.stringify(body);
+};
+
 export const createCurlActions = (context: ActionContext): FunctionFactory => ({
   performCurlRequest: {
     description: 'Perform an HTTP request to a specified URL',
@@ -75,22 +94,24 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
           };
         }
 
-        // Properly serialize the body if it's an object, use as-is if it's a string, or use an empty string if not provided
-        const serializedBody = body === undefined ? '' :
-          typeof body === 'object' ? JSON.stringify(body) : String(body);
+        // Process the body to prevent double serialization
+        const processedBody = processBody(body);
 
         // Ensure headers are properly handled
-        const sanitizedHeaders: { [key: string]: string } = {};
-        for (const [key, value] of Object.entries(headers)) {
-          sanitizedHeaders[key] = String(value); // Ensure all header values are strings
-        }
+        const sanitizedHeaders: { [key: string]: string } = {
+          'Content-Type': 'application/json',
+          ...Object.entries(headers).reduce((acc, [key, value]) => ({
+            ...acc,
+            [key]: String(value) // Ensure all header values are strings
+          }), {})
+        };
 
         // Call the service to perform the request
         const response = await performCurlRequest(context, {
           url,
           method,
           headers: sanitizedHeaders,
-          body: serializedBody,
+          body: processedBody,
           timeout,
           max_response_chars
         });
