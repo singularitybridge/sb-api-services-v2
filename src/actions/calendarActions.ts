@@ -15,8 +15,7 @@ export const createCalendarActions = (context: ActionContext): FunctionFactory =
       },
       required: ['summary', 'start', 'end'],
     },
-    function: async (args: IEventRequestBody) => {
-      console.log('called createEvent with args: ', args);
+    function: async (args: IEventRequestBody) => {      
       const eventCreationResponse = await createEvent(args);
       return eventCreationResponse;
     },
@@ -39,8 +38,7 @@ export const createCalendarActions = (context: ActionContext): FunctionFactory =
       },
       required: ['id', 'eventData'],
     },
-    function: async (args: { id: string; eventData: IEventRequestBody }) => {
-      console.log('called updateEvent with args: ', args);
+    function: async (args: { id: string; eventData: IEventRequestBody }) => {      
       const updateResponse = await updateEvent(args.id, args.eventData);
       return updateResponse;
     },
@@ -54,8 +52,7 @@ export const createCalendarActions = (context: ActionContext): FunctionFactory =
       },
       required: ['id'],
     },
-    function: async (args: { id: string }) => {
-      console.log('called deleteEvent with args: ', args);
+    function: async (args: { id: string }) => {      
       const deleteResponse = await deleteEvent(args.id);
       return deleteResponse;
     },

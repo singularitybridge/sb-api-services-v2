@@ -10,8 +10,7 @@ export const submitToolOutputs = async (
   sessionId: string,
   companyId: string,
   allowedActions: string[]
-) => {
-  console.log('called submitToolOutputs with args: ', toolCalls);
+) => { 
 
   const outputs = await Promise.all(
     toolCalls.map(async (call) => {
@@ -22,8 +21,7 @@ export const submitToolOutputs = async (
       };
     }),
   );
-
-  console.log('tool outputs: ', outputs);
+  
   await openaiClient.beta.threads.runs.submitToolOutputs(threadId, runId, {
     tool_outputs: outputs,
   });
