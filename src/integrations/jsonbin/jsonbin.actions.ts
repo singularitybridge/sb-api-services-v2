@@ -1,14 +1,6 @@
 import { ActionContext, FunctionFactory } from '../actions/types';
 import { jsonbinService } from './jsonbin.service';
 
-// Debug logging function
-const DEBUG = process.env.DEBUG === 'true';
-const debug = (message: string, ...args: any[]) => {
-  if (DEBUG) {
-    console.log(`[JSONBinActions] ${message}`, ...args);
-  }
-};
-
 interface CreateJSONBinFileArgs {
   data: Record<string, any>;
   name: string;
@@ -62,8 +54,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       required: ['data', 'name'],
       additionalProperties: false,
     },
-    function: async (args: CreateJSONBinFileArgs) => {
-      debug('createJSONBinFile called with arguments:', JSON.stringify(args, null, 2));
+    function: async (args: CreateJSONBinFileArgs) => {      
       const { data, name } = args;
       return await jsonbinService.createFile(context.companyId, data, name);
     },
@@ -86,8 +77,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       required: ['binId', 'data'],
       additionalProperties: false,
     },
-    function: async (args: UpdateJSONBinFileArgs) => {
-      debug('updateJSONBinFile called with arguments:', JSON.stringify(args, null, 2));
+    function: async (args: UpdateJSONBinFileArgs) => {      
       const { binId, data } = args;
       return await jsonbinService.updateFile(context.companyId, binId, data);
     },
@@ -137,8 +127,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       required: ['binId', 'arrayKey', 'elementId', 'updateData'],
       additionalProperties: false,
     },
-    function: async (args: UpdateJSONBinArrayElementArgs) => {
-      debug('updateJSONBinArrayElement called with arguments:', JSON.stringify(args, null, 2));
+    function: async (args: UpdateJSONBinArrayElementArgs) => {      
       const { binId, arrayKey, elementId, updateData, useMerge = false } = args;
       return await jsonbinService.updateArrayElement(context.companyId, binId, arrayKey, elementId, updateData, useMerge);
     },
@@ -165,8 +154,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       required: ['binId', 'arrayKey', 'elementId'],
       additionalProperties: false,
     },
-    function: async (args: DeleteJSONBinArrayElementArgs) => {
-      debug('deleteJSONBinArrayElement called with arguments:', JSON.stringify(args, null, 2));
+    function: async (args: DeleteJSONBinArrayElementArgs) => {      
       const { binId, arrayKey, elementId } = args;
       return await jsonbinService.deleteArrayElement(context.companyId, binId, arrayKey, elementId);
     },
@@ -193,8 +181,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       required: ['binId', 'arrayKey', 'newElement'],
       additionalProperties: false,
     },
-    function: async (args: InsertJSONBinArrayElementArgs) => {
-      debug('insertJSONBinArrayElement called with arguments:', JSON.stringify(args, null, 2));
+    function: async (args: InsertJSONBinArrayElementArgs) => {      
       const { binId, arrayKey, newElement } = args;
       return await jsonbinService.insertArrayElement(context.companyId, binId, arrayKey, newElement);
     },
@@ -213,8 +200,7 @@ export const createJSONBinActions = (context: ActionContext): FunctionFactory =>
       required: ['binId'],
       additionalProperties: false,
     },
-    function: async (args: CloneJSONBinFileArgs) => {
-      debug('cloneJSONBinFile called with arguments:', JSON.stringify(args, null, 2));
+    function: async (args: CloneJSONBinFileArgs) => {      
       const { binId } = args;
       return await jsonbinService.cloneFile(context.companyId, binId);
     },

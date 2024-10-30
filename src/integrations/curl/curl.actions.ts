@@ -77,7 +77,6 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
       additionalProperties: false,
     },
     function: async (args: CurlRequestArgs): Promise<CurlActionResponse> => {
-      console.log('performCurlRequest called with arguments:', JSON.stringify(args, null, 2));
 
       try {
         // Validate required parameters

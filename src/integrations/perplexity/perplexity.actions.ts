@@ -27,7 +27,7 @@ export const createPerplexityActions = (context: ActionContext): FunctionFactory
       additionalProperties: false,
     },
     function: async (args: PerplexitySearchArgs) => {
-      console.log('perplexitySearch called with arguments:', JSON.stringify(args, null, 2));
+      
 
       const { model, query } = args;
 
@@ -69,8 +69,7 @@ export const createPerplexityActions = (context: ActionContext): FunctionFactory
         };
       }
 
-      try {
-        console.log('perplexitySearch: Calling performPerplexitySearch service');
+      try {        
         const result = await performPerplexitySearch(context.companyId, model, query);
         return { result };
       } catch (error) {

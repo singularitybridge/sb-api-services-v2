@@ -130,8 +130,7 @@ export const handleSessionMessage = async (
     instructions: processedLlmPrompt,
   });
 
-  const completedRun = await pollRunStatus(apiKey, session.threadId, newRun.id, sessionId, session.companyId, assistant.allowedActions);
-  console.log('run completed > ' + completedRun.status);
+  await pollRunStatus(apiKey, session.threadId, newRun.id, sessionId, session.companyId, assistant.allowedActions);
 
   const messages = await openaiClient.beta.threads.messages.list(
     session.threadId,
