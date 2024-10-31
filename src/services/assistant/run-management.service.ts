@@ -25,27 +25,58 @@ interface ToolCall {
   };
 }
 
-const logRunStep = (step: RunStep) => {
-  console.log(`Step ID: ${step.id}, Type: ${step.type}, Status: ${step.status}`);
-  if (step.step_details.tool_calls) {
-    step.step_details.tool_calls.forEach((call: ToolCall) => {
-      console.log(`  Tool Call: ${call.type}, Function: ${call.function?.name || 'N/A'}`);
-      if (call.function?.arguments) {
-        console.log(`  Arguments: ${call.function.arguments}`);
-      }
-    });
-  }
-};
+class StatusLogger {
+  private lastStatus: string = '';
+  private lastLine: number = 0;
 
-const checkFileToolUsage = async (openaiClient: any, threadId: string, runId: string): Promise<boolean> => {
+  constructor() {
+    // Move cursor to new line initially
+    process.stdout.write('\n');
+    this.lastLine = 1;
+  }
+
+  private clearLine() {
+    process.stdout.clearLine(0);
+    process.stdout.cursorTo(0);
+  }
+
+  updateStatus(status: string) {
+    // Clear the previous status line
+    this.clearLine();
+    // Write the new status
+    process.stdout.write(`Run Status: ${status}`);
+    this.lastStatus = status;
+  }
+
+  info(message: string) {
+    // Move to new line, print message, then return to status line
+    this.clearLine();
+    console.log(message);
+    process.stdout.write(`Run Status: ${this.lastStatus}`);
+  }
+
+  succeed(message: string, tokens?: number) {
+    this.clearLine();
+    const tokenInfo = tokens ? ` (${tokens} tokens used)` : '';
+    console.log(`✓ ${message}${tokenInfo}`);
+  }
+
+  fail(message: string) {
+    this.clearLine();
+    console.log(`✗ ${message}`);
+  }
+}
+
+
+
+const checkFileToolUsage = async (openaiClient: any, threadId: string, runId: string, logger: StatusLogger): Promise<boolean> => {
   const runSteps = await openaiClient.beta.threads.runs.steps.list(threadId, runId);
   let fileToolUsed = false;
-  console.log(`Checking ${runSteps.data.length} steps for file tool usage`);
+  
   runSteps.data.forEach((step: RunStep) => {
-    logRunStep(step);
     if (step.step_details.tool_calls?.some(call => call.type === 'retrieval' || call.type === 'file_search')) {
       fileToolUsed = true;
-      console.log('File tool usage detected in step:', step.id);
+      logger.info('File tool usage detected in step: ' + step.id);
     }
   });
   return fileToolUsed;
@@ -65,7 +96,7 @@ export const pollRunStatus = async (
   sessionId: string,
   companyId: string,
   allowedActions: string[],
-  timeout: number = 90000,
+  timeout: number = 180000, // 3 minutes
 ) => {
   const startTime = Date.now();
   let lastRun;
@@ -76,14 +107,19 @@ export const pollRunStatus = async (
   const session = await getSessionById(sessionId);
   const sessionLanguage = session.language as SupportedLanguage;
 
+  // Create status logger
+  const logger = new StatusLogger();
+
   while (Date.now() - startTime < timeout) {
     const openaiClient = getOpenAIClient(apiKey);
     const run = await openaiClient.beta.threads.runs.retrieve(threadId, runId);
-    console.log(`Run ID: ${runId}, Status: ${run.status}`);
+    
+    // Update status
+    logger.updateStatus(run.status);
 
-    const fileToolUsed = await checkFileToolUsage(openaiClient, threadId, runId);
+    const fileToolUsed = await checkFileToolUsage(openaiClient, threadId, runId, logger);
     if (fileToolUsed && !knowledgeRetrievalNotificationSent) {
-      console.log(`File tool usage confirmed for run id: ${runId}`);
+      logger.info(`File tool usage confirmed for run id: ${runId}`);
       await publishActionMessage(sessionId, 'started', {
         id: knowledgeRetrievalNotificationId,
         actionId: 'knowledge_retrieval_notification',
@@ -103,10 +139,6 @@ export const pollRunStatus = async (
 
     const completedStatuses = ['completed', 'cancelled', 'failed', 'expired'];
     if (completedStatuses.includes(run.status)) {
-      if (run.usage && run.usage.prompt_tokens) {
-        console.log(`Run id: ${runId} used ${run.usage.prompt_tokens} prompt tokens`);
-      }
-
       if (knowledgeRetrievalNotificationSent) {
         await publishActionMessage(sessionId, 'completed', {
           id: knowledgeRetrievalNotificationId,
@@ -124,6 +156,7 @@ export const pollRunStatus = async (
         });
       }
 
+      logger.succeed(`Run completed > ${run.status}`, run.usage?.prompt_tokens);
       return run;
     }
 
@@ -131,8 +164,6 @@ export const pollRunStatus = async (
       run.status === 'requires_action' &&
       run.required_action?.type === 'submit_tool_outputs'
     ) {
-      console.log(`Tool outputs submission required for run id: ${runId}`);
-      
       await submitToolOutputs(
         openaiClient,
         threadId,
@@ -142,8 +173,7 @@ export const pollRunStatus = async (
         companyId,
         allowedActions
       );
-      
-      console.log(`Completed tool outputs submission for run id: ${runId}`);
+            
     }
 
     lastRun = run;
@@ -152,5 +182,6 @@ export const pollRunStatus = async (
     );
   }
 
+  logger.fail('Timeout exceeded while waiting for run to complete');
   throw new Error('Timeout exceeded while waiting for run to complete');
 };

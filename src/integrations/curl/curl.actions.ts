@@ -2,12 +2,8 @@ import { ActionContext, FunctionFactory } from '../actions/types';
 import { performCurlRequest } from './curl.service';
 
 interface CurlRequestArgs {
-  url: string;
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-  headers?: { [key: string]: string };
-  body?: string | object;
-  timeout?: number;
-  max_response_chars?: number;
+  curlCommand: string;
+  maxResponseChars?: number;
 }
 
 export interface CurlActionResponse {
@@ -15,133 +11,58 @@ export interface CurlActionResponse {
   data: any;
   headers: { [key: string]: string };
   error?: string;
-  truncated?: boolean;
 }
-
-const processBody = (body: string | object | undefined): string => {
-  if (body === undefined) {
-    return '';
-  }
-  
-  if (typeof body === 'string') {
-    try {
-      // Check if it's already a JSON string
-      JSON.parse(body);
-      return body; // If it parses successfully, it's already JSON, return as-is
-    } catch {
-      return body; // If parsing fails, it's a regular string, return as-is
-    }
-  }
-  
-  // If it's an object, stringify it
-  return JSON.stringify(body);
-};
 
 export const createCurlActions = (context: ActionContext): FunctionFactory => ({
   performCurlRequest: {
-    description: 'Perform an HTTP request to a specified URL',
+    description: 'Execute a curl command',
     parameters: {
       type: 'object',
       properties: {
-        url: {
+        curlCommand: {
           type: 'string',
-          description: 'The URL to send the request to',
+          description: 'The complete curl command to execute',
         },
-        method: {
-          type: 'string',
-          enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-          description: 'The HTTP method to use',
-        },
-        headers: {
-          type: 'object',
-          additionalProperties: { type: 'string' },
-          description: 'Additional headers to include in the request',
-        },
-        body: {
-          oneOf: [
-            { type: 'string' },
-            { type: 'object' }
-          ],
-          description: 'The body of the request (for POST, PUT, PATCH methods)',
-        },
-        timeout: {
+        maxResponseChars: {
           type: 'number',
-          description: 'Request timeout in milliseconds',
-        },
-        max_response_chars: {
-          type: 'number',
-          description: 'Maximum number of characters in the response. Responses longer than this will be truncated.',
+          description: 'Maximum number of characters to return in the response',
         },
       },
-      required: ['url'],
+      required: ['curlCommand'],
       additionalProperties: false,
     },
     function: async (args: CurlRequestArgs): Promise<CurlActionResponse> => {
-      console.log('performCurlRequest called with arguments:', JSON.stringify(args, null, 2));
-
       try {
-        // Validate required parameters
-        const { url, method = 'GET', headers = {}, body, timeout = 5000, max_response_chars } = args;
-
-        // Input validation
-        if (!/^https?:\/\//i.test(url)) {
-          return {
-            status: 400,
-            data: null,
-            headers: {},
-            error: 'Invalid URL: The URL must start with http:// or https://',
-            truncated: false
-          };
-        }
-
-        // Process the body to prevent double serialization
-        const processedBody = processBody(body);
-
-        // Ensure headers are properly handled
-        const sanitizedHeaders: { [key: string]: string } = {
-          'Content-Type': 'application/json',
-          ...Object.entries(headers).reduce((acc, [key, value]) => ({
-            ...acc,
-            [key]: String(value) // Ensure all header values are strings
-          }), {})
-        };
+        const { curlCommand, maxResponseChars } = args;
 
         // Call the service to perform the request
-        const response = await performCurlRequest(context, {
-          url,
-          method,
-          headers: sanitizedHeaders,
-          body: processedBody,
-          timeout,
-          max_response_chars
-        });
+        const response = await performCurlRequest(context, curlCommand);
 
-        // Return the full response, including error if status is >= 400
-        if (response.status >= 400) {
-          return {
-            status: response.status,
-            data: response.data,
-            headers: response.headers,
-            error: `HTTP ${response.status}: ${response.data?.message || 'Request failed'}`,
-            truncated: response.truncated
-          };
-        }
-
-        // Return the successful response
-        return {
+        // Create the result object
+        const result: CurlActionResponse = {
           status: response.status,
           data: response.data,
-          headers: response.headers,
-          truncated: response.truncated
+          headers: response.headers
         };
+
+        // If maxResponseChars is specified, truncate the response data
+        if (maxResponseChars && typeof result.data === 'string' && result.data.length > maxResponseChars) {
+          result.data = result.data.substring(0, maxResponseChars) + '...';
+        }
+
+        // Only set error if HTTP status indicates an error
+        if (response.status >= 400) {
+          result.error = response.error;
+        }
+
+        return result;
       } catch (error: any) {
         console.error('performCurlRequest: Error performing request', error);
         return {
           status: 500,
           data: null,
           headers: {},
-          error: `Request failed: ${error.message || 'An unexpected error occurred'}`,
-          truncated: false
+          error: `Request failed: ${error.message || 'An unexpected error occurred'}`
         };
       }
     },

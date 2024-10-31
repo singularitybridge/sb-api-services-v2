@@ -36,7 +36,6 @@ export const createSendGridActions = (context: ActionContext): FunctionFactory =
       additionalProperties: false,
     },
     function: async (args: SendEmailArgs) => {
-      console.log('sendEmail called with arguments:', JSON.stringify(args, null, 2));
 
       const { to, subject, text, html } = args;
 

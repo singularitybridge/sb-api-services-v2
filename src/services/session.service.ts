@@ -106,12 +106,10 @@ export const getSessionOrCreate = async (
   channel: ChannelType = ChannelType.WEB,
   language: string = 'en'
 ) => {
-  console.log(`Attempting to find or create session for userId: ${userId}, companyId: ${companyId}, channel: ${channel}, language: ${language}`);
 
   const findSession = async () => {
     const session = await Session.findOne({ userId, companyId, channel, active: true });
-    if (session) {
-      console.log(`Existing session found: ${session._id}`);
+    if (session) {      
       return session;
     }
     return null;
@@ -227,8 +225,7 @@ export async function getSessionLanguage(
       ChannelType.WEB,
       'en', // Default language
     );
-
-    console.log(`Session found:`, session);
+    
     return session.language as SupportedLanguage;
   } catch (error) {
     console.error('Error getting session language:', error);

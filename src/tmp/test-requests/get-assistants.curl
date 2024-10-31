@@ -1,0 +1,2 @@
+curl --location 'http://localhost:3000/assistant' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2NmQ0Y2MzMjg0NjEyMjMzNDEzYmViNzciLCJlbWFpbCI6ImF2aUBzaW5ndWxhcml0eWJyaWRnZS5uZXQiLCJjb21wYW55SWQiOiI2NmQ0MWFjMzQ4N2MxOWY2ZDRjMjNmYTEiLCJpYXQiOjE3Mjk4Nzc5NDQsImV4cCI6MTczMDQ4Mjc0NH0.Ya7P-8_zBv1pdEVXZTiEpeO_eQX7OkB6sjwqpQo2dyw'

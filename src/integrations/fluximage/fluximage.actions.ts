@@ -31,7 +31,7 @@ export const createFluxImageActions = (context: ActionContext): FunctionFactory 
       additionalProperties: false,
     },
     function: async (args: FluxImageArgs) => {
-      console.log('generateFluxImage called with arguments:', JSON.stringify(args, null, 2));
+      
 
       const { prompt, width, height } = args;
 

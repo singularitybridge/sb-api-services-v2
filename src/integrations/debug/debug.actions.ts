@@ -12,11 +12,9 @@ export const createDebugActions = (context: ActionContext): FunctionFactory => (
       required: [],
       additionalProperties: false,
     },
-    function: async () => {
-      console.log('Starting getSessionInfo action');
+    function: async () => {      
       try {
-        const result = await getSessionInfo(context.sessionId, context.companyId);
-        console.log('getSessionInfo action completed successfully', { result });
+        const result = await getSessionInfo(context.sessionId, context.companyId);        
         return result;
       } catch (error) {
         console.error('Error in getSessionInfo action:', error);

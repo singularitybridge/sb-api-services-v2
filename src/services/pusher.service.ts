@@ -22,6 +22,5 @@ export const publishSessionMessage = async (
   message: Record<string, unknown>
 ): Promise<void> => {
   const channel = `sb-${sessionId}`;
-  await publishMessage(channel, eventName, message);
-  console.log(`Published message to channel ${channel}:`, message);
+  await publishMessage(channel, eventName, message);  
 };
