@@ -1,0 +1,28 @@
+curl --location 'https://cguat2.creditguard.co.il/xpo/Relay' \
+--header 'Content-Type: application/x-www-form-urlencoded' \
+--header 'Cookie: TS011c0af0=01c4b5d6b1249d937642063d3e77afb0d79d2c347b7962345fa670d471823b059c3e04e6b0ce667e179a64ce2232401f670781628b' \
+--data-urlencode 'user=lametayellJfhLsBudlX' \
+--data-urlencode 'password=lsghOSOh-4E2f-lqKx-h2e@-Psw0Q2Lo2lAa' \
+--data-urlencode 'int_in=<ashrait>
+  <request>
+    <version>2000</version>
+    <language>ENG</language>
+    <dateTime/>
+    <command>doDeal</command>
+    <doDeal>
+      <terminalNumber>9014905015</terminalNumber>
+      <cardNo>CGMPI</cardNo>
+      <total>1</total>
+      <currency>ILS</currency>
+      <transactionType>Debit</transactionType>
+      <creditType>RegularCredit</creditType>
+      <validation>TxnSetup</validation>
+      <mid>19759</mid>
+      <uniqueid>test-transaction-123</uniqueid>
+      <mpiValidation>AutoComm</mpiValidation>
+      <successUrl>https://example.com/success</successUrl>
+      <errorUrl>https://example.com/error</errorUrl>
+      <cancelUrl>https://example.com/cancel</cancelUrl>
+    </doDeal>
+  </request>
+</ashrait>'
