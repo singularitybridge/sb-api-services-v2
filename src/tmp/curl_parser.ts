@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import axios from 'axios';
+import axios, { AxiosRequestConfig } from 'axios';
 import * as querystring from 'querystring';
 
 export const readAndParseRequest = (filePath: string): {
@@ -30,20 +30,27 @@ export const parseCurlCommand = (curlCommand: string): {
     headers[match[1]] = match[2];
   }
 
-  // Try to extract data-raw JSON
+  // Try to extract data-raw content
   let data = null;
-  const dataRawMatch = curlCommand.match(/--data-raw\s+'({[\s\S]*?})'(?:\s|$)/);
+  const dataRawMatch = curlCommand.match(/--data-raw\s+'([\s\S]*?)'(?:\s|$)/);
   if (dataRawMatch?.[1]) {
-    try {
-      // Clean up the JSON string
-      const jsonStr = dataRawMatch[1]
-        .replace(/\n/g, '')  // Remove newlines
-        .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-        .trim();
-      data = JSON.parse(jsonStr);
-    } catch (error) {
-      console.error('Error parsing JSON:', error);
-      throw error;
+    const rawData = dataRawMatch[1].trim();
+    // If it starts with { and ends with }, try to parse as JSON
+    if (rawData.startsWith('{') && rawData.endsWith('}')) {
+      try {
+        // Clean up the JSON string
+        const jsonStr = rawData
+          .replace(/\n/g, '')  // Remove newlines
+          .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+          .trim();
+        data = JSON.parse(jsonStr);
+      } catch (error) {
+        // If JSON parsing fails, use the raw string
+        data = rawData;
+      }
+    } else {
+      // Not JSON format, use as-is
+      data = rawData;
     }
   }
 
@@ -84,12 +91,14 @@ export const executeCurlRequest = async (
   method: string = 'GET'
 ) => {
   try {
-    const config: any = {
+    const config: AxiosRequestConfig = {
       method: method.toLowerCase(),
       url,
       headers,
       validateStatus: () => true, // Accept any status code
-      maxRedirects: 5 // Allow redirects
+      maxRedirects: 5, // Allow redirects
+      responseType: 'text', // Force text response type to handle XML properly
+      transformResponse: [(responseData: string) => responseData] // Prevent axios from parsing the response
     };
 
     // Only add data for POST requests
@@ -102,7 +111,8 @@ export const executeCurlRequest = async (
     return {
       status: response.status,
       data: response.data,
-      headers: response.headers
+      headers: response.headers,
+      error: response.status >= 400 ? response.statusText : undefined
     };
   } catch (error) {
     if (axios.isAxiosError(error)) {
