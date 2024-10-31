@@ -1,5 +1,5 @@
 import { ActionContext } from '../actions/types';
-import { parseCurlCommand, executeCurlRequest } from '../../tmp/curl_parser';
+import { parseCurlCommand, executeCurlRequest } from './curl.parser';
 
 interface CurlResponse {
   status: number;
