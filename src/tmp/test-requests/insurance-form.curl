@@ -1,0 +1,77 @@
+curl --location 'https://api-ins.lametayel.co.il/api/insurance/submit' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+    "travelDetails": {
+        "departureDateAsDate": "2024-11-01T00:00:00.000Z",
+        "returnDateAsDate": "2024-11-05T00:00:00.000Z",
+        "travelRegionCode" : 2
+    },
+    "passengers": [
+        {
+            "id": "1",
+            "idNumber": "306198086",
+            "firstName": "בדיקה",
+            "lastName": "בדיקה",
+            "firstNameEnglish": "Ddss",
+            "lastNameEnglish": "Gggg",
+            "birthDate": "1986-05-08",
+            "gender": "male",
+            "phoneNumber": "0544494082",
+            "email": "Rina@cgh.com",
+            "questions": [
+                {
+                    "questionId": 1,
+                    "answerId": 170
+                },
+                {
+                    "questionId": 7,
+                    "answerId": 174
+                },
+                {
+                    "questionId": 9,
+                    "answerId": 188
+                },
+                {
+                    "questionId": 2,
+                    "answerId": 200
+                }                                
+            ]
+        }
+    ],
+    "insuranceCoverage": {
+        "extensions": [
+            {
+                "id": "1",
+                "isSelected": true,
+                "appliesTo": [
+                    "1"
+                ]
+            },
+            {
+                "id": "36",
+                "isSelected": true,
+                "appliesTo": [
+                    "1"
+                ]
+            },
+            {
+                "id": "176",
+                "isSelected": true,
+                "appliesTo": [
+                    "1"
+                ]
+            }
+        ]
+    },
+    "paymentDetails": {
+        "creditCardType": "2",
+        "creditCardNumber": "4111111111111111",
+        "creditCardValidDate": "1225",
+        "creditCardCVV": "123",
+        "payerId": "1",
+        "payerFirstName": "בדיקה",
+        "payerLastName": "בדיקה",
+        "payerPhone": "0544494082",
+        "numberOfPayments": 1
+    }
+}'

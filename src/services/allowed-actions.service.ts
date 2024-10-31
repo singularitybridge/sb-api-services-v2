@@ -25,29 +25,38 @@ export const updateAllowedActions = async (assistantId: string, allowedActions: 
       assistant.description,
       assistant.llmModel,
       assistant.llmPrompt,
-      allowedActions // Pass the original allowedActions without modification
+      allowedActions
     );
 
-    // Check if all allowed actions were successfully added to the OpenAI assistant
-    let updatedTools = updatedOpenAIAssistant.tools
+    // Check which actions were successfully added to the OpenAI assistant
+    const updatedTools = updatedOpenAIAssistant.tools
       .filter(tool => tool.type === 'function')
       .map(tool => (tool as any).function.name);
 
-    let missingActions = allowedActions.filter(action => 
+    // Find which actions were successfully added and which ones failed
+    const successfulActions = allowedActions.filter(action => 
+      updatedTools.includes(sanitizeFunctionName(action))
+    );
+
+    const failedActions = allowedActions.filter(action => 
       !updatedTools.includes(sanitizeFunctionName(action))
     );
 
-    if (missingActions.length > 0) {
-      console.error(`Error: Failed to add the following actions: ${missingActions.join(', ')}`);
-      throw new Error(`Failed to add actions: ${missingActions.join(', ')}`);
+    // Log warnings for failed actions but continue processing
+    if (failedActions.length > 0) {
+      console.warn(`Warning: The following actions were not successfully added to the OpenAI assistant: ${failedActions.join(', ')}`);
     }
 
-    // Update the local database only if OpenAI update was successful
-    assistant.allowedActions = allowedActions; // Store original action names
+    // Update the local database with only the successful actions
+    assistant.allowedActions = successfulActions;
     const updatedAssistant = await assistant.save({ session });
 
     await session.commitTransaction();
     console.log(`Successfully updated allowed actions for assistant ${assistantId}`);
+    
+    if (successfulActions.length > 0) {
+      console.log(`Successfully added actions: ${successfulActions.join(', ')}`);
+    }
 
     return updatedAssistant;
   } catch (error) {

@@ -1,0 +1,125 @@
+curl --location 'https://preprod-apig.harel-group.co.il/api/test-external/travel-insurance-production/v2.0.0/purchasing-process' \
+--header 'x-ibm-client-id: e60d0320-7162-4925-8a85-e0ef1ee16266' \
+--header 'x-ibm-client-secret: OAN8Q~go~CUzv93bfq-G3EqCCa3_pr4wgJlVMbdX' \
+--header 'Content-Type: application/json' \
+--data-raw '{
+  "requestDetails": {
+    "internetId": "",
+    "actionCode": "CALC",
+    "userType": "",
+    "isBusinessValid": false,
+    "systemCodeAddressing": 1
+  },
+  "businessIdentifiers": {
+    "agentNumber": 1474,
+    "collectiveCode": 5443,
+    "programNumber": 501,
+    "branchNumber": 565,
+    "tableGuid": 57
+  },
+  "agentDetails": {
+    "userName": "",
+    "agentEmail": "",
+    "branch": 0,
+    "doqetNumber": "",
+    "transactionNumber": 0
+  },
+  "others": {
+    "excludedViewingInd": 0,
+    "additionNumber": "",
+    "policyNumber": 0,
+    "discountPrecent": 0,
+    "additionDate": 0
+  },
+  "travelDetails": {
+    "insuranceStartDate": "20240901",
+    "insuranceEndDate": "20240905",
+    "daysOfTravel": 5,
+    "travelRegionCode": 2,
+    "numOfPassengers": 1
+  },
+  "paymentDetails": {
+    "collectionType": 0,
+    "creditCardType": "2",
+    "creditCardNumber": "1596048788474580",
+    "creditCardValidDate": 202505,
+    "creditCardCVV": "",
+    "confirmNumber": "2222222",
+    "payerId": 306198086,
+    "payerFirstName": "בדיקה",
+    "payerLastName": "בדיקה",
+    "payerPhone": "0544494082",
+    "numberOfPayments": 1,
+    "meserTransId": "",
+    "paymentType": "cc"
+  },
+  "applicationDetails": {
+    "appAgentNumber": 0,
+    "appConnectedUserId": 306198086,
+    "appConnectedPhoneNum": "",
+    "appConnectedEmail": ""
+  },
+  "passengers": {
+    "underWritingAnswersInd": 0,
+    "passengersList": [
+      {
+        "passengerIdNumber": 306198086,
+        "passengerIdCode": "ת",
+        "firstName": "בדיקה",
+        "lastName": "בדיקה",
+        "firstNameEnglish": "Ddss",
+        "lastNameEnglish": "Gggg",
+        "birthDate": 19860508,
+        "gender": "f",
+        "phonePrefix": "054",
+        "phoneNumber": "4494082",
+        "email": "Rina@cgh.com",
+        "policyOwner": 1,
+        "covers": [
+          {
+            "coverCode": 1,
+            "fromDate": "20240901",
+            "toDate": "20240905",
+            "additionalInfo": " "
+          },
+          {
+            "coverCode": 36,
+            "fromDate": "20240901",
+            "toDate": "20240905",
+            "additionalInfo": " "
+          },
+          {
+            "coverCode": 176,
+            "fromDate": "20240901",
+            "toDate": "20240905",
+            "additionalInfo": " "
+          }
+        ],
+        "questions": [
+          {
+            "questionId": 1,
+            "answerId": 2
+          },
+          {
+            "questionId": 3,
+            "answerId": 2
+          },
+          {
+            "questionId": 7,
+            "answerId": 2
+          },
+          {
+            "questionId": 9,
+            "answerId": 2
+          },
+          {
+            "questionId": 27,
+            "answerId": 2
+          }
+        ],
+        "policyNumber": 0,
+        "clubMember": 0
+      }
+    ]
+  }
+}'
