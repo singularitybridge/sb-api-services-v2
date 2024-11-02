@@ -8,6 +8,7 @@ interface CurlResponse {
   status: number;
   data: any;
   headers: Record<string, string>;
+  error?: string;
 }
 
 const normalizeCurlCommand = (command: string): string => {
@@ -30,7 +31,12 @@ export async function performCurlRequest(
   try {
     // Validate and normalize the command
     if (!curlCommand.trim().toLowerCase().startsWith('curl')) {
-      throw new Error('Invalid curl command. Command must start with "curl"');
+      return {
+        status: 400,
+        data: null,
+        headers: {},
+        error: 'Invalid curl command. Command must start with "curl"'
+      };
     }
     const normalizedCommand = normalizeCurlCommand(curlCommand);
 
@@ -41,7 +47,12 @@ export async function performCurlRequest(
     // Extract status code using our marker
     const statusMatch = response.match(/\nSTATUS_CODE:(\d+)$/);
     if (!statusMatch) {
-      throw new Error('Could not extract status code from response');
+      return {
+        status: 500,
+        data: null,
+        headers: {},
+        error: 'Could not extract status code from response'
+      };
     }
 
     // Get response body (everything before our status code marker)
@@ -68,6 +79,11 @@ export async function performCurlRequest(
     return { status, data, headers: {} };
   } catch (error: any) {
     console.error('performCurlRequest: Error performing request', error);
-    throw error;
+    return {
+      status: 500,
+      data: null,
+      headers: {},
+      error: error.message || 'An error occurred while performing the curl request'
+    };
   }
 }
