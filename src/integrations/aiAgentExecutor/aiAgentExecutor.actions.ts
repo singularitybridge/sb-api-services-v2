@@ -34,39 +34,24 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
 
   return {
     executeCommand: {
-      description: 'Execute a command on the AI Agent Executor. Optionally run in background.',
+      description: 'Execute a command on the AI Agent Executor.',
       parameters: {
         type: 'object',
         properties: {
           command: { type: 'string', description: 'The command to execute' },
-          runInBackground: {
-            type: 'boolean',
-            description: 'Whether to run the command in background',
-            optional: true,
-          },
         },
         required: ['command'],
       },
-      function: async ({
-        command,
-        runInBackground,
-      }: {
-        command: string;
-        runInBackground?: boolean;
-      }): Promise<AIAgentExecutorResponse> => {
+      function: async ({ command }: { command: string }): Promise<AIAgentExecutorResponse> => {
         try {
           const response = await axios.post(
             `${baseUrl}/execute`,
-            { command, runInBackground },
+            { command },
             { headers: getHeaders() }
           );
           const data = response.data;
           if (data.result) {
-            // Foreground execution result
             return { success: true, data: data.result };
-          } else if (data.pid) {
-            // Background execution result
-            return { success: true, data: { message: data.message, pid: data.pid } };
           } else {
             return { success: false, error: 'Unknown response format from execute command.' };
           }
