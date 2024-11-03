@@ -33,7 +33,7 @@ inboxRouter.post('/reply/:sessionId', async (req: AuthenticatedRequest, res) => 
   const { sessionId } = req.params;
 
   try {
-    const apiKey = await getApiKey(req.company._id, 'openai');
+    const apiKey = await getApiKey(req.company._id, 'openai_api_key');
 
     // Add human operator response to inbox
     await addMessageToInbox({

@@ -147,7 +147,7 @@ router.post(
       // Get API key
       const apiKey = await getApiKey(
         companyId.toString(),
-        'openai' as ApiKeyType,
+        'openai_api_key',
       );
       if (!apiKey) {
         return res

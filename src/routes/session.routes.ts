@@ -44,7 +44,7 @@ sessionRouter.put(
 // Update session assistant
 sessionRouter.put(
   '/:id/assistant',
-  validateApiKeys(['openai']),
+  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const { id } = req.params;
     const { assistantId } = req.body;
@@ -72,7 +72,7 @@ sessionRouter.post(
   '/',
   async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const apiKey = await getApiKey(req.company._id, 'openai');
+      const apiKey = await getApiKey(req.company._id, 'openai_api_key');
       
       if (!apiKey) {
         return res.status(200).json({
@@ -104,12 +104,12 @@ sessionRouter.post(
 // End session
 sessionRouter.delete(
   '/:id',
-  validateApiKeys(['openai']),
+  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const { id } = req.params;
 
     try {
-      const apiKey = await getApiKey(req.company._id, 'openai');
+      const apiKey = await getApiKey(req.company._id, 'openai_api_key');
 
       if (!apiKey) {
         throw new BadRequestError('OpenAI API key not found');
@@ -195,10 +195,10 @@ sessionRouter.get('/:id', async (req: AuthenticatedRequest, res: Response) => {
 // Get session messages
 sessionRouter.get(
   '/:id/messages',
-  validateApiKeys(['openai']),
+  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
-    const apiKey = await getApiKey(req.company._id, 'openai');
+    const apiKey = await getApiKey(req.company._id, 'openai_api_key');
 
     try {
       const session = await Session.findOne({

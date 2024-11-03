@@ -18,7 +18,7 @@ assistantRouter.use('/', postRoutes);
 
 assistantRouter.delete(
   '/:id',
-  validateApiKeys(['openai']),
+  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     const { id } = req.params;
 
@@ -44,7 +44,7 @@ assistantRouter.delete(
 
 assistantRouter.patch(
   '/:id/allowed-actions',
-  validateApiKeys(['openai']),
+  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;

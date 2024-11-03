@@ -5,7 +5,7 @@ import { ApiKey } from './verification.service';
 const BASE_URL = 'https://api.jsonbin.io/v3';
 
 const getHeaders = async (companyId: string, binName?: string) => {
-  const apiKey = await getApiKey(companyId, 'jsonbin');
+  const apiKey = await getApiKey(companyId, 'jsonbin_api_key');
   if (!apiKey) {
     throw new Error('Failed to retrieve JSONBin API key');
   }

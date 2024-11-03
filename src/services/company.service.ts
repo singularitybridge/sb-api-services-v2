@@ -67,6 +67,8 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
       { key: 'photoroom_api_key', value: 'default_photoroom_key' },
       { key: 'telegram_bot_api_key', value: 'default_telegram_bot_key' },
       { key: 'linear_api_key', value: 'default_linear_key' },
+      { key: 'executor_agent_url', value: 'default_executor_agent_url' },
+      { key: 'executor_agent_token', value: 'default_executor_agent_token' },
     ];
 
     defaultKeys.forEach(defaultKey => {

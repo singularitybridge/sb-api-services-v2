@@ -16,7 +16,7 @@ export const updateAllowedActions = async (assistantId: string, allowedActions: 
     }
 
     // Update the OpenAI assistant first
-    const apiKey = await getApiKey(assistant.companyId.toString(), 'openai') as string;
+    const apiKey = await getApiKey(assistant.companyId.toString(), 'openai_api_key') as string;
 
     let updatedOpenAIAssistant = await updateAssistantById(
       apiKey,

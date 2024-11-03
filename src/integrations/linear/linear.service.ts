@@ -2,7 +2,7 @@ import { LinearClient, Issue, IssueConnection, IssuePayload, User, UserConnectio
 import { getApiKey } from '../../services/api.key.service';
 
 const createLinearClient = async (companyId: string): Promise<LinearClient> => {
-  const apiKey = await getApiKey(companyId, 'linear');
+  const apiKey = await getApiKey(companyId, 'linear_api_key');
   if (!apiKey) {
     throw new Error('Linear API key not found');
   }

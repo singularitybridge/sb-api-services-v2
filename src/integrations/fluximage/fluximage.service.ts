@@ -10,7 +10,7 @@ interface FluxImageGenerationOptions {
 }
 
 export const generateFluxImage = async (companyId: string, options: FluxImageGenerationOptions): Promise<string> => {
-  const apiKey = await getApiKey(companyId, 'getimg');
+  const apiKey = await getApiKey(companyId, 'getimg_api_key');
   if (!apiKey) {
     throw new Error('GetImg API key not found');
   }

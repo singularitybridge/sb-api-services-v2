@@ -13,14 +13,14 @@ const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 router.post('/transcribe/oai', 
-  validateApiKeys(['openai']),
+  validateApiKeys(['openai_api_key']),
   upload.single('audio'), 
   async (req: AuthenticatedRequest, res) => {
     const language = req.body.language || 'en'; // Default to English if not specified
 
     try {
 
-      const openaiApiKey = await getApiKey(req.company._id, 'openai');
+      const openaiApiKey = await getApiKey(req.company._id, 'openai_api_key');
 
       if (!openaiApiKey) {
         res.status(401).send('OpenAI API key not found');
