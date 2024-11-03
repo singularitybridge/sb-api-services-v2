@@ -34,7 +34,7 @@ export const sendMessageToAgent = async (
       throw new Error('Session not found');
     }
 
-    const apiKey = await getApiKey(session.companyId.toString(), 'openai') as string;
+    const apiKey = await getApiKey(session.companyId.toString(), 'openai_api_key') as string;
     const response = await handleSessionMessage(apiKey, message, sessionId, session.channel);
     
     // Send the response to the appropriate channel

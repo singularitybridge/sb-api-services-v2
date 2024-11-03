@@ -17,7 +17,7 @@ interface EmailParams {
 
 export const sendEmail = async (companyId: string, params: EmailParams): Promise<{ success: boolean; message?: string; error?: string }> => {
   try {
-    const apiKey = await getApiKey(companyId, 'sendgrid');
+    const apiKey = await getApiKey(companyId, 'sendgrid_api_key');
     if (!apiKey) {
       throw new Error('SendGrid API key not found');
     }

@@ -5,7 +5,7 @@ import { readFile, updateFile, createFile, updateArrayElement, deleteArrayElemen
 
 const jsonbinRouter = express.Router();
 
-jsonbinRouter.post('/', validateApiKeys(['jsonbin']), express.json(), async (req: AuthenticatedRequest, res) => {
+jsonbinRouter.post('/', validateApiKeys(['jsonbin_api_key']), express.json(), async (req: AuthenticatedRequest, res) => {
   try {
     const { data, name } = req.body;
     const result = await createFile(req.company._id, data, name);
@@ -15,7 +15,7 @@ jsonbinRouter.post('/', validateApiKeys(['jsonbin']), express.json(), async (req
   }
 });
 
-jsonbinRouter.get('/:binId', validateApiKeys(['jsonbin']), async (req: AuthenticatedRequest, res) => {
+jsonbinRouter.get('/:binId', validateApiKeys(['jsonbin_api_key']), async (req: AuthenticatedRequest, res) => {
   try {
     const { binId } = req.params;
     const data = await readFile(req.company._id, binId);
@@ -25,7 +25,7 @@ jsonbinRouter.get('/:binId', validateApiKeys(['jsonbin']), async (req: Authentic
   }
 });
 
-jsonbinRouter.put('/:binId', validateApiKeys(['jsonbin']), express.json(), async (req: AuthenticatedRequest, res) => {
+jsonbinRouter.put('/:binId', validateApiKeys(['jsonbin_api_key']), express.json(), async (req: AuthenticatedRequest, res) => {
   try {
     const { binId } = req.params;
     const data = req.body;
@@ -36,7 +36,7 @@ jsonbinRouter.put('/:binId', validateApiKeys(['jsonbin']), express.json(), async
   }
 });
 
-jsonbinRouter.put('/:binId/:arrayKey/:elementId', validateApiKeys(['jsonbin']), express.json(), async (req: AuthenticatedRequest, res) => {
+jsonbinRouter.put('/:binId/:arrayKey/:elementId', validateApiKeys(['jsonbin_api_key']), express.json(), async (req: AuthenticatedRequest, res) => {
   try {
     const { binId, arrayKey, elementId } = req.params;
     const updateData = req.body;
@@ -52,7 +52,7 @@ jsonbinRouter.put('/:binId/:arrayKey/:elementId', validateApiKeys(['jsonbin']), 
 });
 
 // New route for deleting an array element
-jsonbinRouter.delete('/:binId/:arrayKey/:elementId', validateApiKeys(['jsonbin']), async (req: AuthenticatedRequest, res) => {
+jsonbinRouter.delete('/:binId/:arrayKey/:elementId', validateApiKeys(['jsonbin_api_key']), async (req: AuthenticatedRequest, res) => {
   try {
     const { binId, arrayKey, elementId } = req.params;
     const result = await deleteArrayElement(req.company._id, binId, arrayKey, elementId);
@@ -67,7 +67,7 @@ jsonbinRouter.delete('/:binId/:arrayKey/:elementId', validateApiKeys(['jsonbin']
 });
 
 // New route for inserting an array element
-jsonbinRouter.post('/:binId/:arrayKey', validateApiKeys(['jsonbin']), express.json(), async (req: AuthenticatedRequest, res) => {
+jsonbinRouter.post('/:binId/:arrayKey', validateApiKeys(['jsonbin_api_key']), express.json(), async (req: AuthenticatedRequest, res) => {
   try {
     const { binId, arrayKey } = req.params;
     const newElement = req.body;

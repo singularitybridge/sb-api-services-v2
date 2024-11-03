@@ -7,7 +7,7 @@ const completionRouter = express.Router();
 
 completionRouter.post(
   '/',
-  validateApiKeys(['openai']),
+  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     const {
       systemPrompt,
@@ -16,7 +16,7 @@ completionRouter.post(
       temperature,
     } = req.body;
 
-    const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
+    const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
 
     try {
       const response = await getCompletionResponse(

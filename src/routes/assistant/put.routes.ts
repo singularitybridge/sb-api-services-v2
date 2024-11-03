@@ -9,14 +9,14 @@ const router = Router();
 
 router.put(
   '/:id',
-  validateApiKeys(['openai']),
+  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
       const assistantData = req.body;
       const { allowedActions, ...otherData } = assistantData;
 
-      const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
+      const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
 
       const assistant = await Assistant.findOneAndUpdate(
         {

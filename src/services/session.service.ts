@@ -211,7 +211,7 @@ export async function getSessionLanguage(
   companyId: string,
 ): Promise<SupportedLanguage> {
   try {
-    const apiKey = await getApiKey(companyId, 'openai' as ApiKeyType);
+    const apiKey = await getApiKey(companyId, 'openai_api_key' as ApiKeyType);
 
     if (!apiKey) {
       console.log('OpenAI API key not found, defaulting to English');

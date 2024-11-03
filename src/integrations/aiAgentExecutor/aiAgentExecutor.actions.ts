@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { ActionContext, FunctionFactory } from '../actions/types';
+import { getApiKey } from '../../services/api.key.service';
 
 interface AIAgentExecutorResponse {
   success: boolean;
@@ -23,14 +24,26 @@ const handleError = (error: unknown): string => {
 };
 
 export const createAIAgentExecutorActions = (context: ActionContext): FunctionFactory => {
-  // Base URL for the AI Agent Executor API
-  const baseUrl = process.env.AI_AGENT_EXECUTOR_URL || 'http://localhost:3001';
+  // Get headers with encrypted keys
+  const getHeaders = async () => {
+    const token = await getApiKey(context.companyId, 'executor_agent_token');
+    if (!token) {
+      throw new Error('AI Agent Executor token is missing');
+    }
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    };
+  };
 
-  // Common headers for all requests
-  const getHeaders = () => ({
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${process.env.AI_AGENT_EXECUTOR_TOKEN}`,
-  });
+  // Get base URL from encrypted key
+  const getBaseUrl = async () => {
+    const url = await getApiKey(context.companyId, 'executor_agent_url');
+    if (!url) {
+      throw new Error('AI Agent Executor URL is missing');
+    }
+    return url;
+  };
 
   return {
     executeCommand: {
@@ -44,10 +57,13 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
       },
       function: async ({ command }: { command: string }): Promise<AIAgentExecutorResponse> => {
         try {
+          const baseUrl = await getBaseUrl();
+          const headers = await getHeaders();
+          
           const response = await axios.post(
             `${baseUrl}/execute`,
             { command },
-            { headers: getHeaders() }
+            { headers }
           );
           const data = response.data;
           if (data.result) {
@@ -72,8 +88,11 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
       },
       function: async ({ pid }: { pid: string }): Promise<AIAgentExecutorResponse> => {
         try {
+          const baseUrl = await getBaseUrl();
+          const headers = await getHeaders();
+          
           const response = await axios.get(`${baseUrl}/process/${pid}`, {
-            headers: getHeaders(),
+            headers,
           });
           return { success: true, data: response.data };
         } catch (error: unknown) {
@@ -93,10 +112,13 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
       },
       function: async ({ pid }: { pid: string }): Promise<AIAgentExecutorResponse> => {
         try {
+          const baseUrl = await getBaseUrl();
+          const headers = await getHeaders();
+          
           const response = await axios.post(
             `${baseUrl}/process/${pid}/stop`,
             {},
-            { headers: getHeaders() }
+            { headers }
           );
           return { success: true, data: response.data };
         } catch (error: unknown) {
@@ -159,10 +181,13 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
         mode?: 'overwrite' | 'append';
       }): Promise<AIAgentExecutorResponse> => {
         try {
+          const baseUrl = await getBaseUrl();
+          const headers = await getHeaders();
+          
           const response = await axios.post(
             `${baseUrl}/file-operation`,
             { operation, path, content, recursive, mode },
-            { headers: getHeaders() }
+            { headers }
           );
           const data = response.data;
           return { success: true, data: data.result };
@@ -181,10 +206,13 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
       },
       function: async (): Promise<AIAgentExecutorResponse> => {
         try {
+          const baseUrl = await getBaseUrl();
+          const headers = await getHeaders();
+          
           const response = await axios.post(
             `${baseUrl}/stop-execution`,
             {},
-            { headers: getHeaders() }
+            { headers }
           );
           return { success: true, data: response.data.message };
         } catch (error: unknown) {

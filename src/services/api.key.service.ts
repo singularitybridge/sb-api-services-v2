@@ -5,17 +5,19 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
 export type ApiKeyType =
-  | 'openai'
-  | 'labs11'
-  | 'google'
-  | 'twilio'
-  | 'jsonbin'
-  | 'getimg'
-  | 'perplexity'
-  | 'sendgrid'
-  | 'photoroom'
-  | 'telegram_bot'
-  | 'linear';
+  | 'openai_api_key'
+  | 'labs11_api_key'
+  | 'google_api_key'
+  | 'twilio_api_key'
+  | 'jsonbin_api_key'
+  | 'getimg_api_key'
+  | 'perplexity_api_key'
+  | 'sendgrid_api_key'
+  | 'photoroom_api_key'
+  | 'telegram_bot_api_key'
+  | 'linear_api_key'
+  | 'executor_agent_url'
+  | 'executor_agent_token';
 
 // Initialize cache with a 15-minute TTL (time to live)
 const apiKeyCache = new NodeCache({ stdTTL: 900 });
@@ -39,7 +41,7 @@ export const getApiKey = async (
   }
 
   const apiKey = company.api_keys.find(
-    (key) => key.key === `${keyType}_api_key`,
+    (key) => key.key === keyType,
   );
   if (!apiKey) {
     return null;
@@ -101,7 +103,7 @@ export const refreshApiKeyCache = async (companyId: string): Promise<void> => {
   }
 
   for (const apiKey of company.api_keys) {
-    const keyType = apiKey.key.split('_')[0] as ApiKeyType;
+    const keyType = apiKey.key as ApiKeyType;
     const decryptedKey = decryptData({
       value: apiKey.value,
       iv: apiKey.iv,
@@ -129,7 +131,7 @@ export const validateApiKeys = (requiredKeys: ApiKeyType[]) => {
     if (missingKeys.length > 0) {
       return res.status(400).json({
         error: 'Missing API keys',
-        missingKeys: missingKeys.map((key) => `${key} API key`),
+        missingKeys,
       });
     }
 

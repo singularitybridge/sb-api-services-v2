@@ -54,7 +54,7 @@ export const initializeTelegramBots = async () => {
     for (const company of companies) {
       try {
         const companyId = normalizeCompanyId(company._id);
-        const telegramBotToken = await getApiKey(companyId, 'telegram_bot');
+        const telegramBotToken = await getApiKey(companyId, 'telegram_bot_api_key');
 
         if (!telegramBotToken) {
           console.log(`Notice: No Telegram bot token found for company ${companyId}`);
@@ -134,7 +134,7 @@ export const initializeTelegramBots = async () => {
             console.log(`[Company ${companyId}] Processing message for user ${user.id}`);
 
             if (messageText) {
-              const apiKey = await getApiKey(companyId, 'openai') as string;
+              const apiKey = await getApiKey(companyId, 'openai_api_key') as string;
               
               const session = await getSessionOrCreate(
                 apiKey,
@@ -179,7 +179,7 @@ const handleClearChat = async (bot: TelegramBot, chatId: number, userId: number,
       return;
     }
 
-    const apiKey = await getApiKey(companyId, 'openai') as string;
+    const apiKey = await getApiKey(companyId, 'openai_api_key') as string;
     
     const session = await getSessionOrCreate(
       apiKey,
@@ -215,7 +215,7 @@ const handleChangeAgent = async (bot: TelegramBot, chatId: number, userId: numbe
       return;
     }
 
-    const apiKey = await getApiKey(companyId, 'openai') as string;
+    const apiKey = await getApiKey(companyId, 'openai_api_key') as string;
     
     const session = await getSessionOrCreate(
       apiKey,

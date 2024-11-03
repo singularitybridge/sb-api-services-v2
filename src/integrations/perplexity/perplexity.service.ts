@@ -20,7 +20,7 @@ interface PerplexityResponse {
 }
 
 export async function performPerplexitySearch(companyId: string, model: string, query: string): Promise<string> {
-  const apiKey = await getApiKey(companyId, 'perplexity');
+  const apiKey = await getApiKey(companyId, 'perplexity_api_key');
   if (!apiKey) {
     throw new Error('Perplexity API key not found');
   }

@@ -64,7 +64,7 @@ export const updateAllowedActions = async (assistantId: string, allowedActions: 
       return parts.length > 1 ? parts[1] : actionName;
     });
 
-    const apiKey = await getApiKey(assistant.companyId.toString(), 'openai') as string;
+    const apiKey = await getApiKey(assistant.companyId.toString(), 'openai_api_key') as string;
 
     let updatedOpenAIAssistant = await updateAssistantById(
       apiKey,
@@ -122,7 +122,7 @@ export async function deleteAssistant(id: string, assistantId: string): Promise<
     await Assistant.findByIdAndDelete(id);
 
     try {
-      const apiKey = await getApiKey(assistant.companyId.toString(), 'openai') as string;
+      const apiKey = await getApiKey(assistant.companyId.toString(), 'openai_api_key') as string;
       await deleteAssistantById(apiKey, assistantId, id);
     } catch (error) {
       console.warn(`Warning: Failed to delete assistant from OpenAI: ${error instanceof Error ? error.message : 'Unknown error'}`);
