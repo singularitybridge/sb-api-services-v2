@@ -5,6 +5,7 @@ import { getSessionById } from '../../services/session.service';
 import { SupportedLanguage } from '../../services/discovery.service';
 import { v4 as uuidv4 } from 'uuid';
 import heKnowledgeRetrieval from '../../translations/he-knowledge-retrieval';
+import * as readline from 'readline';
 
 interface RunStep {
   id: string;
@@ -27,47 +28,65 @@ interface ToolCall {
 
 class StatusLogger {
   private lastStatus: string = '';
-  private lastLine: number = 0;
+  private isTTY: boolean;
 
   constructor() {
-    // Move cursor to new line initially
-    process.stdout.write('\n');
-    this.lastLine = 1;
+    // Check if stdout is a TTY (terminal)
+    this.isTTY = process.stdout.isTTY;
+
+    if (this.isTTY) {
+      // Move cursor to new line initially
+      process.stdout.write('\n');
+    }
   }
 
   private clearLine() {
-    process.stdout.clearLine(0);
-    process.stdout.cursorTo(0);
+    if (this.isTTY) {
+      // Use readline methods instead of process.stdout methods
+      readline.clearLine(process.stdout, 0);
+      readline.cursorTo(process.stdout, 0);
+    }
   }
 
   updateStatus(status: string) {
-    // Clear the previous status line
-    this.clearLine();
-    // Write the new status
-    process.stdout.write(`Run Status: ${status}`);
+    if (this.isTTY) {
+      // Clear the previous status line
+      this.clearLine();
+      // Write the new status
+      process.stdout.write(`Run Status: ${status}`);
+    } else {
+      // In environments without TTY, just log the status normally
+      console.log(`Run Status: ${status}`);
+    }
     this.lastStatus = status;
   }
 
   info(message: string) {
-    // Move to new line, print message, then return to status line
-    this.clearLine();
-    console.log(message);
-    process.stdout.write(`Run Status: ${this.lastStatus}`);
+    if (this.isTTY) {
+      // Clear the status line, print message, then restore status line
+      this.clearLine();
+      console.log(message);
+      process.stdout.write(`Run Status: ${this.lastStatus}`);
+    } else {
+      console.log(message);
+    }
   }
 
   succeed(message: string, tokens?: number) {
-    this.clearLine();
+    if (this.isTTY) {
+      this.clearLine();
+    }
     const tokenInfo = tokens ? ` (${tokens} tokens used)` : '';
     console.log(`✓ ${message}${tokenInfo}`);
   }
 
   fail(message: string) {
-    this.clearLine();
+    if (this.isTTY) {
+      this.clearLine();
+    }
     console.log(`✗ ${message}`);
   }
 }
-
-
 
 const checkFileToolUsage = async (openaiClient: any, threadId: string, runId: string, logger: StatusLogger): Promise<boolean> => {
   const runSteps = await openaiClient.beta.threads.runs.steps.list(threadId, runId);
