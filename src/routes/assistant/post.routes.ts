@@ -9,7 +9,7 @@ const router = Router();
 
 router.post(
   '/',
-  validateApiKeys(['openai']),
+  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     try {
       await refreshApiKeyCache(req.company._id.toString());
@@ -19,7 +19,7 @@ router.post(
         companyId: req.user?.companyId,
       };
       const newAssistant = new Assistant(assistantData);
-      const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
+      const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
 
       await newAssistant.save();
 
@@ -56,11 +56,11 @@ router.post(
 
 router.post(
   '/default',
-  validateApiKeys(['openai']),
+  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     try {
       const companyId = req.company._id;
-      const apiKey = await getApiKey(companyId, 'openai') as string;
+      const apiKey = await getApiKey(companyId, 'openai_api_key') as string;
 
       if (!apiKey) {
         return res.status(400).json({ message: 'OpenAI API key not found' });

@@ -12,10 +12,10 @@ const threadRouter = express.Router();
 
 threadRouter.get(
   '/:id/messages',
-  validateApiKeys(['openai']),
+  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     const { id } = req.params;
-    const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
+    const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
     const messages = await getMessages(apiKey, id);
     res.send(messages);
   }
@@ -57,9 +57,9 @@ threadRouter.get(
 
 threadRouter.post(
   '/',
-  validateApiKeys(['openai']),
+  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
-    const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
+    const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
     const newThread = await createNewThread(apiKey);
     res.send(newThread);
   }
@@ -67,10 +67,10 @@ threadRouter.post(
 
 threadRouter.delete(
   '/:id',
-  validateApiKeys(['openai']),
+  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     const { id } = req.params;
-    const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
+    const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
     await deleteThread(apiKey, id);
     res.send({ message: 'Thread deleted successfully' });
   }
@@ -78,10 +78,10 @@ threadRouter.delete(
 
 threadRouter.post(
   '/user-input',
-  validateApiKeys(['openai']),
+  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     const { userInput, sessionId } = req.body;
-    const apiKey = (await getApiKey(req.company._id, 'openai')) as string;
+    const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
     
     try {
       const session = await Session.findById(sessionId);

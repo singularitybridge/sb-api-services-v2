@@ -72,7 +72,7 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
     },
     function: async ({ text, voice = 'alloy', model = 'tts-1-hd', textLimit = 256 }: GenerateSpeechArgs) => {
       try {
-        const apiKey = await getApiKey(context.companyId, 'openai');
+        const apiKey = await getApiKey(context.companyId, 'openai_api_key');
         if (!apiKey) {
           return { error: 'OpenAI API key is missing' };
         }
@@ -103,7 +103,7 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
     },
     function: async ({ audioUrl, language }: TranscribeAudioArgs) => {
       try {
-        const apiKey = await getApiKey(context.companyId, 'openai');
+        const apiKey = await getApiKey(context.companyId, 'openai_api_key');
         if (!apiKey) {
           return { error: 'OpenAI API key is missing' };
         }
@@ -139,7 +139,7 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
         if (!allowedModels.includes(model)) {
           return { error: `Invalid model specified. Allowed models are ${allowedModels.join(', ')}` };
         }
-        const apiKey = await getApiKey(context.companyId, 'openai');
+        const apiKey = await getApiKey(context.companyId, 'openai_api_key');
         if (!apiKey) {
           return { error: 'OpenAI API key is missing' };
         }
@@ -182,7 +182,7 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
           return { error: `Invalid model specified. Allowed models are ${allowedModels.join(', ')}` };
         }
 
-        const apiKey = await getApiKey(context.companyId, 'openai');
+        const apiKey = await getApiKey(context.companyId, 'openai_api_key');
         if (!apiKey) {
           return { error: 'OpenAI API key is missing' };
         }

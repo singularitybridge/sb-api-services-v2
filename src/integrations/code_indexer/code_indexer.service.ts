@@ -26,7 +26,7 @@ export const scanCodeProject = async (params: ScanCodeProjectParams): Promise<vo
   const files = getFilesFromGlob(directoryPath, includePatterns, excludePatterns);
   console.log(`Found ${files.length} files to process`);
 
-  const apiKey = await getApiKey(companyId, 'openai');
+  const apiKey = await getApiKey(companyId, 'openai_api_key');
   if (!apiKey) throw new Error('OpenAI API key is missing');
 
   const openai = new OpenAI({ apiKey });
@@ -106,7 +106,7 @@ export const queryRelevantFiles = async (
 ): Promise<CodeFileSummary[]> => {
   const contentType = await getOrCreateContentType(companyId, 'CodeFileSummary');
   
-  const apiKey = await getApiKey(companyId, 'openai');
+  const apiKey = await getApiKey(companyId, 'openai_api_key');
   if (!apiKey) throw new Error('OpenAI API key is missing');
 
   const openai = new OpenAI({ apiKey });

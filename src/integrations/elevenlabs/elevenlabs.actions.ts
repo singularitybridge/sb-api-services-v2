@@ -6,7 +6,7 @@ export const createElevenLabsActions = (context: ActionContext): FunctionFactory
   generateElevenLabsAudio: {
     function: async ({ text, voiceId }: { text: string; voiceId: string }) => {
       try {
-        const apiKey = await getApiKey(context.companyId, 'labs11');
+        const apiKey = await getApiKey(context.companyId, 'labs11_api_key');
         if (!apiKey) {
           throw new Error('ElevenLabs API key is missing');
         }

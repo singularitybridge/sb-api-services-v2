@@ -74,7 +74,7 @@ export const createJournalActions = (
           };
         }
 
-        const apiKey = (await getApiKey(companyId, 'openai')) || '';
+        const apiKey = (await getApiKey(companyId, 'openai_api_key')) || '';
         const result = await createJournalEntry(
           {
             content,

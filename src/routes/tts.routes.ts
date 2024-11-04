@@ -10,10 +10,10 @@ const router = express.Router();
 
 router.post(
   '/generate/11labs',
-  validateApiKeys(['labs11']),
+  validateApiKeys(['labs11_api_key']),
   async (req: AuthenticatedRequest, res) => {
     const { text, voiceId, modelId } = req.body;
-    const apiKey = await getApiKey(req.company._id, 'labs11');
+    const apiKey = await getApiKey(req.company._id, 'labs11_api_key');
 
     if (apiKey === null) {
       return res.status(400).json({ error: '11labs API key is not set' });
@@ -26,7 +26,7 @@ router.post(
 
 router.post('/generate/google', async (req: AuthenticatedRequest, res) => {
   const { text, voiceLanguageCode, voiceName } = req.body;
-  const apiKey = await getApiKey(req.company._id, 'google');
+  const apiKey = await getApiKey(req.company._id, 'google_api_key');
   if (apiKey === 'not set') {
     return res.status(400).json({ error: 'Google API key is not set' });
   }
@@ -36,11 +36,11 @@ router.post('/generate/google', async (req: AuthenticatedRequest, res) => {
 
 router.post(
   '/generate/oai',
-  validateApiKeys(['openai']),
+  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     try {
       const { text, voice, textLimit } = req.body;
-      const openaiApiKey = await getApiKey(req.company._id, 'openai');
+      const openaiApiKey = await getApiKey(req.company._id, 'openai_api_key');
 
       if (!openaiApiKey) {
         res.status(401).send('OpenAI API key not found');
