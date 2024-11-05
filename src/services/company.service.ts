@@ -5,6 +5,7 @@ import { encryptData, decryptData } from './encryption.service';
 import jwt from 'jsonwebtoken';
 import { updateOnboardingStatus } from './onboarding.service';
 import { User } from '../models/User';
+import { refreshApiKeyCache, ApiKeyType } from './api.key.service';
 
 const generateToken = () => {
   return jwt.sign({}, process.env.JWT_SECRET as string);
@@ -89,6 +90,10 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
     const createdCompany = company.toObject();
     decryptCompanyData(createdCompany);
 
+    // Refresh API key cache for the new company
+    await refreshApiKeyCache(createdCompany._id.toString());
+    console.log(`API key cache refreshed for new company: ${createdCompany._id}`);
+
     return createdCompany as unknown as ICompany;
   } catch (error) {
     console.error('Error creating company:', error);
@@ -153,6 +158,10 @@ export const updateCompany = async (id: string, data: Partial<ICompany>) => {
     const updatedCompanyData = updatedCompany.toObject();
     decryptCompanyData(updatedCompanyData);
 
+    // Refresh API key cache for the updated company
+    await refreshApiKeyCache(id);
+    console.log(`API key cache refreshed for updated company: ${id}`);
+
     return updatedCompanyData as unknown as ICompany;
   } catch (error) {
     console.error('Error updating company:', error);
@@ -199,6 +208,10 @@ export const updateCompanyOnboarding = async (id: string, data: { companyName: s
     const updatedCompanyData = company.toObject();
     decryptCompanyData(updatedCompanyData);
 
+    // Refresh API key cache for the updated company
+    await refreshApiKeyCache(id);
+    console.log(`API key cache refreshed for company after onboarding update: ${id}`);
+
     return updatedCompanyData as unknown as ICompany;
   } catch (error) {
     console.error('Error updating company onboarding information:', error);
@@ -224,7 +237,7 @@ export const refreshCompanyToken = async (id: string, data: ICompany) => {
       data,
     )) as unknown as ICompany;
 
-    console.log('new token generated');
+    console.log(`New token generated and API key cache refreshed for company: ${id}`);
     return updatedCompanyData;
   } catch (error) {
     console.error('Error refreshing company token:', error);
