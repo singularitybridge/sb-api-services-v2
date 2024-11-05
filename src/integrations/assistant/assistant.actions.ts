@@ -1,5 +1,6 @@
 import { ActionContext, FunctionFactory } from '../actions/types';
 import { getAssistants, setAssistant, createNewAssistant } from './assistant.service';
+import { IIdentifier } from '../../models/Assistant';
 
 const createAssistantActions = (context: ActionContext): FunctionFactory => ({
   getAssistants: {
@@ -56,12 +57,26 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
           type: 'string',
           description: 'The voice of the assistant',
         },
-        introMessage: {
-          type: 'string',
-          description: 'The introductory message of the assistant',
+        conversationStarters: {
+          type: 'array',
+          description: 'Array of conversation starters with title and content',
+          items: {
+            type: 'object',
+            properties: {
+              key: {
+                type: 'string',
+                description: 'The title of the conversation starter',
+              },
+              value: {
+                type: 'string',
+                description: 'The content of the conversation starter',
+              },
+            },
+            required: ['key', 'value'],
+          },
         },
       },
-      required: ['name', 'description', 'prompt', 'language', 'voice', 'introMessage'],
+      required: ['name', 'description', 'prompt', 'language', 'voice'],
     },
     function: async ({ 
       name, 
@@ -69,14 +84,14 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
       prompt, 
       language, 
       voice, 
-      introMessage 
+      conversationStarters = []
     }: { 
       name: string; 
       description: string; 
       prompt: string;
       language: string;
       voice: string;
-      introMessage: string;
+      conversationStarters?: IIdentifier[];
     }) => {
       return await createNewAssistant(
         context.sessionId, 
@@ -85,7 +100,7 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
         prompt, 
         language, 
         voice, 
-        introMessage
+        conversationStarters
       );
     },
   },
