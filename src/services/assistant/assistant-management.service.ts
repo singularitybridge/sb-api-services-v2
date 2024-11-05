@@ -139,7 +139,12 @@ export const createDefaultAssistant = async (companyId: string, apiKey: string):
   const defaultAssistantData = {
     name: 'Default Assistant',
     description: 'Your company\'s default AI assistant',
-    introMessage: 'Hello {{user.name}}! I\'m your default AI assistant for {{company.name}}. How can I help you today?',
+    conversationStarters: [
+      {
+        key: 'Welcome',
+        value: 'Hello {{user.name}}! I\'m your default AI assistant for {{company.name}}. How can I help you today?'
+      }
+    ],
     voice: 'en-US-Standard-C',
     language: 'en',
     llmModel: 'gpt-4o',
