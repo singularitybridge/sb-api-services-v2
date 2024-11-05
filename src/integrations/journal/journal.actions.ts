@@ -22,6 +22,7 @@ interface GetJournalEntriesArgs {
   entryType?: string;
   tags?: string[];
   limit?: number;
+  scope?: 'user' | 'company';
 }
 
 interface UpdateJournalEntryArgs {
@@ -106,14 +107,19 @@ export const createJournalActions = (
     parameters: {
       type: 'object',
       properties: {
-        entryType: { type: 'string' },
-        tags: { type: 'array', items: { type: 'string' } },
-        limit: { type: 'number' },
+        entryType: { type: 'string', description: 'Filter by entry type' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Filter by tags' },
+        limit: { type: 'number', description: 'Maximum number of entries to return' },
+        scope: { 
+          type: 'string', 
+          enum: ['user', 'company'],
+          description: 'Get entries for current user only or all company entries' 
+        },
       },
       required: [],
       additionalProperties: false,
     },
-    function: async ({ entryType, tags, limit = 25 }: GetJournalEntriesArgs) => {
+    function: async ({ entryType, tags, limit = 25, scope = 'user' }: GetJournalEntriesArgs) => {
       try {
         const { companyId, sessionId } = context;
 
@@ -121,6 +127,13 @@ export const createJournalActions = (
           return {
             error: 'Invalid session',
             message: 'Session ID is required.',
+          };
+        }
+
+        if (!companyId) {
+          return {
+            error: 'Missing parameters',
+            message: 'companyId is required to get journal entries.',
           };
         }
 
@@ -140,6 +153,7 @@ export const createJournalActions = (
           entryType,
           tags,
           limit,
+          scope
         );
         return { success: true, data: entries };
       } catch (error) {
@@ -161,14 +175,19 @@ export const createJournalActions = (
     parameters: {
       type: 'object',
       properties: {
-        entryType: { type: 'string' },
-        tags: { type: 'array', items: { type: 'string' } },
-        limit: { type: 'number' },
+        entryType: { type: 'string', description: 'Filter by entry type' },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Filter by tags' },
+        limit: { type: 'number', description: 'Maximum number of entries to return' },
+        scope: { 
+          type: 'string', 
+          enum: ['user', 'company'],
+          description: 'Get entries for current user only or all company entries' 
+        },
       },
       required: [],
       additionalProperties: false,
     },
-    function: async ({ entryType, tags, limit = 25 }: GetJournalEntriesArgs) => {
+    function: async ({ entryType, tags, limit = 25, scope = 'user' }: GetJournalEntriesArgs) => {
       try {
         const { companyId, sessionId } = context;
 
@@ -176,6 +195,13 @@ export const createJournalActions = (
           return {
             error: 'Invalid session',
             message: 'Session ID is required.',
+          };
+        }
+
+        if (!companyId) {
+          return {
+            error: 'Missing parameters',
+            message: 'companyId is required to get journal entries.',
           };
         }
 
@@ -195,6 +221,7 @@ export const createJournalActions = (
           entryType,
           tags,
           limit,
+          scope
         );
         return { success: true, data: entries };
       } catch (error) {

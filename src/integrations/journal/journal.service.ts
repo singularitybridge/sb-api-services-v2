@@ -6,6 +6,8 @@ import { getUserById } from '../../services/user.service';
 import { getAssistantById } from '../../services/assistant.service';
 import { format, toZonedTime } from 'date-fns-tz';
 
+type JournalScope = 'user' | 'company';
+
 export async function createJournalEntry(
   journalData: Partial<IJournal>,
   apiKey: string,
@@ -37,15 +39,24 @@ export async function createJournalEntry(
 
 export async function getJournalEntries(
   userId: string,
-  companyId?: string,
+  companyId: string,
   sessionId?: string,
   entryType?: string,
   tags?: string[],
-  limit: number = 25
+  limit: number = 25,
+  scope: JournalScope = 'user'
 ): Promise<IJournal[]> {
   try {
-    const query: any = { userId: new mongoose.Types.ObjectId(userId) };
-    if (companyId) query.companyId = new mongoose.Types.ObjectId(companyId);
+    if (!companyId) {
+      throw new Error('companyId is required to get journal entries');
+    }
+
+    const query: any = { companyId: new mongoose.Types.ObjectId(companyId) };
+    
+    if (scope === 'user') {
+      query.userId = new mongoose.Types.ObjectId(userId);
+    }
+    
     if (sessionId) query.sessionId = new mongoose.Types.ObjectId(sessionId);
     if (entryType) query.entryType = entryType;
     if (tags && tags.length > 0) query.tags = { $in: tags };
@@ -59,15 +70,23 @@ export async function getJournalEntries(
 
 export async function getFriendlyJournalEntries(
   userId: string,
-  companyId?: string,
+  companyId: string,
   sessionId?: string,
   entryType?: string,
   tags?: string[],
-  limit: number = 25
+  limit: number = 25,
+  scope: JournalScope = 'user'
 ): Promise<Array<IJournal & { userName: string; agentName: string | null; friendlyTimestamp: string }>> {
   try {
-    const entries = await getJournalEntries(userId, companyId, sessionId, entryType, tags, limit);
-    const user = await getUserById(userId);
+    if (!companyId) {
+      throw new Error('companyId is required to get friendly journal entries');
+    }
+
+    const entries = await getJournalEntries(userId, companyId, sessionId, entryType, tags, limit, scope);
+    
+    const userIds = [...new Set(entries.map(entry => entry.userId.toString()))];
+    const users = await Promise.all(userIds.map(id => getUserById(id)));
+    const userMap = new Map(users.map(user => [user?._id.toString(), user?.name || 'Unknown User']));
     
     const friendlyEntries = await Promise.all(entries.map(async (entry) => {
       const session = await getSessionById(entry.sessionId.toString());
@@ -83,7 +102,7 @@ export async function getFriendlyJournalEntries(
 
       return {
         ...entry.toObject(),
-        userName: user?.name || 'Unknown User',
+        userName: userMap.get(entry.userId.toString()) || 'Unknown User',
         agentName: agentName,
         friendlyTimestamp: friendlyTimestamp
       };
