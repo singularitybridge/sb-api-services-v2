@@ -118,8 +118,8 @@ export const handleSessionMessage = async (
 
   console.log('create new run', session.threadId, session.assistantId);
 
-  const processedIntroMessage = messageCount === 0
-    ? await processTemplate(assistant.introMessage, sessionId)
+  const processedIntroMessage = messageCount === 0 && assistant.conversationStarters?.length > 0
+    ? await processTemplate(assistant.conversationStarters[0].value, sessionId)
     : undefined;
 
   const processedLlmPrompt = await processTemplate(assistant.llmPrompt, sessionId);

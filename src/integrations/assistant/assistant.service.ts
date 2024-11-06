@@ -1,4 +1,4 @@
-import { Assistant } from '../../models/Assistant';
+import { Assistant, IIdentifier } from '../../models/Assistant';
 import { Session } from '../../models/Session';
 import { publishMessage } from '../../services/pusher.service';
 
@@ -59,7 +59,7 @@ export const createNewAssistant = async (
   prompt: string,
   language: string,
   voice: string,
-  introMessage: string
+  conversationStarters: IIdentifier[] = []
 ): Promise<{ success: boolean; description: string; data?: any }> => {
   try {
     const session = await Session.findById(sessionId);
@@ -76,7 +76,7 @@ export const createNewAssistant = async (
       prompt,
       language,
       voice,
-      introMessage,
+      conversationStarters,
       companyId: session.companyId,
     });
 
@@ -88,7 +88,7 @@ export const createNewAssistant = async (
       description: newAssistant.description,
       language: newAssistant.language,
       voice: newAssistant.voice,
-      introMessage: newAssistant.introMessage,
+      conversationStarters: newAssistant.conversationStarters,
     });
 
     return {
@@ -100,7 +100,7 @@ export const createNewAssistant = async (
         description: newAssistant.description,
         language: newAssistant.language,
         voice: newAssistant.voice,
-        introMessage: newAssistant.introMessage,
+        conversationStarters: newAssistant.conversationStarters,
       },
     };
   } catch (error) {
