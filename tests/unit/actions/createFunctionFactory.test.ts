@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { createFunctionFactory } from '../../../src/integrations/actions/loaders';
 import { ActionContext, FunctionFactory } from '../../../src/integrations/actions/types';
+import { SupportedLanguage } from '../../../src/services/discovery.service';
 import * as utils from '../../../src/integrations/actions/utils';
 
 jest.mock('../../../src/integrations/actions/utils', () => ({
@@ -24,6 +25,7 @@ describe('createFunctionFactory', () => {
   const mockContext: ActionContext = {
     sessionId: mockSessionId,
     companyId: mockCompanyId,
+    language: 'en' as SupportedLanguage
   };
 
   const mockActions: FunctionFactory = {

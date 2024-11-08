@@ -1,5 +1,5 @@
 import { ActionContext, FunctionFactory } from '../actions/types';
-import { getSessionInfo, triggerIntegrationAction, discoverLeanActions, getIntegration } from './debug.service';
+import { getSessionInfo, triggerIntegrationAction, discoverLeanActions, getIntegration, discoverActionById } from './debug.service';
 import { SupportedLanguage, Integration } from '../../services/discovery.service';
 
 export const createDebugActions = (context: ActionContext): FunctionFactory => ({
@@ -23,27 +23,46 @@ export const createDebugActions = (context: ActionContext): FunctionFactory => (
     },
   },
   triggerIntegrationAction: {
-    description: 'Trigger an integration action for debug purposes',
+    description: 'Triggers debugging for an integration action with the specified name and service, and accepts request data either as a string or as JSON.',
     strict: true,
     parameters: {
       type: 'object',
+      required: [
+        'integrationName',
+        'requestData',
+        'service'
+      ],
       properties: {
-        integrationName: { type: 'string' },
-        service: { type: 'string' },
-        data: { type: 'object' },
+        integrationName: {
+          type: 'string',
+          description: 'The name of the integration to trigger.'
+        },
+        requestData: {
+          type: 'string',
+          description: 'The request data for the integration action, which can also be provided in JSON format.'
+        },
+        service: {
+          type: 'string',
+          description: 'The specific service associated with the integration action.'
+        }
       },
-      required: ['integrationName', 'service', 'data'],
-      additionalProperties: false,
+      additionalProperties: false
     },
-    function: async (params: { integrationName: string; service: string; data: any }) => {
+    function: async (params: { integrationName: string; service: string; requestData: string }) => {
       console.log('Starting triggerIntegrationAction', { params });
       try {
+        let data: any;
+        try {
+          data = JSON.parse(params.requestData);
+        } catch {
+          data = params.requestData;
+        }
         const result = await triggerIntegrationAction(
           context.sessionId,
           context.companyId,
           params.integrationName,
           params.service,
-          params.data
+          data
         );
         console.log('triggerIntegrationAction completed successfully', { result });
         return result;
@@ -98,6 +117,29 @@ export const createDebugActions = (context: ActionContext): FunctionFactory => (
       } catch (error) {
         console.error('Error in getIntegration:', error);
         return { success: false, error: 'Failed to get integration' };
+      }
+    },
+  },
+  discoverActionById: {
+    description: 'Discover a specific action by ID',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        actionId: { type: 'string' },
+      },
+      required: ['actionId'],
+      additionalProperties: false,
+    },
+    function: async (params: { actionId: string }) => {
+      console.log('Starting discoverActionById', { actionId: params.actionId });
+      try {
+        const result = await discoverActionById(params.actionId, context.language);
+        console.log('discoverActionById completed successfully', { result });
+        return result;
+      } catch (error) {
+        console.error('Error in discoverActionById:', error);
+        return { success: false, error: 'Failed to discover action by ID' };
       }
     },
   },

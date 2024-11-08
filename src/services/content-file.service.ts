@@ -1,6 +1,5 @@
 import { ContentFile, IContentFile } from '../models/ContentFile';
 import { Storage } from '@google-cloud/storage';
-import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import mongoose from 'mongoose';
 
@@ -13,55 +12,120 @@ export const uploadContentFile = async (
   title: string,
   description?: string,
   sessionId?: string,
-  content?: string
-): Promise<Partial<IContentFile>> => {
+  fileId?: string
+): Promise<{ success: boolean; data?: Partial<IContentFile>; error?: string }> => {
   try {
+    let contentFile;
+    
+    // If fileId is provided, check if file exists
+    if (fileId) {
+      try {
+        const mongoFileId = new mongoose.Types.ObjectId(fileId);
+        const mongoCompanyId = new mongoose.Types.ObjectId(companyId);
+
+        // Log the search parameters for debugging
+        console.log('Searching for file with:', {
+          fileId: mongoFileId,
+          companyId: mongoCompanyId
+        });
+
+        contentFile = await ContentFile.findOne({
+          _id: mongoFileId,
+          companyId: mongoCompanyId
+        });
+
+        console.log('Found file:', contentFile);
+
+        if (!contentFile) {
+          // Improved error message
+          const existingFile = await ContentFile.findById(mongoFileId);
+          if (existingFile) {
+            throw new Error(`File found but not owned by the company. File ID: ${fileId}, Company ID: ${companyId}`);
+          } else {
+            throw new Error(`File not found. File ID: ${fileId}`);
+          }
+        }
+
+        // Delete existing file from GCP
+        const bucket = storage.bucket(bucketName);
+        const existingBlobName = path.basename(contentFile.gcpStorageUrl);
+        try {
+          await bucket.file(existingBlobName).delete();
+          console.log('Successfully deleted old GCP file:', existingBlobName);
+        } catch (error) {
+          console.error('Error deleting existing file from GCP:', error);
+          // Continue even if delete fails
+        }
+
+        // Update file properties
+        contentFile.filename = file.originalname;
+        contentFile.title = title;
+        contentFile.mimeType = file.mimetype;
+        contentFile.size = file.size;
+        if (description !== undefined) contentFile.description = description;
+        if (sessionId) contentFile.sessionId = new mongoose.Types.ObjectId(sessionId);
+      } catch (error: any) {
+        console.error('Error processing existing file:', error);
+        throw new Error(`Error processing existing file: ${error?.message || 'Unknown error'}`);
+      }
+    } else {
+      // Create new ContentFile instance without saving
+      contentFile = new ContentFile({
+        filename: file.originalname,
+        title,
+        mimeType: file.mimetype,
+        size: file.size,
+        companyId: new mongoose.Types.ObjectId(companyId),
+        ...(description !== undefined && { description }),
+        ...(sessionId && { sessionId: new mongoose.Types.ObjectId(sessionId) }),
+      });
+    }
+
+    // Use the file ID for GCP storage filename
     const fileExtension = path.extname(file.originalname);
-    const uniqueFilename = `${uuidv4()}${fileExtension}`;
+    const uniqueFilename = `${contentFile._id}${fileExtension}`;
     const bucket = storage.bucket(bucketName);
     const blob = bucket.file(uniqueFilename);
+
+    // Add timestamp to metadata to ensure uniqueness
+    const timestamp = new Date().toISOString();
 
     await blob.save(file.buffer, {
       metadata: {
         contentType: file.mimetype,
+        cacheControl: 'no-cache, no-store, must-revalidate',
+        lastModified: timestamp,
+        metadata: {
+          updateTimestamp: timestamp
+        }
       },
     });
+    console.log('Successfully uploaded new file to GCP:', uniqueFilename);
 
-    const baseUrl = `https://storage.googleapis.com/${bucketName}/${uniqueFilename}`;
+    // Generate signed URL with query parameter to bypass cache
+    const [signedUrl] = await blob.getSignedUrl({
+      version: 'v4',
+      action: 'read',
+      expires: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
 
-    const contentFileData: any = {
-      filename: file.originalname,
-      title,
-      mimeType: file.mimetype,
-      size: file.size,
-      gcpStorageUrl: baseUrl,
-      companyId: new mongoose.Types.ObjectId(companyId),
-    };
+    // Add cache-busting query parameter
+    const baseUrl = `${signedUrl.split('?')[0]}?t=${Date.now()}`;
 
-    if (description !== undefined) {
-      contentFileData.description = description;
-    }
-
-    if (sessionId) {
-      contentFileData.sessionId = new mongoose.Types.ObjectId(sessionId);
-    }
-
-    if (content !== undefined) {
-      contentFileData.content = content;
-    }
-
-    const contentFile = new ContentFile(contentFileData);
-
+    // Set the GCP URL
+    contentFile.gcpStorageUrl = baseUrl;
+    
     await contentFile.save();
+    console.log('Successfully saved content file to database');
 
     // Remove companyId from the response
     const responseContentFile: Partial<IContentFile> = contentFile.toObject();
     delete responseContentFile.companyId;
 
-    return responseContentFile;
-  } catch (error) {
-    console.error('Error uploading content file:', error);
-    throw error;
+    return { success: true, data: responseContentFile };
+  } catch (error: any) {
+    console.error('Error in uploadContentFile:', error);
+    return { success: false, error: error.message || 'An unknown error occurred' };
   }
 };
 
@@ -74,15 +138,18 @@ export const getContentFiles = async (companyId: string): Promise<IContentFile[]
   }
 };
 
-export const deleteContentFile = async (fileId: string, companyId: string): Promise<{ deleted: boolean }> => {
+export const deleteContentFile = async (fileId: string, companyId: string): Promise<{ success: boolean; error?: string }> => {
   try {
     console.log(`Attempting to delete file with ID: ${fileId} for company: ${companyId}`);
     
-    const file = await ContentFile.findOne({ _id: new mongoose.Types.ObjectId(fileId), companyId: new mongoose.Types.ObjectId(companyId) });
+    const file = await ContentFile.findOne({ 
+      _id: new mongoose.Types.ObjectId(fileId), 
+      companyId: new mongoose.Types.ObjectId(companyId) 
+    });
 
     if (!file) {
       console.error(`File not found or not owned by the company. FileId: ${fileId}, CompanyId: ${companyId}`);
-      throw new Error('File not found or not owned by the company');
+      return { success: false, error: 'File not found or not owned by the company' };
     }
 
     console.log(`File found in database: ${JSON.stringify(file)}`);
@@ -93,25 +160,15 @@ export const deleteContentFile = async (fileId: string, companyId: string): Prom
     
     const blob = bucket.file(blobName);
 
-    try {
-      await blob.delete();
-      console.log(`Blob ${blobName} deleted successfully from GCS`);
-    } catch (gcsError) {
-      console.error(`Error deleting blob from GCS: ${gcsError}`);
-      throw gcsError;
-    }
+    await blob.delete();
+    console.log(`Blob ${blobName} deleted successfully from GCS`);
 
-    try {
-      await file.deleteOne();
-      console.log(`File document deleted successfully from database`);
-    } catch (dbError) {
-      console.error(`Error deleting file document from database: ${dbError}`);
-      throw dbError;
-    }
+    await file.deleteOne();
+    console.log(`File document deleted successfully from database`);
 
-    return { deleted: true };
-  } catch (error) {
+    return { success: true };
+  } catch (error: any) {
     console.error('Error in deleteContentFile:', error);
-    throw error;
+    return { success: false, error: error.message || 'An unknown error occurred' };
   }
 };

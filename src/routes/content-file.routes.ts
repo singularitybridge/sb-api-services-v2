@@ -13,7 +13,7 @@ contentFileRouter.post(
   upload.single('file'),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { title, description, sessionId, content } = req.body;
+      const { title, description, sessionId, fileId } = req.body;
       const companyId = req.company._id;
 
       if (!req.file) {
@@ -26,7 +26,7 @@ contentFileRouter.post(
         title,
         description,
         sessionId,
-        content
+        fileId
       );
       res.status(201).json(contentFile);
     } catch (error) {

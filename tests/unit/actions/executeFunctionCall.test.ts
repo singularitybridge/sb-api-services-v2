@@ -5,6 +5,7 @@ import { processTemplate } from '../../../src/services/template.service';
 import { ActionContext, FunctionFactory, FunctionDefinition } from '../../../src/integrations/actions/types';
 import * as integrationService from '../../../src/services/integration.service';
 import * as publishersModule from '../../../src/integrations/actions/publishers';
+import { SupportedLanguage } from '../../../src/services/discovery.service';
 
 // Mock the template service
 jest.mock('../../../src/services/template.service', () => ({
@@ -35,6 +36,11 @@ describe('executeFunctionCall', () => {
   const mockSessionId = new mongoose.Types.ObjectId().toHexString();
   const mockCompanyId = new mongoose.Types.ObjectId().toHexString();
   const mockAllowedActions = ['testAction', 'errorAction'];
+  const mockContext: ActionContext = {
+    sessionId: mockSessionId,
+    companyId: mockCompanyId,
+    language: 'en' as SupportedLanguage
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -84,7 +90,7 @@ describe('executeFunctionCall', () => {
     const result = await executeFunctionCall(mockCall, mockSessionId, mockCompanyId, mockAllowedActions);
 
     expect(factoryModule.createFunctionFactory).toHaveBeenCalledWith(
-      expect.objectContaining<ActionContext>({ sessionId: mockSessionId, companyId: mockCompanyId }),
+      mockContext,
       mockAllowedActions
     );
     expect(processTemplate).toHaveBeenCalledWith('value1', mockSessionId);
@@ -123,7 +129,7 @@ describe('executeFunctionCall', () => {
     const result = await executeFunctionCall(mockCall, mockSessionId, mockCompanyId, mockAllowedActions);
 
     expect(factoryModule.createFunctionFactory).toHaveBeenCalledWith(
-      expect.objectContaining<ActionContext>({ sessionId: mockSessionId, companyId: mockCompanyId }),
+      mockContext,
       mockAllowedActions
     );
     expect(processTemplate).toHaveBeenCalledWith('value1', mockSessionId);
@@ -154,7 +160,7 @@ describe('executeFunctionCall', () => {
     const result = await executeFunctionCall(mockCall, mockSessionId, mockCompanyId, mockAllowedActions);
 
     expect(factoryModule.createFunctionFactory).toHaveBeenCalledWith(
-      expect.objectContaining<ActionContext>({ sessionId: mockSessionId, companyId: mockCompanyId }),
+      mockContext,
       mockAllowedActions
     );
     expect(result).toEqual({
