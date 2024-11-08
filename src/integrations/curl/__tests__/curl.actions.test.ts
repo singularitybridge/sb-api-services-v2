@@ -1,10 +1,12 @@
 import { ActionContext, FunctionFactory } from '../../actions/types';
 import { createCurlActions, CurlActionResponse } from '../curl.actions';
+import { SupportedLanguage } from '../../../services/discovery.service';
 
 // Mock the context
 const mockContext: ActionContext = {
   sessionId: 'test-session',
-  companyId: 'test-company'
+  companyId: 'test-company',
+  language: 'en' as SupportedLanguage
 };
 
 // Mock the curl service

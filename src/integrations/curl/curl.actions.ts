@@ -32,7 +32,7 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
       required: ['curlCommand'],
       additionalProperties: false,
     },
-    function: async (args: CurlRequestArgs): Promise<CurlActionResponse> => {
+    function: async (args: CurlRequestArgs) => {
       try {
         const { curlCommand, maxResponseChars } = args;
 
@@ -40,10 +40,11 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
         const response = await performCurlRequest(context, curlCommand);
 
         // Create the result object with original status and data
-        const result: CurlActionResponse = {
+        const result: CurlActionResponse & { success: boolean } = {
           status: response.status,
           data: response.data,
-          headers: response.headers
+          headers: response.headers,
+          success: response.status >= 200 && response.status < 300 // Set success based on HTTP status code
         };
 
         // Only handle truncation if specified

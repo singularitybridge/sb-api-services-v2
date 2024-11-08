@@ -4,6 +4,7 @@ import { ApiKey } from './verification.service';
 import { cleanupAssistantFiles } from './file.service';
 import { VectorStore } from '../models/VectorStore';
 import { createFunctionFactory, ActionContext, FunctionFactory, FunctionDefinition, sanitizeFunctionName } from '../integrations/actions/factory';
+import { SupportedLanguage } from './discovery.service';
 
 export const getAssistants = async (apiKey: string) => {
   const openaiClient = getOpenAIClient(apiKey);
@@ -23,7 +24,11 @@ export const getAssistantById = async (apiKey: string, assistantId: string) => {
 
 const createFunctionDefinitions = async (allowedActions: string[]) => {
   // Create a dummy context to generate function definitions
-  const dummyContext: ActionContext = { sessionId: 'dummy-session-id', companyId: 'dummy-company-id' };
+  const dummyContext: ActionContext = { 
+    sessionId: 'dummy-session-id', 
+    companyId: 'dummy-company-id',
+    language: 'en' as SupportedLanguage
+  };
 
   // Use original allowedActions without sanitization
   const functionFactory = await createFunctionFactory(dummyContext, allowedActions);

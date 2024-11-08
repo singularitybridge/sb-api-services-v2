@@ -19,6 +19,12 @@ interface PreparedAction {
   processedArgs: Record<string, unknown>;
 }
 
+interface ActionResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+
 const prepareActionExecution = async (
   functionName: string,
   args: Record<string, unknown>,
@@ -54,13 +60,13 @@ export const executeFunctionCall = async (
   companyId: string,
   allowedActions: string[]
 ): Promise<{ result?: unknown; error?: DetailedError }> => {
-  const context: ActionContext = { sessionId, companyId };
+  const session = await getSessionById(sessionId);
+  const sessionLanguage = session.language as SupportedLanguage;
+  const context: ActionContext = { sessionId, companyId, language: sessionLanguage };
   const functionFactory = await createFunctionFactory(context, allowedActions);
 
   const functionName = call.function.name;
   const originalActionId = functionName;
-  const session = await getSessionById(sessionId);
-  const sessionLanguage = session.language as SupportedLanguage;
 
   if (functionName in functionFactory) {
     try {
@@ -110,15 +116,15 @@ export const executeFunctionCall = async (
         });
       }
 
-      const result = await functionFactory[functionName].function(processedArgs);
+      const result = await functionFactory[functionName].function(processedArgs) as ActionResult;
 
-      if (result && typeof result === 'object' && 'error' in result) {
-        // If the result contains an error field, treat it as a failure
-        const errorDetails = extractErrorDetails(result.error);
+      if (!result.success) {
+        // If the result is not successful, treat it as a failure
+        const errorDetails = extractErrorDetails(result.error || 'Unknown error');
         await publishActionMessage(sessionId, 'failed', { ...executionDetails, output: result, error: errorDetails });
         return { error: errorDetails };
       } else {
-        // If no error, publish completed message and return result
+        // If success is true, publish completed message and return result
         await publishActionMessage(sessionId, 'completed', { ...executionDetails, output: result });
         if (isFileSearch) {
           // Complete the file search notification
@@ -135,7 +141,7 @@ export const executeFunctionCall = async (
             input: { message: 'File search completed. Results retrieved and incorporated into the response.' }
           });
         }
-        return { result };
+        return { result: result.data };
       }
     } catch (error) {
       console.error(`Error executing function ${functionName}:`, error);

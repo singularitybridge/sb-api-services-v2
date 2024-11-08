@@ -1,6 +1,9 @@
+import { SupportedLanguage } from '../../services/discovery.service';
+
 export interface ActionContext {
   sessionId: string;
   companyId: string;
+  language: SupportedLanguage;
 }
 
 export interface FunctionDefinition<T = any> {
