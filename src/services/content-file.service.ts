@@ -48,7 +48,9 @@ export const uploadContentFile = async (
 
         // Delete existing file from GCP
         const bucket = storage.bucket(bucketName);
-        const existingBlobName = path.basename(contentFile.gcpStorageUrl);
+        // Strip query parameters before getting basename
+        const urlWithoutParams = contentFile.gcpStorageUrl.split('?')[0];
+        const existingBlobName = path.basename(urlWithoutParams);
         try {
           await bucket.file(existingBlobName).delete();
           console.log('Successfully deleted old GCP file:', existingBlobName);
@@ -155,7 +157,9 @@ export const deleteContentFile = async (fileId: string, companyId: string): Prom
     console.log(`File found in database: ${JSON.stringify(file)}`);
 
     const bucket = storage.bucket(bucketName);
-    const blobName = path.basename(file.gcpStorageUrl);
+    // Strip query parameters before getting basename
+    const urlWithoutParams = file.gcpStorageUrl.split('?')[0];
+    const blobName = path.basename(urlWithoutParams);
     console.log(`Attempting to delete blob: ${blobName} from bucket: ${bucketName}`);
     
     const blob = bucket.file(blobName);
