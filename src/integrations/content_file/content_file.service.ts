@@ -57,13 +57,13 @@ export const writeContentFile = async (
     // Create a file object that implements Express.Multer.File
     const file = {
       buffer,
-      originalname: `${params.title}.txt`,
+      originalname: params.title,
       mimetype: 'text/plain',
       size: buffer.length,
       fieldname: 'file',
       encoding: '7bit',
       destination: '',
-      filename: `${params.title}.txt`,
+      filename: params.title,
       path: '',
       stream
     };
