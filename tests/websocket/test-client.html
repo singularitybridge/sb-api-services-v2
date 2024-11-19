@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test Client</title>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        #messages {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            font-family: monospace;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .sent {
+            background-color: #e3f2fd;
+        }
+        .received {
+            background-color: #f5f5f5;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #d32f2f;
+        }
+        .system {
+            background-color: #fff3e0;
+            font-style: italic;
+        }
+        input[type="text"], select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .input-group {
+            margin-bottom: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            display: none;
+        }
+        .status.connected {
+            display: block;
+            background-color: #c8e6c9;
+            color: #2e7d32;
+        }
+        .status.disconnected {
+            display: block;
+            background-color: #ffcdd2;
+            color: #c62828;
+        }
+    </style>
+</head>
+<body>
+    <h2>WebSocket Test Client</h2>
+    
+    <div id="connectionStatus" class="status">Not connected</div>
+    
+    <div class="input-group">
+        <label for="token">Authorization Token:</label>
+        <input type="text" id="token" placeholder="Bearer your-jwt-token">
+    </div>
+    
+    <div class="input-group">
+        <button onclick="connect()" id="connectBtn">Connect</button>
+        <button onclick="disconnect()" disabled id="disconnectBtn">Disconnect</button>
+    </div>
+    
+    <h3>Messages</h3>
+    <div id="messages"></div>
+    
+    <div class="input-group">
+        <label for="messageType">Message Type:</label>
+        <select id="messageType" onchange="updateDataField()">
+            <option value="session">Session Message</option>
+            <option value="completion">Completion</option>
+        </select>
+    </div>
+
+    <div class="input-group">
+        <label for="action">Action:</label>
+        <input type="text" id="action" value="handleSessionMessage" readonly>
+    </div>
+    
+    <div class="input-group">
+        <label for="data">Data (JSON):</label>
+        <input type="text" id="data" value='{"userInput": "tell me a joke"}'>
+    </div>
+    
+    <button onclick="sendMessage()" disabled id="sendBtn">Send Message</button>
+    <button onclick="clearMessages()" id="clearBtn">Clear Messages</button>
+
+    <script>
+        let socket;
+        
+        function updateConnectionStatus(connected, message) {
+            const statusDiv = document.getElementById('connectionStatus');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${connected ? 'connected' : 'disconnected'}`;
+            
+            document.getElementById('connectBtn').disabled = connected;
+            document.getElementById('disconnectBtn').disabled = !connected;
+            document.getElementById('sendBtn').disabled = !connected;
+        }
+        
+        function updateDataField() {
+            const messageType = document.getElementById('messageType').value;
+            const actionInput = document.getElementById('action');
+            const dataInput = document.getElementById('data');
+
+            if (messageType === 'session') {
+                actionInput.value = 'handleSessionMessage';
+                dataInput.value = '{"userInput": "tell me a joke"}';
+            } else if (messageType === 'completion') {
+                actionInput.value = 'completion';
+                dataInput.value = JSON.stringify({
+                    systemPrompt: "You are a helpful assistant.",
+                    userInput: "What is the capital of France?",
+                    model: "gpt-4",
+                    temperature: 0.7
+                }, null, 2);
+            }
+        }
+
+        function addMessage(message, type = 'received') {
+            const messagesDiv = document.getElementById('messages');
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${type}`;
+            
+            let formattedMessage = typeof message === 'object' ? 
+                JSON.stringify(message, null, 2) : message;
+            
+            messageElement.textContent = formattedMessage;
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function clearMessages() {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = '';
+            addMessage('Messages cleared', 'system');
+        }
+
+        function connect() {
+            const token = document.getElementById('token').value;
+            
+            if (!token) {
+                addMessage('Please enter an authorization token', 'error');
+                return;
+            }
+
+            const url = 'ws://localhost:3000';
+            const options = {
+                path: '/realtime',
+                auth: { token }
+            };
+
+            try {
+                socket = io(url, options);
+
+                socket.on('connect', () => {
+                    updateConnectionStatus(true, 'Connected to WebSocket server');
+                    addMessage('Connected to WebSocket server', 'system');
+                });
+
+                socket.on('disconnect', () => {
+                    updateConnectionStatus(false, 'Disconnected from WebSocket server');
+                    addMessage('Disconnected from WebSocket server', 'system');
+                });
+
+                socket.on('message', (message) => {
+                    const parsed = typeof message === 'string' ? JSON.parse(message) : message;
+                    addMessage(parsed, parsed.type === 'ERROR' ? 'error' : 'received');
+                });
+
+                socket.on('connect_error', (error) => {
+                    updateConnectionStatus(false, `Connection error: ${error.message}`);
+                    addMessage(`Connection error: ${error.message}`, 'error');
+                });
+
+            } catch (error) {
+                updateConnectionStatus(false, `Error: ${error.message}`);
+                addMessage(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+            }
+        }
+
+        function sendMessage() {
+            if (!socket?.connected) {
+                addMessage('Not connected to server', 'error');
+                return;
+            }
+
+            const action = document.getElementById('action').value;
+            const dataStr = document.getElementById('data').value;
+
+            if (!action) {
+                addMessage('Please enter an action', 'error');
+                return;
+            }
+
+            try {
+                const data = dataStr ? JSON.parse(dataStr) : {};
+                const message = {
+                    type: 'REQUEST',
+                    requestId: Date.now().toString(),
+                    action,
+                    data
+                };
+
+                socket.emit('message', JSON.stringify(message));
+                addMessage(message, 'sent');
+            } catch (error) {
+                addMessage(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Initialize connection status
+        updateConnectionStatus(false, 'Not connected');
+    </script>
+</body>
+</html>
