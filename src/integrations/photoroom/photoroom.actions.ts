@@ -3,6 +3,7 @@ import { removeBackgroundFromImage } from './photoroom.service';
 
 interface RemoveBackgroundArgs {
   imageUrl: string;
+  filename?: string;
 }
 
 export const createPhotoRoomActions = (
@@ -18,12 +19,16 @@ export const createPhotoRoomActions = (
           type: 'string',
           description: 'The URL of the image to process',
         },
+        filename: {
+          type: 'string',
+          description: 'Optional custom filename for the processed image',
+        },
       },
       required: ['imageUrl'],
       additionalProperties: false,
     },
     function: async (args: RemoveBackgroundArgs) => {
-      const { imageUrl } = args;
+      const { imageUrl, filename } = args;
 
       // Check if all required properties are present
       if (imageUrl === undefined) {
@@ -34,7 +39,7 @@ export const createPhotoRoomActions = (
       }
 
       // Check for additional properties
-      const allowedProps = ['imageUrl'];
+      const allowedProps = ['imageUrl', 'filename'];
       const extraProps = Object.keys(args).filter(
         (prop) => !allowedProps.includes(prop),
       );
@@ -65,10 +70,18 @@ export const createPhotoRoomActions = (
         };
       }
 
+      // Verify that filename is a non-empty string if provided
+      if (filename !== undefined && (typeof filename !== 'string' || filename.trim().length === 0)) {
+        return {
+          error: 'Invalid filename',
+          message: 'The filename must be a non-empty string.',
+        };
+      }
+
       try {
         const processedImageUrl = await removeBackgroundFromImage(
           context.companyId,
-          imageUrl,
+          { imageUrl, filename }
         );
         return {
           success: true,

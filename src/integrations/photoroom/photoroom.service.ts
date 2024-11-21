@@ -1,17 +1,22 @@
 import axios from 'axios';
-import { getCompany } from '../../services/company.service';
-import { googleStorageService } from '../../services/google.storage.service';
-import * as path from 'path';
+import { getApiKey } from '../../services/api.key.service';
+import { uploadFile } from '../../services/google.storage.service';
 
 const API_URL = 'https://sdk.photoroom.com/v1/segment';
 
-export const removeBackgroundFromImage = async (companyId: string, imageUrl: string, crop: boolean = false): Promise<string> => {
-  const company = await getCompany(companyId);
-  const apiKey = company.api_keys.find((key: { key: string; value: string }) => key.key === 'photoroom_api_key')?.value;
+interface RemoveBackgroundOptions {
+  imageUrl: string;
+  filename?: string;
+  crop?: boolean;
+}
 
+export const removeBackgroundFromImage = async (companyId: string, options: RemoveBackgroundOptions): Promise<string> => {
+  const apiKey = await getApiKey(companyId, 'photoroom_api_key');
   if (!apiKey) {
-    throw new Error('PhotoRoom API key not found for the company');
+    throw new Error('PhotoRoom API key not found');
   }
+
+  const { imageUrl, filename, crop = false } = options;
 
   try {
     const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
@@ -30,21 +35,23 @@ export const removeBackgroundFromImage = async (companyId: string, imageUrl: str
     });
 
     const processedImage = Buffer.from(response.data);
+    const fileName = filename ? `${filename}.png` : `photoroom_image_${Date.now()}.png`;
 
-    // Generate a unique filename for the processed image
-    const filename = `processed_${Date.now()}${path.extname(imageUrl)}`;
-    
-    // Save the processed image to Google Storage
-    const uploadedImageUrl = await googleStorageService.uploadBuffer(companyId, filename, processedImage, 'image/png');
+    // Create a partial File object that includes only the necessary properties
+    const file: Partial<Express.Multer.File> = {
+      fieldname: 'file',
+      originalname: fileName,
+      encoding: '7bit',
+      mimetype: 'image/png',
+      buffer: processedImage,
+      size: processedImage.length,
+    };
 
-    return uploadedImageUrl;
+    const publicUrl = await uploadFile(file as Express.Multer.File);
+
+    return publicUrl;
   } catch (error) {
-    console.error('Error processing or uploading image:', error);
-    if (axios.isAxiosError(error) && error.response) {
-      console.error('Response data:', error.response.data.toString());
-      console.error('Response status:', error.response.status);
-      console.error('Response headers:', error.response.headers);
-    }
-    throw new Error('Failed to process and upload image');
+    console.error('Error processing image with PhotoRoom:', error);
+    throw new Error('Failed to process image with PhotoRoom');
   }
 };
