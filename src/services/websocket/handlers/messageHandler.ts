@@ -5,6 +5,7 @@ import { ChannelType } from '../../../types/ChannelType';
 import { getSessionOrCreate } from '../../session.service';
 import { AuthenticatedSocket, WebSocketMessage, CompletionRequestData } from '../types';
 import { getCompletionResponse } from '../../oai.completion.service';
+import { generateSpeech } from '../../oai.speech.service';
 
 export const sendMessage = (socket: Socket, message: WebSocketMessage): void => {
   socket.emit('message', JSON.stringify(message));
@@ -102,6 +103,30 @@ export const handleMessage = async (socket: AuthenticatedSocket, message: WebSoc
         action,
         data: {
           content: response,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } else if (action === 'generateSpeech') {
+      if (!data?.text) {
+        throw new Error('text is required for generateSpeech action');
+      }
+
+      const { text, voice = 'alloy', textLimit, filename } = data;
+      const audioUrl = await generateSpeech(
+        apiKey,
+        text,
+        voice,
+        'tts-1',
+        textLimit,
+        filename
+      );
+
+      sendMessage(socket, {
+        type: 'UPDATE',
+        requestId,
+        action,
+        data: {
+          audioUrl,
           timestamp: new Date().toISOString()
         }
       });

@@ -1,5 +1,3 @@
-/// file_path: src/services/oai.speech.service.ts
-
 import { uploadFile } from './google.storage.service';
 import { getOpenAIClient } from './assistant.service';
 import { getCompletionResponse, summarizeText } from './oai.completion.service';
@@ -9,7 +7,8 @@ export const generateSpeech = async (
   text: string,  
   voice: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' = 'alloy',
   model:  'tts-1-hd' | 'tts-1' = 'tts-1-hd',
-  textLimit: number = 256 // Default limit of 4096 characters
+  textLimit: number = 256, // Default limit of 4096 characters
+  filename?: string // Optional filename parameter
 ): Promise<string> => { // Return string instead of SaveToFileResponse
   // Check if text exceeds the limit
   if (text.length > textLimit) {
@@ -26,10 +25,15 @@ export const generateSpeech = async (
 
   const buffer = Buffer.from(await mp3.arrayBuffer());
   
+  // Use provided filename if available, otherwise generate timestamp-based name
+  const finalFilename = filename ? 
+    (filename.endsWith('.mp3') ? filename : `${filename}.mp3`) : 
+    `file_${Date.now()}.mp3`;
+
   // Create a mock Express.Multer.File object
   const file: Express.Multer.File = {
     fieldname: 'file',
-    originalname: `file_${Date.now()}.mp3`,
+    originalname: finalFilename,
     encoding: '7bit',
     mimetype: 'audio/mpeg',
     buffer: buffer,
