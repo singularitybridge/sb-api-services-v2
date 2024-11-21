@@ -1,4 +1,3 @@
-/// file_path: /src/services/twilio/voice.service.ts
 import VoiceResponse from 'twilio/lib/twiml/VoiceResponse';
 import { Assistant } from '../../models/Assistant';
 import { Session } from '../../models/Session';
@@ -60,7 +59,7 @@ export const handleVoiceRequest = async (
     twiml.play(
       'https://red-labradoodle-6369.twil.io/assets/agent-not-found.mp3',
     );
-    return twiml.toString();
+    return { callActive: false, response: twiml.toString() };
   }
 
   let session = await Session.findOne({
@@ -89,11 +88,16 @@ export const handleVoiceRequest = async (
       }, start with greeting the user. ${getCurrentTimeAndDay()}`,
       session.id      
     );
-    const limitedResponse = response.substring(0, 1200); // Limit response to 1600 characters
+    const limitedResponse = response.substring(0, 1200); // Limit response to 1200 characters
 
     // generate intro message
     const audioResponse = await generateAudio('', limitedResponse);
-    twiml.play(audioResponse);
+    if (audioResponse.success && audioResponse.data?.audioUrl) {
+      twiml.play(audioResponse.data.audioUrl);
+    } else {
+      console.error('Failed to generate audio:', audioResponse.error);
+      twiml.say('I apologize, but I am unable to generate audio at the moment.');
+    }
   }
 
   twiml.record({
@@ -151,11 +155,16 @@ export const handleVoiceRecordingRequest = async (
     session._id,
   );
 
-
-  const limitedResponse = response.substring(0, 1200); // Limit response to 1600 characters
+  const limitedResponse = response.substring(0, 1200); // Limit response to 1200 characters
   const audioResponse = await generateAudio('', limitedResponse);
 
-  twiml.play(audioResponse);
+  if (audioResponse.success && audioResponse.data?.audioUrl) {
+    twiml.play(audioResponse.data.audioUrl);
+  } else {
+    console.error('Failed to generate audio:', audioResponse.error);
+    twiml.say('I apologize, but I am unable to generate audio at the moment.');
+  }
+
   twiml.redirect('/twilio/voice?firstTime=false');
   return twiml.toString();
 };

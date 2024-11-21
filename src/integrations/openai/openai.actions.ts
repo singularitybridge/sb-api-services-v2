@@ -96,7 +96,7 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
         },
         language: {
           type: 'string',
-          description: 'The language of the audio file (optional)',
+          description: 'The language of the audio file (optional), e.g., he, en, es, fr, de, it, nl, pt, ru, zh',
         },
       },
       required: ['audioUrl'],
