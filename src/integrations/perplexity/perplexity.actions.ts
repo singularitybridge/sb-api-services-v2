@@ -27,14 +27,13 @@ export const createPerplexityActions = (context: ActionContext): FunctionFactory
       additionalProperties: false,
     },
     function: async (args: PerplexitySearchArgs) => {
-      
-
       const { model, query } = args;
 
       // Check if all required properties are present
       if (model === undefined || query === undefined) {
         console.error('perplexitySearch: Missing required parameter');
         return {
+          success: false,
           error: 'Missing parameter',
           message: 'Both model and query parameters are required.',
         };
@@ -46,6 +45,7 @@ export const createPerplexityActions = (context: ActionContext): FunctionFactory
       if (extraProps.length > 0) {
         console.error('perplexitySearch: Additional properties found', extraProps);
         return {
+          success: false,
           error: 'Invalid parameters',
           message: `Additional properties are not allowed: ${extraProps.join(', ')}`,
         };
@@ -55,6 +55,7 @@ export const createPerplexityActions = (context: ActionContext): FunctionFactory
       if (typeof model !== 'string' || !['llama-3.1-sonar-small-128k-online', 'llama-3.1-sonar-large-128k-online'].includes(model)) {
         console.error('perplexitySearch: Invalid model', model);
         return {
+          success: false,
           error: 'Invalid model',
           message: 'The model must be either "llama-3.1-sonar-small-128k-online" or "llama-3.1-sonar-large-128k-online".',
         };
@@ -64,6 +65,7 @@ export const createPerplexityActions = (context: ActionContext): FunctionFactory
       if (typeof query !== 'string') {
         console.error('perplexitySearch: Invalid query type', typeof query);
         return {
+          success: false,
           error: 'Invalid query',
           message: 'The query must be a string.',
         };
@@ -71,10 +73,14 @@ export const createPerplexityActions = (context: ActionContext): FunctionFactory
 
       try {        
         const result = await performPerplexitySearch(context.companyId, model, query);
-        return { result };
+        return {
+          success: true,
+          result,
+        };
       } catch (error) {
         console.error('perplexitySearch: Error performing search', error);
         return {
+          success: false,
           error: 'Search failed',
           message: 'Failed to perform the search using Perplexity API.',
         };
