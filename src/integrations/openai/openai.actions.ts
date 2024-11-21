@@ -15,6 +15,7 @@ interface GenerateSpeechArgs {
   voice?: OpenAIVoice;
   model?: OpenAIModel;
   textLimit?: number;
+  filename?: string;
 }
 
 interface TranscribeAudioArgs {
@@ -66,17 +67,21 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
           description: 'The maximum number of characters allowed in the input text (default: 256)',
           default: 256,
         },
+        filename: {
+          type: 'string',
+          description: 'Optional custom filename for the generated audio',
+        },
       },
       required: ['text'],
       additionalProperties: false,
     },
-    function: async ({ text, voice = 'alloy', model = 'tts-1-hd', textLimit = 256 }: GenerateSpeechArgs) => {
+    function: async ({ text, voice = 'alloy', model = 'tts-1-hd', textLimit = 256, filename }: GenerateSpeechArgs) => {
       try {
         const apiKey = await getApiKey(context.companyId, 'openai_api_key');
         if (!apiKey) {
           return { success: false, error: 'OpenAI API key is missing' };
         }
-        const audioUrl = await generateSpeech(apiKey, text, voice, model, textLimit);
+        const audioUrl = await generateSpeech(apiKey, text, voice, model, textLimit, filename);
         return { success: true, data: { audioUrl } };
       } catch (error) {
         console.error('Error in generateOpenAiSpeech:', error);

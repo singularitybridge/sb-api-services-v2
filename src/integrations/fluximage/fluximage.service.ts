@@ -7,6 +7,7 @@ interface FluxImageGenerationOptions {
   prompt: string;
   width?: number;
   height?: number;
+  filename?: string;
 }
 
 export const generateFluxImage = async (companyId: string, options: FluxImageGenerationOptions): Promise<string> => {
@@ -15,7 +16,7 @@ export const generateFluxImage = async (companyId: string, options: FluxImageGen
     throw new Error('GetImg API key not found');
   }
 
-  const { prompt, width = 1024, height = 1024 } = options;
+  const { prompt, width = 1024, height = 1024, filename } = options;
 
   try {
     const response = await axios.post(
@@ -36,7 +37,7 @@ export const generateFluxImage = async (companyId: string, options: FluxImageGen
     );
 
     const imageBuffer = Buffer.from(response.data.image, 'base64');
-    const fileName = `flux_image_${Date.now()}.png`;
+    const fileName = filename ? `${filename}.png` : `flux_image_${Date.now()}.png`;
 
     // Create a partial File object that includes only the necessary properties
     const file: Partial<Express.Multer.File> = {

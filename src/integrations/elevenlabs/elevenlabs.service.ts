@@ -19,6 +19,7 @@ export const generateAudio = async (
   apikey: string,
   text: string,
   voiceId: string = 'gbTBNCAEwTTleGFPK23L',
+  filename?: string,
   modelId: string = 'eleven_turbo_v2',
 ): Promise<{ success: boolean; data?: { audioUrl: string }; error?: string }> => {
   const isValidVoice = await verifyVoiceId(apikey, voiceId);
@@ -55,7 +56,7 @@ export const generateAudio = async (
 
     const file: Express.Multer.File = {
       fieldname: 'file',
-      originalname: `elevenlabs_audio_${Date.now()}.mp3`,
+      originalname: filename ? `${filename}.mp3` : `elevenlabs_audio_${Date.now()}.mp3`,
       encoding: '7bit',
       mimetype: 'audio/mpeg',
       buffer: buffer,

@@ -5,6 +5,7 @@ interface FluxImageArgs {
   prompt: string;
   width?: number;
   height?: number;
+  filename?: string;
 }
 
 export const createFluxImageActions = (context: ActionContext): FunctionFactory => ({
@@ -25,13 +26,17 @@ export const createFluxImageActions = (context: ActionContext): FunctionFactory 
         height: {
           type: 'number',
           description: 'The height of the generated image in pixels (256 to 1280). Must be a multiple of 8.',
+        },
+        filename: {
+          type: 'string',
+          description: 'Optional custom filename for the generated image',
         }
       },
       required: ['prompt'],
       additionalProperties: false,
     },
     function: async (args: FluxImageArgs) => {
-      const { prompt, width, height } = args;
+      const { prompt, width, height, filename } = args;
 
       // Verify that prompt is a string
       if (typeof prompt !== 'string' || prompt.trim().length === 0) {
@@ -64,7 +69,7 @@ export const createFluxImageActions = (context: ActionContext): FunctionFactory 
 
       try {
         console.log('generateFluxImage: Calling generateFluxImage service');
-        const imageUrl = await generateFluxImage(context.companyId, { prompt, width, height });
+        const imageUrl = await generateFluxImage(context.companyId, { prompt, width, height, filename });
         return {
           success: true,
           data: { imageUrl },
