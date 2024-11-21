@@ -4,7 +4,7 @@ import { getApiKey } from '../../services/api.key.service';
 
 export const createElevenLabsActions = (context: ActionContext): FunctionFactory => ({
   generateElevenLabsAudio: {
-    function: async ({ text, voiceId }: { text: string; voiceId: string }) => {
+    function: async ({ text, voiceId, filename }: { text: string; voiceId: string; filename?: string }) => {
       const apiKey = await getApiKey(context.companyId, 'labs11_api_key');
       if (!apiKey) {
         return {
@@ -14,7 +14,7 @@ export const createElevenLabsActions = (context: ActionContext): FunctionFactory
         };
       }
 
-      const result = await generateAudio(apiKey, text, voiceId);
+      const result = await generateAudio(apiKey, text, voiceId, filename);
       if (result.success) {
         return {
           success: true,
@@ -23,7 +23,7 @@ export const createElevenLabsActions = (context: ActionContext): FunctionFactory
       } else {
         return {
           success: false,
-          error: 'Audio generation failed',
+          error: result.error || 'Audio generation failed',
           message: result.error || 'Unknown error occurred while generating audio.',
         };
       }
@@ -39,6 +39,10 @@ export const createElevenLabsActions = (context: ActionContext): FunctionFactory
         voiceId: {
           type: 'string',
           description: 'The ID of the voice to use for speech generation',
+        },
+        filename: {
+          type: 'string',
+          description: 'Optional custom filename for the generated audio',
         },
       },
       required: ['text', 'voiceId'],
