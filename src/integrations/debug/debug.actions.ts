@@ -14,8 +14,12 @@ export const createDebugActions = (context: ActionContext): FunctionFactory => (
     },
     function: async () => {      
       try {
-        const result = await getSessionInfo(context.sessionId, context.companyId);        
-        return result;
+        const result = await getSessionInfo(context.sessionId, context.companyId);
+        if (result.success && result.markdown) {
+          return { success: true, data: { markdown: result.markdown } };
+        } else {
+          return { success: false, error: result.error || 'Failed to get session info' };
+        }
       } catch (error) {
         console.error('Error in getSessionInfo action:', error);
         return { success: false, error: 'Failed to get session info' };

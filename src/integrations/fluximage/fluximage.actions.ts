@@ -67,7 +67,7 @@ export const createFluxImageActions = (context: ActionContext): FunctionFactory 
         const imageUrl = await generateFluxImage(context.companyId, { prompt, width, height });
         return {
           success: true,
-          imageUrl,
+          data: { imageUrl },
         };
       } catch (error) {
         console.error('generateFluxImage: Error generating image', error);

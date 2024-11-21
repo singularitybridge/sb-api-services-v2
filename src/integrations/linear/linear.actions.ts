@@ -1,5 +1,9 @@
-import { ActionContext, FunctionDefinition } from '../actions/types';
+import { ActionContext, FunctionFactory } from '../actions/types';
 import * as linearService from './linear.service';
+
+interface FetchIssuesArgs {
+  first?: number;
+}
 
 interface CreateIssueArgs {
   title: string;
@@ -15,6 +19,10 @@ interface UpdateIssueArgs {
   };
 }
 
+interface DeleteIssueArgs {
+  issueId: string;
+}
+
 interface FetchIssuesByUserArgs {
   userId: string;
 }
@@ -28,13 +36,10 @@ interface CreateCommentArgs {
   body: string;
 }
 
-export const createLinearActions = (context: ActionContext) => {
-  const fetchIssues: FunctionDefinition = {
-    function: async ({ first = 50 }: { first?: number }) => {
-      const issues = await linearService.fetchIssues(context.companyId, first);
-      return issues;
-    },
+export const createLinearActions = (context: ActionContext): FunctionFactory => ({
+  fetchIssues: {
     description: 'Fetch issues from Linear',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -44,15 +49,31 @@ export const createLinearActions = (context: ActionContext) => {
         },
       },
       required: [],
+      additionalProperties: false,
     },
-  };
+    function: async (args: FetchIssuesArgs) => {
+      const { first = 50 } = args;
 
-  const createIssue: FunctionDefinition = {
-    function: async ({ title, description, teamId }: CreateIssueArgs) => {
-      const issue = await linearService.createIssue(context.companyId, title, description, teamId);
-      return issue;
+      try {
+        const result = await linearService.fetchIssues(context.companyId, first);
+        return {
+          success: true,
+          result: result.data,
+        };
+      } catch (error) {
+        console.error('fetchIssues: Error fetching issues', error);
+        return {
+          success: false,
+          error: 'Failed to fetch issues',
+          message: 'An error occurred while fetching issues from Linear.',
+        };
+      }
     },
+  },
+
+  createLinearIssue: {
     description: 'Create a new issue in Linear',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -70,15 +91,31 @@ export const createLinearActions = (context: ActionContext) => {
         },
       },
       required: ['title', 'description', 'teamId'],
+      additionalProperties: false,
     },
-  };
+    function: async (args: CreateIssueArgs) => {
+      const { title, description, teamId } = args;
 
-  const updateIssue: FunctionDefinition = {
-    function: async ({ issueId, updateData }: UpdateIssueArgs) => {
-      await linearService.updateIssue(context.companyId, issueId, updateData);
-      return { success: true };
+      try {
+        const result = await linearService.createIssue(context.companyId, title, description, teamId);
+        return {
+          success: true,
+          result,
+        };
+      } catch (error) {
+        console.error('createLinearIssue: Error creating issue', error);
+        return {
+          success: false,
+          error: 'Failed to create issue',
+          message: 'An error occurred while creating an issue in Linear.',
+        };
+      }
     },
+  },
+
+  updateLinearIssue: {
     description: 'Update an existing issue in Linear',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -102,15 +139,31 @@ export const createLinearActions = (context: ActionContext) => {
         },
       },
       required: ['issueId', 'updateData'],
+      additionalProperties: false,
     },
-  };
+    function: async (args: UpdateIssueArgs) => {
+      const { issueId, updateData } = args;
 
-  const deleteIssue: FunctionDefinition = {
-    function: async ({ issueId }: { issueId: string }) => {
-      await linearService.deleteIssue(context.companyId, issueId);
-      return { success: true };
+      try {
+        await linearService.updateIssue(context.companyId, issueId, updateData);
+        return {
+          success: true,
+          result: { message: 'Issue updated successfully' },
+        };
+      } catch (error) {
+        console.error('updateLinearIssue: Error updating issue', error);
+        return {
+          success: false,
+          error: 'Failed to update issue',
+          message: 'An error occurred while updating the issue in Linear.',
+        };
+      }
     },
+  },
+
+  deleteLinearIssue: {
     description: 'Delete an issue from Linear',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -120,28 +173,58 @@ export const createLinearActions = (context: ActionContext) => {
         },
       },
       required: ['issueId'],
+      additionalProperties: false,
     },
-  };
+    function: async (args: DeleteIssueArgs) => {
+      const { issueId } = args;
 
-  const fetchAllIssues: FunctionDefinition = {
-    function: async () => {
-      const issues = await linearService.fetchAllIssues(context.companyId);
-      return issues;
+      try {
+        await linearService.deleteIssue(context.companyId, issueId);
+        return {
+          success: true,
+          result: { message: 'Issue deleted successfully' },
+        };
+      } catch (error) {
+        console.error('deleteLinearIssue: Error deleting issue', error);
+        return {
+          success: false,
+          error: 'Failed to delete issue',
+          message: 'An error occurred while deleting the issue from Linear.',
+        };
+      }
     },
+  },
+
+  fetchAllLinearIssues: {
     description: 'Fetch all issues from Linear',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {},
       required: [],
+      additionalProperties: false,
     },
-  };
+    function: async () => {
+      try {
+        const result = await linearService.fetchAllIssues(context.companyId);
+        return {
+          success: true,
+          result: result.data,
+        };
+      } catch (error) {
+        console.error('fetchAllLinearIssues: Error fetching all issues', error);
+        return {
+          success: false,
+          error: 'Failed to fetch all issues',
+          message: 'An error occurred while fetching all issues from Linear.',
+        };
+      }
+    },
+  },
 
-  const fetchIssuesByUser: FunctionDefinition = {
-    function: async ({ userId }: FetchIssuesByUserArgs) => {
-      const issues = await linearService.fetchIssuesByUser(context.companyId, userId);
-      return issues;
-    },
+  fetchLinearIssuesByUser: {
     description: 'Fetch issues assigned to a specific user from Linear',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -151,15 +234,31 @@ export const createLinearActions = (context: ActionContext) => {
         },
       },
       required: ['userId'],
+      additionalProperties: false,
     },
-  };
+    function: async (args: FetchIssuesByUserArgs) => {
+      const { userId } = args;
 
-  const fetchIssuesByDate: FunctionDefinition = {
-    function: async ({ days }: FetchIssuesByDateArgs) => {
-      const issues = await linearService.fetchIssuesByDate(context.companyId, days);
-      return issues;
+      try {
+        const result = await linearService.fetchIssuesByUser(context.companyId, userId);
+        return {
+          success: true,
+          result,
+        };
+      } catch (error) {
+        console.error('fetchLinearIssuesByUser: Error fetching issues by user', error);
+        return {
+          success: false,
+          error: 'Failed to fetch issues by user',
+          message: 'An error occurred while fetching issues for the specified user from Linear.',
+        };
+      }
     },
+  },
+
+  fetchLinearIssuesByDate: {
     description: 'Fetch issues created or updated within a specific number of days',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -169,54 +268,112 @@ export const createLinearActions = (context: ActionContext) => {
         },
       },
       required: ['days'],
+      additionalProperties: false,
     },
-  };
+    function: async (args: FetchIssuesByDateArgs) => {
+      const { days } = args;
 
-  const fetchUserList: FunctionDefinition = {
-    function: async () => {
-      const users = await linearService.fetchUserList(context.companyId);
-      return users;
+      try {
+        const result = await linearService.fetchIssuesByDate(context.companyId, days);
+        return {
+          success: true,
+          result,
+        };
+      } catch (error) {
+        console.error('fetchLinearIssuesByDate: Error fetching issues by date', error);
+        return {
+          success: false,
+          error: 'Failed to fetch issues by date',
+          message: 'An error occurred while fetching issues within the specified date range from Linear.',
+        };
+      }
     },
+  },
+
+  fetchLinearUserList: {
     description: 'Fetch list of users from Linear',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {},
       required: [],
+      additionalProperties: false,
     },
-  };
-
-  const fetchTeams: FunctionDefinition = {
     function: async () => {
-      const teams = await linearService.fetchTeams(context.companyId);
-      return teams;
+      try {
+        const result = await linearService.fetchUserList(context.companyId);
+        return {
+          success: true,
+          result,
+        };
+      } catch (error) {
+        console.error('fetchLinearUserList: Error fetching user list', error);
+        return {
+          success: false,
+          error: 'Failed to fetch user list',
+          message: 'An error occurred while fetching the list of users from Linear.',
+        };
+      }
     },
+  },
+
+  fetchLinearTeams: {
     description: 'Fetch list of teams from Linear',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {},
       required: [],
+      additionalProperties: false,
     },
-  };
-
-  const fetchIssueStatuses: FunctionDefinition = {
     function: async () => {
-      const statuses = await linearService.fetchIssueStatuses(context.companyId);
-      return statuses;
+      try {
+        const result = await linearService.fetchTeams(context.companyId);
+        return {
+          success: true,
+          result,
+        };
+      } catch (error) {
+        console.error('fetchLinearTeams: Error fetching teams', error);
+        return {
+          success: false,
+          error: 'Failed to fetch teams',
+          message: 'An error occurred while fetching the list of teams from Linear.',
+        };
+      }
     },
+  },
+
+  fetchIssueStatuses: {
     description: 'Fetch issue statuses from Linear',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {},
       required: [],
+      additionalProperties: false,
     },
-  };
+    function: async () => {
+      try {
+        const result = await linearService.fetchIssueStatuses(context.companyId);
+        return {
+          success: true,
+          result,
+        };
+      } catch (error) {
+        console.error('fetchIssueStatuses: Error fetching issue statuses', error);
+        return {
+          success: false,
+          error: 'Failed to fetch issue statuses',
+          message: 'An error occurred while fetching issue statuses from Linear.',
+        };
+      }
+    },
+  },
 
-  const createComment: FunctionDefinition = {
-    function: async ({ issueId, body }: CreateCommentArgs) => {
-      const comment = await linearService.createComment(context.companyId, issueId, body);
-      return comment;
-    },
+  createLinearComment: {
     description: 'Create a new comment on a Linear issue',
+    strict: true,
     parameters: {
       type: 'object',
       properties: {
@@ -230,20 +387,25 @@ export const createLinearActions = (context: ActionContext) => {
         },
       },
       required: ['issueId', 'body'],
+      additionalProperties: false,
     },
-  };
+    function: async (args: CreateCommentArgs) => {
+      const { issueId, body } = args;
 
-  return {
-    fetchIssues,
-    createLinearIssue: createIssue,
-    updateLinearIssue: updateIssue,
-    deleteLinearIssue: deleteIssue,
-    fetchAllLinearIssues: fetchAllIssues,
-    fetchLinearIssuesByUser: fetchIssuesByUser,
-    fetchLinearIssuesByDate: fetchIssuesByDate,
-    fetchLinearUserList: fetchUserList,
-    fetchLinearTeams: fetchTeams,
-    fetchIssueStatuses,
-    createLinearComment: createComment,
-  };
-};
+      try {
+        const result = await linearService.createComment(context.companyId, issueId, body);
+        return {
+          success: true,
+          result,
+        };
+      } catch (error) {
+        console.error('createLinearComment: Error creating comment', error);
+        return {
+          success: false,
+          error: 'Failed to create comment',
+          message: 'An error occurred while creating a comment on the Linear issue.',
+        };
+      }
+    },
+  },
+});
