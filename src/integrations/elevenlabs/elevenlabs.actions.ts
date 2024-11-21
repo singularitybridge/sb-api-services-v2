@@ -5,16 +5,27 @@ import { getApiKey } from '../../services/api.key.service';
 export const createElevenLabsActions = (context: ActionContext): FunctionFactory => ({
   generateElevenLabsAudio: {
     function: async ({ text, voiceId }: { text: string; voiceId: string }) => {
-      try {
-        const apiKey = await getApiKey(context.companyId, 'labs11_api_key');
-        if (!apiKey) {
-          throw new Error('ElevenLabs API key is missing');
-        }
-        const audioUrl = await generateAudio(apiKey, text, voiceId);
-        return { audioUrl };
-      } catch (error) {
-        console.error('Error generating audio with ElevenLabs:', error);
-        throw new Error('Failed to generate audio with ElevenLabs');
+      const apiKey = await getApiKey(context.companyId, 'labs11_api_key');
+      if (!apiKey) {
+        return {
+          success: false,
+          error: 'API key missing',
+          message: 'ElevenLabs API key is not configured.',
+        };
+      }
+
+      const result = await generateAudio(apiKey, text, voiceId);
+      if (result.success) {
+        return {
+          success: true,
+          data: { audioUrl: result.data?.audioUrl },
+        };
+      } else {
+        return {
+          success: false,
+          error: 'Audio generation failed',
+          message: result.error || 'Unknown error occurred while generating audio.',
+        };
       }
     },
     description: 'Generate audio using ElevenLabs text-to-speech service',
