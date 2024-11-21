@@ -87,6 +87,10 @@
             background-color: #ffcdd2;
             color: #c62828;
         }
+        #audioPlayer {
+            width: 100%;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -112,6 +116,7 @@
         <select id="messageType" onchange="updateDataField()">
             <option value="session">Session Message</option>
             <option value="completion">Completion</option>
+            <option value="tts">Text-to-Speech</option>
         </select>
     </div>
 
@@ -128,8 +133,11 @@
     <button onclick="sendMessage()" disabled id="sendBtn">Send Message</button>
     <button onclick="clearMessages()" id="clearBtn">Clear Messages</button>
 
+    <audio id="audioPlayer" controls style="display: none;"></audio>
+
     <script>
         let socket;
+        let lastAudioUrl = null;
         
         function updateConnectionStatus(connected, message) {
             const statusDiv = document.getElementById('connectionStatus');
@@ -157,6 +165,13 @@
                     model: "gpt-4",
                     temperature: 0.7
                 }, null, 2);
+            } else if (messageType === 'tts') {
+                actionInput.value = 'generateSpeech';
+                dataInput.value = JSON.stringify({
+                    text: "Hello, this is a test of text to speech generation.",
+                    voice: "alloy",
+                    filename: "test-speech.mp3"
+                }, null, 2);
             }
         }
 
@@ -171,12 +186,29 @@
             messageElement.textContent = formattedMessage;
             messagesDiv.appendChild(messageElement);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            // Handle audio URL in response
+            if (type === 'received' && typeof message === 'object') {
+                const parsed = message;
+                if (parsed.type === 'UPDATE' && parsed.action === 'generateSpeech' && parsed.data?.audioUrl) {
+                    const audioPlayer = document.getElementById('audioPlayer');
+                    audioPlayer.style.display = 'block';
+                    audioPlayer.src = parsed.data.audioUrl;
+                    lastAudioUrl = parsed.data.audioUrl;
+                }
+            }
         }
 
         function clearMessages() {
             const messagesDiv = document.getElementById('messages');
             messagesDiv.innerHTML = '';
             addMessage('Messages cleared', 'system');
+            
+            // Reset audio player
+            const audioPlayer = document.getElementById('audioPlayer');
+            audioPlayer.style.display = 'none';
+            audioPlayer.src = '';
+            lastAudioUrl = null;
         }
 
         function connect() {

@@ -1,4 +1,3 @@
-/// file_path: src/routes/tts.routes.ts
 import express from 'express';
 import { synthesizeText } from '../services/google.tts.service';
 import { generateSpeech } from '../services/oai.speech.service';
@@ -39,7 +38,7 @@ router.post(
   validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { text, voice, textLimit } = req.body;
+      const { text, voice, textLimit, filename } = req.body;
       const openaiApiKey = await getApiKey(req.company._id, 'openai_api_key');
 
       if (!openaiApiKey) {
@@ -47,7 +46,7 @@ router.post(
         return;
       }
 
-      const fileInfo = await generateSpeech(openaiApiKey, text, voice, 'tts-1', textLimit);
+      const fileInfo = await generateSpeech(openaiApiKey, text, voice, 'tts-1', textLimit, filename);
       res.send(fileInfo);
     } catch (error: unknown) {
       console.error('Error in /generate/oai route:', error);
