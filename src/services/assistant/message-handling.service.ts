@@ -127,7 +127,8 @@ export const handleSessionMessage = async (
   const newRun = await openaiClient.beta.threads.runs.create(session.threadId, {
     assistant_id: assistant.assistantId as string,
     additional_instructions: processedIntroMessage,
-    instructions: processedLlmPrompt,
+    instructions: processedLlmPrompt,    
+    parallel_tool_calls: false, // This disables parallel function calling
   });
 
   await pollRunStatus(apiKey, session.threadId, newRun.id, sessionId, session.companyId, assistant.allowedActions);
