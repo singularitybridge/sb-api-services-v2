@@ -10,7 +10,8 @@
     "dev": "nodemon --exec ts-node src/index.ts",
     "dev-public": "concurrently \"npm run start\" \"ngrok http --domain=sb-api.ngrok.app 3000\"",
     "lint": "eslint '*/**/*.{js,ts}' --quiet --fix",
-    "create-search-index": "ts-node scripts/createSearchIndex.ts"
+    "create-search-index": "ts-node scripts/createSearchIndex.ts",
+    "backfill-journal": "ts-node scripts/backfillJournalEmbeddings.ts"
   },
   "keywords": [
     "task",
@@ -28,6 +29,7 @@
     "@google-cloud/storage": "^7.11.2",
     "@google-cloud/text-to-speech": "^5.0.1",
     "@linear/sdk": "^10.0.0",
+    "@pinecone-database/pinecone": "^4.0.0",
     "@sendgrid/mail": "^8.1.3",
     "@types/google-cloud__storage": "^2.3.1",
     "@types/multer": "^1.4.11",
@@ -53,6 +55,7 @@
     "node-telegram-bot-api": "^0.66.0",
     "openai": "^4.60.0",
     "ora": "^8.1.0",
+    "p-limit": "^5.0.0",
     "pusher": "^5.2.0",
     "sanitize-filename": "^1.6.3",
     "socket.io": "^4.8.1",
