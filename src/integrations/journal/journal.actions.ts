@@ -5,6 +5,7 @@ import {
   updateJournalEntry,
   deleteJournalEntry,
   getFriendlyJournalEntries,
+  searchJournalEntries,
 } from './journal.service';
 import { getSessionById } from '../../services/session.service';
 import { ChannelType } from '../../types/ChannelType';
@@ -28,6 +29,12 @@ interface GetJournalEntriesArgs {
 interface UpdateJournalEntryArgs {
   journalId: string;
   updateData: Partial<IJournal>;
+}
+
+interface SearchJournalEntriesArgs {
+  query: string;
+  limit?: number;
+  scope?: 'user' | 'company';
 }
 
 export const createJournalActions = (
@@ -95,6 +102,76 @@ export const createJournalActions = (
             error instanceof Error
               ? error.message
               : 'An unknown error occurred while creating the journal entry.',
+        };
+      }
+    },
+  },
+
+  searchJournalEntries: {
+    description: 'Search journal entries using vector similarity search',
+    strict: true,
+    actionType: ActionType.JOURNAL_OPERATION,
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { 
+          type: 'string', 
+          description: 'The search query text' 
+        },
+        limit: { 
+          type: 'number', 
+          description: 'Maximum number of entries to return' 
+        },
+        scope: { 
+          type: 'string', 
+          enum: ['user', 'company'],
+          description: 'Search entries for current user only or all company entries' 
+        },
+      },
+      required: ['query'],
+      additionalProperties: false,
+    },
+    function: async ({ query, limit = 10, scope = 'user' }: SearchJournalEntriesArgs) => {
+      try {
+        const { companyId, sessionId } = context;
+
+        if (!sessionId) {
+          return {
+            error: 'Invalid session',
+            message: 'Session ID is required.',
+          };
+        }
+
+        if (!companyId) {
+          return {
+            error: 'Missing parameters',
+            message: 'companyId is required to search journal entries.',
+          };
+        }
+
+        const session = await getSessionById(sessionId);
+
+        if (!session) {
+          return {
+            error: 'Invalid session',
+            message: 'Unable to retrieve a valid session.',
+          };
+        }
+
+        const entries = await searchJournalEntries(
+          query,
+          companyId,
+          scope === 'user' ? session.userId : undefined,
+          limit
+        );
+        return { success: true, data: entries };
+      } catch (error) {
+        return {
+          error: 'Search failed',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'An unknown error occurred while searching journal entries.',
         };
       }
     },
