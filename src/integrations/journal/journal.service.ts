@@ -43,6 +43,9 @@ export async function createJournalEntry(
         tags: savedJournal.tags,
         timestamp: savedJournal.timestamp.toISOString(),
       });
+      // Update isIndexed flag after successful vector creation
+      await Journal.findByIdAndUpdate(savedJournal._id, { isIndexed: true });
+      savedJournal.isIndexed = true;
     } catch (vectorError) {
       // Log the error but don't throw it
       console.warn('Warning: Failed to store vector in Pinecone:', vectorError);
@@ -209,6 +212,9 @@ export async function updateJournalEntry(
           tags: updatedJournal.tags,
           timestamp: updatedJournal.timestamp.toISOString(),
         });
+        // Update isIndexed flag after successful vector update
+        await Journal.findByIdAndUpdate(updatedJournal._id, { isIndexed: true });
+        updatedJournal.isIndexed = true;
       } catch (vectorError) {
         console.warn('Warning: Failed to update vector in Pinecone:', vectorError);
         console.warn('Journal entry was updated in MongoDB but vector search may be out of sync');
