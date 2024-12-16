@@ -1,0 +1,11 @@
+{
+  "serviceName": "ממשק משתמש סוכן",
+  "getUiContext": {
+    "actionTitle": "קבל הקשר ממשק משתמש",
+    "description": "מאחזר את הקשר ממשק המשתמש הנוכחי"
+  },
+  "updateUiElement": {
+    "actionTitle": "עדכן אלמנט ממשק משתמש",
+    "description": "מעדכן אלמנט ממשק משתמש ספציפי עם נתונים חדשים"
+  }
+}

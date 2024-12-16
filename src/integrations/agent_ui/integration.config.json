@@ -1,0 +1,7 @@
+{
+  "name": "agent_ui",
+  "icon": "layout",
+  "apiKeyName": "agent_ui_api_key",
+  "actionCreator": "createAgentUiActions",
+  "actionsFile": "agent_ui.actions.ts"
+}
