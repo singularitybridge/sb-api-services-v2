@@ -1,0 +1,6 @@
+{
+  "name": "agent_ui_framework",
+  "icon": "layout",
+  "actionCreator": "createAgentUiFrameworkActions",
+  "actionsFile": "agent_ui_framework.actions.ts"
+}
