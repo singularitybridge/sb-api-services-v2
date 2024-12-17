@@ -1,10 +1,10 @@
 import { ActionContext, FunctionFactory } from '../actions/types';
-import { getUiContext, updateUiElement } from './agent_ui.service';
+import { getUiContext, executeUiMethod } from './agent_ui.service';
 
-interface UpdateUiElementArgs {
-  type: string;
-  id: string;
-  data: any;
+interface ExecuteUiMethodArgs {
+  method: string;
+  pageId: string;
+  params: Record<string, any>;
 }
 
 export const createAgentUiActions = (context: ActionContext): FunctionFactory => ({
@@ -14,71 +14,75 @@ export const createAgentUiActions = (context: ActionContext): FunctionFactory =>
     parameters: {
       type: 'object',
       properties: {},
-      required: [], // Added required property as empty array since there are no required parameters
+      required: [],
       additionalProperties: false,
     },
     function: async () => {
-      try {
-        const uiContext = await getUiContext(context.companyId);
-        return {
-          success: true,
-          data: { uiContext }
-        };
-      } catch (error) {
-        console.error('getUiContext: Error getting UI context', error);
+      const result = await getUiContext(context.companyId);
+      
+      if (!result.success) {
         return {
           success: false,
-          error: 'Failed to get UI context',
+          error: result.error || 'Failed to get UI context',
           message: 'An error occurred while getting the UI context.',
         };
       }
+
+      return {
+        success: true,
+        data: { uiContext: result.data }
+      };
     },
   },
 
-  updateUiElement: {
-    description: 'Update a UI element',
+  executeUiMethod: {
+    description: 'Execute a UI method with parameters',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
-        type: {
+        method: {
           type: 'string',
-          description: 'Type of UI element to update'
+          description: 'Method to execute (e.g., updateGoal, setFilter)'
         },
-        id: {
+        pageId: {
           type: 'string',
-          description: 'ID of the UI element'
+          description: 'ID of the page where the method should be executed'
         },
-        data: {
+        params: {
           type: 'object',
-          description: 'Data to update the UI element with'
+          description: 'Parameters for the method',
+          additionalProperties: true
         }
       },
-      required: ['type', 'id', 'data'],
+      required: ['method', 'pageId', 'params'],
       additionalProperties: false,
     },
-    function: async (args: UpdateUiElementArgs) => {
-      const { type, id, data } = args;
+    function: async (args: ExecuteUiMethodArgs) => {
+      const { method, pageId, params } = args;
 
-      if (!type || !id) {
+      if (!method || !pageId) {
         return {
           success: false,
           error: 'Invalid parameters',
-          message: 'Type and ID are required.',
+          message: 'Method and pageId are required.',
         };
       }
 
-      try {
-        const result = await updateUiElement(context.companyId, { type, id, data });
-        return result;
-      } catch (error) {
-        console.error('updateUiElement: Error updating UI element', error);
+      const result = await executeUiMethod(context.companyId, { method, pageId, params });
+      
+      if (!result.success) {
         return {
           success: false,
-          error: 'Failed to update UI element',
-          message: 'An error occurred while updating the UI element.',
+          error: result.error || 'Failed to execute UI method',
+          message: 'An error occurred while executing the UI method.',
         };
       }
+
+      return {
+        success: true,
+        data: result.data
+      };
     },
   },
 });
