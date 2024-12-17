@@ -5,12 +5,45 @@ import { validateMessage } from './validation';
 import { handleSessionAction } from './actions/session.handler';
 import { handleCompletionAction } from './actions/completion.handler';
 import { handleSpeechAction } from './actions/speech.handler';
+import { 
+  isJsonRpcRequest, 
+  isJsonRpcResponse, 
+  handleRpcRequest, 
+  handleRpcResponse 
+} from '../rpc/utils';
+import { RPC_ERROR_CODES, JsonRpcErrorResponse } from '../rpc/types';
 
-export const sendMessage = (socket: Socket, message: WebSocketMessage): void => {
-  socket.emit('message', JSON.stringify(message));
+export const sendMessage = (socket: Socket, message: WebSocketMessage | JsonRpcErrorResponse | string): void => {
+  socket.emit('message', typeof message === 'string' ? message : JSON.stringify(message));
 };
 
-export const handleMessage = async (socket: AuthenticatedSocket, message: WebSocketMessage): Promise<void> => {
+export const handleMessage = async (socket: AuthenticatedSocket, message: WebSocketMessage | any): Promise<void> => {
+  // Handle JSON-RPC messages
+  if (typeof message === 'object' && message.jsonrpc === '2.0') {
+    if (isJsonRpcRequest(message)) {
+      await handleRpcRequest(socket, message);
+      return;
+    }
+    
+    if (isJsonRpcResponse(message)) {
+      handleRpcResponse(message);
+      return;
+    }
+    
+    // Invalid RPC message
+    const errorResponse: JsonRpcErrorResponse = {
+      jsonrpc: '2.0',
+      error: {
+        code: RPC_ERROR_CODES.INVALID_REQUEST,
+        message: 'Invalid Request'
+      },
+      id: (message?.id || 'unknown').toString()
+    };
+    sendMessage(socket, errorResponse);
+    return;
+  }
+
+  // Handle legacy message format
   if (!validateMessage(socket, message)) {
     return;
   }

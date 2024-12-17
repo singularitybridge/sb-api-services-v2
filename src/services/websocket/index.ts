@@ -4,10 +4,16 @@ import { AuthenticatedSocket } from './types';
 import { websocketConfig } from './config';
 import { setupSocketAuth } from './handlers/authHandler';
 import { handleMessage } from './handlers/messageHandler';
+import { registerSocket, unregisterSocket } from '../../integrations/agent_ui/agent_ui.service';
 
 const setupEventHandlers = (io: SocketServer): void => {
   io.on('connection', (socket: AuthenticatedSocket) => {
     console.log(`Client connected: ${socket.id}`);
+
+    // Register socket for UI RPC communication if company ID is available
+    if (socket.decodedToken?.companyId) {
+      registerSocket(socket.decodedToken.companyId, socket);
+    }
 
     socket.on('message', async (rawMessage: string) => {
       try {
@@ -27,6 +33,10 @@ const setupEventHandlers = (io: SocketServer): void => {
 
     socket.on('disconnect', () => {
       console.log(`Client disconnected: ${socket.id}`);
+      // Unregister socket when client disconnects
+      if (socket.decodedToken?.companyId) {
+        unregisterSocket(socket.decodedToken.companyId);
+      }
     });
 
     socket.on('error', (error) => {
