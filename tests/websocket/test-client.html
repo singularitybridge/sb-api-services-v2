@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+<!-- Previous head and style sections remain the same -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -171,7 +172,7 @@
             messagesDiv.appendChild(messageElement);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
-            // Handle audio URL in response
+            // Handle responses and update display
             if (type === 'received' && typeof message === 'object') {
                 const parsed = message;
                 if (parsed.result?.audioUrl) {
@@ -182,6 +183,8 @@
                     updateResponseDisplay(`Audio generated successfully!\nURL: ${parsed.result.audioUrl}`);
                 } else if (parsed.result?.response) {
                     updateResponseDisplay(parsed.result.response);
+                } else if (parsed.result?.content) {
+                    updateResponseDisplay(parsed.result.content);
                 }
             }
         }
@@ -196,6 +199,9 @@
             audioPlayer.style.display = 'none';
             audioPlayer.src = '';
             lastAudioUrl = null;
+            
+            // Reset response display
+            updateResponseDisplay('Response will appear here...');
         }
 
         function connect() {
@@ -285,7 +291,8 @@
         function sendTTS() {
             sendRpcMessage('generateSpeech', {
                 text: "Hello, this is a test of text to speech generation.",
-                voice: "alloy",
+                voice: "onyx",
+                provider: "openai",
                 filename: "test-speech.mp3"
             });
         }
