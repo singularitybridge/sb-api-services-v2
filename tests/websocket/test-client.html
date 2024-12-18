@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-<!-- Previous head and style sections remain the same -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -59,6 +58,7 @@
             display: flex;
             gap: 10px;
             margin: 15px 0;
+            flex-wrap: wrap;
         }
         button {
             padding: 10px 20px;
@@ -69,6 +69,7 @@
             cursor: pointer;
             font-size: 14px;
             flex: 1;
+            min-width: 150px;
         }
         button:hover { background-color: #45a049; }
         button:disabled {
@@ -103,6 +104,13 @@
             border-radius: 4px;
         }
         h3 { margin-top: 0; }
+        #generatedImage {
+            max-width: 100%;
+            margin-top: 10px;
+            display: none;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body>
@@ -128,10 +136,12 @@
             <button onclick="sendSessionMessage()" disabled id="sessionBtn">Ask for a Joke</button>
             <button onclick="sendCompletion()" disabled id="completionBtn">Get Completion</button>
             <button onclick="sendTTS()" disabled id="ttsBtn">Generate Speech</button>
+            <button onclick="generateImage()" disabled id="imageBtn">Generate Image</button>
         </div>
 
         <div class="response-display" id="responseDisplay">Response will appear here...</div>
         <audio id="audioPlayer" controls></audio>
+        <img id="generatedImage" alt="Generated image will appear here">
     </div>
 
     <div class="section">
@@ -143,6 +153,7 @@
     <script>
         let socket;
         let lastAudioUrl = null;
+        let lastImageUrl = null;
         
         function updateConnectionStatus(connected, message) {
             const statusDiv = document.getElementById('connectionStatus');
@@ -154,6 +165,7 @@
             document.getElementById('sessionBtn').disabled = !connected;
             document.getElementById('completionBtn').disabled = !connected;
             document.getElementById('ttsBtn').disabled = !connected;
+            document.getElementById('imageBtn').disabled = !connected;
         }
 
         function updateResponseDisplay(text) {
@@ -181,6 +193,12 @@
                     audioPlayer.src = parsed.result.audioUrl;
                     lastAudioUrl = parsed.result.audioUrl;
                     updateResponseDisplay(`Audio generated successfully!\nURL: ${parsed.result.audioUrl}`);
+                } else if (parsed.result?.imageUrl) {
+                    const imageElement = document.getElementById('generatedImage');
+                    imageElement.style.display = 'block';
+                    imageElement.src = parsed.result.imageUrl;
+                    lastImageUrl = parsed.result.imageUrl;
+                    updateResponseDisplay(`Image generated successfully!\nURL: ${parsed.result.imageUrl}`);
                 } else if (parsed.result?.response) {
                     updateResponseDisplay(parsed.result.response);
                 } else if (parsed.result?.content) {
@@ -199,6 +217,12 @@
             audioPlayer.style.display = 'none';
             audioPlayer.src = '';
             lastAudioUrl = null;
+            
+            // Reset image
+            const imageElement = document.getElementById('generatedImage');
+            imageElement.style.display = 'none';
+            imageElement.src = '';
+            lastImageUrl = null;
             
             // Reset response display
             updateResponseDisplay('Response will appear here...');
@@ -291,9 +315,18 @@
         function sendTTS() {
             sendRpcMessage('generateSpeech', {
                 text: "Hello, this is a test of text to speech generation.",
-                voice: "onyx",
-                provider: "openai",
+                voice: "Rachel",
+                provider: "elevenlabs",
                 filename: "test-speech.mp3"
+            });
+        }
+
+        function generateImage() {
+            sendRpcMessage('generateImage', {
+                prompt: "A beautiful sunset over a mountain landscape",
+                width: 1024,
+                height: 1024,
+                filename: "test-image"
             });
         }
 
