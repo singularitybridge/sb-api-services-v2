@@ -12,13 +12,24 @@
             margin: 20px auto;
             padding: 0 20px;
         }
+        .response-display {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            min-height: 100px;
+            background-color: #f9f9f9;
+            white-space: pre-wrap;
+            font-size: 16px;
+        }
         #messages {
             border: 1px solid #ccc;
             padding: 10px;
-            height: 300px;
+            height: 200px;
             overflow-y: auto;
             margin-bottom: 10px;
             font-family: monospace;
+            font-size: 12px;
         }
         .message {
             margin: 5px 0;
@@ -26,13 +37,9 @@
             border-radius: 4px;
             white-space: pre-wrap;
         }
-        .sent {
-            background-color: #e3f2fd;
-        }
-        .received {
-            background-color: #f5f5f5;
-        }
-        .error {
+        .sent { background-color: #e3f2fd; }
+        .received { background-color: #f5f5f5; }
+        .error { 
             background-color: #ffebee;
             color: #d32f2f;
         }
@@ -40,36 +47,32 @@
             background-color: #fff3e0;
             font-style: italic;
         }
-        input[type="text"], select {
+        input[type="text"] {
             width: 100%;
             padding: 8px;
             margin: 5px 0;
             border: 1px solid #ccc;
             border-radius: 4px;
         }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
         button {
-            padding: 8px 15px;
+            padding: 10px 20px;
             background-color: #4CAF50;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            margin-right: 5px;
+            font-size: 14px;
+            flex: 1;
         }
-        button:hover {
-            background-color: #45a049;
-        }
+        button:hover { background-color: #45a049; }
         button:disabled {
             background-color: #cccccc;
             cursor: not-allowed;
-        }
-        .input-group {
-            margin-bottom: 10px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
         }
         .status {
             padding: 5px 10px;
@@ -90,50 +93,51 @@
         #audioPlayer {
             width: 100%;
             margin-top: 10px;
+            display: none;
         }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+        h3 { margin-top: 0; }
     </style>
 </head>
 <body>
     <h2>WebSocket Test Client</h2>
     
-    <div id="connectionStatus" class="status">Not connected</div>
-    
-    <div class="input-group">
-        <label for="token">Authorization Token:</label>
-        <input type="text" id="token" placeholder="Bearer your-jwt-token">
-    </div>
-    
-    <div class="input-group">
-        <button onclick="connect()" id="connectBtn">Connect</button>
-        <button onclick="disconnect()" disabled id="disconnectBtn">Disconnect</button>
-    </div>
-    
-    <h3>Messages</h3>
-    <div id="messages"></div>
-    
-    <div class="input-group">
-        <label for="messageType">Message Type:</label>
-        <select id="messageType" onchange="updateDataField()">
-            <option value="session">Session Message</option>
-            <option value="completion">Completion</option>
-            <option value="tts">Text-to-Speech</option>
-        </select>
+    <div class="section">
+        <div id="connectionStatus" class="status">Not connected</div>
+        
+        <div class="input-group">
+            <label for="token">Authorization Token:</label>
+            <input type="text" id="token" placeholder="Bearer your-jwt-token">
+        </div>
+        
+        <div class="button-group">
+            <button onclick="connect()" id="connectBtn">Connect</button>
+            <button onclick="disconnect()" disabled id="disconnectBtn">Disconnect</button>
+        </div>
     </div>
 
-    <div class="input-group">
-        <label for="action">Action:</label>
-        <input type="text" id="action" value="handleSessionMessage" readonly>
-    </div>
-    
-    <div class="input-group">
-        <label for="data">Data (JSON):</label>
-        <input type="text" id="data" value='{"userInput": "tell me a joke"}'>
-    </div>
-    
-    <button onclick="sendMessage()" disabled id="sendBtn">Send Message</button>
-    <button onclick="clearMessages()" id="clearBtn">Clear Messages</button>
+    <div class="section">
+        <h3>Actions</h3>
+        <div class="button-group">
+            <button onclick="sendSessionMessage()" disabled id="sessionBtn">Ask for a Joke</button>
+            <button onclick="sendCompletion()" disabled id="completionBtn">Get Completion</button>
+            <button onclick="sendTTS()" disabled id="ttsBtn">Generate Speech</button>
+        </div>
 
-    <audio id="audioPlayer" controls style="display: none;"></audio>
+        <div class="response-display" id="responseDisplay">Response will appear here...</div>
+        <audio id="audioPlayer" controls></audio>
+    </div>
+
+    <div class="section">
+        <h3>Debug Log</h3>
+        <div id="messages"></div>
+        <button onclick="clearMessages()" id="clearBtn">Clear Log</button>
+    </div>
 
     <script>
         let socket;
@@ -146,33 +150,13 @@
             
             document.getElementById('connectBtn').disabled = connected;
             document.getElementById('disconnectBtn').disabled = !connected;
-            document.getElementById('sendBtn').disabled = !connected;
+            document.getElementById('sessionBtn').disabled = !connected;
+            document.getElementById('completionBtn').disabled = !connected;
+            document.getElementById('ttsBtn').disabled = !connected;
         }
-        
-        function updateDataField() {
-            const messageType = document.getElementById('messageType').value;
-            const actionInput = document.getElementById('action');
-            const dataInput = document.getElementById('data');
 
-            if (messageType === 'session') {
-                actionInput.value = 'handleSessionMessage';
-                dataInput.value = '{"userInput": "tell me a joke"}';
-            } else if (messageType === 'completion') {
-                actionInput.value = 'completion';
-                dataInput.value = JSON.stringify({
-                    systemPrompt: "You are a helpful assistant.",
-                    userInput: "What is the capital of France?",
-                    model: "gpt-4",
-                    temperature: 0.7
-                }, null, 2);
-            } else if (messageType === 'tts') {
-                actionInput.value = 'generateSpeech';
-                dataInput.value = JSON.stringify({
-                    text: "Hello, this is a test of text to speech generation.",
-                    voice: "alloy",
-                    filename: "test-speech.mp3"
-                }, null, 2);
-            }
+        function updateResponseDisplay(text) {
+            document.getElementById('responseDisplay').textContent = text;
         }
 
         function addMessage(message, type = 'received') {
@@ -190,11 +174,14 @@
             // Handle audio URL in response
             if (type === 'received' && typeof message === 'object') {
                 const parsed = message;
-                if (parsed.type === 'UPDATE' && parsed.action === 'generateSpeech' && parsed.data?.audioUrl) {
+                if (parsed.result?.audioUrl) {
                     const audioPlayer = document.getElementById('audioPlayer');
                     audioPlayer.style.display = 'block';
-                    audioPlayer.src = parsed.data.audioUrl;
-                    lastAudioUrl = parsed.data.audioUrl;
+                    audioPlayer.src = parsed.result.audioUrl;
+                    lastAudioUrl = parsed.result.audioUrl;
+                    updateResponseDisplay(`Audio generated successfully!\nURL: ${parsed.result.audioUrl}`);
+                } else if (parsed.result?.response) {
+                    updateResponseDisplay(parsed.result.response);
                 }
             }
         }
@@ -240,7 +227,10 @@
 
                 socket.on('message', (message) => {
                     const parsed = typeof message === 'string' ? JSON.parse(message) : message;
-                    addMessage(parsed, parsed.type === 'ERROR' ? 'error' : 'received');
+                    if (parsed.error) {
+                        updateResponseDisplay(`Error: ${parsed.error.message}`);
+                    }
+                    addMessage(parsed, parsed.error ? 'error' : 'received');
                 });
 
                 socket.on('connect_error', (error) => {
@@ -260,34 +250,44 @@
             }
         }
 
-        function sendMessage() {
+        function sendRpcMessage(method, params) {
             if (!socket?.connected) {
                 addMessage('Not connected to server', 'error');
                 return;
             }
 
-            const action = document.getElementById('action').value;
-            const dataStr = document.getElementById('data').value;
+            const message = {
+                jsonrpc: '2.0',
+                method,
+                params,
+                id: Date.now().toString()
+            };
 
-            if (!action) {
-                addMessage('Please enter an action', 'error');
-                return;
-            }
+            socket.emit('message', JSON.stringify(message));
+            addMessage(message, 'sent');
+        }
 
-            try {
-                const data = dataStr ? JSON.parse(dataStr) : {};
-                const message = {
-                    type: 'REQUEST',
-                    requestId: Date.now().toString(),
-                    action,
-                    data
-                };
+        function sendSessionMessage() {
+            sendRpcMessage('handleSessionMessage', {
+                userInput: "tell me a joke"
+            });
+        }
 
-                socket.emit('message', JSON.stringify(message));
-                addMessage(message, 'sent');
-            } catch (error) {
-                addMessage(`Error: ${error.message}`, 'error');
-            }
+        function sendCompletion() {
+            sendRpcMessage('completion', {
+                systemPrompt: "You are a helpful assistant.",
+                userInput: "What is the capital of France?",
+                model: "gpt-4",
+                temperature: 0.7
+            });
+        }
+
+        function sendTTS() {
+            sendRpcMessage('generateSpeech', {
+                text: "Hello, this is a test of text to speech generation.",
+                voice: "alloy",
+                filename: "test-speech.mp3"
+            });
         }
 
         // Initialize connection status

@@ -6,6 +6,9 @@ import { setupSocketAuth } from './handlers/authHandler';
 import { handleMessage } from './handlers/messageHandler';
 import { registerSocket, unregisterSocket } from '../../integrations/agent_ui/agent_ui.service';
 
+// Import RPC methods
+import './rpc/methods';
+
 const setupEventHandlers = (io: SocketServer): void => {
   io.on('connection', (socket: AuthenticatedSocket) => {
     console.log(`Client connected: ${socket.id}`);
