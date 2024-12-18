@@ -315,8 +315,8 @@
         function sendTTS() {
             sendRpcMessage('generateSpeech', {
                 text: "Hello, this is a test of text to speech generation.",
-                voice: "Rachel",
-                provider: "elevenlabs",
+                voice: "alloy",
+                provider: "openai",
                 filename: "test-speech.mp3"
             });
         }
