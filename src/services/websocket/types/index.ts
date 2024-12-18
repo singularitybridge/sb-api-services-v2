@@ -10,6 +10,7 @@ export type AuthenticatedSocket = Socket & {
   sessionId?: string;
 };
 
+// Request data types for type checking
 export type CompletionRequestData = {
   systemPrompt: string;
   userInput: string;
@@ -19,23 +20,8 @@ export type CompletionRequestData = {
 
 export type GenerateSpeechData = {
   text: string;
-  voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+  voice?: string; // Removed specific voice types to support both OpenAI and ElevenLabs
+  provider?: 'openai' | 'elevenlabs';
   textLimit?: number;
   filename?: string;
-};
-
-export type WebSocketAction = 
-  | 'handleSessionMessage'
-  | 'completion'
-  | 'generateSpeech';
-
-export type WebSocketMessage = {
-  type: 'REQUEST' | 'RESPONSE' | 'UPDATE' | 'ERROR';
-  requestId: string;
-  action?: WebSocketAction;
-  data?: any;
-  error?: {
-    code: string;
-    message: string;
-  };
 };
