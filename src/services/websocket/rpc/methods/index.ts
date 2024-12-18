@@ -2,5 +2,6 @@
 import './session';
 import './completion';
 import './speech';
+import './image';
 
 // Add other method imports as needed
