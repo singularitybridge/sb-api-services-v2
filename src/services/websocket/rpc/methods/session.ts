@@ -4,6 +4,7 @@ import { getSessionOrCreate } from '../../../session.service';
 import { ChannelType } from '../../../../types/ChannelType';
 import { registerRpcMethod } from '../utils';
 import { getApiKey } from '../../../api.key.service';
+import { publishSessionMessage } from '../../../pusher.service';
 
 const processSessionMessage = async (apiKey: string, socket: AuthenticatedSocket, userInput: string) => {
   const { userId, companyId } = socket.decodedToken!;
@@ -20,11 +21,34 @@ const processSessionMessage = async (apiKey: string, socket: AuthenticatedSocket
     socket.sessionId = session._id.toString();
   }
 
+  // Notify UI about user message immediately
+  await publishSessionMessage(
+    socket.sessionId!,
+    'chat_message',
+    {
+      type: 'user',
+      content: userInput,
+      timestamp: new Date().toISOString()
+    }
+  );
+
+  // Process the message and get response
   const response = await handleSessionMessage(
     apiKey,
     userInput,
     socket.sessionId!,
     ChannelType.WEB
+  );
+
+  // Notify UI about assistant response
+  await publishSessionMessage(
+    socket.sessionId!,
+    'chat_message',
+    {
+      type: 'assistant',
+      content: response,
+      timestamp: new Date().toISOString()
+    }
   );
 
   return {
