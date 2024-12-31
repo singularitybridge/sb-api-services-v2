@@ -1,4 +1,6 @@
 import OpenAI from 'openai';
+import axios from 'axios';
+const pdf = require('pdf-parse');
 
 export const summarizeText = async (
   apiKey: string,
@@ -31,18 +33,42 @@ export const getO1CompletionResponse = async (
   }
 };
 
+const fetchAndParsePdf = async (url: string): Promise<string> => {
+  try {
+    const response = await axios.get(url, { responseType: 'arraybuffer' });
+    const data = await pdf(response.data);
+    return data.text;
+  } catch (error) {
+    console.error('Error fetching or parsing PDF:', error);
+    throw new Error('Failed to fetch or parse PDF file');
+  }
+};
+
 export const getCompletionResponse = async (
   apiKey: string,
   systemPrompt: string,
   userInput: string,
   model: string = 'gpt-4o',
-  temperature: number = 0.7,  
+  temperature: number = 0.7,
+  pdfUrl?: string
 ): Promise<string> => {
+  let enhancedUserInput = userInput;
+  
+  if (pdfUrl) {
+    try {
+      const pdfContent = await fetchAndParsePdf(pdfUrl);
+      enhancedUserInput = `Context from PDF:\n${pdfContent}\n\nUser Question:\n${userInput}`;
+    } catch (error) {
+      console.error('Error processing PDF:', error);
+      throw new Error('Failed to process PDF file');
+    }
+  }
+
   const o1Models = ['o1', 'o1-mini', 'o1-preview'];
 
   if (o1Models.includes(model)) {
     return getO1CompletionResponse(apiKey, [
-      { role: 'user', content: `${systemPrompt}\n\n${userInput}` }
+      { role: 'user', content: `${systemPrompt}\n\n${enhancedUserInput}` }
     ], model);
   }
 
@@ -51,7 +77,7 @@ export const getCompletionResponse = async (
   try {
     const messages = [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: userInput },
+      { role: 'user', content: enhancedUserInput },
     ];
 
     const params: any = {

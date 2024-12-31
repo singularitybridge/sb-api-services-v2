@@ -135,6 +135,7 @@
         <div class="button-group">
             <button onclick="sendSessionMessage()" disabled id="sessionBtn">Ask for a Joke</button>
             <button onclick="sendCompletion()" disabled id="completionBtn">Get Completion</button>
+            <button onclick="sendPdfCompletion()" disabled id="pdfCompletionBtn">PDF Completion</button>
             <button onclick="sendTTS()" disabled id="ttsBtn">Generate Speech</button>
             <button onclick="generateImage()" disabled id="imageBtn">Generate Image</button>
         </div>
@@ -164,6 +165,7 @@
             document.getElementById('disconnectBtn').disabled = !connected;
             document.getElementById('sessionBtn').disabled = !connected;
             document.getElementById('completionBtn').disabled = !connected;
+            document.getElementById('pdfCompletionBtn').disabled = !connected;
             document.getElementById('ttsBtn').disabled = !connected;
             document.getElementById('imageBtn').disabled = !connected;
         }
@@ -309,6 +311,16 @@
                 userInput: "What is the capital of France?",
                 model: "gpt-4",
                 temperature: 0.7
+            });
+        }
+
+        function sendPdfCompletion() {
+            sendRpcMessage('completion', {
+                systemPrompt: "You are a helpful assistant. Analyze the provided PDF and answer questions about its content.",
+                userInput: "What is the main topic of this document?",
+                model: "gpt-4",
+                temperature: 0.7,
+                pdfUrl: "https://storage.googleapis.com/sb-ai-experiments-files/67706f762da04f83c4098255.pdf?t=1735421815572"
             });
         }
 
