@@ -17,7 +17,8 @@ registerRpcMethod('completion', async (socket: AuthenticatedSocket, params: any)
     params.systemPrompt,
     params.userInput,
     params.model || 'gpt-4',
-    params.temperature
+    params.temperature,
+    params.pdfUrl
   );
 
   return {

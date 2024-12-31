@@ -14,6 +14,7 @@ completionRouter.post(
       userInput,
       model = 'gpt-4o',
       temperature,
+      pdfUrl,
     } = req.body;
 
     const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
@@ -25,11 +26,15 @@ completionRouter.post(
         userInput,
         model,
         temperature,
+        pdfUrl
       );
       res.json({ content: response });
     } catch (error) {
-      res.status(500).json({
-        error: 'An error occurred while processing the completion request',
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred while processing the completion request';
+      const statusCode = errorMessage.includes('PDF') ? 400 : 500;
+      
+      res.status(statusCode).json({
+        error: errorMessage
       });
     }
   },
