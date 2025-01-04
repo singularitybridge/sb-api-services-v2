@@ -126,6 +126,25 @@
   "text": "hello world"
 }</textarea>
     </div>
+
+    <div class="section">
+        <h3>Journal Operations</h3>
+        <div class="button-group">
+            <button onclick="createJournalEntry()" disabled id="journalCreateBtn">Create Journal Entry</button>
+            <button onclick="searchJournalEntries()" disabled id="journalSearchBtn">Search Journals</button>
+            <button onclick="getJournalEntries()" disabled id="journalGetBtn">Get Journals</button>
+            <button onclick="updateJournalEntry()" disabled id="journalUpdateBtn">Update Journal Entry</button>
+            <button onclick="deleteJournalEntry()" disabled id="journalDeleteBtn">Delete Journal Entry</button>
+        </div>
+        <div class="input-group">
+            <label for="journalContent">Journal Content:</label>
+            <textarea id="journalContent" placeholder="Enter journal content here">Test journal entry from agent UI</textarea>
+        </div>
+        <div class="input-group">
+            <label for="journalId">Journal ID (for update):</label>
+            <input type="text" id="journalId" placeholder="Enter journal ID to update">
+        </div>
+    </div>
     
     <h3>Messages</h3>
     <div id="messages"></div>
@@ -143,6 +162,11 @@
             
             document.getElementById('connectBtn').disabled = connected;
             document.getElementById('disconnectBtn').disabled = !connected;
+            document.getElementById('journalCreateBtn').disabled = !connected;
+            document.getElementById('journalSearchBtn').disabled = !connected;
+            document.getElementById('journalGetBtn').disabled = !connected;
+            document.getElementById('journalUpdateBtn').disabled = !connected;
+            document.getElementById('journalDeleteBtn').disabled = !connected;
         }
         
         function addMessage(message, type = 'received') {
@@ -267,6 +291,98 @@
             mockUiContext = JSON.parse(document.getElementById('mockContext').value);
         } catch (e) {
             console.error('Error parsing initial mock context:', e);
+        }
+
+        function createJournalEntry() {
+            const content = document.getElementById('journalContent').value;
+            const message = {
+                jsonrpc: '2.0',
+                method: 'createJournalEntry',
+                params: {
+                    content: content,
+                    entryType: "agent_ui_test",
+                    tags: ["test", "agent_ui"]
+                },
+                id: Date.now().toString()
+            };
+            socket.emit('message', JSON.stringify(message));
+            addMessage(message, 'sent');
+        }
+
+        function searchJournalEntries() {
+            const message = {
+                jsonrpc: '2.0',
+                method: 'searchJournalEntries',
+                params: {
+                    query: "test",
+                    limit: 5,
+                    scope: "user"
+                },
+                id: Date.now().toString()
+            };
+            socket.emit('message', JSON.stringify(message));
+            addMessage(message, 'sent');
+        }
+
+        function getJournalEntries() {
+            const message = {
+                jsonrpc: '2.0',
+                method: 'getJournalEntries',
+                params: {
+                    // entryType: "agent_ui_test",
+                    // tags: ["test", "agent_ui"],
+                    limit: 5,
+                    scope: "user"
+                },
+                id: Date.now().toString()
+            };
+            socket.emit('message', JSON.stringify(message));
+            addMessage(message, 'sent');
+        }
+
+        function updateJournalEntry() {
+            const journalId = document.getElementById('journalId').value;
+            const content = document.getElementById('journalContent').value;
+            
+            if (!journalId) {
+                addMessage('Please enter a journal ID to update', 'error');
+                return;
+            }
+
+            const message = {
+                jsonrpc: '2.0',
+                method: 'updateJournalEntry',
+                params: {
+                    journalId: journalId,
+                    updateData: {
+                        content: content,
+                        tags: ["test", "agent_ui", "updated"]
+                    }
+                },
+                id: Date.now().toString()
+            };
+            socket.emit('message', JSON.stringify(message));
+            addMessage(message, 'sent');
+        }
+
+        function deleteJournalEntry() {
+            const journalId = document.getElementById('journalId').value;
+            
+            if (!journalId) {
+                addMessage('Please enter a journal ID to delete', 'error');
+                return;
+            }
+
+            const message = {
+                jsonrpc: '2.0',
+                method: 'deleteJournalEntry',
+                params: {
+                    journalId: journalId
+                },
+                id: Date.now().toString()
+            };
+            socket.emit('message', JSON.stringify(message));
+            addMessage(message, 'sent');
         }
     </script>
 </body>
