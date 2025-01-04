@@ -138,6 +138,9 @@
             <button onclick="sendPdfCompletion()" disabled id="pdfCompletionBtn">PDF Completion</button>
             <button onclick="sendTTS()" disabled id="ttsBtn">Generate Speech</button>
             <button onclick="generateImage()" disabled id="imageBtn">Generate Image</button>
+            <button onclick="createJournalEntry()" disabled id="journalCreateBtn">Create Journal Entry</button>
+            <button onclick="searchJournalEntries()" disabled id="journalSearchBtn">Search Journals</button>
+            <button onclick="getJournalEntries()" disabled id="journalGetBtn">Get Journals</button>
         </div>
 
         <div class="response-display" id="responseDisplay">Response will appear here...</div>
@@ -168,6 +171,9 @@
             document.getElementById('pdfCompletionBtn').disabled = !connected;
             document.getElementById('ttsBtn').disabled = !connected;
             document.getElementById('imageBtn').disabled = !connected;
+            document.getElementById('journalCreateBtn').disabled = !connected;
+            document.getElementById('journalSearchBtn').disabled = !connected;
+            document.getElementById('journalGetBtn').disabled = !connected;
         }
 
         function updateResponseDisplay(text) {
@@ -344,6 +350,30 @@
 
         // Initialize connection status
         updateConnectionStatus(false, 'Not connected');
+        function createJournalEntry() {
+            sendRpcMessage('createJournalEntry', {
+                content: "Test journal entry created at " + new Date().toISOString(),
+                entryType: "test",
+                tags: ["test", "websocket"]
+            });
+        }
+
+        function searchJournalEntries() {
+            sendRpcMessage('searchJournalEntries', {
+                query: "test",
+                limit: 5,
+                scope: "user"
+            });
+        }
+
+        function getJournalEntries() {
+            sendRpcMessage('getJournalEntries', {
+                // entryType: "project",
+                // tags: ["מטייל"],
+                limit: 5,
+                scope: "user"
+            });
+        }
     </script>
 </body>
 </html>
