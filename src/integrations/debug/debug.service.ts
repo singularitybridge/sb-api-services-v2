@@ -1,7 +1,7 @@
 import { Session } from '../../models/Session';
 import { getUserById } from '../../services/user.service';
 import { getCompany } from '../../services/company.service';
-import { triggerAction, getLeanIntegrationActions, getIntegrationById } from '../../services/integration.service';
+import { triggerAction, getLeanIntegrationActions, getIntegrationById, discoverActionById as discoverActionByIdService } from '../../services/integration.service';
 import { ActionContext } from '../actions/types';
 import { getSessionContextData } from '../../services/session-context.service';
 import { SupportedLanguage, Integration } from '../../services/discovery.service';
@@ -98,5 +98,19 @@ export const getIntegration = async (integrationId: string): Promise<{ success: 
   } catch (error: any) {
     console.error('Error in getIntegration:', error);
     return { success: false, error: error.message || 'Failed to get integration' };
+  }
+};
+
+export const discoverActionById = async (actionId: string, language: SupportedLanguage): Promise<{ success: boolean; data?: any; error?: string }> => {
+  try {
+    const action = await discoverActionByIdService(actionId, language);
+    if (action) {
+      return { success: true, data: action };
+    } else {
+      return { success: false, error: 'Action not found' };
+    }
+  } catch (error: any) {
+    console.error('Error in discoverActionById:', error);
+    return { success: false, error: error.message || 'Failed to discover action by ID' };
   }
 };

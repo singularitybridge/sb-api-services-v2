@@ -1,6 +1,7 @@
 import { createAIAgentExecutorActions } from '../aiAgentExecutor.actions';
 import { ActionContext } from '../../actions/types';
 import axios from 'axios';
+import { SupportedLanguage } from '../../../services/discovery.service';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -18,7 +19,8 @@ describe('AI Agent Executor Actions', () => {
   beforeEach(() => {
     const context: ActionContext = {
       sessionId: 'test-session',
-      companyId: 'test-company'
+      companyId: 'test-company',
+      language: 'en' as SupportedLanguage
     };
     actions = createAIAgentExecutorActions(context);
   });

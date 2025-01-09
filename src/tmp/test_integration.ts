@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { performCurlRequest } from '../integrations/curl/curl.service';
 import { ActionContext } from '../integrations/actions/types';
+import { SupportedLanguage } from '../services/discovery.service';
 
 const TEST_REQUESTS_DIR = './src/tmp/test-requests';
 
@@ -15,7 +16,8 @@ const testIntegration = async (specificFile?: string) => {
     // Create context with required properties
     const context: ActionContext = {
       sessionId: 'test-session',
-      companyId: 'test-company'
+      companyId: 'test-company',
+      language: 'en' as SupportedLanguage
     };
 
     console.log(`Found ${files.length} test request${files.length === 1 ? '' : 's'} to process\n`);

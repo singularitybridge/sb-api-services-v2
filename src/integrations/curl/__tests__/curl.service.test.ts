@@ -1,10 +1,12 @@
 import { performCurlRequest } from '../curl.service';
 import { ActionContext } from '../../actions/types';
+import { SupportedLanguage } from '../../../services/discovery.service';
 
 describe('curl.service', () => {
   const mockContext: ActionContext = {
     sessionId: 'test-session',
-    companyId: 'test-company'
+    companyId: 'test-company',
+    language: 'en' as SupportedLanguage
   };
 
   const mockCurlCommand = `curl --location 'https://api.example.com/test' \

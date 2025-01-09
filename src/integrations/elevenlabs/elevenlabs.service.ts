@@ -1,77 +1,109 @@
 import axios from 'axios';
-import { uploadFile } from '../../services/google.storage.service';
 import { ApiKey } from '../../services/verification.service';
 
-export const generateAudio = async (
-  apikey: string,
-  text: string,
-  voiceId: string = 'gbTBNCAEwTTleGFPK23L',
-  modelId: string = 'eleven_turbo_v2',
-): Promise<string> => {
-  console.log('generateAudio ...', text);
+interface ElevenLabsConfig {
+  apiKey: string;
+  baseUrl?: string;
+}
 
-  const data = {
-    model_id: modelId,
-    text: text,
-    voice_settings: {
-      similarity_boost: 0.5,
-      stability: 0.5,
-      style: 1,
-      use_speaker_boost: true,
-    },
+interface GenerateAudioResult {
+  success: boolean;
+  data?: {
+    audioUrl: string;
   };
+  error?: string;
+}
 
+interface GenerateSpeechOptions {
+  text: string;
+  voiceId?: string;
+  modelId?: string;
+  filename?: string;
+}
+
+export const generateAudio = async (
+  apiKey: string,
+  text: string,
+  voiceId: string = '21m00Tcm4TlvDq8ikWAM',
+  filename?: string
+): Promise<GenerateAudioResult> => {
   try {
-    const response = await axios.post(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
-      data,
-      {
-        headers: {
-          'xi-api-key': apikey,
-          'Content-Type': 'application/json',
-          Accept: 'audio/mpeg',
-        },
-        responseType: 'arraybuffer',
-      },
+    const result = await generateSpeech(
+      { apiKey },
+      { text, voiceId, filename }
     );
-
-    const buffer = Buffer.from(response.data);
-
-    // Create a mock Express.Multer.File object
-    const file: Express.Multer.File = {
-      fieldname: 'file',
-      originalname: `elevenlabs_audio_${Date.now()}.mp3`,
-      encoding: '7bit',
-      mimetype: 'audio/mpeg',
-      buffer: buffer,
-      size: buffer.length,
-      stream: null as any,
-      destination: '',
-      filename: '',
-      path: '',
+    return {
+      success: true,
+      data: {
+        audioUrl: result
+      }
     };
-
-    // Upload the file to cloud storage
-    const publicUrl = await uploadFile(file);
-    return publicUrl;
-
   } catch (error) {
-    console.error('Error generating audio with ElevenLabs:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
+};
+
+export const generateSpeech = async (
+  config: ElevenLabsConfig,
+  options: GenerateSpeechOptions
+): Promise<string> => {
+  const {
+    text,
+    voiceId = '21m00Tcm4TlvDq8ikWAM', // Default voice - Rachel
+    modelId = 'eleven_monolingual_v1'
+  } = options;
+
+  const baseUrl = config.baseUrl || 'https://api.elevenlabs.io/v1';
+  
+  try {
+    const response = await axios({
+      method: 'POST',
+      url: `${baseUrl}/text-to-speech/${voiceId}`,
+      headers: {
+        'Accept': 'audio/mpeg',
+        'xi-api-key': config.apiKey,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        text,
+        model_id: modelId,
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.5
+        }
+      },
+      responseType: 'arraybuffer'
+    });
+
+    // Convert the audio buffer to base64
+    const audioBase64 = Buffer.from(response.data).toString('base64');
+    const audioUrl = `data:audio/mpeg;base64,${audioBase64}`;
+
+    return audioUrl;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(`ElevenLabs API error: ${error.response?.data?.message || error.message}`);
+    }
     throw error;
   }
 };
 
-export const verifyElevenLabsKey = async (apiKey: ApiKey) => {
+export const verifyElevenLabsKey = async (key: ApiKey): Promise<boolean> => {
+  if (typeof key !== 'string') {
+    return false;
+  }
+  
   try {
-    if (typeof apiKey !== 'string') {
-      throw new Error('Invalid API key type for 11labs verification');
-    }
-    const response = await axios.get('https://api.elevenlabs.io/v1/voices', {
+    const response = await axios({
+      method: 'GET',
+      url: 'https://api.elevenlabs.io/v1/voices',
       headers: {
-        'xi-api-key': apiKey,
-      },
+        'xi-api-key': key
+      }
     });
-
     return response.status === 200;
   } catch (error) {
     return false;

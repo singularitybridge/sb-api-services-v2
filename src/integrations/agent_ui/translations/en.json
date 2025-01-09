@@ -1,0 +1,11 @@
+{
+  "serviceName": "Agent UI",
+  "getUiContext": {
+    "actionTitle": "Get UI Context",
+    "description": "Retrieves the current UI context"
+  },
+  "updateUiElement": {
+    "actionTitle": "Update UI Element",
+    "description": "Updates a specific UI element with new data"
+  }
+}

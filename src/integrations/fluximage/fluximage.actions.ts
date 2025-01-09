@@ -5,6 +5,7 @@ interface FluxImageArgs {
   prompt: string;
   width?: number;
   height?: number;
+  filename?: string;
 }
 
 export const createFluxImageActions = (context: ActionContext): FunctionFactory => ({
@@ -25,20 +26,23 @@ export const createFluxImageActions = (context: ActionContext): FunctionFactory 
         height: {
           type: 'number',
           description: 'The height of the generated image in pixels (256 to 1280). Must be a multiple of 8.',
+        },
+        filename: {
+          type: 'string',
+          description: 'Optional custom filename for the generated image',
         }
       },
       required: ['prompt'],
       additionalProperties: false,
     },
     function: async (args: FluxImageArgs) => {
-      
-
-      const { prompt, width, height } = args;
+      const { prompt, width, height, filename } = args;
 
       // Verify that prompt is a string
       if (typeof prompt !== 'string' || prompt.trim().length === 0) {
         console.error('generateFluxImage: Invalid prompt', prompt);
         return {
+          success: false,
           error: 'Invalid prompt',
           message: 'The prompt must be a non-empty string.',
         };
@@ -48,6 +52,7 @@ export const createFluxImageActions = (context: ActionContext): FunctionFactory 
       if (width !== undefined && (typeof width !== 'number' || width < 256 || width > 1280 || width % 8 !== 0)) {
         console.error('generateFluxImage: Invalid width', width);
         return {
+          success: false,
           error: 'Invalid width',
           message: 'The width must be a number between 256 and 1280 and a multiple of 8.',
         };
@@ -56,6 +61,7 @@ export const createFluxImageActions = (context: ActionContext): FunctionFactory 
       if (height !== undefined && (typeof height !== 'number' || height < 256 || height > 1280 || height % 8 !== 0)) {
         console.error('generateFluxImage: Invalid height', height);
         return {
+          success: false,
           error: 'Invalid height',
           message: 'The height must be a number between 256 and 1280 and a multiple of 8.',
         };
@@ -63,11 +69,15 @@ export const createFluxImageActions = (context: ActionContext): FunctionFactory 
 
       try {
         console.log('generateFluxImage: Calling generateFluxImage service');
-        const imageUrl = await generateFluxImage(context.companyId, { prompt, width, height });
-        return { imageUrl };
+        const imageUrl = await generateFluxImage(context.companyId, { prompt, width, height, filename });
+        return {
+          success: true,
+          data: { imageUrl },
+        };
       } catch (error) {
         console.error('generateFluxImage: Error generating image', error);
         return {
+          success: false,
           error: 'Image generation failed',
           message: 'Failed to generate the image using Flux AI.',
         };

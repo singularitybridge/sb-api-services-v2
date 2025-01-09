@@ -2,11 +2,48 @@ import axios, { AxiosError } from 'axios';
 import { ActionContext, FunctionFactory } from '../actions/types';
 import { getApiKey } from '../../services/api.key.service';
 
+// Response interfaces to match the API structure
+interface ExecuteResponse {
+  output?: string;
+  exitCode?: number;
+  completed?: boolean;
+  taskId?: string;
+  initialOutput?: string;
+}
+
+interface TaskResponse {
+  id: string;
+  command: string;
+  status: 'pending' | 'completed' | 'failed';
+  output: string;
+  exitCode: number | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface FileOperationResponse {
+  success: boolean;
+  result?: any;
+  error?: string;
+}
+
 interface AIAgentExecutorResponse {
   success: boolean;
   data?: any;
   error?: string;
 }
+
+type FileOperation = 
+  | 'list'
+  | 'read'
+  | 'write'
+  | 'createFile'
+  | 'update'
+  | 'deleteFile'
+  | 'createDir'
+  | 'deleteDirectory'
+  | 'checkExistence';
 
 // Enhanced error handling with detailed logging
 const handleError = (error: unknown): string => {
@@ -47,11 +84,14 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
 
   return {
     executeCommand: {
-      description: 'Execute a command on the AI Agent Executor.',
+      description: 'Execute a shell command sequentially using Terminal Turtle.',
       parameters: {
         type: 'object',
         properties: {
-          command: { type: 'string', description: 'The command to execute' },
+          command: { 
+            type: 'string', 
+            description: 'The shell command to execute (e.g., npm install, git clone, pm2 logs)' 
+          },
         },
         required: ['command'],
       },
@@ -60,75 +100,40 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
           const baseUrl = await getBaseUrl();
           const headers = await getHeaders();
           
-          const response = await axios.post(
+          const response = await axios.post<ExecuteResponse>(
             `${baseUrl}/execute`,
             { command },
             { headers }
           );
-          const data = response.data;
-          if (data.result) {
-            return { success: true, data: data.result };
-          } else {
-            return { success: false, error: 'Unknown response format from execute command.' };
+
+          // Handle both immediate and long-running task responses
+          if (response.data.taskId) {
+            return {
+              success: true,
+              data: {
+                taskId: response.data.taskId,
+                initialOutput: response.data.initialOutput,
+                isLongRunning: true
+              }
+            };
           }
+
+          return {
+            success: true,
+            data: {
+              output: response.data.output,
+              exitCode: response.data.exitCode,
+              completed: response.data.completed
+            }
+          };
         } catch (error: unknown) {
           return { success: false, error: handleError(error) };
         }
       },
     },
 
-    getProcessStatus: {
-      description: 'Get the status of a background process',
-      parameters: {
-        type: 'object',
-        properties: {
-          pid: { type: 'string', description: 'The process ID returned when the process was started' },
-        },
-        required: ['pid'],
-      },
-      function: async ({ pid }: { pid: string }): Promise<AIAgentExecutorResponse> => {
-        try {
-          const baseUrl = await getBaseUrl();
-          const headers = await getHeaders();
-          
-          const response = await axios.get(`${baseUrl}/process/${pid}`, {
-            headers,
-          });
-          return { success: true, data: response.data };
-        } catch (error: unknown) {
-          return { success: false, error: handleError(error) };
-        }
-      },
-    },
-
-    stopProcess: {
-      description: 'Stop a background process',
-      parameters: {
-        type: 'object',
-        properties: {
-          pid: { type: 'string', description: 'The process ID of the process to stop' },
-        },
-        required: ['pid'],
-      },
-      function: async ({ pid }: { pid: string }): Promise<AIAgentExecutorResponse> => {
-        try {
-          const baseUrl = await getBaseUrl();
-          const headers = await getHeaders();
-          
-          const response = await axios.post(
-            `${baseUrl}/process/${pid}/stop`,
-            {},
-            { headers }
-          );
-          return { success: true, data: response.data };
-        } catch (error: unknown) {
-          return { success: false, error: handleError(error) };
-        }
-      },
-    },
-
-    fileOperation: {
-      description: 'Perform a file operation on the AI Agent Executor',
+    performFileOperation: {
+      description: 'Perform file operations like listing, reading, writing, creating, updating, and deleting files or directories.',
       parameters: {
         type: 'object',
         properties: {
@@ -143,27 +148,24 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
               'deleteFile',
               'createDir',
               'deleteDirectory',
-              'checkExistence',
+              'checkExistence'
             ],
-            description: 'The file operation to perform',
+            description: 'The file operation to perform'
           },
-          path: { type: 'string', description: 'The path to the file or directory' },
+          path: { 
+            type: 'string', 
+            description: 'The path to the file or directory' 
+          },
           content: {
             type: 'string',
             description: 'Content for write, createFile, or update operations',
-            optional: true,
+            optional: true
           },
           recursive: {
             type: 'boolean',
             description: 'Whether to perform the operation recursively (for list operation)',
-            optional: true,
-          },
-          mode: {
-            type: 'string',
-            enum: ['overwrite', 'append'],
-            description: 'Mode for update operation',
-            optional: true,
-          },
+            optional: true
+          }
         },
         required: ['operation', 'path'],
       },
@@ -171,50 +173,123 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
         operation,
         path,
         content,
-        recursive,
-        mode,
+        recursive
       }: {
-        operation: string;
+        operation: FileOperation;
         path: string;
         content?: string;
         recursive?: boolean;
-        mode?: 'overwrite' | 'append';
       }): Promise<AIAgentExecutorResponse> => {
         try {
           const baseUrl = await getBaseUrl();
           const headers = await getHeaders();
           
-          const response = await axios.post(
+          const response = await axios.post<FileOperationResponse>(
             `${baseUrl}/file-operation`,
-            { operation, path, content, recursive, mode },
+            { operation, path, content, recursive },
             { headers }
           );
-          const data = response.data;
-          return { success: true, data: data.result };
+
+          return {
+            success: response.data.success,
+            data: response.data.result,
+            error: response.data.error
+          };
         } catch (error: unknown) {
           return { success: false, error: handleError(error) };
         }
       },
     },
 
-    stopExecution: {
-      description: 'Stop all running processes and shut down the AI Agent Executor',
+    getTaskStatus: {
+      description: 'Check the status of a running task.',
       parameters: {
         type: 'object',
-        properties: {},
-        required: [],
+        properties: {
+          taskId: { 
+            type: 'string', 
+            description: 'The task ID returned when the command was started' 
+          },
+        },
+        required: ['taskId'],
       },
-      function: async (): Promise<AIAgentExecutorResponse> => {
+      function: async ({ taskId }: { taskId: string }): Promise<AIAgentExecutorResponse> => {
+        try {
+          const baseUrl = await getBaseUrl();
+          const headers = await getHeaders();
+          
+          const response = await axios.get<TaskResponse>(
+            `${baseUrl}/tasks/${taskId}`,
+            { headers }
+          );
+
+          return { success: true, data: response.data };
+        } catch (error: unknown) {
+          return { success: false, error: handleError(error) };
+        }
+      },
+    },
+
+    endTask: {
+      description: 'Terminate a running task.',
+      parameters: {
+        type: 'object',
+        properties: {
+          taskId: { 
+            type: 'string', 
+            description: 'The task ID of the task to terminate' 
+          },
+        },
+        required: ['taskId'],
+      },
+      function: async ({ taskId }: { taskId: string }): Promise<AIAgentExecutorResponse> => {
         try {
           const baseUrl = await getBaseUrl();
           const headers = await getHeaders();
           
           const response = await axios.post(
-            `${baseUrl}/stop-execution`,
+            `${baseUrl}/tasks/${taskId}/end`,
             {},
             { headers }
           );
-          return { success: true, data: response.data.message };
+
+          return {
+            success: true,
+            data: {
+              message: response.data.message,
+              taskId: response.data.taskId
+            }
+          };
+        } catch (error: unknown) {
+          return { success: false, error: handleError(error) };
+        }
+      },
+    },
+
+    changeDirectory: {
+      description: 'Change the working directory for subsequent commands.',
+      parameters: {
+        type: 'object',
+        properties: {
+          newPath: { 
+            type: 'string', 
+            description: 'The new directory path to change to' 
+          },
+        },
+        required: ['newPath'],
+      },
+      function: async ({ newPath }: { newPath: string }): Promise<AIAgentExecutorResponse> => {
+        try {
+          const baseUrl = await getBaseUrl();
+          const headers = await getHeaders();
+          
+          const response = await axios.post(
+            `${baseUrl}/change-directory`,
+            { newPath },
+            { headers }
+          );
+
+          return { success: true, data: response.data };
         } catch (error: unknown) {
           return { success: false, error: handleError(error) };
         }

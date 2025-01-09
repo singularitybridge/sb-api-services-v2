@@ -4,6 +4,8 @@ dotenv.config();
 import mongoose from 'mongoose';
 import { startAgenda } from './integrations/agenda/agenda.service';
 import { initializeTelegramBots } from './services/telegram.bot';
+import { initializeWebSocket } from './services/websocket';
+import http from 'http';
 
 const initializeApp = async () => {
   try {
@@ -59,6 +61,12 @@ import integrationRouter from './routes/integration.routes';
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Create HTTP server instance
+const server = http.createServer(app);
+
+// Initialize WebSocket service
+const io = initializeWebSocket(server);
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cors());
@@ -113,7 +121,9 @@ app.use(errorHandler);
 export default app;
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(port, () => {
+  // Use the HTTP server instead of the Express app to listen
+  server.listen(port, () => {
     console.log(`Server is running on port ${port}`);
+    console.log(`WebSocket server is available at ws://localhost:${port}/realtime`);
   });
 }

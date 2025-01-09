@@ -5,6 +5,7 @@ import { ChannelType } from '../../types/ChannelType';
 import { getUserById } from '../../services/user.service';
 import { getAssistantById } from '../../services/assistant.service';
 import { format, toZonedTime } from 'date-fns-tz';
+import { upsertVector, deleteVector, runVectorSearch } from '../../services/vector.search.service';
 
 type JournalScope = 'user' | 'company';
 
@@ -30,7 +31,28 @@ export async function createJournalEntry(
     journalData.sessionId = session._id;
     
     const newJournal = new Journal(journalData);
-    return await newJournal.save();
+    const savedJournal = await newJournal.save();
+    
+    // Try to store in Pinecone, but don't fail if it errors
+    try {
+      await upsertVector(savedJournal._id.toString(), savedJournal.content, {
+        userId: savedJournal.userId.toString(),
+        companyId: savedJournal.companyId.toString(),
+        sessionId: savedJournal.sessionId.toString(),
+        entryType: savedJournal.entryType,
+        tags: savedJournal.tags,
+        timestamp: savedJournal.timestamp.toISOString(),
+      });
+      // Update isIndexed flag after successful vector creation
+      await Journal.findByIdAndUpdate(savedJournal._id, { isIndexed: true });
+      savedJournal.isIndexed = true;
+    } catch (vectorError) {
+      // Log the error but don't throw it
+      console.warn('Warning: Failed to store vector in Pinecone:', vectorError);
+      console.warn('Journal entry was saved to MongoDB but vector search will not be available for this entry');
+    }
+    
+    return savedJournal;
   } catch (error) {
     console.error('Error creating journal entry:', error);
     throw error;
@@ -64,6 +86,60 @@ export async function getJournalEntries(
     return await Journal.find(query).sort({ timestamp: -1 }).limit(limit);
   } catch (error) {
     console.error('Error getting journal entries:', error);
+    throw error;
+  }
+}
+
+export async function searchJournalEntries(
+  query: string,
+  companyId: string,
+  userId?: string,
+  limit: number = 10
+): Promise<IJournal[]> {
+  try {
+    let journalEntries: IJournal[] = [];
+    
+    try {
+      const searchResults = await runVectorSearch({
+        query,
+        entity: ['journal'],
+        companyId,
+        limit,
+        filter: userId ? { userId: { $eq: userId } } : {},
+      });
+
+      // Get the IDs of matched documents
+      const matchedIds = searchResults.map(match => match.id);
+
+      // Fetch the full journal entries from MongoDB
+      journalEntries = await Journal.find({
+        _id: { $in: matchedIds.map(id => new mongoose.Types.ObjectId(id)) },
+      });
+
+      // Sort entries based on the order of search results
+      const idToEntry = new Map(journalEntries.map(entry => [entry._id.toString(), entry]));
+      journalEntries = matchedIds.map(id => idToEntry.get(id)!).filter(Boolean);
+    } catch (vectorError) {
+      console.warn('Warning: Vector search failed, falling back to text search:', vectorError);
+      
+      // Fallback to basic text search if vector search fails
+      const textSearchQuery: any = {
+        companyId: new mongoose.Types.ObjectId(companyId),
+        $text: { $search: query },
+      };
+      
+      if (userId) {
+        textSearchQuery.userId = new mongoose.Types.ObjectId(userId);
+      }
+      
+      journalEntries = await Journal.find(textSearchQuery)
+        .sort({ score: { $meta: 'textScore' } })
+        .limit(limit);
+    }
+    
+    return journalEntries;
+  } catch (error) {
+    console.error('Error searching journal entries:', error);
     throw error;
   }
 }
@@ -123,7 +199,29 @@ export async function updateJournalEntry(
   updateData: Partial<IJournal>
 ): Promise<IJournal | null> {
   try {
-    return await Journal.findByIdAndUpdate(journalId, updateData, { new: true });
+    const updatedJournal = await Journal.findByIdAndUpdate(journalId, updateData, { new: true });
+    
+    if (updatedJournal && updateData.content) {
+      // Try to update vector in Pinecone, but don't fail if it errors
+      try {
+        await upsertVector(updatedJournal._id.toString(), updatedJournal.content, {
+          userId: updatedJournal.userId.toString(),
+          companyId: updatedJournal.companyId.toString(),
+          sessionId: updatedJournal.sessionId.toString(),
+          entryType: updatedJournal.entryType,
+          tags: updatedJournal.tags,
+          timestamp: updatedJournal.timestamp.toISOString(),
+        });
+        // Update isIndexed flag after successful vector update
+        await Journal.findByIdAndUpdate(updatedJournal._id, { isIndexed: true });
+        updatedJournal.isIndexed = true;
+      } catch (vectorError) {
+        console.warn('Warning: Failed to update vector in Pinecone:', vectorError);
+        console.warn('Journal entry was updated in MongoDB but vector search may be out of sync');
+      }
+    }
+    
+    return updatedJournal;
   } catch (error) {
     console.error('Error updating journal entry:', error);
     throw error;
@@ -133,6 +231,14 @@ export async function updateJournalEntry(
 export async function deleteJournalEntry(journalId: string): Promise<boolean> {
   try {
     const result = await Journal.findByIdAndDelete(journalId);
+    if (result) {
+      // Try to delete from Pinecone, but don't fail if it errors
+      try {
+        await deleteVector(journalId);
+      } catch (vectorError) {
+        console.warn('Warning: Failed to delete vector from Pinecone:', vectorError);
+      }
+    }
     return !!result;
   } catch (error) {
     console.error('Error deleting journal entry:', error);

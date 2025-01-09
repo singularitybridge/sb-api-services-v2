@@ -11,6 +11,7 @@ export interface IJournal extends Document {
   tags: string[];
   createdAt: Date;
   updatedAt: Date;
+  isIndexed: boolean;
 }
 
 const JournalSchema: Schema = new Schema({
@@ -22,6 +23,7 @@ const JournalSchema: Schema = new Schema({
   content: { type: String, required: true },
   metadata: { type: Schema.Types.Mixed },
   tags: [{ type: String }],
+  isIndexed: { type: Boolean, default: false },
 }, { timestamps: true });
 
 export const Journal = mongoose.model<IJournal>('Journal', JournalSchema);
