@@ -1,6 +1,7 @@
 import { ContentItem, IContentItem } from '../../models/ContentItem';
 import { validateContentData } from './validation';
 import { generateEmbedding } from './utils';
+import { getApiKey } from '../../services/api.key.service';
 
 type ContentItemOperation = 'create' | 'update';
 
@@ -34,8 +35,17 @@ const handleContentItemOperation = async (
     dataWithoutEmbedding.content ||
     JSON.stringify(dataWithoutEmbedding);
 
+  // Get OpenAI API key
+  const openaiApiKey = await getApiKey(companyId, 'openai_api_key');
+  if (!openaiApiKey) {
+    return {
+      error: 'Configuration Error',
+      details: { message: 'OpenAI API key not found for company' }
+    };
+  }
+
   // Use the provided embedding or generate a new one
-  const embeddingToUse = embedding || (await generateEmbedding(textToEmbed));
+  const embeddingToUse = embedding || (await generateEmbedding(textToEmbed, openaiApiKey));
 
   if (operation === 'create') {
     const contentItem = new ContentItem({
