@@ -1,5 +1,6 @@
 import { Pinecone } from '@pinecone-database/pinecone';
 import { generateEmbedding } from './content/utils';
+import { getApiKey } from './api.key.service';
 
 let pineconeClient: Pinecone | null = null;
 const INDEX_NAME = process.env.PINECONE_INDEX || 'journal';
@@ -20,13 +21,19 @@ const initPinecone = () => {
 export const upsertVector = async (
   id: string,
   content: string,
-  metadata: Record<string, any>
+  metadata: Record<string, any>,
+  companyId: string
 ) => {
   try {
     const client = initPinecone();
     const index = client.index(INDEX_NAME);
     
-    const embedding = await generateEmbedding(content);
+    const openaiApiKey = await getApiKey(companyId, 'openai_api_key');
+    if (!openaiApiKey) {
+      throw new Error('OpenAI API key not found for company');
+    }
+    
+    const embedding = await generateEmbedding(content, openaiApiKey);
     
     await index.upsert([
       {
@@ -73,7 +80,12 @@ export const runVectorSearch = async ({
     const client = initPinecone();
     const index = client.index(INDEX_NAME);
     
-    const queryEmbedding = await generateEmbedding(query);
+    const openaiApiKey = await getApiKey(companyId, 'openai_api_key');
+    if (!openaiApiKey) {
+      throw new Error('OpenAI API key not found for company');
+    }
+    
+    const queryEmbedding = await generateEmbedding(query, openaiApiKey);
     
     // Combine entity and company filters with any additional filters
     const searchFilter = {

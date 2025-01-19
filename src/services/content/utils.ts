@@ -1,10 +1,10 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+export const generateEmbedding = async (text: string, apiKey: string): Promise<number[]> => {
+  const openai = new OpenAI({
+    apiKey,
+  });
 
-export const generateEmbedding = async (text: string): Promise<number[]> => {
   const response = await openai.embeddings.create({
     model: 'text-embedding-3-large',
     input: text,

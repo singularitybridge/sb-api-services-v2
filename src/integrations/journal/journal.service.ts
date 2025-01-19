@@ -35,14 +35,19 @@ export async function createJournalEntry(
     
     // Try to store in Pinecone, but don't fail if it errors
     try {
-      await upsertVector(savedJournal._id.toString(), savedJournal.content, {
-        userId: savedJournal.userId.toString(),
-        companyId: savedJournal.companyId.toString(),
-        sessionId: savedJournal.sessionId.toString(),
-        entryType: savedJournal.entryType,
-        tags: savedJournal.tags,
-        timestamp: savedJournal.timestamp.toISOString(),
-      });
+      await upsertVector(
+        savedJournal._id.toString(),
+        savedJournal.content,
+        {
+          userId: savedJournal.userId.toString(),
+          companyId: savedJournal.companyId.toString(),
+          sessionId: savedJournal.sessionId.toString(),
+          entryType: savedJournal.entryType,
+          tags: savedJournal.tags,
+          timestamp: savedJournal.timestamp.toISOString(),
+        },
+        savedJournal.companyId.toString()
+      );
       // Update isIndexed flag after successful vector creation
       await Journal.findByIdAndUpdate(savedJournal._id, { isIndexed: true });
       savedJournal.isIndexed = true;
@@ -204,14 +209,19 @@ export async function updateJournalEntry(
     if (updatedJournal && updateData.content) {
       // Try to update vector in Pinecone, but don't fail if it errors
       try {
-        await upsertVector(updatedJournal._id.toString(), updatedJournal.content, {
-          userId: updatedJournal.userId.toString(),
-          companyId: updatedJournal.companyId.toString(),
-          sessionId: updatedJournal.sessionId.toString(),
-          entryType: updatedJournal.entryType,
-          tags: updatedJournal.tags,
-          timestamp: updatedJournal.timestamp.toISOString(),
-        });
+        await upsertVector(
+          updatedJournal._id.toString(),
+          updatedJournal.content,
+          {
+            userId: updatedJournal.userId.toString(),
+            companyId: updatedJournal.companyId.toString(),
+            sessionId: updatedJournal.sessionId.toString(),
+            entryType: updatedJournal.entryType,
+            tags: updatedJournal.tags,
+            timestamp: updatedJournal.timestamp.toISOString(),
+          },
+          updatedJournal.companyId.toString()
+        );
         // Update isIndexed flag after successful vector update
         await Journal.findByIdAndUpdate(updatedJournal._id, { isIndexed: true });
         updatedJournal.isIndexed = true;
