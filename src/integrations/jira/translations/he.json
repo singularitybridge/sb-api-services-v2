@@ -1,0 +1,28 @@
+{
+  "serviceName": "אינטגרציית JIRA",
+  "createTicket": {
+    "actionTitle": "יצירת כרטיס JIRA",
+    "description": "יוצר כרטיס חדש ב-JIRA עם הפרטים שצוינו",
+    "parameters": {
+      "summary": "כותרת הכרטיס",
+      "description": "תיאור מפורט של הכרטיס",
+      "projectKey": "מזהה הפרויקט ב-JIRA",
+      "issueType": "סוג הבעיה (למשל, משימה, באג)"
+    }
+  },
+  "fetchTickets": {
+    "actionTitle": "שליפת כרטיסי JIRA",
+    "description": "מאחזר כרטיסים מפרויקט JIRA מסוים",
+    "parameters": {
+      "projectKey": "מזהה הפרויקט ב-JIRA",
+      "maxResults": "מספר מקסימלי של כרטיסים לשליפה"
+    }
+  },
+  "getTicket": {
+    "actionTitle": "קבלת כרטיס JIRA",
+    "description": "מאחזר כרטיס JIRA ספציפי לפי מזהה או מפתח",
+    "parameters": {
+      "issueIdOrKey": "מזהה או מפתח של כרטיס ה-JIRA"
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "serviceName": "JIRA Integration",
+  "createTicket": {
+    "actionTitle": "Create JIRA Ticket",
+    "description": "Creates a new ticket in JIRA with specified details",
+    "parameters": {
+      "summary": "Title of the ticket",
+      "description": "Detailed description of the ticket",
+      "projectKey": "JIRA project key",
+      "issueType": "Type of issue (e.g., Task, Bug)"
+    }
+  },
+  "fetchTickets": {
+    "actionTitle": "Fetch JIRA Tickets",
+    "description": "Retrieves tickets from a specified JIRA project",
+    "parameters": {
+      "projectKey": "JIRA project key",
+      "maxResults": "Maximum number of tickets to fetch"
+    }
+  },
+  "getTicket": {
+    "actionTitle": "Get JIRA Ticket",
+    "description": "Retrieves a specific JIRA ticket by its ID or key",
+    "parameters": {
+      "issueIdOrKey": "ID or key of the JIRA ticket"
+    }
+  }
+}

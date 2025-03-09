@@ -57,6 +57,7 @@ import contentFileRouter from './routes/content-file.routes';
 import { contentRouter } from './routes/content.routes';
 import { contentTypeRouter } from './routes/content-type.routes';
 import integrationRouter from './routes/integration.routes';
+import { teamRouter } from './routes/team.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -111,6 +112,7 @@ app.use(
   verifyAccess(),
   integrationRouter
 );
+app.use('/teams', verifyTokenMiddleware, verifyAccess(), teamRouter);
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);

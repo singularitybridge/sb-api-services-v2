@@ -22,6 +22,7 @@ export interface IAssistant extends Document {
   companyId: string;
   allowedActions: string[];
   avatarImage?: string;
+  teams?: mongoose.Schema.Types.ObjectId[];
 }
 
 const AssistantSchema: Schema = new Schema({
@@ -36,6 +37,7 @@ const AssistantSchema: Schema = new Schema({
   companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
   allowedActions: [{ type: String, required: false }],
   avatarImage: { type: String, required: false, default: 'default-avatar' },
+  teams: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: false }],
 });
 
 export const Assistant = mongoose.model<IAssistant>(
