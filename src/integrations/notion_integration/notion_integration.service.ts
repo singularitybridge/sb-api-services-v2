@@ -19,8 +19,8 @@ export const initNotionClient = async (companyId: string): Promise<Client> => {
 export const fetchDatabaseItems = async (
   companyId: string,
   databaseId: string,
-  filter?: object,
-  sorts?: object[]
+  filter?: Record<string, any>,
+  sorts?: Record<string, any>[]
 ): Promise<{ success: boolean; data?: any }> => {
   if (!databaseId) {
     throw new Error('Database ID is required');
@@ -52,8 +52,8 @@ export const createPage = async (
   companyId: string,
   parentId: string,
   parentType: 'database_id' | 'page_id',
-  properties: object,
-  children?: object[]
+  properties: Record<string, any>,
+  children?: Record<string, any>[]
 ): Promise<{ success: boolean; data?: any }> => {
   if (!parentId) {
     throw new Error('Parent ID is required');
@@ -88,7 +88,7 @@ export const createPage = async (
 export const updatePage = async (
   companyId: string,
   pageId: string,
-  properties: object
+  properties: Record<string, any>
 ): Promise<{ success: boolean; data?: any }> => {
   if (!pageId) {
     throw new Error('Page ID is required');
@@ -117,7 +117,7 @@ export const updatePage = async (
 export const searchNotion = async (
   companyId: string,
   query: string,
-  searchParams?: object
+  searchParams?: Record<string, any>
 ): Promise<{ success: boolean; data?: any }> => {
   try {
     const notion = await initNotionClient(companyId);
@@ -145,7 +145,7 @@ export const verifyNotionApiKey = async (apiKey: string): Promise<boolean> => {
   try {
     const notion = new Client({ auth: apiKey });
     // Make a simple request to verify the API key
-    await notion.users.me();
+    await notion.users.me({});
     return true;
   } catch (error) {
     console.error('Error verifying Notion API key:', error);
