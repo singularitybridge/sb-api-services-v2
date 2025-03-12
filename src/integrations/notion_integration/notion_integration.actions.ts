@@ -8,25 +8,25 @@ import {
 
 interface GetDatabaseItemsArgs {
   databaseId: string;
-  filter?: object;
-  sorts?: object[];
+  filter?: Record<string, any>;
+  sorts?: Record<string, any>[];
 }
 
 interface CreatePageArgs {
   parentId: string;
   parentType: 'database_id' | 'page_id';
-  properties: object;
-  children?: object[];
+  properties: Record<string, any>;
+  children?: Record<string, any>[];
 }
 
 interface UpdatePageArgs {
   pageId: string;
-  properties: object;
+  properties: Record<string, any>;
 }
 
 interface SearchNotionArgs {
   query: string;
-  searchParams?: object;
+  searchParams?: Record<string, any>;
 }
 
 export const createNotionIntegrationActions = (context: ActionContext): FunctionFactory => ({
