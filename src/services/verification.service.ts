@@ -4,8 +4,6 @@ import { verifyJsonBinKey } from './jsonbin.service';
 import axios from 'axios';
 import { verifyElevenLabsKey } from '../integrations/elevenlabs/elevenlabs.service';
 
-// To do: verifyGcpKey, verifyNotionKey
-
 export type ApiKey = string | TwilioKeys;
 
 type VerificationFunction = (key: ApiKey) => Promise<boolean>;
@@ -13,7 +11,6 @@ type VerificationFunction = (key: ApiKey) => Promise<boolean>;
 const services: Record<string, VerificationFunction> = {
   //   'gcp_key': verifyGcpKey,
   openai_api_key: verifyOpenAiKey,
-  //   'notion_api_key': verifyNotionKey,
   twilio_auth_token: verifyTwilioKeys,
   labs11_api_key: verifyElevenLabsKey,
   jsonbin_api_key: verifyJsonBinKey,
