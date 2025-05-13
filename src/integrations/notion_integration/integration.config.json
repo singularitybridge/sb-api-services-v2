@@ -1,7 +1,0 @@
-{
-  "name": "notion_integration",
-  "icon": "file-text",
-  "apiKeyName": "NOTION_API_KEY",
-  "actionCreator": "createNotionIntegrationActions",
-  "actionsFile": "notion_integration.actions.ts"
-}
