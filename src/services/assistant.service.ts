@@ -34,8 +34,9 @@ export const sendMessageToAgent = async (
       throw new Error('Session not found');
     }
 
-    const apiKey = await getApiKey(session.companyId.toString(), 'openai_api_key') as string;
-    const response = await handleSessionMessage(apiKey, message, sessionId, session.channel);
+    // const apiKey = await getApiKey(session.companyId.toString(), 'openai_api_key') as string; // apiKey is no longer needed here
+    // The refactored handleSessionMessage fetches the API key internally.
+    const response = await handleSessionMessage(message, sessionId, session.channel as ChannelType);
     
     // Send the response to the appropriate channel
     switch (session.channel) {

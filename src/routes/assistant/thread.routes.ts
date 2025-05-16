@@ -88,7 +88,8 @@ threadRouter.post(
       if (!session) {
         throw new Error('Session not found');
       }
-      const response = await handleSessionMessage(apiKey, userInput, sessionId, ChannelType.WEB);
+      // apiKey is no longer passed as the first argument to handleSessionMessage
+      const response = await handleSessionMessage(userInput, sessionId, ChannelType.WEB);
       res.send(response);
     } catch (error) {
       console.error('Error handling session message:', error);
