@@ -145,7 +145,9 @@ export const initializeTelegramBots = async () => {
 
               console.log(`[Company ${companyId}] Created/Retrieved session ${session._id} for user ${user.id}`);
 
-              await handleSessionMessage(apiKey, messageText, session._id, ChannelType.TELEGRAM);
+              // Updated call to handleSessionMessage, apiKey is no longer needed as first argument
+              // and session._id needs to be a string.
+              await handleSessionMessage(messageText, session._id.toString(), ChannelType.TELEGRAM);
             } else if (msg.photo) {
               console.log(`[Company ${companyId}] Received photo from user ${user.id}`);
               bot.sendMessage(chatId, `Thanks for the photo, ${fullName}! Unfortunately, I can't process images yet.`);

@@ -6,13 +6,14 @@ import { registerRpcMethod } from '../utils';
 import { getApiKey } from '../../../api.key.service';
 import { publishSessionMessage } from '../../../pusher.service';
 
-const processSessionMessage = async (apiKey: string, socket: AuthenticatedSocket, userInput: string) => {
+const processSessionMessage = async (socket: AuthenticatedSocket, userInput: string) => {
   const { userId, companyId } = socket.decodedToken!;
   
   // Get or create session if not already set
   if (!socket.sessionId) {
+    const apiKeyForSession = await getApiKey(companyId, 'openai_api_key') as string; // Renamed variable
     const session = await getSessionOrCreate(
-      apiKey,
+      apiKeyForSession, // Use renamed variable
       userId,
       companyId,
       ChannelType.WEB,
@@ -34,7 +35,6 @@ const processSessionMessage = async (apiKey: string, socket: AuthenticatedSocket
 
   // Process the message and get response
   const response = await handleSessionMessage(
-    apiKey,
     userInput,
     socket.sessionId!,
     ChannelType.WEB
@@ -63,8 +63,5 @@ registerRpcMethod('handleSessionMessage', async (socket: AuthenticatedSocket, pa
     throw new Error('userInput is required');
   }
 
-  const { companyId } = socket.decodedToken!;
-  const apiKey = await getApiKey(companyId, 'openai_api_key') as string;
-
-  return processSessionMessage(apiKey, socket, params.userInput);
+  return processSessionMessage(socket, params.userInput);
 });
