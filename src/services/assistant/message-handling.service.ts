@@ -12,7 +12,7 @@ import { FunctionCall } from '../../integrations/actions/types';
 import { getApiKey } from '../api.key.service'; 
 
 // Vercel AI SDK imports
-import { generateText, tool, streamText, CoreMessage } from 'ai'; 
+import { generateText, tool, streamText, CoreMessage, StreamTextResult, Tool } from 'ai'; // Updated import
 import { z, ZodTypeAny } from 'zod';
 import { trimToWindow } from '../../utils/tokenWindow'; 
 import { getProvider } from './provider.service'; 
@@ -83,12 +83,14 @@ export const handleProductOffer = async (
   await handleCustomMessage(sessionId, 'product_offer', content, { productName, price, description });
 };
 
+// Removed custom StreamTextResultType
+
 export const handleSessionMessage = async (
   userInput: string,
   sessionId: string,
   channel: ChannelType = ChannelType.WEB,
   metadata?: Record<string, string>,
-): Promise<string> => {
+): Promise<string | StreamTextResult<Record<string, Tool<any, any>>, unknown>> => { // Corrected return type
   console.log(`Handling session message for session ${sessionId} on channel ${channel}`);
   const session = await Session.findById(sessionId);
   if (!session || !session.active || session.channel !== channel) {
@@ -127,7 +129,7 @@ export const handleSessionMessage = async (
   const actionContext = { sessionId: sessionId.toString(), companyId: session.companyId.toString(), language: session.language as SupportedLanguage };
   const functionFactory = await createFunctionFactory(actionContext, assistant.allowedActions);
   
-  const toolsForSdk: Record<string, any> = {};
+  const toolsForSdk: Record<string, Tool<any, any>> = {}; // Changed type to Tool<any, any>
   for (const funcName in functionFactory) {
     const funcDef = functionFactory[funcName];
     const zodShape: Record<string, ZodTypeAny> = {};
@@ -181,6 +183,8 @@ export const handleSessionMessage = async (
   if (!llmApiKey) throw new Error(`${providerKey} API key not found for company.`);
     
   console.log(`Using LLM provider: ${providerKey}, model: ${modelIdentifier} for session ${sessionId}`);
+  const shouldStream = metadata?.['X-Experimental-Stream'] === 'true';
+  console.log(`Should stream: ${shouldStream}`);
 
   const systemPrompt = await processTemplate(assistant.llmPrompt, sessionId.toString());
   const messagesForLlm: CoreMessage[] = [...history, { role: 'user', content: userInput }];
@@ -205,57 +209,71 @@ export const handleSessionMessage = async (
   console.log(`Manual trim: Target tokens: ${maxPromptTokens}, Actual: ${actualTokensInPrompt}, Original msgs: ${messagesForLlm.length}, Trimmed msgs: ${trimmedMessages.length}`);
 
   let aggregatedResponse = '';
-  let finalLlmResult: any; 
+  let finalLlmResult: any; // This will hold StreamTextResult if not streaming
 
   try {
     const llm = getProvider(providerKey, modelIdentifier, llmApiKey as string);
 
-    // Removed the llm.use() or llm.usePromptMiddleware() block
-
-    const slimToolsForIntent = (input: string, allTools: Record<string, any>): Record<string, any> => {
+    const slimToolsForIntent = (input: string, allTools: Record<string, Tool<any, any>>): Record<string, Tool<any, any>> => { // Changed type
       console.log(`Slimming tools for input: "${input}". Currently returning all ${Object.keys(allTools).length} tools.`);
       return allTools;
     };
     const relevantTools = slimToolsForIntent(userInput, toolsForSdk);
 
-    const streamResult = await streamText({ 
+    const streamResult = await streamText({
       model: llm,
       system: systemPrompt,
-      messages: trimmedMessages, // Using manually trimmed messages
-      tools: relevantTools, 
-      maxSteps: 3,
+      messages: trimmedMessages, 
+      tools: relevantTools,
+      maxSteps: 3, 
     });
 
-    for await (const chunk of streamResult.textStream) {
-      aggregatedResponse += chunk;
-    }
-    finalLlmResult = streamResult; 
-    if (finalLlmResult.toolCalls && finalLlmResult.toolCalls.length > 0) {
-      console.log('Tool Calls from streamText:', JSON.stringify(finalLlmResult.toolCalls, null, 2));
-    }
-    if (finalLlmResult.toolResults && finalLlmResult.toolResults.length > 0) {
-      console.log('Tool Results from streamText:', JSON.stringify(finalLlmResult.toolResults, null, 2));
+    if (shouldStream) {
+      console.log(`Returning stream object for session ${sessionId}`);
+      return streamResult; // Return the whole StreamTextResult object
+    } else {
+      // Existing behavior: aggregate the response
+      for await (const chunk of streamResult.textStream) {
+        aggregatedResponse += chunk;
+      }
+      finalLlmResult = streamResult; // Store the full result for tool calls etc.
+      if (finalLlmResult.toolCalls && (await finalLlmResult.toolCalls).length > 0) { // Await promises
+        console.log('Tool Calls from streamText:', JSON.stringify(await finalLlmResult.toolCalls, null, 2));
+      }
+      if (finalLlmResult.toolResults && (await finalLlmResult.toolResults).length > 0) { // Await promises
+        console.log('Tool Results from streamText:', JSON.stringify(await finalLlmResult.toolResults, null, 2));
+      }
     }
   } catch (error) {
     console.error('Error during LLM stream processing or tool execution:', error);
-    throw error; 
+    throw error;
   }
 
-  if (!finalLlmResult) {
-    throw new Error('LLM stream result was not obtained.');
+  if (!shouldStream) {
+    if (!finalLlmResult) { // Check if finalLlmResult was populated
+        throw new Error('LLM stream result was not obtained for non-streaming case.');
+    }
+    const processedResponse = await processTemplate(aggregatedResponse, sessionId.toString());
+    const assistantMessage = new Message({
+      sessionId: session._id,
+      sender: 'assistant',
+      content: processedResponse,
+      assistantId: assistant._id,
+      userId: session.userId,
+      timestamp: new Date(),
+      messageType: 'text',
+    });
+    await assistantMessage.save();
+    return processedResponse;
   }
-
-  const processedResponse = await processTemplate(aggregatedResponse, sessionId.toString());
-  const assistantMessage = new Message({
-    sessionId: session._id,
-    sender: 'assistant',
-    content: processedResponse,
-    assistantId: assistant._id,
-    userId: session.userId,
-    timestamp: new Date(),
-    messageType: 'text',
-  });
-  await assistantMessage.save();
-
-  return processedResponse;
+  
+  // This path should not be reached if shouldStream is true, as streamResult would have been returned.
+  // Adding a fallback throw to satisfy TypeScript if it thinks this path is possible for shouldStream=true.
+  if (shouldStream) {
+    console.error("Reached end of function in streaming mode without returning stream. This shouldn't happen.");
+    throw new Error("Internal error: Failed to return stream in streaming mode.");
+  }
+  
+  // Fallback for type checker, should ideally not be reached
+  throw new Error("Unhandled case in handleSessionMessage");
 };
