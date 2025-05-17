@@ -8,6 +8,7 @@ import {
   deleteThread,
 } from '../../services/oai.thread.service';
 import axios from 'axios';
+import { ChannelType } from '../../types/ChannelType'; // Added import
 
 import { file } from 'googleapis/build/src/apis/file';
 import { transcribeAudioWhisper } from '../../services/speech.recognition.service';
@@ -147,11 +148,19 @@ messagingRouter.post('/whatsapp/reply', async (req, res) => {
   console.log(req.body);
 
   const response = await handleSessionMessage(
-    'openai',
     Body,
-    session.id,
+    session.id, // session.id is typically session._id.toString()
+    session.channel as ChannelType,
   );
-  const limitedResponse = response.substring(0, 1600); // Limit response to 1600 characters
+
+  let responseText: string;
+  if (typeof response === 'string') {
+    responseText = response;
+  } else {
+    // Assuming StreamTextResult has a 'text' property that resolves to the full string
+    responseText = await response.text;
+  }
+  const limitedResponse = responseText.substring(0, 1600); // Limit response to 1600 characters
 
   twilioClient.messages
     .create({
