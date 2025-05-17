@@ -16,6 +16,7 @@ import { generateText, tool, streamText, CoreMessage, StreamTextResult, Tool } f
 import { z, ZodTypeAny } from 'zod';
 import { trimToWindow } from '../../utils/tokenWindow'; 
 import { getProvider } from './provider.service'; 
+import util from 'node:util'; // Added for debugging
 
 
 const saveSystemMessage = async (
@@ -133,6 +134,18 @@ export const handleSessionMessage = async (
   for (const funcName in functionFactory) {
     const funcDef = functionFactory[funcName];
     const zodShape: Record<string, ZodTypeAny> = {};
+    let saneRequiredParams: string[] = [];
+
+    // Sanitize the original 'required' array to only include parameters that are actually defined in 'properties'
+    // and are valid non-empty strings.
+    if (funcDef.parameters?.required && Array.isArray(funcDef.parameters.required) && funcDef.parameters.properties) {
+        saneRequiredParams = funcDef.parameters.required.filter(reqParam => 
+            typeof reqParam === 'string' && reqParam.trim() !== '' && funcDef.parameters.properties!.hasOwnProperty(reqParam)
+        );
+    }
+    // If funcDef.parameters.required is not a valid array or properties are missing, 
+    // saneRequiredParams will remain empty. This means all Zod properties will become optional by default later.
+
     if (funcDef.parameters && funcDef.parameters.properties) {
       for (const paramName in funcDef.parameters.properties) {
         const paramDef = funcDef.parameters.properties[paramName] as any;
@@ -148,11 +161,16 @@ export const handleSessionMessage = async (
             else if (paramDef.items && paramDef.items.type === 'boolean') zodType = z.array(z.boolean());
             else zodType = z.array(z.any());
             break;
-          case 'object': zodType = z.record(z.any()); break;
+          case 'object': zodType = z.record(z.string(), z.any()); break; // Changed to z.record(z.string(), z.any())
           default: zodType = z.any();
         }
         if (paramDef.description) zodType = zodType.describe(paramDef.description);
-        if (!funcDef.parameters.required?.includes(paramName)) zodType = zodType.optional();
+        
+        // A Zod property is made optional if its name is NOT in our sanitized 'saneRequiredParams' list.
+        // If 'saneRequiredParams' is empty, all properties become optional.
+        if (!saneRequiredParams.includes(paramName)) {
+            zodType = zodType.optional();
+        }
         zodShape[paramName] = zodType;
       }
     }
@@ -178,9 +196,14 @@ export const handleSessionMessage = async (
   }
   
   const providerKey = assistant.llmProvider;
-  const modelIdentifier = assistant.llmModel || 'gpt-4o-mini';
+  let modelIdentifier = assistant.llmModel || 'gpt-4o-mini'; // Changed to let
   const llmApiKey = await getApiKey(session.companyId.toString(), `${providerKey}_api_key`);
   if (!llmApiKey) throw new Error(`${providerKey} API key not found for company.`);
+
+  if (providerKey === 'google' && modelIdentifier && !modelIdentifier.startsWith('models/')) {
+    modelIdentifier = `models/${modelIdentifier}`;
+    console.log(`Prefixed Google model ID: ${modelIdentifier}`);
+  }
     
   console.log(`Using LLM provider: ${providerKey}, model: ${modelIdentifier} for session ${sessionId}`);
   const shouldStream = metadata?.['X-Experimental-Stream'] === 'true';
@@ -214,44 +237,64 @@ export const handleSessionMessage = async (
   try {
     const llm = getProvider(providerKey, modelIdentifier, llmApiKey as string);
 
-    const slimToolsForIntent = (input: string, allTools: Record<string, Tool<any, any>>): Record<string, Tool<any, any>> => { // Changed type
+    const slimToolsForIntent = (input: string, allTools: Record<string, Tool<any, any>>): Record<string, Tool<any, any>> => {
       console.log(`Slimming tools for input: "${input}". Currently returning all ${Object.keys(allTools).length} tools.`);
       return allTools;
     };
     const relevantTools = slimToolsForIntent(userInput, toolsForSdk);
 
-    const streamResult = await streamText({
-      model: llm,
-      system: systemPrompt,
-      messages: trimmedMessages, 
-      tools: relevantTools,
-      maxSteps: 3, 
-    });
-
     if (shouldStream) {
+      const streamResult = await streamText({
+        model: llm,
+        system: systemPrompt,
+        messages: trimmedMessages,
+        tools: relevantTools,
+        maxSteps: 3,
+      });
       console.log(`Returning stream object for session ${sessionId}`);
-      return streamResult; // Return the whole StreamTextResult object
+      // Note: The consumer of this streamResult (if any further processing like iteration is done by the caller)
+      // would be responsible for implementing specific try-catch around iteration as per Point 5 of the checklist.
+      return streamResult;
     } else {
-      // Existing behavior: aggregate the response
-      for await (const chunk of streamResult.textStream) {
-        aggregatedResponse += chunk;
+      // Use generateText for non-streaming case as per Point 4
+      const result = await generateText({
+        model: llm,
+        system: systemPrompt,
+        messages: trimmedMessages,
+        tools: relevantTools,
+        maxSteps: 3, 
+      });
+      aggregatedResponse = result.text; 
+      finalLlmResult = result; 
+
+      if (finalLlmResult.toolCalls && finalLlmResult.toolCalls.length > 0) {
+        console.log('Tool Calls from generateText:', JSON.stringify(finalLlmResult.toolCalls, null, 2));
       }
-      finalLlmResult = streamResult; // Store the full result for tool calls etc.
-      if (finalLlmResult.toolCalls && (await finalLlmResult.toolCalls).length > 0) { // Await promises
-        console.log('Tool Calls from streamText:', JSON.stringify(await finalLlmResult.toolCalls, null, 2));
-      }
-      if (finalLlmResult.toolResults && (await finalLlmResult.toolResults).length > 0) { // Await promises
-        console.log('Tool Results from streamText:', JSON.stringify(await finalLlmResult.toolResults, null, 2));
+      if (finalLlmResult.toolResults && finalLlmResult.toolResults.length > 0) {
+        console.log('Tool Results from generateText:', JSON.stringify(finalLlmResult.toolResults, null, 2));
       }
     }
-  } catch (error) {
-    console.error('Error during LLM stream processing or tool execution:', error);
+  } catch (error: any) { 
+    let specificGeminiError = false;
+    if (error && error.message) {
+        const errorMessage = String(error.message).toLowerCase();
+        if (errorMessage.includes('model not found') || 
+            errorMessage.includes('permission denied') || 
+            errorMessage.includes('api key not valid') ||
+            errorMessage.includes('invalid api key')) {
+            console.error('Gemini API Error (detected by message):', error);
+            specificGeminiError = true;
+        }
+    }
+    if (!specificGeminiError) {
+        console.error('Error during LLM processing or tool execution:', error);
+    }
     throw error;
   }
 
   if (!shouldStream) {
-    if (!finalLlmResult) { // Check if finalLlmResult was populated
-        throw new Error('LLM stream result was not obtained for non-streaming case.');
+    if (!finalLlmResult) { 
+        throw new Error('LLM result was not obtained for non-streaming case.');
     }
     const processedResponse = await processTemplate(aggregatedResponse, sessionId.toString());
     const assistantMessage = new Message({

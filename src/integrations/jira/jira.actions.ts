@@ -78,11 +78,11 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
         issueIdOrKey: { type: 'string', description: 'ID or key of the JIRA ticket to update' },
         fields: { 
           type: 'object', 
-          description: 'An object containing the fields to update. For example: {"summary": "New summary", "assignee": {"name": "user@example.com"}, "labels": ["new-label", "another-label"]}. Refer to JIRA API for updatable fields and their structure.',
-          additionalProperties: true 
+          description: 'An object containing the fields to update. For example: {"summary": "New summary", "assignee": {"name": "user@example.com"}, "labels": ["new-label", "another-label"]}. Refer to JIRA API for updatable fields and their structure.'
+          // additionalProperties: true // Removed this line
         }
       },
-      required: ['issueIdOrKey', 'fields'],
+      required: ['issueIdOrKey'], // 'fields' is now optional at this level
       additionalProperties: false,
     },
     function: async (params: any) => {
