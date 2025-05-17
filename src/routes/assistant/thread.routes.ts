@@ -81,16 +81,40 @@ threadRouter.post(
   validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     const { userInput, sessionId } = req.body;
-    const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
-    
+
     try {
       const session = await Session.findById(sessionId);
       if (!session) {
         throw new Error('Session not found');
       }
-      // apiKey is no longer passed as the first argument to handleSessionMessage
-      const response = await handleSessionMessage(userInput, sessionId, ChannelType.WEB);
-      res.send(response);
+      const wantsStream =
+        req.accepts(['text/event-stream']) === 'text/event-stream' ||
+        req.query.stream === 'true';
+
+      if (wantsStream) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.flushHeaders && res.flushHeaders();
+
+        await handleSessionMessage(
+          userInput,
+          sessionId,
+          ChannelType.WEB,
+          undefined,
+          (token) => {
+            res.write(`data: ${token}\n\n`);
+            if (typeof res.flush === 'function') {
+              res.flush();
+            }
+          },
+        );
+        res.write('data: [DONE]\n\n');
+        res.end();
+      } else {
+        const response = await handleSessionMessage(userInput, sessionId, ChannelType.WEB);
+        res.send(response);
+      }
     } catch (error) {
       console.error('Error handling session message:', error);
       res.status(500).send('An error occurred while processing your request.');

@@ -91,6 +91,7 @@ export const handleSessionMessage = async (
   sessionId: string,
   channel: ChannelType = ChannelType.WEB,
   metadata?: Record<string, string>,
+  onToken?: (token: string) => void,
 ): Promise<string> => {
   console.log(`Handling session message for session ${sessionId} on channel ${channel}`);
   const session = await Session.findById(sessionId);
@@ -349,13 +350,10 @@ export const handleSessionMessage = async (
     });
 
     // Handle the stream
-    // For now, aggregate the text stream to maintain current function signature.
-    // True streaming to client would require further refactoring.
+    // Aggregate the text for the return value while optionally emitting chunks
     for await (const chunk of streamResult.textStream) {
       aggregatedResponse += chunk;
-      // In a true streaming setup, you would send `chunk` to the client here.
-      // e.g., via WebSocket: session.socket.send(chunk);
-      // or for Telegram: await sendTelegramChunk(session.userId.toString(), chunk, session.companyId.toString());
+      if (onToken) onToken(chunk);
     }
     
     // The streamText result also contains toolCalls, toolResults, finishReason, usage
