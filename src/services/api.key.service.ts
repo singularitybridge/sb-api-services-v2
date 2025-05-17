@@ -8,6 +8,7 @@ export type ApiKeyType =
   | 'openai_api_key'
   | 'labs11_api_key'
   | 'google_api_key'
+  | 'anthropic_api_key' // Added anthropic_api_key
   | 'twilio_api_key'
   | 'jsonbin_api_key'
   | 'getimg_api_key'

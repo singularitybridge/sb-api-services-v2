@@ -13,10 +13,12 @@ import { getApiKey } from '../api.key.service'; // For OpenAI API key if needed 
 
 // Vercel AI SDK imports (assuming OpenAI provider for now)
 // Note: Ensure 'ai' and '@ai-sdk/openai' are installed
-import { openai as openaiProvider } from '@ai-sdk/openai'; // Removed OpenAIChatModelId import
-import { generateText, tool } from 'ai'; 
-import { CoreMessage } from 'ai'; 
-import { z, ZodTypeAny } from 'zod'; 
+import { openai as openaiProvider } from '@ai-sdk/openai'; // Reverted to original import
+import { generateText, tool, streamText } from 'ai'; // Added streamText import
+import { CoreMessage } from 'ai';
+import { z, ZodTypeAny } from 'zod';
+import { trimToWindow } from '../../utils/tokenWindow';
+import { getProvider } from './providers'; // Added import for getProvider
 
 
 const saveSystemMessage = async (
@@ -103,6 +105,8 @@ export const handleSessionMessage = async (
   if (!assistant) {
     throw new Error('Assistant not found');
   }
+  // Log the fetched assistant's provider and model fields for debugging
+  console.log(`Fetched assistant details: Provider='${assistant.llmProvider}', Model='${assistant.llmModel}'`);
 
   // Save user message to our DB
   const userMessage = new Message({
@@ -248,14 +252,20 @@ export const handleSessionMessage = async (
     });
   }
   
-  // Initialize Vercel AI SDK client (e.g., OpenAI)
-  const llmApiKey = await getApiKey(session.companyId.toString(), 'openai_api_key');
+  // Initialize Vercel AI SDK client
+  const providerKey = assistant.llmProvider; // Use the new llmProvider field
+  const modelIdentifier = assistant.llmModel || 'gpt-4o-mini'; // Use existing llmModel, fallback to a default
+                                                             // This fallback ensures a model is always chosen.
+                                                             // Ideally, llmModel should be required or have a schema default
+                                                             // if it's the primary model identifier.
+                                                             // For now, 'gpt-4o-mini' is a general fallback.
+
+  const llmApiKey = await getApiKey(session.companyId.toString(), `${providerKey}_api_key`); // Fetch API key based on llmProvider
   if (!llmApiKey) {
-    throw new Error('OpenAI API key not found for company.');
+    throw new Error(`${providerKey} API key not found for company.`);
   }
-  
-  const modelName: string = assistant.llmModel || 'gpt-3.5-turbo'; // Corrected to assistant.llmModel
-  console.log(`Using LLM model for session ${sessionId}: ${modelName}`); // Log the model name
+    
+  console.log(`Using LLM provider: ${providerKey}, model: ${modelIdentifier} for session ${sessionId}`);
 
   // System prompt
   const systemPrompt = await processTemplate(assistant.llmPrompt, sessionId.toString());
@@ -266,29 +276,101 @@ export const handleSessionMessage = async (
     { role: 'user', content: userInput }
   ];
   
-  // LLM call using Vercel AI SDK's generateText which handles tool execution flow
-  // Temporarily set environment variable for API key
+  // Manually trim messages and log token count
+  // Determine maxTokens based on provider and model for sliding window
+  let maxPromptTokens: number;
+  // Default to a conservative value if specific model isn't matched
+  const defaultMaxTokens = 7000; // General default, leaving headroom from 8k
+  const gemini15MaxTokens = 20000; // As per new requirement
+  const gpt4oMaxTokens = 8000;    // As per new requirement
+
+  switch (providerKey) { // providerKey is now assistant.llmProvider
+    case 'google':
+      if (modelIdentifier && modelIdentifier.includes('gemini-1.5')) { // modelIdentifier is assistant.llmModel
+        maxPromptTokens = gemini15MaxTokens;
+      } else {
+        maxPromptTokens = defaultMaxTokens; // Or another Google-specific default
+      }
+      break;
+    case 'openai':
+      if (modelIdentifier && modelIdentifier.includes('gpt-4o')) { // Covers gpt-4o and gpt-4o-mini
+        maxPromptTokens = gpt4oMaxTokens;
+      } else if (modelIdentifier && modelIdentifier.includes('gpt-4')) {
+        maxPromptTokens = gpt4oMaxTokens; // GPT-4 also often has 8k context windows in practice for prompts
+      } else {
+        maxPromptTokens = defaultMaxTokens; // e.g., for gpt-3.5-turbo
+      }
+      break;
+    // case 'anthropic':
+    // Add specific limits for Anthropic models if known, e.g., Claude 3 Sonnet might be ~28k prompt
+    // For now, falls through to default
+    default:
+      maxPromptTokens = defaultMaxTokens;
+      break;
+  }
+  
+  const { trimmedMessages, tokensInPrompt: actualTokensInPrompt } = trimToWindow(messagesForLlm, maxPromptTokens);
+  console.log(`Tokens in prompt (target: ${maxPromptTokens}, actual: ${actualTokensInPrompt}), Original message count: ${messagesForLlm.length}, Trimmed message count: ${trimmedMessages.length}`);
+
+  // LLM call using Vercel AI SDK
+  // Temporarily set environment variable for API key (as per original code structure,
+  // because direct apiKey passing is not supported by the current @ai-sdk/openai version)
   const originalOpenAIApiKey = process.env.OPENAI_API_KEY;
   process.env.OPENAI_API_KEY = llmApiKey as string;
 
-  let llmResult;
+  let aggregatedResponse = '';
+  let finalLlmResult: any; // To store the full result object from streamText
+
   try {
-    llmResult = await generateText({
-      model: openaiProvider.chat(modelName as any, { // Reverted to 'as any' as OpenAIChatModelId is not exportable
-        // apiKey is removed from here as it's expected to be picked from env
-        // Other settings like temperature, maxTokens, etc., can be added here
-      }),
+    // Get the language model instance using the provider factory
+    const llm = getProvider(providerKey, modelIdentifier, llmApiKey as string);
+
+    // Note: The manual trimToWindow is kept here.
+    // SDK middleware would be ideal if versions were V4 compatible.
+
+    // Placeholder for slimming tools based on intent (Optimization 5)
+    // A real implementation would analyze userInput and filter toolsForSdk.
+    const slimToolsForIntent = (input: string, allTools: Record<string, any>): Record<string, any> => {
+      // TODO: Implement intent detection and tool filtering logic.
+      // For now, returns all tools.
+      console.log(`Slimming tools for input: "${input}". Currently returning all ${Object.keys(allTools).length} tools.`);
+      return allTools;
+    };
+    const relevantTools = slimToolsForIntent(userInput, toolsForSdk);
+
+    const streamResult = await streamText({ // Changed to streamText
+      model: llm,
       system: systemPrompt,
-      messages: messagesForLlm,
-      tools: toolsForSdk,
-      maxSteps: 3, // Allow for a tool call, its result, and a final response. Min 2 for one tool roundtrip. Using 3 for a bit more buffer.
-      onStepFinish: async ({ text, toolCalls, toolResults }) => { // Added for debugging
-        console.log('onStepFinish Details:');
-        if (text) console.log('  Text:', text);
-        if (toolCalls && toolCalls.length > 0) console.log('  Tool Calls:', JSON.stringify(toolCalls, null, 2));
-        if (toolResults && toolResults.length > 0) console.log('  Tool Results:', JSON.stringify(toolResults, null, 2));
-      },
+      messages: trimmedMessages,
+      tools: relevantTools, // Use potentially filtered tools
+      maxSteps: 3,
+      // onStepFinish is not a direct parameter for streamText like in generateText.
+      // Tool calls and results are part of the yielded stream or final result object.
     });
+
+    // Handle the stream
+    // For now, aggregate the text stream to maintain current function signature.
+    // True streaming to client would require further refactoring.
+    for await (const chunk of streamResult.textStream) {
+      aggregatedResponse += chunk;
+      // In a true streaming setup, you would send `chunk` to the client here.
+      // e.g., via WebSocket: session.socket.send(chunk);
+      // or for Telegram: await sendTelegramChunk(session.userId.toString(), chunk, session.companyId.toString());
+    }
+    
+    // The streamText result also contains toolCalls, toolResults, finishReason, usage
+    finalLlmResult = streamResult; 
+    // TODO: If tools were called, streamResult.toolCalls and streamResult.toolResults would be populated.
+    // The Vercel SDK's streamText is expected to handle the tool execution loop internally
+    // if `tools` with `execute` methods are provided. The `textStream` should be the final assistant response.
+    // Logging these for now:
+    if (finalLlmResult.toolCalls && finalLlmResult.toolCalls.length > 0) {
+      console.log('Tool Calls from streamText:', JSON.stringify(finalLlmResult.toolCalls, null, 2));
+    }
+    if (finalLlmResult.toolResults && finalLlmResult.toolResults.length > 0) {
+      console.log('Tool Results from streamText:', JSON.stringify(finalLlmResult.toolResults, null, 2));
+    }
+
   } finally {
     // Restore original environment variable
     if (originalOpenAIApiKey) {
@@ -298,18 +380,13 @@ export const handleSessionMessage = async (
     }
   }
 
-  // The generateText function with tools should handle the two-step call internally if tools are invoked.
-  // The final `llmResult.text` should be the assistant's textual response after any tool use.
-  // If `llmResult.toolCalls` is present, it means the model wants to call tools, and `generateText`
-  // when provided with `execute` in tool definitions, handles calling them and re-prompting.
-
-  if (!llmResult) {
-    // This should ideally not happen if generateText resolves, but as a safeguard
-    throw new Error('LLM result was not obtained.');
+  if (!finalLlmResult) {
+    throw new Error('LLM stream result was not obtained.');
   }
-  const responseText = llmResult.text;
-  console.log(`Raw LLM response text: "${responseText}"`); // Log raw LLM response
-  const processedResponse = await processTemplate(responseText, sessionId.toString());
+
+  // Use the aggregated text
+  console.log(`Aggregated LLM response text: "${aggregatedResponse}"`);
+  const processedResponse = await processTemplate(aggregatedResponse, sessionId.toString());
 
   const assistantMessage = new Message({
     sessionId: session._id,
