@@ -72,9 +72,25 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cors());
 
+import compression from 'compression'; // Added for SSE Step 2
+
 // Public routes
 app.use('/auth', authRouter);
 app.use('/policy', policyRouter);
+
+// SSE Step 2: Skip compression() when SSE is requested for /assistant/user-input
+// Note: The task card mentions /api/assistant/user-input.
+// Given assistantRouter is mounted at /assistant, this middleware targets /assistant/user-input.
+app.use('/assistant/user-input', (req, res, next) => {
+  const acceptHeader = req.get('accept');
+  // Check if acceptHeader is not undefined and includes 'text/event-stream'
+  const wantsSSE = typeof acceptHeader === 'string' && acceptHeader.includes('text/event-stream');
+  if (wantsSSE) {
+    return next(); // no gzip for SSE
+  }
+  // Apply compression only if SSE is not requested for this specific route
+  return compression()(req, res, next);
+});
 
 // Routes that only require authentication
 app.use('/tts', verifyTokenMiddleware, ttsRouter);
