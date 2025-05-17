@@ -16,8 +16,10 @@ import { generateText, tool, streamText, CoreMessage, StreamTextResult, Tool } f
 import { z, ZodTypeAny } from 'zod';
 import { trimToWindow } from '../../utils/tokenWindow'; 
 import { getProvider } from './provider.service'; 
-import util from 'node:util'; // Added for debugging
+// import util from 'node:util'; // No longer needed after debug log removal
 
+// Simple in-memory cache for toolsForSdk
+const toolsCache = new Map<string, Record<string, Tool<any, any>>>();
 
 const saveSystemMessage = async (
   sessionId: mongoose.Types.ObjectId,
@@ -128,12 +130,19 @@ export const handleSessionMessage = async (
     }));
 
   const actionContext = { sessionId: sessionId.toString(), companyId: session.companyId.toString(), language: session.language as SupportedLanguage };
-  const functionFactory = await createFunctionFactory(actionContext, assistant.allowedActions);
   
-  const toolsForSdk: Record<string, Tool<any, any>> = {}; // Changed type to Tool<any, any>
-  for (const funcName in functionFactory) {
-    const funcDef = functionFactory[funcName];
-    const zodShape: Record<string, ZodTypeAny> = {};
+  const cacheKey = `${assistant._id.toString()}-${JSON.stringify(assistant.allowedActions.slice().sort())}`;
+  let toolsForSdk: Record<string, Tool<any, any>>;
+
+  if (toolsCache.has(cacheKey)) {
+    toolsForSdk = toolsCache.get(cacheKey)!;
+    console.log(`Using cached toolsForSdk for assistant ${assistant._id}`);
+  } else {
+    toolsForSdk = {};
+    const functionFactory = await createFunctionFactory(actionContext, assistant.allowedActions);
+    for (const funcName in functionFactory) {
+      const funcDef = functionFactory[funcName];
+      const zodShape: Record<string, ZodTypeAny> = {};
     let saneRequiredParams: string[] = [];
 
     // Sanitize the original 'required' array to only include parameters that are actually defined in 'properties'
@@ -192,7 +201,10 @@ export const handleSessionMessage = async (
         return rawResult; 
       };
     }
-    toolsForSdk[funcName] = tool({ description: funcDef.description, parameters: zodSchema, execute: executeFunc });
+      toolsForSdk[funcName] = tool({ description: funcDef.description, parameters: zodSchema, execute: executeFunc });
+    }
+    toolsCache.set(cacheKey, toolsForSdk);
+    console.log(`Cached toolsForSdk for assistant ${assistant._id}`);
   }
   
   const providerKey = assistant.llmProvider;
@@ -212,19 +224,24 @@ export const handleSessionMessage = async (
   const systemPrompt = await processTemplate(assistant.llmPrompt, sessionId.toString());
   const messagesForLlm: CoreMessage[] = [...history, { role: 'user', content: userInput }];
   
+  const TOKEN_LIMITS = {
+    google: { 'gemini-1.5': 20000, default: 7000 },
+    openai: { 'gpt-4o': 8000, 'gpt-4': 8000, default: 7000 },
+    anthropic: { default: 7000 }, // Assuming a default for anthropic, adjust if specific models exist
+    default: { default: 7000 } 
+  } as const;
+  
   let maxPromptTokens: number;
-  const defaultMaxTokens = 7000; 
-  const gemini15MaxTokens = 20000; 
-  const gpt4oMaxTokens = 8000;   
-
-  switch (providerKey) {
-    case 'google': maxPromptTokens = modelIdentifier?.includes('gemini-1.5') ? gemini15MaxTokens : defaultMaxTokens; break;
-    case 'openai': 
-      if (modelIdentifier?.includes('gpt-4o')) maxPromptTokens = gpt4oMaxTokens;
-      else if (modelIdentifier?.includes('gpt-4')) maxPromptTokens = gpt4oMaxTokens;
-      else maxPromptTokens = defaultMaxTokens;
-      break;
-    default: maxPromptTokens = defaultMaxTokens; break;
+  const providerConfig = TOKEN_LIMITS[providerKey as keyof typeof TOKEN_LIMITS] || TOKEN_LIMITS.default;
+  
+  if (providerKey === 'google') {
+    maxPromptTokens = modelIdentifier?.includes('gemini-1.5') ? providerConfig['gemini-1.5' as keyof typeof providerConfig] : providerConfig.default;
+  } else if (providerKey === 'openai') {
+    if (modelIdentifier?.includes('gpt-4o')) maxPromptTokens = providerConfig['gpt-4o' as keyof typeof providerConfig];
+    else if (modelIdentifier?.includes('gpt-4')) maxPromptTokens = providerConfig['gpt-4' as keyof typeof providerConfig];
+    else maxPromptTokens = providerConfig.default;
+  } else {
+    maxPromptTokens = providerConfig.default;
   }
   
   // Re-instating manual trimToWindow as SDK middleware is problematic
@@ -232,13 +249,14 @@ export const handleSessionMessage = async (
   console.log(`Manual trim: Target tokens: ${maxPromptTokens}, Actual: ${actualTokensInPrompt}, Original msgs: ${messagesForLlm.length}, Trimmed msgs: ${trimmedMessages.length}`);
 
   let aggregatedResponse = '';
-  let finalLlmResult: any; // This will hold StreamTextResult if not streaming
+  let finalLlmResult: Awaited<ReturnType<typeof generateText>> | undefined;
 
   try {
     const llm = getProvider(providerKey, modelIdentifier, llmApiKey as string);
 
     const slimToolsForIntent = (input: string, allTools: Record<string, Tool<any, any>>): Record<string, Tool<any, any>> => {
-      console.log(`Slimming tools for input: "${input}". Currently returning all ${Object.keys(allTools).length} tools.`);
+      // Reverted to original behavior: always return all tools.
+      console.log(`Tool slimming disabled for input: "${input}". Returning all ${Object.keys(allTools).length} tools.`);
       return allTools;
     };
     const relevantTools = slimToolsForIntent(userInput, toolsForSdk);
@@ -251,9 +269,35 @@ export const handleSessionMessage = async (
         tools: relevantTools,
         maxSteps: 3,
       });
-      console.log(`Returning stream object for session ${sessionId}`);
-      // Note: The consumer of this streamResult (if any further processing like iteration is done by the caller)
-      // would be responsible for implementing specific try-catch around iteration as per Point 5 of the checklist.
+      
+      // Asynchronously save the full response once the stream is complete.
+      // This does not block returning the streamResult to the client.
+      // The .text property on streamResult is a Promise<string> that resolves with the full text.
+      streamResult.text.then(async (finalText) => {
+        try {
+          console.log('Stream finished, saving full assistant message to DB. Final text length:', finalText.length);
+          const processedResponse = await processTemplate(finalText, sessionId.toString());
+          const assistantMessage = new Message({
+            sessionId: session._id,
+            sender: 'assistant',
+            content: processedResponse,
+            assistantId: assistant._id,
+            userId: session.userId,
+            timestamp: new Date(), // Consider using a timestamp from when the stream *finished* if available/important
+            messageType: 'text',
+          });
+          await assistantMessage.save();
+          console.log('Assistant message from streamed response saved to DB.');
+        } catch (dbError) {
+          console.error('Error saving streamed assistant message to DB:', dbError);
+        }
+      }).catch(streamProcessingError => {
+        // This catches errors if the streamResult.text promise itself rejects
+        // (e.g., due to an error during the LLM generation after streaming has started)
+        console.error('Error processing full streamed text for DB save:', streamProcessingError);
+      });
+
+      console.log(`Returning stream object for session ${sessionId} for client consumption.`);
       return streamResult;
     } else {
       // Use generateText for non-streaming case as per Point 4
