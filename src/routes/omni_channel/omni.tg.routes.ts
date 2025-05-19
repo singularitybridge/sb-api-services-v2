@@ -3,12 +3,13 @@ import { Twilio } from 'twilio';
 import { Assistant, IAssistant } from '../../models/Assistant';
 import { IUser, User } from '../../models/User';
 import { ISession, Session } from '../../models/Session';
-import {
-  createNewThread,
-  deleteThread,
-} from '../../services/oai.thread.service';
+// import {
+//   createNewThread,
+//   deleteThread,
+// } from '../../services/oai.thread.service'; // Removed, OpenAI specific
 import axios from 'axios';
 import { ChannelType } from '../../types/ChannelType'; // Added import
+import mongoose from 'mongoose'; // Added for ObjectId generation
 
 import { file } from 'googleapis/build/src/apis/file';
 import { transcribeAudioWhisper } from '../../services/speech.recognition.service';
@@ -130,10 +131,10 @@ messagingRouter.post('/whatsapp/reply', async (req, res) => {
   });
 
   if (!session) {
-    const threadId = await createNewThread('');
+    const threadId = new mongoose.Types.ObjectId().toString(); // Generate local threadId
 
     session = new Session({
-      threadId: threadId,
+      threadId: threadId, // Use locally generated threadId
       userId: user._id,
       assistantId: assistant.assistantId,
       active: true,
