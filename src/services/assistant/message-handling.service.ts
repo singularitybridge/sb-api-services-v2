@@ -110,11 +110,11 @@ export const handleSessionMessage = async (
   console.log(`Fetched assistant details: Provider='${assistant.llmProvider}', Model='${assistant.llmModel}'`);
 
   const userMessage = new Message({
-    sessionId: session._id,
+    sessionId: new mongoose.Types.ObjectId(session._id),
     sender: 'user',
     content: userInput,
-    assistantId: assistant._id,
-    userId: session.userId,
+    assistantId: new mongoose.Types.ObjectId(assistant._id),
+    userId: new mongoose.Types.ObjectId(session.userId),
     timestamp: new Date(),
     messageType: 'text',
     data: metadata,
@@ -273,25 +273,54 @@ export const handleSessionMessage = async (
       // Asynchronously save the full response once the stream is complete.
       // This does not block returning the streamResult to the client.
       // The .text property on streamResult is a Promise<string> that resolves with the full text.
-      streamResult.text.then(async (finalText) => {
+      // Asynchronously save the full response once the stream is complete.
+      // This includes text, toolCalls, and toolResults.
+      (async () => {
         try {
-          console.log('Stream finished, saving full assistant message to DB. Final text length:', finalText.length);
+          // Await all necessary parts of the stream result
+          const finalText = await streamResult.text;
+          // Correctly await the promises for toolCalls and toolResults
+          const toolCalls = await streamResult.toolCalls; 
+          const toolResults = await streamResult.toolResults;
+
+          console.log('Stream finished, saving full assistant message to DB.');
+          if (finalText) console.log('Final text length:', finalText.length);
+          if (toolCalls) console.log('Tool Calls:', JSON.stringify(toolCalls, null, 2));
+          if (toolResults) console.log('Tool Results:', JSON.stringify(toolResults, null, 2));
+          
           const processedResponse = await processTemplate(finalText, sessionId.toString());
-          const assistantMessage = new Message({
-            sessionId: session._id,
+          
+          const assistantMessageData: Partial<IMessage> = {
+            sessionId: new mongoose.Types.ObjectId(session._id),
             sender: 'assistant',
             content: processedResponse,
-            assistantId: assistant._id,
-            userId: session.userId,
-            timestamp: new Date(), // Consider using a timestamp from when the stream *finished* if available/important
-            messageType: 'text',
-          });
+            assistantId: new mongoose.Types.ObjectId(assistant._id),
+            userId: new mongoose.Types.ObjectId(session.userId),
+            timestamp: new Date(),
+            messageType: 'text', // Default to text
+            data: {},
+          };
+
+          if (toolCalls && toolCalls.length > 0) {
+            assistantMessageData.messageType = 'tool_calls'; // Or a more appropriate type
+            assistantMessageData.data = { ...assistantMessageData.data, toolCalls: toolCalls };
+          }
+          if (toolResults && toolResults.length > 0) {
+            // Ensure messageType reflects tool usage if not already set
+            if (assistantMessageData.messageType !== 'tool_calls') {
+                 assistantMessageData.messageType = 'tool_results'; // Or a more appropriate type
+            }
+            assistantMessageData.data = { ...assistantMessageData.data, toolResults: toolResults };
+          }
+          
+          const assistantMessage = new Message(assistantMessageData);
           await assistantMessage.save();
-          console.log('Assistant message from streamed response saved to DB.');
+          console.log('Assistant message from streamed response (with potential tool data) saved to DB.');
+
         } catch (dbError) {
           console.error('Error saving streamed assistant message to DB:', dbError);
         }
-      }).catch(streamProcessingError => {
+      })().catch(streamProcessingError => {
         // This catches errors if the streamResult.text promise itself rejects
         // (e.g., due to an error during the LLM generation after streaming has started)
         console.error('Error processing full streamed text for DB save:', streamProcessingError);
@@ -341,17 +370,38 @@ export const handleSessionMessage = async (
         throw new Error('LLM result was not obtained for non-streaming case.');
     }
     const processedResponse = await processTemplate(aggregatedResponse, sessionId.toString());
-    const assistantMessage = new Message({
-      sessionId: session._id,
+    
+    const assistantMessageData: Partial<IMessage> = {
+      sessionId: new mongoose.Types.ObjectId(session._id),
       sender: 'assistant',
       content: processedResponse,
-      assistantId: assistant._id,
-      userId: session.userId,
+      assistantId: new mongoose.Types.ObjectId(assistant._id),
+      userId: new mongoose.Types.ObjectId(session.userId),
       timestamp: new Date(),
-      messageType: 'text',
-    });
+      messageType: 'text', // Default to text
+      data: {},
+    };
+
+    if (finalLlmResult.toolCalls && finalLlmResult.toolCalls.length > 0) {
+      assistantMessageData.messageType = 'tool_calls'; // Or a more appropriate type
+      assistantMessageData.data = { ...assistantMessageData.data, toolCalls: finalLlmResult.toolCalls };
+    }
+    if (finalLlmResult.toolResults && finalLlmResult.toolResults.length > 0) {
+      // Ensure messageType reflects tool usage if not already set
+      if (assistantMessageData.messageType !== 'tool_calls') {
+           assistantMessageData.messageType = 'tool_results'; // Or a more appropriate type
+      }
+      assistantMessageData.data = { ...assistantMessageData.data, toolResults: finalLlmResult.toolResults };
+    }
+
+    const assistantMessage = new Message(assistantMessageData);
     await assistantMessage.save();
-    return processedResponse;
+    
+    // For non-streaming, the UI expects the text response directly, 
+    // but the full message including tool data is saved.
+    // If the UI needs tool data for non-streaming, the response structure here would need to change.
+    // For now, returning processedResponse to maintain existing non-streaming behavior.
+    return processedResponse; 
   }
   
   // This path should not be reached if shouldStream is true, as streamResult would have been returned.

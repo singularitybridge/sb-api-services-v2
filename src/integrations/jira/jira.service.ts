@@ -131,8 +131,23 @@ export const getJiraTicketById = async (
     const issue = await client.issues.getIssue({
       issueIdOrKey: params.issueIdOrKey
     });
+
+    // Simplify the ticket data before returning
+    const simplifiedIssue = {
+      key: issue.key,
+      summary: issue.fields?.summary,
+      status: issue.fields?.status?.name,
+      description: issue.fields?.description?.content?.[0]?.content?.[0]?.text, // Extract text from ADF
+      assignee: issue.fields?.assignee?.displayName,
+      reporter: issue.fields?.reporter?.displayName,
+      created: issue.fields?.created,
+      updated: issue.fields?.updated,
+      // You can add other essential fields here if needed
+      // For example, to include all fields for debugging or more complex scenarios:
+      // rawFields: issue.fields 
+    };
     
-    return { success: true, data: issue };
+    return { success: true, data: simplifiedIssue };
   } catch (error: any) {
     throw new Error(`Failed to fetch JIRA ticket: ${error?.message || 'Unknown error'}`);
   }
