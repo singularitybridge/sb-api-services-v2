@@ -1,8 +1,8 @@
 import express from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { validateApiKeys } from '../../services/api.key.service';
-import { getApiKey } from '../../services/api.key.service';
-import { createNewThread, deleteThread, getMessages } from '../../services/oai.thread.service';
+// import { getApiKey } from '../../services/api.key.service'; // Not used after removing OpenAI specific routes
+// import { createNewThread, deleteThread, getMessages } from '../../services/oai.thread.service'; // Removed, OpenAI specific
 import { Session } from '../../models/Session';
 import { Message } from '../../models/Message'; // Added for Step 5
 import { handleSessionMessage } from '../../services/assistant.service';
@@ -14,16 +14,8 @@ const threadRouter = express.Router();
 // User feedback: Streaming is possible by default if client requests via Accept header.
 // No global disable flag in code.
 
-threadRouter.get(
-  '/:id/messages',
-  validateApiKeys(['openai_api_key']),
-  async (req: AuthenticatedRequest, res) => {
-    const { id } = req.params;
-    const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
-    const messages = await getMessages(apiKey, id);
-    res.send(messages);
-  }
-);
+// Removed GET /:id/messages route as it was OpenAI specific and redundant
+// Use GET /session/:sessionId/messages to fetch messages from MongoDB
 
 // New route to fetch messages by session ID from MongoDB
 threadRouter.get(
@@ -59,26 +51,8 @@ threadRouter.get(
   }
 );
 
-threadRouter.post(
-  '/',
-  validateApiKeys(['openai_api_key']),
-  async (req: AuthenticatedRequest, res) => {
-    const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
-    const newThread = await createNewThread(apiKey);
-    res.send(newThread);
-  }
-);
-
-threadRouter.delete(
-  '/:id',
-  validateApiKeys(['openai_api_key']),
-  async (req: AuthenticatedRequest, res) => {
-    const { id } = req.params;
-    const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
-    await deleteThread(apiKey, id);
-    res.send({ message: 'Thread deleted successfully' });
-  }
-);
+// Removed POST / route as it was for creating OpenAI specific threads
+// Removed DELETE /:id route as it was for deleting OpenAI specific threads
 
 threadRouter.post(
   '/user-input',
@@ -153,24 +127,8 @@ threadRouter.post(
             res.write(`data:${JSON.stringify({ type: 'token', value: chunk })}\n\n`);
           }
 
-          if (!res.writableEnded && fullText.trim() !== '') { // Only save if there's content and stream is still open
-            try {
-              await Message.create({
-                sessionId,
-                sender: 'assistant',
-                content: fullText, // <-- STRING not array
-                messageType: 'text',
-                assistantId: messageAssistantId || session.assistantId, // you already have this
-                userId: session.userId, // fixes “Path userId is required”
-                // companyId is not in the schema based on the user's description, so removing it.
-                // threadId is not in the schema based on the user's description, so removing it.
-              });
-              console.log('Assistant SSE reply persisted for session:', sessionId);
-            } catch (dbError) {
-              console.error('Failed to persist assistant SSE reply:', dbError);
-              // Decide if an SSE error event should be sent to client about this
-            }
-          }
+          // Removed Message.create from here as it's handled in message-handling.service.ts
+          // The console.log for "Assistant SSE reply persisted" is also removed as the save happens elsewhere.
         } else {
           console.error(
             'handleSessionMessage did not return a valid textStream for SSE. Result:',

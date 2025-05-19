@@ -1,10 +1,11 @@
 import { Assistant } from '../models/Assistant';
 import { ISession, Session } from '../models/Session';
 import { CustomError, NotFoundError } from '../utils/errors';
-import { createNewThread, deleteThread } from './oai.thread.service';
+// OpenAI thread service calls removed as it's deprecated in favor of Vercel AI
 import { ChannelType } from '../types/ChannelType';
 import { getApiKey, ApiKeyType } from './api.key.service';
 import { SupportedLanguage } from './discovery.service';
+import mongoose from 'mongoose'; // Added for ObjectId generation
 
 export const sessionFriendlyAggreationQuery = [
   {
@@ -135,7 +136,8 @@ export const getSessionOrCreate = async (
     throw new Error('No default assistant available for this company');
   }
 
-  const threadId = await createNewThread(apiKey);
+  // Generate a unique ID for threadId instead of getting it from OpenAI
+  const threadId = new mongoose.Types.ObjectId().toString();
 
   try {
     session = await Session.create({
@@ -143,7 +145,7 @@ export const getSessionOrCreate = async (
       companyId,
       assistantId: defaultAssistant._id,
       active: true,
-      threadId,
+      threadId, // Use the locally generated threadId
       channel,
       language,
     });
@@ -179,11 +181,11 @@ export const endSession = async (apiKey: string, sessionId: string): Promise<boo
   }
 
   try {
-    await deleteThread(apiKey, session.threadId);
+    // OpenAI thread deletion removed as it's deprecated in favor of Vercel AI
     session.active = false;
     await session.save();
 
-    console.log(`Session ended, sessionId: ${sessionId}, userId: ${session.userId}, channel: ${session.channel}`);
+    console.log(`Session ended locally, sessionId: ${sessionId}, userId: ${session.userId}, channel: ${session.channel}`);
     return true;
   } catch (error: any) {
     console.error('Error ending session:', error);

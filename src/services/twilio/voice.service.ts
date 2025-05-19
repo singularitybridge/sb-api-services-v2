@@ -2,9 +2,10 @@ import VoiceResponse from 'twilio/lib/twiml/VoiceResponse';
 import { Assistant } from '../../models/Assistant';
 import { Session } from '../../models/Session';
 import { User } from '../../models/User';
-import { deleteThread, createNewThread } from '../oai.thread.service';
+// import { deleteThread, createNewThread } from '../oai.thread.service'; // Removed, OpenAI specific
 import { ChannelType } from '../../types/ChannelType'; // Added import
 import { transcribeAudioWhisper } from '../speech.recognition.service';
+import mongoose from 'mongoose'; // Added for ObjectId generation
 import { getCurrentTimeAndDay } from '../context.service';
 import { Twilio } from 'twilio';
 import { ApiKey } from '../verification.service';
@@ -35,7 +36,7 @@ export const handleVoiceCallEnded = async (
 
   if (!session) return false;
 
-  deleteThread(apiKey, session.threadId);
+  // deleteThread(apiKey, session.threadId); // Removed, OpenAI specific
   session.active = false;
   await session.save();
 
@@ -70,10 +71,10 @@ export const handleVoiceRequest = async (
   });
 
   if (!session) {
-    const threadId = await createNewThread(apiKey);
+    const threadId = new mongoose.Types.ObjectId().toString(); // Generate local threadId
 
     session = new Session({
-      threadId: threadId,
+      threadId: threadId, // Use locally generated threadId
       userId: user._id,
       assistantId: assistant.assistantId,
       active: true,
