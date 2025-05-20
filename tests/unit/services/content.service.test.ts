@@ -3,6 +3,12 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import * as ContentService from '../../../src/services/content.service';
 import { ContentItem, IContentItem } from '../../../src/models/ContentItem';
 import { ContentType } from '../../../src/models/ContentType';
+import { Company } from '../../../src/models/Company'; // Import Company model
+import * as apiKeyService from '../../../src/services/api.key.service'; // Import to mock
+
+// Mock api.key.service
+jest.mock('../../../src/services/api.key.service');
+const mockedApiKeyService = apiKeyService as jest.Mocked<typeof apiKeyService>;
 
 let mongoServer: MongoMemoryServer;
 
@@ -25,6 +31,32 @@ describe('Content Service', () => {
   beforeEach(async () => {
     await ContentItem.deleteMany({});
     await ContentType.deleteMany({});
+    await Company.deleteMany({}); // Clear companies too
+
+    // Mock getApiKey to return a dummy key, bypassing decryption
+    mockedApiKeyService.getApiKey.mockImplementation(async (companyId, keyType) => {
+      if (companyId === mockCompanyId && keyType === 'openai_api_key') {
+        return 'sk-mockOpenAiApiKey'; // Return a decrypted-like key
+      }
+      return null;
+    });
+
+    // Create a mock company (still needed if other parts of the service use it directly, though getApiKey is now mocked)
+    // For safety, keep it, but its api_keys content is less critical now for getApiKey.
+    const company = new Company({
+      _id: mockCompanyId,
+      name: 'Test Company',
+      api_keys: [{ // Minimal valid structure if Company model still needs it for save()
+          name: 'openai_api_key', 
+          key: 'openai_api_key', 
+          value: 'dummyValue', 
+          iv: '64756d6d7949763132333435', // "dummyIv12345" in hex (12 bytes)
+          tag: '64756d6d795461673132333435363738', // "dummyTag12345678" in hex (16 bytes)
+          created_at: new Date() 
+      }]
+    });
+    await company.save();
+
 
     // Create a mock content type
     const contentType = new ContentType({
