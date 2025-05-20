@@ -3,9 +3,10 @@ import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { validateApiKeys } from '../../services/api.key.service';
 // import { getApiKey } from '../../services/api.key.service'; // Not used after removing OpenAI specific routes
 // import { createNewThread, deleteThread, getMessages } from '../../services/oai.thread.service'; // Removed, OpenAI specific
-import { Session } from '../../models/Session';
+import { Session, ISession } from '../../models/Session'; // ISession added
 import { Message } from '../../models/Message'; // Added for Step 5
 import { handleSessionMessage } from '../../services/assistant.service';
+import { getSessionOrCreate } from '../../services/session.service'; // Added
 import { ChannelType } from '../../types/ChannelType';
 import { getMessagesBySessionId, getMessageById } from '../../services/message.service';
 
@@ -16,21 +17,8 @@ const threadRouter = express.Router();
 
 // Removed GET /:id/messages route as it was OpenAI specific and redundant
 // Use GET /session/:sessionId/messages to fetch messages from MongoDB
-
-// New route to fetch messages by session ID from MongoDB
-threadRouter.get(
-  '/session/:sessionId/messages',
-  async (req: AuthenticatedRequest, res) => {
-    const { sessionId } = req.params;
-    try {
-      const messages = await getMessagesBySessionId(sessionId);
-      res.send(messages);
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-      res.status(500).send('An error occurred while fetching messages.');
-    }
-  }
-);
+// This route is now handled by src/routes/session.routes.ts (GET /messages and GET /:id/messages)
+// So, the specific /session/:sessionId/messages route is removed from here to avoid redundancy.
 
 // New route to fetch a specific message by ID from MongoDB
 threadRouter.get(
@@ -58,7 +46,7 @@ threadRouter.post(
   '/user-input',
   validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
-    const { userInput, sessionId } = req.body;
+    const { userInput } = req.body; // Removed sessionId from here
     // const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string; // apiKey is likely handled within handleSessionMessage or streamText
 
     // Determine clientWantsSSE before the try block for wider scope
@@ -66,10 +54,42 @@ threadRouter.post(
     const clientWantsSSE = typeof acceptHeader === 'string' && acceptHeader.includes('text/event-stream');
 
     try {
-      const session = await Session.findById(sessionId);
-      if (!session) {
-        return res.status(404).json({ error: 'Session not found' });
+      // Get or create the active session for the user
+      const companyId = req.user?.companyId?.toString();
+      const userId = req.user?._id?.toString();
+
+      if (!companyId || !userId) {
+        return res.status(400).json({ error: 'User or Company ID not found in request.' });
       }
+      
+      // Assuming ChannelType.WEB for this endpoint. If other channels use this, it might need adjustment.
+      // The getSessionOrCreate function expects an API key, but it's not directly used for session retrieval logic itself,
+      // rather it was a prerequisite for OpenAI calls. Since we are moving away from direct OpenAI calls in session.service for thread creation,
+      // and api.key.service.getApiKey is called within session.service.getSessionLanguage,
+      // we can pass a placeholder or handle it if getSessionOrCreate strictly needs it for other paths.
+      // For now, let's assume it's primarily for downstream services and might not be strictly needed here if we're just getting/creating a session.
+      // However, looking at getSessionOrCreate, it does take an apiKey. Let's pass an empty string for now and see if it breaks.
+      // A better approach would be to refactor getSessionOrCreate if apiKey is not always needed.
+      // For now, let's retrieve it as it was done in other routes.
+      // const apiKey = (await getApiKey(companyId, 'openai_api_key')) as string; // This was how it was done in session.routes.ts
+      // The apiKey is not directly used by getSessionOrCreate for finding/creating session, but passed along.
+      // Let's pass a dummy value or handle it properly.
+      // The validateApiKeys middleware should ensure 'openai_api_key' is available if needed by downstream.
+      // The `getSessionOrCreate` function in `session.service.ts` does not actually use the apiKey parameter for its core logic of finding or creating a session.
+      // It was originally passed for potential OpenAI calls which are now removed.
+      // We can pass an empty string or a placeholder.
+      const sessionData = await getSessionOrCreate(
+        '', // Placeholder for apiKey, as it's not used for session creation/retrieval itself
+        userId,
+        companyId,
+        ChannelType.WEB // Defaulting to WEB for this user-input endpoint
+      );
+
+      if (!sessionData || !sessionData._id) {
+        return res.status(404).json({ error: 'Active session could not be found or created.' });
+      }
+      const activeSessionId = sessionData._id.toString();
+
 
       // Step 3: Streaming is determined by client's Accept header.
       // The 406 error for a global disable flag is removed.
@@ -104,7 +124,7 @@ threadRouter.post(
 
         const result = await handleSessionMessage(
           userInput,
-          sessionId,
+          activeSessionId, // Use the retrieved/created active session ID
           ChannelType.WEB,
           { 'X-Experimental-Stream': 'true' } // Inform service that SSE is expected
         );
@@ -152,7 +172,7 @@ threadRouter.post(
         // JSON Logic (non-streaming)
         const result = await handleSessionMessage(
           userInput,
-          sessionId,
+          activeSessionId, // Use the retrieved/created active session ID
           ChannelType.WEB // No streaming metadata, so it returns a string
         );
 

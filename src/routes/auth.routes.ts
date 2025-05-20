@@ -8,9 +8,8 @@ const authRouter = express.Router();
 
 authRouter.post('/verify-token', async (req, res) => {
   try {
-    console.log('Received authorization header:', req.headers.authorization);
-    const token = extractTokenFromHeader(req.headers.authorization);
-    console.log('Extracted token:', token);
+    
+    const token = extractTokenFromHeader(req.headers.authorization);    
     const { user, company, decryptedApiKey } = await verifyToken(token);
     
     const response: any = { 
