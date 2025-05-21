@@ -148,8 +148,13 @@ sessionRouter.post(
         active: true 
       });
 
+      let lastAssistantId: string | undefined = undefined;
+      let lastLanguage: string = 'en'; // Default language
+
       if (currentActiveSession) {
         console.log(`Clear Session: Ending existing active session ${currentActiveSession._id}`);
+        lastAssistantId = currentActiveSession.assistantId?.toString();
+        lastLanguage = currentActiveSession.language || 'en'; // Use session language or default
         await endSession(apiKey, currentActiveSession._id.toString());
       } else {
         console.log(`Clear Session: No existing active session found for user ${userId} in company ${companyId} on WEB channel.`);
@@ -160,7 +165,9 @@ sessionRouter.post(
         apiKey,
         userId,
         companyId,
-        ChannelType.WEB // Assuming WEB channel
+        ChannelType.WEB, // Assuming WEB channel
+        lastLanguage,    // Pass the last language
+        lastAssistantId  // Pass the last assistantId
       );
       
       res.status(200).json(newSession);
