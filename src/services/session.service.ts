@@ -105,7 +105,8 @@ export const getSessionOrCreate = async (
   userId: string,
   companyId: string,
   channel: ChannelType = ChannelType.WEB,
-  language: string = 'en'
+  language: string = 'en',
+  lastAssistantId?: string // Added lastAssistantId parameter
 ) => {
 
   const findSession = async () => {
@@ -129,11 +130,24 @@ export const getSessionOrCreate = async (
 
   console.log('No existing session found. Attempting to create a new one.');
 
-  const defaultAssistant = await Assistant.findOne({ companyId });
+  let assistantToUseId;
+  if (lastAssistantId) {
+    // Validate if the lastAssistantId is a valid assistant for the company
+    const assistant = await Assistant.findOne({ _id: lastAssistantId, companyId });
+    if (assistant) {
+      assistantToUseId = assistant._id;
+    } else {
+      console.warn(`Last assistant ID ${lastAssistantId} not found or not valid for company ${companyId}. Falling back to default.`);
+    }
+  }
 
-  if (!defaultAssistant) {
-    console.error(`No default assistant available for companyId: ${companyId}`);
-    throw new Error('No default assistant available for this company');
+  if (!assistantToUseId) {
+    const defaultAssistant = await Assistant.findOne({ companyId });
+    if (!defaultAssistant) {
+      console.error(`No default assistant available for companyId: ${companyId}`);
+      throw new Error('No default assistant available for this company');
+    }
+    assistantToUseId = defaultAssistant._id;
   }
 
   // Generate a unique ID for threadId instead of getting it from OpenAI
@@ -143,13 +157,13 @@ export const getSessionOrCreate = async (
     session = await Session.create({
       userId,
       companyId,
-      assistantId: defaultAssistant._id,
+      assistantId: assistantToUseId, // Use determined assistantId
       active: true,
       threadId, // Use the locally generated threadId
       channel,
       language,
     });
-    console.log(`New session created: ${session._id}`);
+    console.log(`New session created: ${session._id} with assistant ${assistantToUseId}`);
   } catch (error: any) {
     if (error.code === 11000) {
       console.log('Duplicate key error encountered. Attempting to fetch existing session.');
