@@ -54,6 +54,74 @@ export const getCurrentAssistant = async (sessionId: string): Promise<{ success:
   }
 };
 
+export const updateCurrentAssistant = async (
+  sessionId: string,
+  updateData: {
+    name?: string;
+    description?: string;
+    llmModel?: string;
+    llmProvider?: 'openai' | 'google' | 'anthropic';
+  }
+): Promise<{ success: boolean; description: string; data?: any }> => {
+  try {
+    const session = await Session.findById(sessionId);
+    if (!session) {
+      return { success: false, description: 'Invalid session' };
+    }
+
+    if (!session.assistantId) {
+      return { success: false, description: 'No assistant assigned to current session' };
+    }
+
+    const assistant = await Assistant.findById(session.assistantId);
+    if (!assistant) {
+      return { success: false, description: 'Assistant not found' };
+    }
+
+    // Update only the allowed fields if they are provided in updateData
+    if (updateData.name !== undefined) assistant.name = updateData.name;
+    if (updateData.description !== undefined) assistant.description = updateData.description;
+    if (updateData.llmModel !== undefined) assistant.llmModel = updateData.llmModel;
+    if (updateData.llmProvider !== undefined) assistant.llmProvider = updateData.llmProvider;
+    // Ensure llmPrompt defaults to empty string if it's somehow null/undefined from DB
+    // This was a previous bug fix attempt, keeping it for safety, though model now has default.
+    assistant.llmPrompt = assistant.llmPrompt || ""; 
+
+
+    await assistant.save();
+
+    publishMessage(`sb-${sessionId}`, 'assistantUpdated', { // Using a more specific event name
+      _id: assistant._id,
+      name: assistant.name,
+      description: assistant.description,
+      llmModel: assistant.llmModel,
+      llmProvider: assistant.llmProvider,
+    });
+
+    return {
+      success: true,
+      description: 'Current assistant updated successfully',
+      data: {
+        _id: assistant._id,
+        name: assistant.name,
+        description: assistant.description,
+        llmModel: assistant.llmModel,
+        llmProvider: assistant.llmProvider,
+        // Include other relevant fields that might be useful for the client
+        llmPrompt: assistant.llmPrompt, 
+        language: assistant.language,
+        voice: assistant.voice,
+      },
+    };
+  } catch (error) {
+    console.error('Error updating current assistant:', error);
+    return {
+      success: false,
+      description: 'Failed to update current assistant',
+    };
+  }
+};
+
 export const getAssistants = async (sessionId: string): Promise<{ success: boolean; description: string; data?: any }> => {
   try {
     const session = await Session.findById(sessionId);
