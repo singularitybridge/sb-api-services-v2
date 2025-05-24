@@ -1,5 +1,5 @@
 import { ActionContext, FunctionFactory } from '../actions/types';
-import { getAssistants, setAssistant, createNewAssistant } from './assistant.service';
+import { getAssistants, setAssistant, createNewAssistant, getCurrentAssistant } from './assistant.service';
 import { IIdentifier } from '../../models/Assistant';
 
 const createAssistantActions = (context: ActionContext): FunctionFactory => ({
@@ -102,6 +102,18 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
         voice, 
         conversationStarters
       );
+    },
+  },
+
+  getCurrentAssistant: {
+    description: "Get the current assistant's information for the session",
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    function: async () => {
+      return await getCurrentAssistant(context.sessionId);
     },
   },
 });

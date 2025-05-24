@@ -2,6 +2,58 @@ import { Assistant, IIdentifier } from '../../models/Assistant';
 import { Session } from '../../models/Session';
 import { publishMessage } from '../../services/pusher.service';
 
+export const getCurrentAssistant = async (sessionId: string): Promise<{ success: boolean; description: string; data?: any }> => {
+  try {
+    const session = await Session.findById(sessionId);
+    if (!session) {
+      return {
+        success: false,
+        description: 'Invalid session',
+      };
+    }
+
+    if (!session.assistantId) {
+      return {
+        success: false,
+        description: 'No assistant assigned to current session',
+      };
+    }
+
+    const assistant = await Assistant.findById(session.assistantId);
+    if (!assistant) {
+      return {
+        success: false,
+        description: 'Assistant not found',
+      };
+    }
+
+    return {
+      success: true,
+      description: 'Current assistant retrieved successfully',
+      data: {
+        _id: assistant._id,
+        name: assistant.name,
+        description: assistant.description,
+        llmPrompt: assistant.llmPrompt,
+        llmProvider: assistant.llmProvider,
+        llmModel: assistant.llmModel,
+        language: assistant.language,
+        voice: assistant.voice,
+        conversationStarters: assistant.conversationStarters,
+        allowedActions: assistant.allowedActions,
+        avatarImage: assistant.avatarImage,
+        assistantId: assistant.assistantId,
+      },
+    };
+  } catch (error) {
+    console.error('Error getting current assistant:', error);
+    return {
+      success: false,
+      description: 'Failed to retrieve current assistant',
+    };
+  }
+};
+
 export const getAssistants = async (sessionId: string): Promise<{ success: boolean; description: string; data?: any }> => {
   try {
     const session = await Session.findById(sessionId);

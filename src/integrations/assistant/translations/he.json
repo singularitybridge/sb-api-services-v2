@@ -24,5 +24,9 @@
   "errorAssistantNotFound": "סוכן AI לא נמצא",
   "errorRetrieveAssistants": "נכשל באחזור סוכני AI",
   "errorSetAssistant": "נכשל בהגדרת סוכן AI",
-  "errorCreateAssistant": "נכשל ביצירת סוכן AI חדש"
+  "errorCreateAssistant": "נכשל ביצירת סוכן AI חדש",
+  "getCurrentAssistant": {
+    "actionTitle": "קבל סוכן נוכחי",
+    "description": "קבל את פרטי הסוכן הנוכחי עבור הסשן"
+  }
 }
