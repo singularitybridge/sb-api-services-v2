@@ -28,5 +28,9 @@
   "getCurrentAssistant": {
     "actionTitle": "Get Current Assistant",
     "description": "Get the current assistant's information for the session"
+  },
+  "updateCurrentAssistant": {
+    "actionTitle": "Update Current Assistant",
+    "description": "Update the current assistant's information (name, description, LLM model, LLM provider). Only provided fields will be updated."
   }
 }

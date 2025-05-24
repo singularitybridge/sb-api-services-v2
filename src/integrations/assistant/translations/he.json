@@ -28,5 +28,9 @@
   "getCurrentAssistant": {
     "actionTitle": "קבל סוכן נוכחי",
     "description": "קבל את פרטי הסוכן הנוכחי עבור הסשן"
+  },
+  "updateCurrentAssistant": {
+    "actionTitle": "עדכן סוכן נוכחי",
+    "description": "עדכן את פרטי הסוכן הנוכחי (שם, תיאור, מודל LLM, ספק LLM). רק שדות שסופקו יעודכנו."
   }
 }
