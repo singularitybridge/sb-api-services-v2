@@ -7,6 +7,7 @@ import { getSessionOrCreate, endSession, updateSessionAssistant } from './sessio
 import { getCompanies } from './company.service';
 import { ICompany, IApiKey } from '../models/Company';
 import { IAssistant } from '../models/Assistant';
+import { logger } from '../utils/logger';
 
 const bots: Map<string, TelegramBot> = new Map();
 
@@ -17,7 +18,7 @@ const normalizeCompanyId = (id: string | any): string => {
   } else if (id && typeof id.toString === 'function') {
     return id.toString();
   }
-  console.error('Invalid company ID type:', typeof id);
+  logger.error('Invalid company ID type:', { type: typeof id, companyId: id });
   return '';
 };
 
@@ -41,8 +42,8 @@ const validateBotToken = async (token: string): Promise<boolean> => {
     const bot = new TelegramBot(token, { polling: false });
     const me = await bot.getMe();
     return !!me.id;
-  } catch (error) {
-    console.log('Notice: Invalid Telegram bot token');
+  } catch (error: any) {
+    logger.warn('Invalid Telegram bot token', { error: error.message });
     return false;
   }
 };
@@ -57,23 +58,23 @@ export const initializeTelegramBots = async () => {
         const telegramBotToken = await getApiKey(companyId, 'telegram_bot_api_key');
 
         if (!telegramBotToken) {
-          console.log(`Notice: No Telegram bot token found for company ${companyId}`);
+          logger.warn(`No Telegram bot token for company ${companyId}`);
           continue;
         }
 
         const isValidToken = await validateBotToken(telegramBotToken);
         if (!isValidToken) {
-          console.log(`Notice: Invalid Telegram bot token for company ${companyId}`);
+          logger.warn(`Invalid Telegram bot token for company ${companyId}`);
           continue;
         }
 
         const bot = new TelegramBot(telegramBotToken, { polling: true });
-        bot.on('polling_error', (error) => {
-          console.log(`Notice: Polling error for company ${companyId}`);
+        bot.on('polling_error', (error: any) => {
+          logger.warn(`Telegram polling error: ${companyId}`, { error: error.message });
         });
 
         bots.set(companyId, bot);
-        console.log(`Bot added to map for company ${companyId} (type: ${typeof companyId})`);
+        logger.info(`✓ Telegram bot started: ${companyId}`);
 
         bot.onText(/\/start/, async (msg) => {
           const chatId = msg.chat.id;
@@ -95,7 +96,7 @@ export const initializeTelegramBots = async () => {
           const messageText = msg.text;
 
           if (!userId) {
-            console.log('Notice: User ID not found in message');
+            logger.warn('User ID not found in message', { chatId });
             return;
           }
 
@@ -118,20 +119,20 @@ export const initializeTelegramBots = async () => {
             const companyId = Array.from(bots.entries()).find(([_, b]) => b === bot)?.[0];
             
             if (!companyId) {
-              console.log(`Notice: Company not found for Telegram bot`);
+              logger.warn('Company not found for Telegram bot', { chatId });
               return;
             }
 
             const user = await findUserByIdentifierAndCompany('tg_user_id', userId.toString(), companyId);
             
             if (!user) {
-              console.log(`[Company ${companyId}] New user detected. Sending onboarding message.`);
+              logger.info(`New Telegram user: ${userId}`);
               const onboardingMessage = `Welcome to the Agent Hub! It looks like you haven't connected your Telegram account with the AI Agent Portal yet. To onboard, please use the following number: ${userId}`;
               await bot.sendMessage(chatId, onboardingMessage);
               return;
             }
 
-            console.log(`[Company ${companyId}] Processing message for user ${user.id}`);
+            logger.debug(`Processing message from user ${user.id}`);
 
             if (messageText) {
               const apiKey = await getApiKey(companyId, 'openai_api_key') as string;
@@ -143,31 +144,31 @@ export const initializeTelegramBots = async () => {
                 ChannelType.TELEGRAM
               );
 
-              console.log(`[Company ${companyId}] Created/Retrieved session ${session._id} for user ${user.id}`);
+              logger.debug(`Session ${session._id} for user ${user.id}`);
 
               // Updated call to handleSessionMessage, apiKey is no longer needed as first argument
               // and session._id needs to be a string.
               await handleSessionMessage(messageText, session._id.toString(), ChannelType.TELEGRAM);
             } else if (msg.photo) {
-              console.log(`[Company ${companyId}] Received photo from user ${user.id}`);
+              logger.debug(`Photo received from user ${user.id}`);
               bot.sendMessage(chatId, `Thanks for the photo, ${fullName}! Unfortunately, I can't process images yet.`);
             } else if (msg.document) {
-              console.log(`[Company ${companyId}] Received document from user ${user.id}`);
+              logger.debug(`Document received from user ${user.id}`);
               bot.sendMessage(chatId, `I received your document, ${fullName}. Unfortunately, I can't process documents yet.`);
             }
-          } catch (error) {
-            console.log(`Notice: Error processing message`);
+          } catch (error: any) {
+            logger.error(`Message processing failed: ${error.message}`);
             bot.sendMessage(chatId, 'Sorry, there was an error processing your message. Please try again later.');
           }
         });
 
-        console.log(`Telegram bot started for company ${companyId}`);
-      } catch (error) {
-        console.log(`Notice: Error initializing bot for company ${company._id}`);
+        logger.info(`✓ Bot ready for company ${companyId}`);
+      } catch (error: any) {
+        logger.error(`Bot init failed for ${company._id}: ${error.message}`);
       }
     }
-  } catch (error) {
-    console.log('Notice: Error initializing Telegram bots');
+  } catch (error: any) {
+    logger.error(`Telegram bots initialization failed: ${error.message}`);
   }
 };
 
@@ -176,7 +177,7 @@ const handleClearChat = async (bot: TelegramBot, chatId: number, userId: number,
     const user = await findUserByIdentifierAndCompany('tg_user_id', userId.toString(), companyId);
     
     if (!user) {
-      console.log(`Notice: User not found for Telegram bot`);
+      logger.warn('User not found for Telegram bot', { companyId, userId });
       await bot.sendMessage(chatId, 'Error clearing chat. Please try again.');
       return;
     }
@@ -201,8 +202,8 @@ const handleClearChat = async (bot: TelegramBot, chatId: number, userId: number,
       companyId,
       ChannelType.TELEGRAM
     );
-  } catch (error) {
-    console.log(`Notice: Error clearing chat`);
+  } catch (error: any) {
+    logger.error('Error clearing chat', { companyId, userId, error: error.message });
     await bot.sendMessage(chatId, 'Error clearing chat. Please try again.');
   }
 };
@@ -212,7 +213,7 @@ const handleChangeAgent = async (bot: TelegramBot, chatId: number, userId: numbe
     const user = await findUserByIdentifierAndCompany('tg_user_id', userId.toString(), companyId);
     
     if (!user) {
-      console.log(`Notice: User not found for Telegram bot`);
+      logger.warn('User not found for Telegram bot', { companyId, userId });
       await bot.sendMessage(chatId, 'Error changing agent. Please try again.');
       return;
     }
@@ -262,33 +263,32 @@ const handleChangeAgent = async (bot: TelegramBot, chatId: number, userId: numbe
         await updateSessionAssistant(session._id.toString(), selectedAssistant._id.toString(), companyId);
         await bot.answerCallbackQuery(callbackQuery.id, { text: `Assistant changed to ${selectedAssistant.name}` });
         await bot.sendMessage(chatId, `You are now chatting with ${selectedAssistant.name}. How can I assist you?`);
-      } catch (error) {
-        console.log('Notice: Error updating assistant');
+      } catch (error: any) {
+        logger.error('Error updating assistant', { companyId, userId, assistantId, error: error.message });
         await bot.answerCallbackQuery(callbackQuery.id, { text: 'Error changing agent. Please try again.' });
       }
     });
-  } catch (error) {
-    console.log(`Notice: Error changing agent`);
+  } catch (error: any) {
+    logger.error('Error changing agent', { companyId, userId, error: error.message });
     await bot.sendMessage(chatId, 'Error changing agent. Please try again.');
   }
 };
 
 export const getTelegramBot = (companyId: string): TelegramBot | undefined => {
   const normalizedId = normalizeCompanyId(companyId);
-  console.log(`Attempting to get Telegram bot for company ID: ${normalizedId} (original: ${companyId})`);
-  console.log('Current bots in map:', Array.from(bots.keys()));
+  logger.debug('Attempting to get Telegram bot for company', { normalizedId, originalCompanyId: companyId });
+  logger.debug('Current bots in map:', { keys: Array.from(bots.keys()) });
   return bots.get(normalizedId);
 };
 
 export const sendTelegramMessage = async (companyId: string | any, chatId: number, message: string): Promise<void> => {
   const normalizedId = normalizeCompanyId(companyId);
-  console.log(`Attempting to send Telegram message for company ${normalizedId} (original: ${companyId}) to chat ${chatId}`);
+  logger.debug('Attempting to send Telegram message for company to chat', { normalizedId, originalCompanyId: companyId, chatId });
   const bot = bots.get(normalizedId);
   if (!bot) {
-    console.log(`Notice: Telegram bot not found for company ID: ${normalizedId}`);
-    console.log('Available bots:', Array.from(bots.keys()));
+    logger.warn('Telegram bot not found for company ID', { normalizedId, availableBots: Array.from(bots.keys()) });
     throw new Error(`Telegram bot not found for company ID: ${normalizedId}`);
   }
-  console.log(`[Company ${normalizedId}] Sending message to chat ${chatId}`);
+  logger.info('Sending message to chat', { companyId: normalizedId, chatId });
   await bot.sendMessage(chatId, message);
 };

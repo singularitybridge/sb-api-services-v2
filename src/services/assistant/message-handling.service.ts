@@ -225,9 +225,14 @@ export const handleSessionMessage = async (
   const messagesForLlm: CoreMessage[] = [...history, { role: 'user', content: userInput }];
   
   const TOKEN_LIMITS = {
-    google: { 'gemini-1.5': 20000, default: 7000 },
-    openai: { 'gpt-4o': 8000, 'gpt-4': 8000, default: 7000 },
-    anthropic: { default: 7000 }, // Assuming a default for anthropic, adjust if specific models exist
+    google: { 'gemini-1.5': 20000, default: 7000 }, // Example, confirm actual limits
+    openai: { 'gpt-4o': 8000, 'gpt-4': 8000, 'gpt-4-turbo': 8000, default: 7000 }, // Added gpt-4-turbo
+    anthropic: { 
+      'claude-3-opus-20240229': 190000, 
+      'claude-3-sonnet-20240229': 190000,
+      'claude-3-haiku-20240307': 190000,
+      default: 100000 // Increased default for other Anthropic models
+    },
     default: { default: 7000 } 
   } as const;
   
@@ -235,18 +240,33 @@ export const handleSessionMessage = async (
   const providerConfig = TOKEN_LIMITS[providerKey as keyof typeof TOKEN_LIMITS] || TOKEN_LIMITS.default;
   
   if (providerKey === 'google') {
-    maxPromptTokens = modelIdentifier?.includes('gemini-1.5') ? providerConfig['gemini-1.5' as keyof typeof providerConfig] : providerConfig.default;
+    maxPromptTokens = modelIdentifier?.includes('gemini-1.5') 
+      ? providerConfig['gemini-1.5' as keyof typeof providerConfig] 
+      : providerConfig.default;
   } else if (providerKey === 'openai') {
     if (modelIdentifier?.includes('gpt-4o')) maxPromptTokens = providerConfig['gpt-4o' as keyof typeof providerConfig];
+    else if (modelIdentifier?.includes('gpt-4-turbo')) maxPromptTokens = providerConfig['gpt-4-turbo' as keyof typeof providerConfig]; // Added gpt-4-turbo
     else if (modelIdentifier?.includes('gpt-4')) maxPromptTokens = providerConfig['gpt-4' as keyof typeof providerConfig];
     else maxPromptTokens = providerConfig.default;
+  } else if (providerKey === 'anthropic') {
+    if (modelIdentifier && providerConfig.hasOwnProperty(modelIdentifier)) {
+      maxPromptTokens = providerConfig[modelIdentifier as keyof typeof providerConfig];
+    } else {
+      maxPromptTokens = providerConfig.default;
+    }
   } else {
     maxPromptTokens = providerConfig.default;
   }
   
   // Re-instating manual trimToWindow as SDK middleware is problematic
-  const { trimmedMessages, tokensInPrompt: actualTokensInPrompt } = trimToWindow(messagesForLlm, maxPromptTokens);
+  let { trimmedMessages, tokensInPrompt: actualTokensInPrompt } = trimToWindow(messagesForLlm, maxPromptTokens); // Made trimmedMessages mutable
   console.log(`Manual trim: Target tokens: ${maxPromptTokens}, Actual: ${actualTokensInPrompt}, Original msgs: ${messagesForLlm.length}, Trimmed msgs: ${trimmedMessages.length}`);
+
+  if (providerKey === 'anthropic') {
+    console.log('Anthropic provider: Prepending system prompt to messages array as well.');
+    // Ensure it's the very first message if other system messages could exist from history (though current logic filters them)
+    trimmedMessages = [{ role: 'system', content: systemPrompt }, ...trimmedMessages.filter(m => m.role !== 'system')];
+  }
 
   let aggregatedResponse = '';
   let finalLlmResult: Awaited<ReturnType<typeof generateText>> | undefined;
@@ -262,13 +282,16 @@ export const handleSessionMessage = async (
     const relevantTools = slimToolsForIntent(userInput, toolsForSdk);
 
     if (shouldStream) {
-      const streamResult = await streamText({
+      const streamCallOptions: Parameters<typeof streamText>[0] = {
         model: llm,
-        system: systemPrompt,
         messages: trimmedMessages,
         tools: relevantTools,
         maxSteps: 3,
-      });
+      };
+      if (systemPrompt !== undefined) { // Using systemPrompt directly
+        streamCallOptions.system = systemPrompt;
+      }
+      const streamResult = await streamText(streamCallOptions);
       
       // Asynchronously save the full response once the stream is complete.
       // This does not block returning the streamResult to the client.
@@ -330,13 +353,16 @@ export const handleSessionMessage = async (
       return streamResult;
     } else {
       // Use generateText for non-streaming case as per Point 4
-      const result = await generateText({
+      const generateCallOptions: Parameters<typeof generateText>[0] = {
         model: llm,
-        system: systemPrompt,
         messages: trimmedMessages,
         tools: relevantTools,
-        maxSteps: 3, 
-      });
+        maxSteps: 3,
+      };
+      if (systemPrompt !== undefined) { // Using systemPrompt directly
+        generateCallOptions.system = systemPrompt;
+      }
+      const result = await generateText(generateCallOptions);
       aggregatedResponse = result.text; 
       finalLlmResult = result; 
 

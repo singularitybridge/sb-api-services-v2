@@ -1,8 +1,5 @@
 import { Assistant, IAssistant } from '../models/Assistant';
 import mongoose from 'mongoose';
-import { getApiKey } from './api.key.service';
-import { updateAssistantById } from './oai.assistant.service';
-import { sanitizeFunctionName } from '../integrations/actions/factory';
 
 export const updateAllowedActions = async (assistantId: string, allowedActions: string[]): Promise<IAssistant | null> => {
   let session = null;
@@ -15,47 +12,18 @@ export const updateAllowedActions = async (assistantId: string, allowedActions: 
       throw new Error('Assistant not found');
     }
 
-    // Update the OpenAI assistant first
-    const apiKey = await getApiKey(assistant.companyId.toString(), 'openai_api_key') as string;
+    // OpenAI synchronization removed as it's deprecated in favor of Vercel AI
+    console.log(`Updating allowed actions for assistant ${assistantId} in local database only`);
 
-    let updatedOpenAIAssistant = await updateAssistantById(
-      apiKey,
-      assistant.assistantId,
-      assistant.name,
-      assistant.description,
-      assistant.llmModel,
-      assistant.llmPrompt,
-      allowedActions
-    );
-
-    // Check which actions were successfully added to the OpenAI assistant
-    const updatedTools = updatedOpenAIAssistant.tools
-      .filter(tool => tool.type === 'function')
-      .map(tool => (tool as any).function.name);
-
-    // Find which actions were successfully added and which ones failed
-    const successfulActions = allowedActions.filter(action => 
-      updatedTools.includes(sanitizeFunctionName(action))
-    );
-
-    const failedActions = allowedActions.filter(action => 
-      !updatedTools.includes(sanitizeFunctionName(action))
-    );
-
-    // Log warnings for failed actions but continue processing
-    if (failedActions.length > 0) {
-      console.warn(`Warning: The following actions were not successfully added to the OpenAI assistant: ${failedActions.join(', ')}`);
-    }
-
-    // Update the local database with only the successful actions
-    assistant.allowedActions = successfulActions;
+    // Update the local database with the allowed actions
+    assistant.allowedActions = allowedActions;
     const updatedAssistant = await assistant.save({ session });
 
     await session.commitTransaction();
     console.log(`Successfully updated allowed actions for assistant ${assistantId}`);
     
-    if (successfulActions.length > 0) {
-      console.log(`Successfully added actions: ${successfulActions.join(', ')}`);
+    if (allowedActions.length > 0) {
+      console.log(`Successfully added actions: ${allowedActions.join(', ')}`);
     }
 
     return updatedAssistant;

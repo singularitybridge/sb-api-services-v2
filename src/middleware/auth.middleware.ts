@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { extractTokenFromHeader, verifyToken } from '../services/token.service';
 import { Company } from '../models/Company';
 import { IUser } from '../models/User';
+import { logger } from '../utils/logger';
 
 export interface AuthenticatedRequest extends Request {
   user?: IUser;
@@ -26,8 +27,8 @@ export const verifyTokenMiddleware = async (
     req.company = company;
     
     next();
-  } catch (error) {
-    console.error('Error verifying token:', error);
+  } catch (error: any) {
+    logger.error('Error verifying token', { error: error.message, stack: error.stack });
     res.status(401).json({ message: 'Authentication token is invalid or company information is missing' });
   }
 };
