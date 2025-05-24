@@ -31,6 +31,6 @@
   },
   "updateCurrentAssistant": {
     "actionTitle": "Update Current Assistant",
-    "description": "Update the current assistant's information (name, description, LLM model, LLM provider). Only provided fields will be updated."
+    "description": "Update the current assistant's information (name, description, LLM model, LLM provider, LLM prompt). Only provided fields will be updated."
   }
 }

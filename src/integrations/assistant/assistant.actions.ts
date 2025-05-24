@@ -124,7 +124,7 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
   },
 
   updateCurrentAssistant: {
-    description: 'Update the current assistant with new information. Only provided fields (name, description, llmModel, llmProvider) will be updated.',
+    description: 'Update the current assistant with new information. Only provided fields (name, description, llmModel, llmProvider, llmPrompt) will be updated.',
     parameters: {
       type: 'object',
       properties: {
@@ -132,6 +132,7 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
         description: { type: 'string', description: 'New description for the assistant' },
         llmModel: { type: 'string', description: 'New LLM model identifier (e.g., gpt-4o-mini)' },
         llmProvider: { type: 'string', enum: ['openai', 'google', 'anthropic'], description: 'New LLM provider' },
+        llmPrompt: { type: 'string', description: 'New LLM prompt for the assistant' }, // Added llmPrompt
       },
       required: [], // No fields are strictly required for a partial update
       additionalProperties: false,
@@ -141,6 +142,7 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
       description?: string;
       llmModel?: string;
       llmProvider?: 'openai' | 'google' | 'anthropic';
+      llmPrompt?: string; // Added llmPrompt
     }) => {
       return await updateCurrentAssistant(context.sessionId, params);
     },

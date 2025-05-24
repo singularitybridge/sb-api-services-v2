@@ -61,6 +61,7 @@ export const updateCurrentAssistant = async (
     description?: string;
     llmModel?: string;
     llmProvider?: 'openai' | 'google' | 'anthropic';
+    llmPrompt?: string; // Added llmPrompt
   }
 ): Promise<{ success: boolean; description: string; data?: any }> => {
   try {
@@ -83,10 +84,18 @@ export const updateCurrentAssistant = async (
     if (updateData.description !== undefined) assistant.description = updateData.description;
     if (updateData.llmModel !== undefined) assistant.llmModel = updateData.llmModel;
     if (updateData.llmProvider !== undefined) assistant.llmProvider = updateData.llmProvider;
+    if (updateData.llmPrompt !== undefined) assistant.llmPrompt = updateData.llmPrompt; // Added llmPrompt update
+    
     // Ensure llmPrompt defaults to empty string if it's somehow null/undefined from DB
     // This was a previous bug fix attempt, keeping it for safety, though model now has default.
-    assistant.llmPrompt = assistant.llmPrompt || ""; 
-
+    // This line is actually redundant if llmPrompt is updated above and the model has a default.
+    // However, if updateData.llmPrompt is explicitly set to null/undefined, this would catch it.
+    // For clarity, if llmPrompt is part of updateData, it should take precedence.
+    // The model default handles the case where it's never set.
+    // If an explicit update to null/undefined is not desired, add a check:
+    // if (updateData.llmPrompt !== undefined) assistant.llmPrompt = updateData.llmPrompt;
+    // else assistant.llmPrompt = assistant.llmPrompt || ""; 
+    // For now, direct assignment is fine as per request.
 
     await assistant.save();
 
@@ -96,6 +105,7 @@ export const updateCurrentAssistant = async (
       description: assistant.description,
       llmModel: assistant.llmModel,
       llmProvider: assistant.llmProvider,
+      llmPrompt: assistant.llmPrompt, // Added llmPrompt to published message
     });
 
     return {
@@ -107,8 +117,7 @@ export const updateCurrentAssistant = async (
         description: assistant.description,
         llmModel: assistant.llmModel,
         llmProvider: assistant.llmProvider,
-        // Include other relevant fields that might be useful for the client
-        llmPrompt: assistant.llmPrompt, 
+        llmPrompt: assistant.llmPrompt, // Return updated llmPrompt
         language: assistant.language,
         voice: assistant.voice,
       },
