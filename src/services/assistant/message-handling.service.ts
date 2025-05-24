@@ -21,6 +21,16 @@ import { getProvider } from './provider.service';
 // Simple in-memory cache for toolsForSdk
 const toolsCache = new Map<string, Record<string, Tool<any, any>>>();
 
+// Helper function to clean action annotations from text
+const cleanActionAnnotations = (text: string): string => {
+  // Remove [Action: ...] annotations and similar patterns
+  return text
+    .replace(/\[Action:\s*[^\]]+\]/gi, '')
+    .replace(/\[.*?action.*?\]/gi, '')
+    .replace(/[ \t]+/g, ' ') // Only clean spaces/tabs, preserve newlines for markdown
+    .trim();
+};
+
 const saveSystemMessage = async (
   sessionId: mongoose.Types.ObjectId,
   assistantId: mongoose.Types.ObjectId,
@@ -92,7 +102,7 @@ export const handleSessionMessage = async (
   userInput: string,
   sessionId: string,
   channel: ChannelType = ChannelType.WEB,
-  metadata?: Record<string, string>,
+  metadata?: Record<string, string>
 ): Promise<string | StreamTextResult<Record<string, Tool<any, any>>, unknown>> => { // Corrected return type
   console.log(`Handling session message for session ${sessionId} on channel ${channel}`);
   const session = await Session.findById(sessionId);
@@ -108,6 +118,7 @@ export const handleSessionMessage = async (
     throw new Error('Assistant not found');
   }
   console.log(`Fetched assistant details: Provider='${assistant.llmProvider}', Model='${assistant.llmModel}'`);
+
 
   const userMessage = new Message({
     sessionId: new mongoose.Types.ObjectId(session._id),
@@ -184,18 +195,46 @@ export const handleSessionMessage = async (
       }
     }
     const zodSchema = Object.keys(zodShape).length > 0 ? z.object(zodShape) : z.object({});
+    // IMPORTANT: Capture the function name in a closure to avoid issues
+    const currentFuncName = funcName;
+    
     let executeFunc = async (args: any) => {
-      const functionCallPayload: FunctionCall = { function: { name: funcName, arguments: JSON.stringify(args) } };
-      const { result, error } = await executeFunctionCall(functionCallPayload, sessionId.toString(), session.companyId.toString(), assistant.allowedActions);
+      console.log(`[Tool Execution] Function ${currentFuncName} called with sessionId from closure: ${sessionId}`);
+      // CRITICAL: Use the current session's ID, not the cached one
+      const currentSession = await Session.findById(sessionId);
+      if (!currentSession) {
+        throw new Error('Session not found during tool execution');
+      }
+      console.log(`[Tool Execution] Retrieved current session ID: ${currentSession._id.toString()}, company ID: ${currentSession.companyId.toString()}`);
+      
+      const functionCallPayload: FunctionCall = { function: { name: currentFuncName, arguments: JSON.stringify(args) } };
+      const { result, error } = await executeFunctionCall(
+        functionCallPayload, 
+        currentSession._id.toString(), // Use current session ID
+        currentSession.companyId.toString(), // Use current company ID
+        assistant.allowedActions
+      );
       if (error) {
-        console.error(`Error in tool ${funcName} execution:`, error);
+        console.error(`Error in tool ${currentFuncName} execution:`, error);
         throw new Error(typeof error === 'string' ? error : (error as any)?.message || 'Tool execution failed');
       }
       return result;
     };
-    if (funcName === 'jira_fetchTickets') { // Special handling
+    
+    if (currentFuncName === 'jira_fetchTickets') { // Special handling
       executeFunc = async (args: any) => {
-        const { result: rawResult, error } = await executeFunctionCall({ function: { name: funcName, arguments: JSON.stringify(args) } }, sessionId.toString(), session.companyId.toString(), assistant.allowedActions);
+        // CRITICAL: Use the current session's ID, not the cached one
+        const currentSession = await Session.findById(sessionId);
+        if (!currentSession) {
+          throw new Error('Session not found during tool execution');
+        }
+        
+        const { result: rawResult, error } = await executeFunctionCall(
+          { function: { name: currentFuncName, arguments: JSON.stringify(args) } }, 
+          currentSession._id.toString(), // Use current session ID
+          currentSession.companyId.toString(), // Use current company ID
+          assistant.allowedActions
+        );
         if (error) throw new Error(typeof error === 'string' ? error : (error as any)?.message || 'Tool execution failed');
         if (Array.isArray(rawResult)) return rawResult.map((ticket: any) => ({ key: ticket.key, summary: ticket.fields?.summary, status: ticket.fields?.status?.name }));
         return rawResult; 
@@ -311,7 +350,9 @@ export const handleSessionMessage = async (
           if (toolCalls) console.log('Tool Calls:', JSON.stringify(toolCalls, null, 2));
           if (toolResults) console.log('Tool Results:', JSON.stringify(toolResults, null, 2));
           
-          const processedResponse = await processTemplate(finalText, sessionId.toString());
+          // Clean action annotations from the final text before saving
+          const cleanedText = cleanActionAnnotations(finalText);
+          const processedResponse = await processTemplate(cleanedText, sessionId.toString());
           
           const assistantMessageData: Partial<IMessage> = {
             sessionId: new mongoose.Types.ObjectId(session._id),
@@ -388,6 +429,8 @@ export const handleSessionMessage = async (
     if (!specificGeminiError) {
         console.error('Error during LLM processing or tool execution:', error);
     }
+    
+    
     throw error;
   }
 
@@ -395,7 +438,10 @@ export const handleSessionMessage = async (
     if (!finalLlmResult) { 
         throw new Error('LLM result was not obtained for non-streaming case.');
     }
-    const processedResponse = await processTemplate(aggregatedResponse, sessionId.toString());
+    
+    // CRITICAL: Clean action annotations from response text for non-streaming mode
+    const cleanedResponse = cleanActionAnnotations(aggregatedResponse);
+    const processedResponse = await processTemplate(cleanedResponse, sessionId.toString());
     
     const assistantMessageData: Partial<IMessage> = {
       sessionId: new mongoose.Types.ObjectId(session._id),
@@ -423,10 +469,8 @@ export const handleSessionMessage = async (
     const assistantMessage = new Message(assistantMessageData);
     await assistantMessage.save();
     
-    // For non-streaming, the UI expects the text response directly, 
-    // but the full message including tool data is saved.
-    // If the UI needs tool data for non-streaming, the response structure here would need to change.
-    // For now, returning processedResponse to maintain existing non-streaming behavior.
+    // Return clean text without action annotations for non-streaming mode
+    // Action updates are handled separately via Pusher in the executors
     return processedResponse; 
   }
   

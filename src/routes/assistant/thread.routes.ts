@@ -12,6 +12,11 @@ import { getMessagesBySessionId, getMessageById } from '../../services/message.s
 
 const threadRouter = express.Router();
 
+// Helper function to generate unique message IDs
+const generateMessageId = (): string => {
+  return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+};
+
 // User feedback: Streaming is possible by default if client requests via Accept header.
 // No global disable flag in code.
 
@@ -169,7 +174,7 @@ threadRouter.post(
           res.end();
         }
       } else {
-        // JSON Logic (non-streaming)
+        // JSON Logic (non-streaming) - FIXED: Return standard message format
         const result = await handleSessionMessage(
           userInput,
           activeSessionId, // Use the retrieved/created active session ID
@@ -177,7 +182,25 @@ threadRouter.post(
         );
 
         if (typeof result === 'string') {
-          res.json({ content: result });
+          // Return standard message format as required by the documentation
+          const response = {
+            id: generateMessageId(),
+            role: "assistant",
+            content: [
+              {
+                type: "text",
+                text: {
+                  value: result
+                }
+              }
+            ],
+            created_at: Math.floor(Date.now() / 1000),
+            assistant_id: sessionData.assistantId?.toString(),
+            thread_id: activeSessionId,
+            message_type: "text"
+          };
+          
+          res.json(response);
         } else {
           // This case should ideally not be hit if handleSessionMessage correctly returns a string
           // when no streaming metadata is passed.

@@ -45,6 +45,10 @@ export async function getSessionMessages(apiKey: string, sessionId: string) {
     .limit(20) // Limit to 20 messages to match OpenAI default
     .lean(); // Use .lean() for better performance as we are transforming the data
 
+  console.log(`Retrieved ${mongoMessages.length} messages for session ${sessionId}`);
+  const systemMessages = mongoMessages.filter(msg => msg.sender === 'system');
+  console.log(`Found ${systemMessages.length} system messages:`, systemMessages.map(msg => ({ id: msg._id, messageType: msg.messageType, sender: msg.sender })));
+
   if (!mongoMessages || mongoMessages.length === 0) {
     return [];
   }
@@ -56,7 +60,7 @@ export async function getSessionMessages(apiKey: string, sessionId: string) {
       // Apply template processing for assistant messages
       if (openAIFormattedMessage.role === 'assistant' && openAIFormattedMessage.content) {
         const processedContent = await Promise.all(
-          openAIFormattedMessage.content.map(async (contentItem: any) => { // Use any for contentItem for flexibility
+          openAIFormattedMessage.content.map(async (contentItem: any) => {
             if (contentItem.type === 'text' && contentItem.text) {
               contentItem.text.value = await processTemplate(contentItem.text.value, sessionId);
             }
