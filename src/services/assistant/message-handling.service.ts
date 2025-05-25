@@ -134,9 +134,9 @@ export const handleSessionMessage = async (
   console.log(`Fetched assistant details: Provider='${assistant.llmProvider}', Model='${assistant.llmModel}'`);
   const providerKey = assistant.llmProvider;
   let processedUserInput = userInput;
-  // This will hold the parts for the user's message, including text and formatted image parts
-  // Explicitly type this array to only contain TextPart or ImagePart from 'ai'
-  const userMessageContentParts: (TextPart | ImagePart)[] = [{ type: 'text', text: processedUserInput }];
+  // This will hold the parts for the user's message, including text, image, and file parts
+  // Using a flexible type for modern PDF handling
+  const userMessageContentParts: (TextPart | ImagePart | any)[] = [{ type: 'text', text: processedUserInput }];
 
   if (attachments && attachments.length > 0) {
     console.log(`Processing ${attachments.length} attachments for session ${sessionId} with provider ${providerKey}`);
@@ -147,94 +147,84 @@ export const handleSessionMessage = async (
           const response = await axios.get(attachment.url, { responseType: 'arraybuffer' });
           const imageBuffer = Buffer.from(response.data);
           
-          if (providerKey === 'openai') {
-            // OpenAI uses image_url, but Vercel's CoreMessage expects ImagePart.
-            // We'll create a standard ImagePart with the data URL.
-            const base64Image = imageBuffer.toString('base64');
-            const dataUrl = `data:${attachment.mimeType};base64,${base64Image}`;
-            userMessageContentParts.push({
-              type: 'image', // Standard ImagePart type
-              image: new URL(dataUrl), // Convert data URL string to URL object
-              mimeType: attachment.mimeType, // Include mimeType as per ImagePart
-            });
-            console.log(`OpenAI Image attachment processed as standard ImagePart: ${attachment.fileName}`);
-          } else if (providerKey === 'google') {
-            // Google Gemini expects Uint8Array and mimeType for an ImagePart
-            userMessageContentParts.push({
-              type: 'image',
-              image: new Uint8Array(imageBuffer),
-              mimeType: attachment.mimeType,
-            });
-            console.log(`Google Image attachment processed: ${attachment.fileName}`);
-          } else if (providerKey === 'anthropic') {
-            // Anthropic Claude expects a URL (can be a data URL) for an ImagePart
-            const base64Image = imageBuffer.toString('base64');
-            const dataUrl = `data:${attachment.mimeType};base64,${base64Image}`;
-            userMessageContentParts.push({
-              type: 'image',
-              image: new URL(dataUrl), // Pass as URL object
-            });
-            console.log(`Anthropic Image attachment processed: ${attachment.fileName}`);
-          } else {
-            // Fallback or default behavior for other providers if any
-            // This might need adjustment based on the provider's requirements
-            const base64Image = imageBuffer.toString('base64');
-            const dataUrl = `data:${attachment.mimeType};base64,${base64Image}`;
-            userMessageContentParts.push({
-              type: 'image', // Generic image part
-              image: new URL(dataUrl), // Assuming URL is a safe default
-            } as ImagePart); // Cast to ImagePart if necessary
-            console.log(`Image attachment processed with default handling for ${providerKey}: ${attachment.fileName}`);
-          }
+          // Use Uint8Array for all providers (recommended approach)
+          userMessageContentParts.push({
+            type: 'image',
+            image: new Uint8Array(imageBuffer),
+            mimeType: attachment.mimeType,
+          });
+          console.log(`Image attachment processed as Uint8Array for ${providerKey}: ${attachment.fileName}`);
         } catch (error) {
           console.error(`Error fetching or processing image data from URL ${attachment.url} for ${attachment.fileName}:`, error);
           // Append error info to the text part of the user message
           (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load image: ${attachment.fileName}]`;
         }
-      } else if (attachment.fileId) { // Handling for non-image files (PDF, TXT, CSV)
-        if (providerKey === 'google' && (attachment.mimeType === 'application/pdf' || attachment.mimeType === 'text/csv' || attachment.mimeType === 'text/plain')) {
-          try {
-            console.log(`Fetching non-image file content AS BUFFER: ${attachment.fileName} (ID: ${attachment.fileId}) for Google`);
-            const fileBufferResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'buffer' });
+      } else if (attachment.fileId && attachment.mimeType === 'application/pdf') { // Modern PDF handling
+        try {
+          console.log(`Fetching PDF content AS BUFFER: ${attachment.fileName} (ID: ${attachment.fileId}) for ${providerKey}`);
+          const pdfBufferResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'buffer' });
 
-            if (fileBufferResult.success && fileBufferResult.data instanceof Buffer) {
+          if (pdfBufferResult.success && pdfBufferResult.data instanceof Buffer) {
+            if (providerKey === 'google' || providerKey === 'anthropic') {
+              // Google and Anthropic: continue using the existing approach
               userMessageContentParts.push({
-                type: 'image', // Using 'image' type as it's the Vercel AI SDK way to send binary with mimeType
-                image: new Uint8Array(fileBufferResult.data),
-                mimeType: attachment.mimeType,
+                type: 'file',
+                content: new Uint8Array(pdfBufferResult.data),
+                mimeType: 'application/pdf',
               });
-              console.log(`Google Document attachment processed as blob part: ${attachment.fileName} (MIME: ${attachment.mimeType})`);
+              console.log(`${providerKey} PDF attachment processed as FilePart: ${attachment.fileName}`);
+            } else if (providerKey === 'openai') {
+              // OpenAI: use modern FilePart for PDFs (GPT-4o and newer support this)
+              userMessageContentParts.push({
+                type: 'file',
+                data: new Uint8Array(pdfBufferResult.data),
+                mimeType: 'application/pdf',
+              });
+              console.log(`OpenAI PDF attachment processed as FilePart: ${attachment.fileName}`);
             } else {
-              console.warn(`Could not fetch file as buffer for Google: ${attachment.fileName}. Error: ${fileBufferResult.error || 'Unknown error'}. Falling back to text extraction.`);
-              // Fallback to text extraction if buffer fetching fails
+              // Fallback for unknown providers: text extraction
               const fileContentResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'string' });
               if (fileContentResult.success && typeof fileContentResult.data === 'string') {
-                (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached File (text fallback): ${attachment.fileName} ---\n${fileContentResult.data}\n--- End of File: ${attachment.fileName} ---`;
+                (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached PDF (text fallback): ${attachment.fileName} ---\n${fileContentResult.data.slice(0, 7000)}\n--- End of File ---`;
               } else {
-                (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load content for attached file: ${attachment.fileName}]`;
+                (userMessageContentParts[0] as TextPart).text += `\n\n[PDF omitted: provider ${providerKey} does not support files]`;
               }
+              console.log(`PDF processed as text fallback for ${providerKey}: ${attachment.fileName}`);
             }
-          } catch (error) {
-            console.error(`Error fetching/processing file ${attachment.fileName} as buffer for Google:`, error);
-            (userMessageContentParts[0] as TextPart).text += `\n\n[Error loading content for attached file: ${attachment.fileName}]`;
-          }
-        } else {
-          // Original logic for other providers or non-PDF/CSV/TXT for Google (text extraction)
-          try {
-            console.log(`Fetching non-image file content AS TEXT: ${attachment.fileName} (ID: ${attachment.fileId}) for provider ${providerKey}`);
+          } else {
+            console.warn(`Could not fetch PDF as buffer: ${attachment.fileName}. Error: ${pdfBufferResult.error || 'Unknown error'}. Falling back to text extraction.`);
             const fileContentResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'string' });
-            
             if (fileContentResult.success && typeof fileContentResult.data === 'string') {
-              (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached File: ${attachment.fileName} ---\n${fileContentResult.data}\n--- End of File: ${attachment.fileName} ---`;
-              console.log(`Non-image file content (text extracted) appended for ${providerKey}: ${attachment.fileName}`);
+              let pdfTextToAppend = fileContentResult.data;
+              const MAX_PDF_TEXT_CHARS = 7000;
+              if (pdfTextToAppend.length > MAX_PDF_TEXT_CHARS) {
+                pdfTextToAppend = pdfTextToAppend.substring(0, MAX_PDF_TEXT_CHARS) + "\n\n[...PDF text truncated due to length...]\n";
+                console.log(`Truncated extracted PDF text for ${attachment.fileName} to ${MAX_PDF_TEXT_CHARS} characters.`);
+              }
+              (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached PDF (text fallback): ${attachment.fileName} ---\n${pdfTextToAppend}\n--- End of File ---`;
             } else {
-              console.warn(`Could not fetch content for file: ${attachment.fileName} (ID: ${attachment.fileId}). Result: ${JSON.stringify(fileContentResult)}`);
-              (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load content for attached file: ${attachment.fileName}]`;
+              (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load PDF content: ${attachment.fileName}]`;
             }
-          } catch (error) {
-            console.error(`Error fetching content for file ${attachment.fileName} (ID: ${attachment.fileId}):`, error);
-            (userMessageContentParts[0] as TextPart).text += `\n\n[Error loading content for attached file: ${attachment.fileName}]`;
           }
+        } catch (error) {
+          console.error(`Error fetching/processing PDF ${attachment.fileName}:`, error);
+          (userMessageContentParts[0] as TextPart).text += `\n\n[Error loading PDF: ${attachment.fileName}]`;
+        }
+      } else if (attachment.fileId) { // Other non-image files (TXT, CSV, etc.)
+        try {
+          console.log(`Fetching non-image file content AS TEXT: ${attachment.fileName} (ID: ${attachment.fileId}) for provider ${providerKey}`);
+          const fileContentResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'string' });
+          
+          if (fileContentResult.success && typeof fileContentResult.data === 'string') {
+            (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached File: ${attachment.fileName} ---\n${fileContentResult.data}\n--- End of File: ${attachment.fileName} ---`;
+            console.log(`Non-image file content (text) appended for ${providerKey}: ${attachment.fileName}`);
+          } else {
+            console.warn(`Could not fetch content for file: ${attachment.fileName} (ID: ${attachment.fileId}). Result: ${JSON.stringify(fileContentResult)}`);
+            (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load content for attached file: ${attachment.fileName}]`;
+          }
+        } catch (error) {
+          console.error(`Error fetching content for file ${attachment.fileName} (ID: ${attachment.fileId}):`, error);
+          (userMessageContentParts[0] as TextPart).text += `\n\n[Error loading content for attached file: ${attachment.fileName}]`;
         }
       }
     }
