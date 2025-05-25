@@ -8,13 +8,14 @@ const bucketName = process.env.GCP_STORAGE_BUCKET || 'sb-ai-experiments-files'; 
 
 interface FetchFileParams {
   fileId: string;
+  returnAs?: 'string' | 'buffer'; // Added option to return buffer
 }
 
 export const fetchGcpFileContent = async (
   sessionId: string, // Included for consistency with ActionContext, though not directly used here
   companyId: string,
   params: FetchFileParams
-): Promise<{ success: boolean; data?: string; error?: string }> => {
+): Promise<{ success: boolean; data?: string | Buffer; error?: string }> => { // Updated return type
   if (!params.fileId) {
     throw new Error('The fileId parameter is missing.');
   }
@@ -65,12 +66,15 @@ export const fetchGcpFileContent = async (
       throw new Error(`File not found in GCP bucket. Bucket: ${bucketName}, Blob: ${blobName}`);
     }
 
-    const [contents] = await blob.download();
-    
-    // Assuming the file is text-based. For binary files, this might need adjustment
-    // or the action should specify expected content type.
-    const fileContentString = contents.toString('utf8');
+    const [contents] = await blob.download(); // contents is a Buffer
 
+    if (params.returnAs === 'buffer') {
+      return { success: true, data: contents };
+    }
+    
+    // Default to string, assuming text-based for backward compatibility
+    // or when 'string' is explicitly requested.
+    const fileContentString = contents.toString('utf8');
     return { success: true, data: fileContentString };
 
   } catch (error: any) {
