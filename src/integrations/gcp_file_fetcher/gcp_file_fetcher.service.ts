@@ -2,6 +2,7 @@ import { ContentFile, IContentFile } from '../../models/ContentFile';
 import { Storage } from '@google-cloud/storage';
 import path from 'path';
 import mongoose from 'mongoose';
+import pdf from 'pdf-parse';
 
 const storage = new Storage();
 const bucketName = process.env.GCP_STORAGE_BUCKET || 'sb-ai-experiments-files'; // Ensure this matches your actual bucket name
@@ -72,8 +73,18 @@ export const fetchGcpFileContent = async (
       return { success: true, data: contents };
     }
     
-    // Default to string, assuming text-based for backward compatibility
-    // or when 'string' is explicitly requested.
+    // Handle PDF files with proper text extraction
+    if (fileDocument.mimeType === 'application/pdf') {
+      try {
+        const pdfData = await pdf(contents);
+        return { success: true, data: pdfData.text };
+      } catch (pdfError: any) {
+        console.error('Error parsing PDF:', pdfError);
+        return { success: false, error: `Failed to parse PDF: ${pdfError.message}` };
+      }
+    }
+    
+    // Default to string for other text-based files
     const fileContentString = contents.toString('utf8');
     return { success: true, data: fileContentString };
 
