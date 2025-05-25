@@ -3,7 +3,9 @@ import { Twilio } from "twilio";
 import { Assistant, IAssistant } from "../../models/Assistant";
 import { IUser, User } from "../../models/User";
 import { ISession, Session } from "../../models/Session";
-import { createNewThread, deleteThread } from "../../services/oai.thread.service";
+// import { createNewThread, deleteThread } from "../../services/oai.thread.service"; // Removed, OpenAI specific
+import { ChannelType } from "../../types/ChannelType"; // Added import
+import mongoose from 'mongoose'; // Added for ObjectId generation
 
 import { file } from "googleapis/build/src/apis/file";
 import { transcribeAudioWhisper } from "../../services/speech.recognition.service";
@@ -50,10 +52,10 @@ twilioMessagingRouter.post("/whatsapp/reply", async (req, res) => {
   });
 
   if (!session) {
-    const threadId = await createNewThread(apiKey);
+    const threadId = new mongoose.Types.ObjectId().toString(); // Generate local threadId
 
     session = new Session({
-      threadId: threadId,
+      threadId: threadId, // Use locally generated threadId
       userId: user._id,
       assistantId: assistant.assistantId,
       active: true,
@@ -67,20 +69,37 @@ twilioMessagingRouter.post("/whatsapp/reply", async (req, res) => {
   // print received message
   console.log(req.body);
 
-  const response = await handleSessionMessage(
-    apiKey,
-    Body,
-    session._id // Add the sessionId argument
-  );
-  const limitedResponse = response.substring(0, 1600); // Limit response to 1600 characters
+  // TODO: Determine appropriate ChannelType for Twilio WhatsApp. Using WEB as placeholder.
+  // Consider ChannelType.TELEGRAM if WhatsApp is handled similarly, or add ChannelType.WHATSAPP.
+  const response = await handleSessionMessage(Body, session.id, ChannelType.WEB);
 
-  twilioClient.messages
-    .create({
-      body: limitedResponse,
-      from: `whatsapp:${twilioPhoneNumber}`,
-      to: From,
-    })
-    .then((message) => console.log(message.sid));
+  if (typeof response === 'string') {
+    const limitedResponse = response.substring(0, 1600); // Limit response to 1600 characters
+
+    twilioClient.messages
+      .create({
+        body: limitedResponse,
+        from: `whatsapp:${twilioPhoneNumber}`,
+        to: From,
+      })
+      .then((message) => {
+        console.log(`Twilio message sent: ${message.sid}`);
+      })
+      .catch((error) => {
+        console.error('Error sending Twilio message:', error);
+        // Potentially send an error response back to Twilio if appropriate, though res.send() is not used here.
+      });
+    // Twilio typically expects a quick response to the webhook.
+    // If we need to send something back to Twilio's HTTP request:
+    res.status(200).send(); // Acknowledge receipt of the webhook
+  } else {
+    // Handle cases where response is not a string (should not happen with non-streaming call)
+    console.error('handleSessionMessage did not return a string for Twilio WhatsApp reply.');
+    // Twilio expects a response. Send an empty 200 OK or an error message if appropriate.
+    // Depending on Twilio's error handling, sending nothing or an error status might be better.
+    // For now, sending an empty 200 to acknowledge the webhook.
+    res.status(200).send(); 
+  }
 });
 
 export { twilioMessagingRouter };

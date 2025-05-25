@@ -80,7 +80,7 @@ describe('executeFunctionCall', () => {
           },
           required: ['param1'],
         },
-        function: jest.fn().mockResolvedValue('Test result'),
+        function: jest.fn().mockResolvedValue({ success: true, data: 'Test result' }),
       } as FunctionDefinition,
     };
 

@@ -3,7 +3,7 @@ import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { validateApiKeys, getApiKey } from '../../services/api.key.service';
 import { Assistant } from '../../models/Assistant';
 import { updateAllowedActions } from '../../services/allowed-actions.service';
-import { updateAssistantById } from '../../services/oai.assistant.service';
+// OpenAI Assistant API calls removed as it's deprecated in favor of Vercel AI
 
 const router = Router();
 
@@ -42,15 +42,8 @@ router.put(
 
       const updatedAssistant = await Assistant.findById(id);
 
-      await updateAssistantById(
-        apiKey,
-        updatedAssistant!.assistantId,
-        updatedAssistant!.name,
-        updatedAssistant!.description,
-        updatedAssistant!.llmModel,
-        updatedAssistant!.llmPrompt,
-        updatedAssistant!.allowedActions
-      );
+      // OpenAI synchronization removed as it's deprecated in favor of Vercel AI
+      console.log(`Updated assistant ${id} in local database only`);
 
       res.send(updatedAssistant);
     } catch (error) {
