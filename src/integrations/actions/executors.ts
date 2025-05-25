@@ -84,9 +84,14 @@ export const executeFunctionCall = async (
   const functionName = call.function.name;
   const originalActionId = functionName;
 
+  console.log(`[executeFunctionCall] Attempting to execute function: ${functionName}`);
+  console.log(`[executeFunctionCall] Raw arguments: ${call.function.arguments}`);
+
   if (functionName in functionFactory) {
     try {
       const args = JSON.parse(call.function.arguments) as Record<string, unknown>;
+      console.log(`[executeFunctionCall] Parsed arguments:`, args);
+
       const { executionId, convertedActionId, actionInfo, processedArgs } = await prepareActionExecution(
         functionName,
         args,
