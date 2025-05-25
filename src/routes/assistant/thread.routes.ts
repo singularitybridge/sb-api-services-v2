@@ -51,7 +51,7 @@ threadRouter.post(
   '/user-input',
   validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
-    const { userInput } = req.body; // Removed sessionId from here
+    const { userInput, attachments } = req.body; // Added attachments
     // const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string; // apiKey is likely handled within handleSessionMessage or streamText
 
     // Determine clientWantsSSE before the try block for wider scope
@@ -131,7 +131,8 @@ threadRouter.post(
           userInput,
           activeSessionId, // Use the retrieved/created active session ID
           ChannelType.WEB,
-          { 'X-Experimental-Stream': 'true' } // Inform service that SSE is expected
+          { 'X-Experimental-Stream': 'true' }, // Inform service that SSE is expected
+          attachments // Pass attachments
         );
 
         if (
@@ -178,7 +179,9 @@ threadRouter.post(
         const result = await handleSessionMessage(
           userInput,
           activeSessionId, // Use the retrieved/created active session ID
-          ChannelType.WEB // No streaming metadata, so it returns a string
+          ChannelType.WEB, // No streaming metadata, so it returns a string
+          undefined, // No streaming metadata
+          attachments // Pass attachments
         );
 
         if (typeof result === 'string') {

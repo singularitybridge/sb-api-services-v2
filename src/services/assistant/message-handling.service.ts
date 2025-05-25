@@ -10,9 +10,11 @@ import { createFunctionFactory } from '../../integrations/actions/loaders';
 import { executeFunctionCall } from '../../integrations/actions/executors';
 import { FunctionCall } from '../../integrations/actions/types';
 import { getApiKey } from '../api.key.service'; 
+import { fetchGcpFileContent } from '../../integrations/gcp_file_fetcher/gcp_file_fetcher.service';
+import axios from 'axios'; // Added axios for fetching image data
 
 // Vercel AI SDK imports
-import { generateText, tool, streamText, CoreMessage, StreamTextResult, Tool } from 'ai'; // Updated import
+import { generateText, tool, streamText, CoreMessage, StreamTextResult, Tool, ImagePart, TextPart } from 'ai'; 
 import { z, ZodTypeAny } from 'zod';
 import { trimToWindow } from '../../utils/tokenWindow'; 
 import { getProvider } from './provider.service'; 
@@ -96,14 +98,26 @@ export const handleProductOffer = async (
   await handleCustomMessage(sessionId, 'product_offer', content, { productName, price, description });
 };
 
-// Removed custom StreamTextResultType
+interface Attachment {
+  fileId: string;
+  url: string;
+  mimeType: string;
+  fileName: string;
+}
+
+type OpenAIImageUrlPart = {
+  type: 'image_url';
+  image_url: { url: string; detail?: 'low' | 'high' | 'auto' };
+};
+
 
 export const handleSessionMessage = async (
   userInput: string,
   sessionId: string,
   channel: ChannelType = ChannelType.WEB,
-  metadata?: Record<string, string>
-): Promise<string | StreamTextResult<Record<string, Tool<any, any>>, unknown>> => { // Corrected return type
+  metadata?: Record<string, string>,
+  attachments?: Attachment[]
+): Promise<string | StreamTextResult<Record<string, Tool<any, any>>, unknown>> => { 
   console.log(`Handling session message for session ${sessionId} on channel ${channel}`);
   const session = await Session.findById(sessionId);
   if (!session || !session.active || session.channel !== channel) {
@@ -118,17 +132,120 @@ export const handleSessionMessage = async (
     throw new Error('Assistant not found');
   }
   console.log(`Fetched assistant details: Provider='${assistant.llmProvider}', Model='${assistant.llmModel}'`);
+  const providerKey = assistant.llmProvider;
+  let processedUserInput = userInput;
+  // This will hold the parts for the user's message, including text and formatted image parts
+  // Explicitly type this array to only contain TextPart or ImagePart from 'ai'
+  const userMessageContentParts: (TextPart | ImagePart)[] = [{ type: 'text', text: processedUserInput }];
 
+  if (attachments && attachments.length > 0) {
+    console.log(`Processing ${attachments.length} attachments for session ${sessionId} with provider ${providerKey}`);
+    for (const attachment of attachments) {
+      if (attachment.mimeType.startsWith('image/')) {
+        try {
+          console.log(`Fetching image: ${attachment.fileName} from ${attachment.url}`);
+          const response = await axios.get(attachment.url, { responseType: 'arraybuffer' });
+          const imageBuffer = Buffer.from(response.data);
+          
+          if (providerKey === 'openai') {
+            // OpenAI uses image_url, but Vercel's CoreMessage expects ImagePart.
+            // We'll create a standard ImagePart with the data URL.
+            const base64Image = imageBuffer.toString('base64');
+            const dataUrl = `data:${attachment.mimeType};base64,${base64Image}`;
+            userMessageContentParts.push({
+              type: 'image', // Standard ImagePart type
+              image: new URL(dataUrl), // Convert data URL string to URL object
+              mimeType: attachment.mimeType, // Include mimeType as per ImagePart
+            });
+            console.log(`OpenAI Image attachment processed as standard ImagePart: ${attachment.fileName}`);
+          } else if (providerKey === 'google') {
+            // Google Gemini expects Uint8Array and mimeType for an ImagePart
+            userMessageContentParts.push({
+              type: 'image',
+              image: new Uint8Array(imageBuffer),
+              mimeType: attachment.mimeType,
+            });
+            console.log(`Google Image attachment processed: ${attachment.fileName}`);
+          } else if (providerKey === 'anthropic') {
+            // Anthropic Claude expects a URL (can be a data URL) for an ImagePart
+            const base64Image = imageBuffer.toString('base64');
+            const dataUrl = `data:${attachment.mimeType};base64,${base64Image}`;
+            userMessageContentParts.push({
+              type: 'image',
+              image: new URL(dataUrl), // Pass as URL object
+            });
+            console.log(`Anthropic Image attachment processed: ${attachment.fileName}`);
+          } else {
+            // Fallback or default behavior for other providers if any
+            // This might need adjustment based on the provider's requirements
+            const base64Image = imageBuffer.toString('base64');
+            const dataUrl = `data:${attachment.mimeType};base64,${base64Image}`;
+            userMessageContentParts.push({
+              type: 'image', // Generic image part
+              image: new URL(dataUrl), // Assuming URL is a safe default
+            } as ImagePart); // Cast to ImagePart if necessary
+            console.log(`Image attachment processed with default handling for ${providerKey}: ${attachment.fileName}`);
+          }
+        } catch (error) {
+          console.error(`Error fetching or processing image data from URL ${attachment.url} for ${attachment.fileName}:`, error);
+          // Append error info to the text part of the user message
+          (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load image: ${attachment.fileName}]`;
+        }
+      } else if (attachment.fileId) { // Handling for non-image files (PDF, TXT, CSV)
+        try {
+          console.log(`Fetching non-image file content: ${attachment.fileName} (ID: ${attachment.fileId}) for provider ${providerKey}`);
+          const fileContentResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId });
+          
+          if (fileContentResult.success && typeof fileContentResult.data === 'string') {
+            if (providerKey === 'google' && (attachment.mimeType === 'application/pdf' || attachment.mimeType === 'text/csv' || attachment.mimeType === 'text/plain')) {
+              // For Gemini, if it's a supported document type, we might be able to pass it directly.
+              // However, the Vercel AI SDK's `ImagePart` is for images.
+              // For documents, Gemini might expect them as part of a different structure or a specific tool call.
+              // For now, appending text content is a safe bet.
+              // If Gemini can take PDF/CSV as a "blob" part similar to images, that would be:
+              // const fileBuffer = Buffer.from(fileContentResult.data, 'utf-8'); // Or appropriate encoding
+              // userMessageContentParts.push({ type: 'image', image: new Uint8Array(fileBuffer), mimeType: attachment.mimeType });
+              // console.log(`Google Document attachment processed as blob: ${attachment.fileName}`);
+              // For now, let's stick to appending text for simplicity until a clearer SDK path for documents is established.
+               (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached File: ${attachment.fileName} ---\n${fileContentResult.data}\n--- End of File: ${attachment.fileName} ---`;
+               console.log(`Non-image file content (text extracted) appended for Google: ${attachment.fileName}`);
+            } else {
+              // For OpenAI and Anthropic (and default), append extracted text.
+              (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached File: ${attachment.fileName} ---\n${fileContentResult.data}\n--- End of File: ${attachment.fileName} ---`;
+              console.log(`Non-image file content (text extracted) appended for ${providerKey}: ${attachment.fileName}`);
+            }
+          } else {
+            console.warn(`Could not fetch content for file: ${attachment.fileName} (ID: ${attachment.fileId}). Result: ${JSON.stringify(fileContentResult)}`);
+            (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load content for attached file: ${attachment.fileName}]`;
+          }
+        } catch (error) {
+          console.error(`Error fetching content for file ${attachment.fileName} (ID: ${attachment.fileId}):`, error);
+          (userMessageContentParts[0] as TextPart).text += `\n\n[Error loading content for attached file: ${attachment.fileName}]`;
+        }
+      }
+    }
+     // Update processedUserInput to reflect any appended text from non-image files or errors
+    processedUserInput = (userMessageContentParts[0] as TextPart).text;
+  }
 
   const userMessage = new Message({
     sessionId: new mongoose.Types.ObjectId(session._id),
     sender: 'user',
-    content: userInput,
+    content: processedUserInput, // Store the primary text input here for DB
     assistantId: new mongoose.Types.ObjectId(assistant._id),
     userId: new mongoose.Types.ObjectId(session.userId),
     timestamp: new Date(),
-    messageType: 'text',
-    data: metadata,
+    messageType: attachments && attachments.length > 0 ? 'file_upload_text' : 'text', 
+    data: {
+      ...(metadata || {}),
+      originalUserInput: userInput, 
+      attachments: attachments?.map(att => ({ 
+        fileName: att.fileName,
+        mimeType: att.mimeType,
+        fileId: att.fileId,
+        url: att.url, 
+      }))
+    },
   });
   await userMessage.save();
 
@@ -156,15 +273,11 @@ export const handleSessionMessage = async (
       const zodShape: Record<string, ZodTypeAny> = {};
     let saneRequiredParams: string[] = [];
 
-    // Sanitize the original 'required' array to only include parameters that are actually defined in 'properties'
-    // and are valid non-empty strings.
     if (funcDef.parameters?.required && Array.isArray(funcDef.parameters.required) && funcDef.parameters.properties) {
         saneRequiredParams = funcDef.parameters.required.filter(reqParam => 
             typeof reqParam === 'string' && reqParam.trim() !== '' && funcDef.parameters.properties!.hasOwnProperty(reqParam)
         );
     }
-    // If funcDef.parameters.required is not a valid array or properties are missing, 
-    // saneRequiredParams will remain empty. This means all Zod properties will become optional by default later.
 
     if (funcDef.parameters && funcDef.parameters.properties) {
       for (const paramName in funcDef.parameters.properties) {
@@ -181,13 +294,11 @@ export const handleSessionMessage = async (
             else if (paramDef.items && paramDef.items.type === 'boolean') zodType = z.array(z.boolean());
             else zodType = z.array(z.any());
             break;
-          case 'object': zodType = z.record(z.string(), z.any()); break; // Changed to z.record(z.string(), z.any())
+          case 'object': zodType = z.record(z.string(), z.any()); break; 
           default: zodType = z.any();
         }
         if (paramDef.description) zodType = zodType.describe(paramDef.description);
         
-        // A Zod property is made optional if its name is NOT in our sanitized 'saneRequiredParams' list.
-        // If 'saneRequiredParams' is empty, all properties become optional.
         if (!saneRequiredParams.includes(paramName)) {
             zodType = zodType.optional();
         }
@@ -195,12 +306,10 @@ export const handleSessionMessage = async (
       }
     }
     const zodSchema = Object.keys(zodShape).length > 0 ? z.object(zodShape) : z.object({});
-    // IMPORTANT: Capture the function name in a closure to avoid issues
     const currentFuncName = funcName;
     
     let executeFunc = async (args: any) => {
       console.log(`[Tool Execution] Function ${currentFuncName} called with sessionId from closure: ${sessionId}`);
-      // CRITICAL: Use the current session's ID, not the cached one
       const currentSession = await Session.findById(sessionId);
       if (!currentSession) {
         throw new Error('Session not found during tool execution');
@@ -210,8 +319,8 @@ export const handleSessionMessage = async (
       const functionCallPayload: FunctionCall = { function: { name: currentFuncName, arguments: JSON.stringify(args) } };
       const { result, error } = await executeFunctionCall(
         functionCallPayload, 
-        currentSession._id.toString(), // Use current session ID
-        currentSession.companyId.toString(), // Use current company ID
+        currentSession._id.toString(), 
+        currentSession.companyId.toString(), 
         assistant.allowedActions
       );
       if (error) {
@@ -221,9 +330,8 @@ export const handleSessionMessage = async (
       return result;
     };
     
-    if (currentFuncName === 'jira_fetchTickets') { // Special handling
+    if (currentFuncName === 'jira_fetchTickets') { 
       executeFunc = async (args: any) => {
-        // CRITICAL: Use the current session's ID, not the cached one
         const currentSession = await Session.findById(sessionId);
         if (!currentSession) {
           throw new Error('Session not found during tool execution');
@@ -231,8 +339,8 @@ export const handleSessionMessage = async (
         
         const { result: rawResult, error } = await executeFunctionCall(
           { function: { name: currentFuncName, arguments: JSON.stringify(args) } }, 
-          currentSession._id.toString(), // Use current session ID
-          currentSession.companyId.toString(), // Use current company ID
+          currentSession._id.toString(), 
+          currentSession.companyId.toString(), 
           assistant.allowedActions
         );
         if (error) throw new Error(typeof error === 'string' ? error : (error as any)?.message || 'Tool execution failed');
@@ -246,8 +354,7 @@ export const handleSessionMessage = async (
     console.log(`Cached toolsForSdk for assistant ${assistant._id}`);
   }
   
-  const providerKey = assistant.llmProvider;
-  let modelIdentifier = assistant.llmModel || 'gpt-4o-mini'; // Changed to let
+  let modelIdentifier = assistant.llmModel || 'gpt-4o-mini'; 
   const llmApiKey = await getApiKey(session.companyId.toString(), `${providerKey}_api_key`);
   if (!llmApiKey) throw new Error(`${providerKey} API key not found for company.`);
 
@@ -261,16 +368,32 @@ export const handleSessionMessage = async (
   console.log(`Should stream: ${shouldStream}`);
 
   const systemPrompt = await processTemplate(assistant.llmPrompt, sessionId.toString());
-  const messagesForLlm: CoreMessage[] = [...history, { role: 'user', content: userInput }];
+
+  // Construct user message content for LLM
+  // The userMessageForLlm will now use the userMessageContentParts array
+  const userMessageForLlm: CoreMessage = {
+    role: 'user',
+    content: userMessageContentParts, // This array contains text and formatted image parts
+  };
+
+  const messagesForLlm: CoreMessage[] = [...history, userMessageForLlm];
+  console.log('Messages prepared for LLM (content parts might be complex):', 
+    messagesForLlm.map(m => ({ 
+      role: m.role, 
+      contentPreview: Array.isArray(m.content) 
+        ? m.content.map(p => p.type === 'text' ? `${p.type}: ${p.text.substring(0,50)}...` : `${p.type}: [${(p as ImagePart).mimeType || 'image data'}]`).join(', ')
+        : typeof m.content === 'string' ? m.content.substring(0,100) + '...' : 'Unknown content structure'
+    }))
+  );
   
   const TOKEN_LIMITS = {
-    google: { 'gemini-1.5': 20000, default: 7000 }, // Example, confirm actual limits
-    openai: { 'gpt-4o': 8000, 'gpt-4': 8000, 'gpt-4-turbo': 8000, default: 7000 }, // Added gpt-4-turbo
+    google: { 'gemini-1.5': 20000, default: 7000 }, 
+    openai: { 'gpt-4o': 8000, 'gpt-4': 8000, 'gpt-4-turbo': 8000, default: 7000 }, 
     anthropic: { 
       'claude-3-opus-20240229': 190000, 
       'claude-3-sonnet-20240229': 190000,
       'claude-3-haiku-20240307': 190000,
-      default: 100000 // Increased default for other Anthropic models
+      default: 100000 
     },
     default: { default: 7000 } 
   } as const;
@@ -284,7 +407,7 @@ export const handleSessionMessage = async (
       : providerConfig.default;
   } else if (providerKey === 'openai') {
     if (modelIdentifier?.includes('gpt-4o')) maxPromptTokens = providerConfig['gpt-4o' as keyof typeof providerConfig];
-    else if (modelIdentifier?.includes('gpt-4-turbo')) maxPromptTokens = providerConfig['gpt-4-turbo' as keyof typeof providerConfig]; // Added gpt-4-turbo
+    else if (modelIdentifier?.includes('gpt-4-turbo')) maxPromptTokens = providerConfig['gpt-4-turbo' as keyof typeof providerConfig]; 
     else if (modelIdentifier?.includes('gpt-4')) maxPromptTokens = providerConfig['gpt-4' as keyof typeof providerConfig];
     else maxPromptTokens = providerConfig.default;
   } else if (providerKey === 'anthropic') {
@@ -297,13 +420,11 @@ export const handleSessionMessage = async (
     maxPromptTokens = providerConfig.default;
   }
   
-  // Re-instating manual trimToWindow as SDK middleware is problematic
-  let { trimmedMessages, tokensInPrompt: actualTokensInPrompt } = trimToWindow(messagesForLlm, maxPromptTokens); // Made trimmedMessages mutable
+  let { trimmedMessages, tokensInPrompt: actualTokensInPrompt } = trimToWindow(messagesForLlm, maxPromptTokens); 
   console.log(`Manual trim: Target tokens: ${maxPromptTokens}, Actual: ${actualTokensInPrompt}, Original msgs: ${messagesForLlm.length}, Trimmed msgs: ${trimmedMessages.length}`);
 
   if (providerKey === 'anthropic') {
     console.log('Anthropic provider: Prepending system prompt to messages array as well.');
-    // Ensure it's the very first message if other system messages could exist from history (though current logic filters them)
     trimmedMessages = [{ role: 'system', content: systemPrompt }, ...trimmedMessages.filter(m => m.role !== 'system')];
   }
 
@@ -314,34 +435,28 @@ export const handleSessionMessage = async (
     const llm = getProvider(providerKey, modelIdentifier, llmApiKey as string);
 
     const slimToolsForIntent = (input: string, allTools: Record<string, Tool<any, any>>): Record<string, Tool<any, any>> => {
-      // Reverted to original behavior: always return all tools.
       console.log(`Tool slimming disabled for input: "${input}". Returning all ${Object.keys(allTools).length} tools.`);
       return allTools;
     };
     const relevantTools = slimToolsForIntent(userInput, toolsForSdk);
 
     if (shouldStream) {
-      const streamCallOptions: Parameters<typeof streamText>[0] = {
-        model: llm,
-        messages: trimmedMessages,
-        tools: relevantTools,
-        maxSteps: 3,
-      };
-      if (systemPrompt !== undefined) { // Using systemPrompt directly
-        streamCallOptions.system = systemPrompt;
-      }
-      const streamResult = await streamText(streamCallOptions);
+    const streamCallOptions: Parameters<typeof streamText>[0] = {
+      model: llm,
+      messages: trimmedMessages, // This now contains correctly formatted multimodal messages
+      tools: relevantTools,
+      maxSteps: 3,
+    };
+    if (systemPrompt !== undefined) {
+      streamCallOptions.system = systemPrompt;
+    }
+    // No separate experimental_attachments or attachments field needed here if images are part of CoreMessage.content
+    console.log('Calling streamText. Multimodal content is part of the messages array.');
+    const streamResult = await streamText(streamCallOptions);
       
-      // Asynchronously save the full response once the stream is complete.
-      // This does not block returning the streamResult to the client.
-      // The .text property on streamResult is a Promise<string> that resolves with the full text.
-      // Asynchronously save the full response once the stream is complete.
-      // This includes text, toolCalls, and toolResults.
       (async () => {
         try {
-          // Await all necessary parts of the stream result
           const finalText = await streamResult.text;
-          // Correctly await the promises for toolCalls and toolResults
           const toolCalls = await streamResult.toolCalls; 
           const toolResults = await streamResult.toolResults;
 
@@ -350,7 +465,6 @@ export const handleSessionMessage = async (
           if (toolCalls) console.log('Tool Calls:', JSON.stringify(toolCalls, null, 2));
           if (toolResults) console.log('Tool Results:', JSON.stringify(toolResults, null, 2));
           
-          // Clean action annotations from the final text before saving
           const cleanedText = cleanActionAnnotations(finalText);
           const processedResponse = await processTemplate(cleanedText, sessionId.toString());
           
@@ -361,18 +475,17 @@ export const handleSessionMessage = async (
             assistantId: new mongoose.Types.ObjectId(assistant._id),
             userId: new mongoose.Types.ObjectId(session.userId),
             timestamp: new Date(),
-            messageType: 'text', // Default to text
+            messageType: 'text', 
             data: {},
           };
 
           if (toolCalls && toolCalls.length > 0) {
-            assistantMessageData.messageType = 'tool_calls'; // Or a more appropriate type
+            assistantMessageData.messageType = 'tool_calls'; 
             assistantMessageData.data = { ...assistantMessageData.data, toolCalls: toolCalls };
           }
           if (toolResults && toolResults.length > 0) {
-            // Ensure messageType reflects tool usage if not already set
             if (assistantMessageData.messageType !== 'tool_calls') {
-                 assistantMessageData.messageType = 'tool_results'; // Or a more appropriate type
+                 assistantMessageData.messageType = 'tool_results'; 
             }
             assistantMessageData.data = { ...assistantMessageData.data, toolResults: toolResults };
           }
@@ -385,27 +498,26 @@ export const handleSessionMessage = async (
           console.error('Error saving streamed assistant message to DB:', dbError);
         }
       })().catch(streamProcessingError => {
-        // This catches errors if the streamResult.text promise itself rejects
-        // (e.g., due to an error during the LLM generation after streaming has started)
         console.error('Error processing full streamed text for DB save:', streamProcessingError);
       });
 
       console.log(`Returning stream object for session ${sessionId} for client consumption.`);
       return streamResult;
     } else {
-      // Use generateText for non-streaming case as per Point 4
-      const generateCallOptions: Parameters<typeof generateText>[0] = {
-        model: llm,
-        messages: trimmedMessages,
-        tools: relevantTools,
-        maxSteps: 3,
-      };
-      if (systemPrompt !== undefined) { // Using systemPrompt directly
-        generateCallOptions.system = systemPrompt;
-      }
-      const result = await generateText(generateCallOptions);
-      aggregatedResponse = result.text; 
-      finalLlmResult = result; 
+    const generateCallOptions: Parameters<typeof generateText>[0] = {
+      model: llm,
+      messages: trimmedMessages, // This now contains correctly formatted multimodal messages
+      tools: relevantTools,
+      maxSteps: 3,
+    };
+    if (systemPrompt !== undefined) {
+      generateCallOptions.system = systemPrompt;
+    }
+    // No separate experimental_attachments or attachments field needed here
+    console.log('Calling generateText. Multimodal content is part of the messages array.');
+    const result = await generateText(generateCallOptions);
+    aggregatedResponse = result.text;
+    finalLlmResult = result;
 
       if (finalLlmResult.toolCalls && finalLlmResult.toolCalls.length > 0) {
         console.log('Tool Calls from generateText:', JSON.stringify(finalLlmResult.toolCalls, null, 2));
@@ -429,8 +541,6 @@ export const handleSessionMessage = async (
     if (!specificGeminiError) {
         console.error('Error during LLM processing or tool execution:', error);
     }
-    
-    
     throw error;
   }
 
@@ -439,7 +549,6 @@ export const handleSessionMessage = async (
         throw new Error('LLM result was not obtained for non-streaming case.');
     }
     
-    // CRITICAL: Clean action annotations from response text for non-streaming mode
     const cleanedResponse = cleanActionAnnotations(aggregatedResponse);
     const processedResponse = await processTemplate(cleanedResponse, sessionId.toString());
     
@@ -450,18 +559,17 @@ export const handleSessionMessage = async (
       assistantId: new mongoose.Types.ObjectId(assistant._id),
       userId: new mongoose.Types.ObjectId(session.userId),
       timestamp: new Date(),
-      messageType: 'text', // Default to text
+      messageType: 'text', 
       data: {},
     };
 
     if (finalLlmResult.toolCalls && finalLlmResult.toolCalls.length > 0) {
-      assistantMessageData.messageType = 'tool_calls'; // Or a more appropriate type
+      assistantMessageData.messageType = 'tool_calls'; 
       assistantMessageData.data = { ...assistantMessageData.data, toolCalls: finalLlmResult.toolCalls };
     }
     if (finalLlmResult.toolResults && finalLlmResult.toolResults.length > 0) {
-      // Ensure messageType reflects tool usage if not already set
       if (assistantMessageData.messageType !== 'tool_calls') {
-           assistantMessageData.messageType = 'tool_results'; // Or a more appropriate type
+           assistantMessageData.messageType = 'tool_results'; 
       }
       assistantMessageData.data = { ...assistantMessageData.data, toolResults: finalLlmResult.toolResults };
     }
@@ -469,18 +577,13 @@ export const handleSessionMessage = async (
     const assistantMessage = new Message(assistantMessageData);
     await assistantMessage.save();
     
-    // Return clean text without action annotations for non-streaming mode
-    // Action updates are handled separately via Pusher in the executors
     return processedResponse; 
   }
   
-  // This path should not be reached if shouldStream is true, as streamResult would have been returned.
-  // Adding a fallback throw to satisfy TypeScript if it thinks this path is possible for shouldStream=true.
   if (shouldStream) {
     console.error("Reached end of function in streaming mode without returning stream. This shouldn't happen.");
     throw new Error("Internal error: Failed to return stream in streaming mode.");
   }
   
-  // Fallback for type checker, should ideally not be reached
   throw new Error("Unhandled case in handleSessionMessage");
 };

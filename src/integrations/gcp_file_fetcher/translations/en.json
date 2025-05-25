@@ -1,0 +1,7 @@
+{
+  "serviceName": "GCP File Fetcher",
+  "fetchFileContent": {
+    "actionTitle": "Fetch GCP File Content",
+    "description": "Retrieves the content of a file stored in Google Cloud Storage by its file ID."
+  }
+}
