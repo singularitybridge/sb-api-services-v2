@@ -1,5 +1,5 @@
 import { getOpenAIClient } from './openai-client.service';
-import { submitToolOutputs } from '../oai.thread.service';
+// import { submitToolOutputs } from '../oai.thread.service'; // Removed, OpenAI specific
 import { publishActionMessage } from '../../integrations/actions/publishers';
 import { getSessionById } from '../../services/session.service';
 import { SupportedLanguage } from '../../services/discovery.service';
@@ -179,21 +179,22 @@ export const pollRunStatus = async (
       return run;
     }
 
-    if (
-      run.status === 'requires_action' &&
-      run.required_action?.type === 'submit_tool_outputs'
-    ) {
-      await submitToolOutputs(
-        openaiClient,
-        threadId,
-        runId,
-        run.required_action.submit_tool_outputs.tool_calls,
-        sessionId,
-        companyId,
-        allowedActions
-      );
-            
-    }
+    // if (
+    //   run.status === 'requires_action' &&
+    //   run.required_action?.type === 'submit_tool_outputs'
+    // ) {
+    //   // This block was for OpenAI function calling, which is no longer used.
+    //   // If Vercel AI has a similar mechanism, it would be handled here.
+    //   // await submitToolOutputs(
+    //   //   openaiClient,
+    //   //   threadId,
+    //   //   runId,
+    //   //   run.required_action.submit_tool_outputs.tool_calls,
+    //   //   sessionId,
+    //   //   companyId,
+    //   //   allowedActions
+    //   // );
+    // }
 
     lastRun = run;
     await new Promise((resolve) =>

@@ -54,14 +54,12 @@ inboxRouter.post('/reply/:sessionId', async (req: AuthenticatedRequest, res) => 
 
     const responseTemplate = `[human-agent-response]: ${message}. [system]: Incorporate this response into your conversation with the user, maintaining context and tone.`;
     const llmResponse = await handleSessionMessage(
-      apiKey as string,
       responseTemplate,
       session.id,
       ChannelType.WEB,
-      {
+      { // This is the metadata argument
         message_type: 'human-agent-response',
       }
-      
     );
 
     res.json({ message: 'Response sent successfully', llmResponse });

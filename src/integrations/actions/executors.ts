@@ -12,6 +12,21 @@ import {
   DetailedError
 } from './utils';
 
+const sendActionUpdate = async (
+  sessionId: string,
+  status: 'started' | 'completed' | 'failed',
+  executionDetails: ExecutionDetails
+) => {
+  // Send via Pusher only - this ensures consistent format with messages endpoint
+  // Don't let Pusher errors affect action execution
+  try {
+    await publishActionMessage(sessionId, status, executionDetails);
+  } catch (error) {
+    console.error('Pusher error (non-critical):', error);
+    // Don't rethrow - Pusher errors shouldn't stop the action
+  }
+};
+
 interface PreparedAction {
   executionId: string;
   convertedActionId: string;
@@ -60,6 +75,7 @@ export const executeFunctionCall = async (
   companyId: string,
   allowedActions: string[]
 ): Promise<{ result?: unknown; error?: DetailedError }> => {
+  console.log(`[executeFunctionCall] Starting execution with sessionId: ${sessionId}, companyId: ${companyId}`);
   const session = await getSessionById(sessionId);
   const sessionLanguage = session.language as SupportedLanguage;
   const context: ActionContext = { sessionId, companyId, language: sessionLanguage };
@@ -93,7 +109,8 @@ export const executeFunctionCall = async (
         input
       };
 
-      await publishActionMessage(sessionId, 'started', executionDetails);
+      console.log(`[executeFunctionCall] Sending 'started' update for action ${convertedActionId} to session ${sessionId}`);
+      await sendActionUpdate(sessionId, 'started', executionDetails);
 
       // Improved file search detection
       const isFileSearch = functionName === 'file_search' ||
@@ -102,7 +119,7 @@ export const executeFunctionCall = async (
 
       if (isFileSearch) {
         // Publish a notification for file search detection
-        await publishActionMessage(sessionId, 'started', {
+        await sendActionUpdate(sessionId, 'started', {
           id: uuidv4(),
           actionId: 'file_search_notification',
           serviceName: 'File Search Notification',
@@ -119,16 +136,19 @@ export const executeFunctionCall = async (
       const result = await functionFactory[functionName].function(processedArgs) as ActionResult;
 
       if (!result.success) {
-        // If the result is not successful, treat it as a failure
+        // If the result is not successful, publish failed message and return error result (not throw)
+        // This ensures the LLM gets the error information as a tool result
         const errorDetails = extractErrorDetails(result.error || 'Unknown error');
-        await publishActionMessage(sessionId, 'failed', { ...executionDetails, output: result, error: errorDetails });
-        return { error: errorDetails };
+        await sendActionUpdate(sessionId, 'failed', { ...executionDetails, output: result, error: errorDetails });
+        
+        // Return error result so AI SDK provides it to LLM as tool result
+        return { result: `Error: ${result.error || 'Action failed'}` };
       } else {
         // If success is true, publish completed message and return result
-        await publishActionMessage(sessionId, 'completed', { ...executionDetails, output: result });
+        await sendActionUpdate(sessionId, 'completed', { ...executionDetails, output: result });
         if (isFileSearch) {
           // Complete the file search notification
-          await publishActionMessage(sessionId, 'completed', {
+          await sendActionUpdate(sessionId, 'completed', {
             id: uuidv4(),
             actionId: 'file_search_notification',
             serviceName: 'File Search Notification',
@@ -151,7 +171,7 @@ export const executeFunctionCall = async (
       const args = JSON.parse(call.function.arguments);
       const input = Object.keys(args).length > 0 ? args : {};
       
-      await publishActionMessage(sessionId, 'failed', {
+      await sendActionUpdate(sessionId, 'failed', {
         id: uuidv4(),
         actionId: convertOpenAIFunctionName(functionName),
         serviceName: failedActionInfo?.serviceName || 'unknown',

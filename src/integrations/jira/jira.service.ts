@@ -39,9 +39,9 @@ export const createJiraTicket = async (
     issueType?: string;
   }
 ) => {
-  const client = await initializeClient(companyId);
-
   try {
+    const client = await initializeClient(companyId);
+
     const newIssue = await client.issues.createIssue({
       fields: {
         summary: params.summary,
@@ -71,7 +71,7 @@ export const createJiraTicket = async (
 
     return { success: true, data: newIssue };
   } catch (error: any) {
-    throw new Error(`Failed to create JIRA ticket: ${error?.message || 'Unknown error'}`);
+    return { success: false, error: `Failed to create JIRA ticket: ${error?.message || 'Unknown error'}` };
   }
 };
 
@@ -83,10 +83,10 @@ export const fetchJiraTickets = async (
     maxResults?: number;
   }
 ) => {
-  const client = await initializeClient(companyId);
-  const maxResults = params.maxResults || 50;
-
   try {
+    const client = await initializeClient(companyId);
+    const maxResults = params.maxResults || 50;
+
     let startAt = 0;
     let allTickets: Version3Models.Issue[] = [];
     
@@ -114,7 +114,7 @@ export const fetchJiraTickets = async (
     
     return { success: true, data: allTickets };
   } catch (error: any) {
-    throw new Error(`Failed to fetch JIRA tickets: ${error?.message || 'Unknown error'}`);
+    return { success: false, error: `Failed to fetch JIRA tickets: ${error?.message || 'Unknown error'}` };
   }
 };
 
@@ -125,16 +125,31 @@ export const getJiraTicketById = async (
     issueIdOrKey: string;
   }
 ) => {
-  const client = await initializeClient(companyId);
-
   try {
+    const client = await initializeClient(companyId);
+
     const issue = await client.issues.getIssue({
       issueIdOrKey: params.issueIdOrKey
     });
+
+    // Simplify the ticket data before returning
+    const simplifiedIssue = {
+      key: issue.key,
+      summary: issue.fields?.summary,
+      status: issue.fields?.status?.name,
+      description: issue.fields?.description?.content?.[0]?.content?.[0]?.text, // Extract text from ADF
+      assignee: issue.fields?.assignee?.displayName,
+      reporter: issue.fields?.reporter?.displayName,
+      created: issue.fields?.created,
+      updated: issue.fields?.updated,
+      // You can add other essential fields here if needed
+      // For example, to include all fields for debugging or more complex scenarios:
+      // rawFields: issue.fields 
+    };
     
-    return { success: true, data: issue };
+    return { success: true, data: simplifiedIssue };
   } catch (error: any) {
-    throw new Error(`Failed to fetch JIRA ticket: ${error?.message || 'Unknown error'}`);
+    return { success: false, error: `Failed to fetch JIRA ticket: ${error?.message || 'Unknown error'}` };
   }
 };
 
@@ -146,9 +161,9 @@ export const addCommentToJiraTicket = async (
     commentBody: string;
   }
 ) => {
-  const client = await initializeClient(companyId);
-
   try {
+    const client = await initializeClient(companyId);
+
     const comment = await client.issueComments.addComment({
       issueIdOrKey: params.issueIdOrKey,
       // Attempting to use 'comment' as the key for ADF instead of 'body'
@@ -170,7 +185,7 @@ export const addCommentToJiraTicket = async (
     });
     return { success: true, data: comment };
   } catch (error: any) {
-    throw new Error(`Failed to add comment to JIRA ticket: ${error?.message || 'Unknown error'}`);
+    return { success: false, error: `Failed to add comment to JIRA ticket: ${error?.message || 'Unknown error'}` };
   }
 };
 
@@ -182,9 +197,9 @@ export const updateJiraTicket = async (
     fields: { [key: string]: any }; // Flexible fields for update
   }
 ) => {
-  const client = await initializeClient(companyId);
-
   try {
+    const client = await initializeClient(companyId);
+
     // The jira.js library expects no response for editIssue, so we don't assign it.
     // A successful call implies the update worked.
     await client.issues.editIssue({
@@ -197,7 +212,7 @@ export const updateJiraTicket = async (
     });
     return { success: true, data: updatedIssue };
   } catch (error: any) {
-    throw new Error(`Failed to update JIRA ticket: ${error?.message || 'Unknown error'}`);
+    return { success: false, error: `Failed to update JIRA ticket: ${error?.message || 'Unknown error'}` };
   }
 };
 
@@ -209,14 +224,14 @@ export const addTicketToCurrentSprint = async (
     issueKey: string;
   }
 ) => {
-  const client = await initializeClient(companyId);
-
   try {
+    const client = await initializeClient(companyId);
+
     // 1. Get active sprints for the board
     // jira.js expects boardId to be a number.
     const boardIdNumber = parseInt(params.boardId, 10);
     if (isNaN(boardIdNumber)) {
-      throw new Error('Invalid boardId. It must be a number.');
+      return { success: false, error: 'Invalid boardId. It must be a number.' };
     }
 
     // 1. Get active sprints for the board using sendRequest, wrapped in a Promise
@@ -248,12 +263,12 @@ export const addTicketToCurrentSprint = async (
     });
 
     if (!activeSprintsResponse || !activeSprintsResponse.values || activeSprintsResponse.values.length === 0) {
-      throw new Error(`No active sprint found for board ID ${params.boardId}. Response: ${JSON.stringify(activeSprintsResponse)}`);
+      return { success: false, error: `No active sprint found for board ID ${params.boardId}. Response: ${JSON.stringify(activeSprintsResponse)}` };
     }
 
     const activeSprint = activeSprintsResponse.values[0];
     if (!activeSprint.id || !activeSprint.name) {
-      throw new Error(`Active sprint found but it does not have a valid ID or name. Sprint data: ${JSON.stringify(activeSprint)}`);
+      return { success: false, error: `Active sprint found but it does not have a valid ID or name. Sprint data: ${JSON.stringify(activeSprint)}` };
     }
 
     // 2. Add the issue to the active sprint using sendRequest, wrapped in a Promise
@@ -289,6 +304,6 @@ export const addTicketToCurrentSprint = async (
   } catch (error: any) {
     // Check if the error is from Jira client or a generic one
     const errorMessage = error.message || (error.errorMessages && error.errorMessages.join(', ')) || 'Unknown error';
-    throw new Error(`Failed to add ticket ${params.issueKey} to current sprint on board ${params.boardId}: ${errorMessage}`);
+    return { success: false, error: `Failed to add ticket ${params.issueKey} to current sprint on board ${params.boardId}: ${errorMessage}` };
   }
 };

@@ -2,7 +2,7 @@ import { Assistant, IAssistant } from '../../models/Assistant';
 import { File } from '../../models/File';
 import mongoose from 'mongoose';
 import { getApiKey } from '../api.key.service';
-import { createAssistant, deleteAssistantById, updateAssistantById } from '../oai.assistant.service';
+// OpenAI Assistant API calls removed as it's deprecated in favor of Vercel AI
 
 export const getAssistants = async (companyId: string): Promise<IAssistant[]> => {
   try {
@@ -59,38 +59,8 @@ export const updateAllowedActions = async (assistantId: string, allowedActions: 
       throw new Error('Assistant not found');
     }
 
-    const adjustedAllowedActions = allowedActions.map(actionName => {
-      const parts = actionName.split('.');
-      return parts.length > 1 ? parts[1] : actionName;
-    });
-
-    const apiKey = await getApiKey(assistant.companyId.toString(), 'openai_api_key') as string;
-
-    let updatedOpenAIAssistant = await updateAssistantById(
-      apiKey,
-      assistant.assistantId,
-      assistant.name,
-      assistant.description,
-      assistant.llmModel,
-      assistant.llmPrompt,
-      adjustedAllowedActions
-    );
-
-    let updatedTools = updatedOpenAIAssistant.tools
-      .filter(tool => tool.type === 'function')
-      .map(tool => (tool as any).function.name);
-
-    const updatedToolsWithPrefixes = updatedTools.map(actionName => {
-      const originalAction = allowedActions.find(a => a.endsWith(actionName));
-      return originalAction || actionName;
-    });
-
-    let missingActions = allowedActions.filter(action => !updatedToolsWithPrefixes.includes(action));
-
-    if (missingActions.length > 0) {
-      console.error(`Error: Failed to add the following actions: ${missingActions.join(', ')}`);
-      throw new Error(`Failed to add actions: ${missingActions.join(', ')}`);
-    }
+    // OpenAI synchronization removed as it's deprecated in favor of Vercel AI
+    console.log(`Updating allowed actions for assistant ${assistantId} in local database only`);
 
     assistant.allowedActions = allowedActions;
     const updatedAssistant = await assistant.save({ session });
@@ -121,14 +91,8 @@ export async function deleteAssistant(id: string, assistantId: string): Promise<
 
     await Assistant.findByIdAndDelete(id);
 
-    try {
-      const apiKey = await getApiKey(assistant.companyId.toString(), 'openai_api_key') as string;
-      await deleteAssistantById(apiKey, assistantId, id);
-    } catch (error) {
-      console.warn(`Warning: Failed to delete assistant from OpenAI: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-
-    console.log(`Successfully deleted assistant ${id} from MongoDB.`);
+    // OpenAI deletion removed as it's deprecated in favor of Vercel AI
+    console.log(`Successfully deleted assistant ${id} from MongoDB only.`);
   } catch (error) {
     console.error('Error in deleteAssistant:', error);
     throw error;
@@ -151,24 +115,15 @@ export const createDefaultAssistant = async (companyId: string, apiKey: string):
     llmPrompt: 'You are a helpful AI assistant for {{company.name}}. Your name is {{assistant.name}}. Provide friendly and professional assistance to {{user.name}}. When referring to the user, use their name {{user.name}} or their email {{user.email}}. Always include placeholders like {{user.name}} or {{company.name}} in your responses, as they will be automatically replaced with the actual values.',
     companyId: companyId,
     allowedActions: ['readJournal', 'writeJournal', 'searchInbox', 'sendEmail', 'scheduleEvent'],
+    // Generate a unique ID for assistantId instead of getting it from OpenAI
+    assistantId: new mongoose.Types.ObjectId().toString()
   };
 
   const assistant = new Assistant(defaultAssistantData);
   await assistant.save();
 
-  const openAIAssistant = await createAssistant(
-    apiKey,
-    companyId,
-    assistant._id,
-    assistant.name,
-    assistant.description,
-    assistant.llmModel,
-    assistant.llmPrompt,
-    assistant.allowedActions
-  );
-
-  assistant.assistantId = openAIAssistant.id;
-  await assistant.save();
+  // OpenAI assistant creation removed as it's deprecated in favor of Vercel AI
+  console.log(`Created default assistant in local database only with ID: ${assistant._id}`);
 
   return assistant;
 };

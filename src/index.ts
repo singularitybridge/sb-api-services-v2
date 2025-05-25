@@ -6,24 +6,25 @@ import { startAgenda } from './integrations/agenda/agenda.service';
 import { initializeTelegramBots } from './services/telegram.bot';
 import { initializeWebSocket } from './services/websocket';
 import http from 'http';
+import { logger } from './utils/logger';
 
 const initializeApp = async () => {
   try {
-    console.log('Attempting to connect to MongoDB...');
+    logger.info('Attempting to connect to MongoDB...');
     const dbUri = process.env.MONGODB_URI || '';
     const dbName = process.env.MONGODB_DB_NAME || 'dev';
     await mongoose.connect(dbUri, { dbName });
-    console.log(`Successfully connected to MongoDB database: ${dbName}`);
+    logger.info(`Successfully connected to MongoDB database: ${dbName}`);
 
-    console.log('Starting Agenda...');
+    logger.info('Starting Agenda...');
     await startAgenda();
-    console.log('Agenda started successfully');
+    logger.info('Agenda started successfully');
 
-    console.log('Initializing Telegram bots...');
+    logger.info('Initializing Telegram bots...');
     await initializeTelegramBots();
-    console.log('Telegram bots initialized for all companies');
-  } catch (error) {
-    console.error('Error during initialization:', error);
+    logger.info('Telegram bots initialized for all companies');
+  } catch (error: any) {
+    logger.error('Error during initialization:', { error: error.message, stack: error.stack });
     process.exit(1);
   }
 };
@@ -72,9 +73,25 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cors());
 
+import compression from 'compression'; // Added for SSE Step 2
+
 // Public routes
 app.use('/auth', authRouter);
 app.use('/policy', policyRouter);
+
+// SSE Step 2: Skip compression() when SSE is requested for /assistant/user-input
+// Note: The task card mentions /api/assistant/user-input.
+// Given assistantRouter is mounted at /assistant, this middleware targets /assistant/user-input.
+app.use('/assistant/user-input', (req, res, next) => {
+  const acceptHeader = req.get('accept');
+  // Check if acceptHeader is not undefined and includes 'text/event-stream'
+  const wantsSSE = typeof acceptHeader === 'string' && acceptHeader.includes('text/event-stream');
+  if (wantsSSE) {
+    return next(); // no gzip for SSE
+  }
+  // Apply compression only if SSE is not requested for this specific route
+  return compression()(req, res, next);
+});
 
 // Routes that only require authentication
 app.use('/tts', verifyTokenMiddleware, ttsRouter);
@@ -125,7 +142,7 @@ export default app;
 if (process.env.NODE_ENV !== 'test') {
   // Use the HTTP server instead of the Express app to listen
   server.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-    console.log(`WebSocket server is available at ws://localhost:${port}/realtime`);
+    logger.info(`Server is running on port ${port}`);
+    logger.info(`WebSocket server is available at ws://localhost:${port}/realtime`);
   });
 }

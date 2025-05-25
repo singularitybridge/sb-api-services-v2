@@ -43,22 +43,32 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
         const result: CurlActionResponse & { success: boolean } = {
           status: response.status,
           data: response.data,
-          headers: response.headers,
-          success: response.status >= 200 && response.status < 300 // Set success based on HTTP status code
+          headers: response.headers, // Note: service currently always returns {}
+          error: response.error,   // Propagate error from service response
+          truncated: false,          // Initialize truncated to false
+          success: response.status >= 200 && response.status < 300 && !response.error // Success if 2xx and no explicit error from service
         };
 
-        // Only handle truncation if specified
+        // Only handle truncation if specified and data is a string
         if (maxResponseChars && typeof result.data === 'string') {
           if (result.data.length > maxResponseChars) {
             result.data = result.data.substring(0, maxResponseChars);
-            result.truncated = true;
+            result.truncated = true; // Set to true if action truncates
           }
         }
+        // If not truncated by this action, result.truncated remains false (its initial value)
 
         return result;
       } catch (error: any) {
         console.error('performCurlRequest: Error performing request', error);
-        throw error; // Let the error propagate up to be handled by the actions layer
+        return {
+          status: 500,
+          data: null,
+          headers: {},
+          error: error.message || 'An unexpected error occurred performing curl request',
+          success: false,
+          truncated: false, // Ensure truncated is always present
+        };
       }
     },
   },

@@ -1,4 +1,4 @@
-import { ActionContext, FunctionFactory } from '../actions/types';
+import { ActionContext, FunctionFactory, FunctionDefinition } from '../actions/types'; // Added FunctionDefinition
 import { 
   createJiraTicket, 
   fetchJiraTickets, 
@@ -8,6 +8,43 @@ import {
   addTicketToCurrentSprint as addTicketToCurrentSprintService
 } from './jira.service';
 
+// Argument types for JIRA actions
+interface CreateTicketArgs {
+  summary: string;
+  description: string;
+  projectKey: string;
+  issueType?: string; // Default handled in service
+}
+
+interface FetchTicketsArgs {
+  projectKey: string;
+  maxResults?: number; // Default handled in service
+}
+
+interface GetTicketArgs {
+  issueIdOrKey: string;
+}
+
+interface AddCommentArgs {
+  issueIdOrKey: string;
+  commentBody: string;
+}
+
+interface UpdateTicketArgs {
+  issueIdOrKey: string;
+  fields?: Record<string, any>;
+}
+
+interface AddTicketToCurrentSprintArgs {
+  boardId: string;
+  issueKey: string;
+}
+
+const projectKeyParamDefinition = {
+  type: 'string' as const, // Use 'as const' for literal type
+  description: 'JIRA project key (e.g., "PROJ"). This is essential for targeting the correct project.'
+};
+
 export const createJiraActions = (context: ActionContext): FunctionFactory => ({
   createTicket: {
     description: 'Creates a new JIRA ticket',
@@ -16,13 +53,13 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
       properties: {
         summary: { type: 'string', description: 'Title of the ticket' },
         description: { type: 'string', description: 'Detailed description of the ticket' },
-        projectKey: { type: 'string', description: 'JIRA project key (e.g., "PROJ"). This is essential for creating the ticket in the correct project.' },
-        issueType: { type: 'string', description: 'Type of issue (e.g., Task, Bug)', default: 'Task' }
+        projectKey: projectKeyParamDefinition,
+        issueType: { type: 'string', description: 'Type of issue (e.g., Task, Bug)' } // Removed default: 'Task'
       },
       required: ['summary', 'description', 'projectKey'],
       additionalProperties: false,
     },
-    function: async (params: any) => {
+    function: async (params: CreateTicketArgs): Promise<any> => {
       return await createJiraTicket(context.sessionId, context.companyId, params);
     },
   },
@@ -31,13 +68,13 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
     parameters: {
       type: 'object',
       properties: {
-        projectKey: { type: 'string', description: 'JIRA project key (e.g., "PROJ"). This is essential for fetching tickets from the correct project.' },
-        maxResults: { type: 'number', description: 'Maximum number of tickets to fetch', default: 50 }
+        projectKey: projectKeyParamDefinition,
+        maxResults: { type: 'number', description: 'Maximum number of tickets to fetch' } // Removed default: 50
       },
       required: ['projectKey'],
       additionalProperties: false,
     },
-    function: async (params: any) => {
+    function: async (params: FetchTicketsArgs): Promise<any> => {
       return await fetchJiraTickets(context.sessionId, context.companyId, params);
     },
   },
@@ -51,7 +88,7 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
       required: ['issueIdOrKey'],
       additionalProperties: false,
     },
-    function: async (params: any) => {
+    function: async (params: GetTicketArgs): Promise<any> => {
       return await getJiraTicketById(context.sessionId, context.companyId, params);
     },
   },
@@ -66,7 +103,7 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
       required: ['issueIdOrKey', 'commentBody'],
       additionalProperties: false,
     },
-    function: async (params: any) => {
+    function: async (params: AddCommentArgs): Promise<any> => {
       return await addCommentToJiraTicket(context.sessionId, context.companyId, params);
     },
   },
@@ -78,15 +115,18 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
         issueIdOrKey: { type: 'string', description: 'ID or key of the JIRA ticket to update' },
         fields: { 
           type: 'object', 
-          description: 'An object containing the fields to update. For example: {"summary": "New summary", "assignee": {"name": "user@example.com"}, "labels": ["new-label", "another-label"]}. Refer to JIRA API for updatable fields and their structure.',
-          additionalProperties: true 
+          description: 'An object containing the fields to update. For example: {"summary": "New summary", "assignee": {"name": "user@example.com"}, "labels": ["new-label", "another-label"]}. Refer to JIRA API for updatable fields and their structure.'
         }
       },
-      required: ['issueIdOrKey', 'fields'],
+      required: ['issueIdOrKey'], 
       additionalProperties: false,
     },
-    function: async (params: any) => {
-      return await updateJiraTicket(context.sessionId, context.companyId, params);
+    function: async (params: UpdateTicketArgs): Promise<any> => {
+      const serviceParams = {
+        issueIdOrKey: params.issueIdOrKey,
+        fields: params.fields ?? {} // Default to empty object if fields is undefined
+      };
+      return await updateJiraTicket(context.sessionId, context.companyId, serviceParams);
     },
   },
   addTicketToCurrentSprint: {
@@ -100,7 +140,7 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
       required: ['boardId', 'issueKey'],
       additionalProperties: false,
     },
-    function: async (params: any) => {
+    function: async (params: AddTicketToCurrentSprintArgs): Promise<any> => {
       return await addTicketToCurrentSprintService(context.sessionId, context.companyId, params);
     },
   },
