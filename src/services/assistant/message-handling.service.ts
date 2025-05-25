@@ -192,46 +192,68 @@ export const handleSessionMessage = async (
           (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load image: ${attachment.fileName}]`;
         }
       } else if (attachment.fileId) { // Handling for non-image files (PDF, TXT, CSV)
-        try {
-          console.log(`Fetching non-image file content: ${attachment.fileName} (ID: ${attachment.fileId}) for provider ${providerKey}`);
-          const fileContentResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId });
-          
-          if (fileContentResult.success && typeof fileContentResult.data === 'string') {
-            if (providerKey === 'google' && (attachment.mimeType === 'application/pdf' || attachment.mimeType === 'text/csv' || attachment.mimeType === 'text/plain')) {
-              // For Gemini, if it's a supported document type, we might be able to pass it directly.
-              // However, the Vercel AI SDK's `ImagePart` is for images.
-              // For documents, Gemini might expect them as part of a different structure or a specific tool call.
-              // For now, appending text content is a safe bet.
-              // If Gemini can take PDF/CSV as a "blob" part similar to images, that would be:
-              // const fileBuffer = Buffer.from(fileContentResult.data, 'utf-8'); // Or appropriate encoding
-              // userMessageContentParts.push({ type: 'image', image: new Uint8Array(fileBuffer), mimeType: attachment.mimeType });
-              // console.log(`Google Document attachment processed as blob: ${attachment.fileName}`);
-              // For now, let's stick to appending text for simplicity until a clearer SDK path for documents is established.
-               (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached File: ${attachment.fileName} ---\n${fileContentResult.data}\n--- End of File: ${attachment.fileName} ---`;
-               console.log(`Non-image file content (text extracted) appended for Google: ${attachment.fileName}`);
+        if (providerKey === 'google' && (attachment.mimeType === 'application/pdf' || attachment.mimeType === 'text/csv' || attachment.mimeType === 'text/plain')) {
+          try {
+            console.log(`Fetching non-image file content AS BUFFER: ${attachment.fileName} (ID: ${attachment.fileId}) for Google`);
+            const fileBufferResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'buffer' });
+
+            if (fileBufferResult.success && fileBufferResult.data instanceof Buffer) {
+              userMessageContentParts.push({
+                type: 'image', // Using 'image' type as it's the Vercel AI SDK way to send binary with mimeType
+                image: new Uint8Array(fileBufferResult.data),
+                mimeType: attachment.mimeType,
+              });
+              console.log(`Google Document attachment processed as blob part: ${attachment.fileName} (MIME: ${attachment.mimeType})`);
             } else {
-              // For OpenAI and Anthropic (and default), append extracted text.
+              console.warn(`Could not fetch file as buffer for Google: ${attachment.fileName}. Error: ${fileBufferResult.error || 'Unknown error'}. Falling back to text extraction.`);
+              // Fallback to text extraction if buffer fetching fails
+              const fileContentResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'string' });
+              if (fileContentResult.success && typeof fileContentResult.data === 'string') {
+                (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached File (text fallback): ${attachment.fileName} ---\n${fileContentResult.data}\n--- End of File: ${attachment.fileName} ---`;
+              } else {
+                (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load content for attached file: ${attachment.fileName}]`;
+              }
+            }
+          } catch (error) {
+            console.error(`Error fetching/processing file ${attachment.fileName} as buffer for Google:`, error);
+            (userMessageContentParts[0] as TextPart).text += `\n\n[Error loading content for attached file: ${attachment.fileName}]`;
+          }
+        } else {
+          // Original logic for other providers or non-PDF/CSV/TXT for Google (text extraction)
+          try {
+            console.log(`Fetching non-image file content AS TEXT: ${attachment.fileName} (ID: ${attachment.fileId}) for provider ${providerKey}`);
+            const fileContentResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'string' });
+            
+            if (fileContentResult.success && typeof fileContentResult.data === 'string') {
               (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached File: ${attachment.fileName} ---\n${fileContentResult.data}\n--- End of File: ${attachment.fileName} ---`;
               console.log(`Non-image file content (text extracted) appended for ${providerKey}: ${attachment.fileName}`);
+            } else {
+              console.warn(`Could not fetch content for file: ${attachment.fileName} (ID: ${attachment.fileId}). Result: ${JSON.stringify(fileContentResult)}`);
+              (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load content for attached file: ${attachment.fileName}]`;
             }
-          } else {
-            console.warn(`Could not fetch content for file: ${attachment.fileName} (ID: ${attachment.fileId}). Result: ${JSON.stringify(fileContentResult)}`);
-            (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load content for attached file: ${attachment.fileName}]`;
+          } catch (error) {
+            console.error(`Error fetching content for file ${attachment.fileName} (ID: ${attachment.fileId}):`, error);
+            (userMessageContentParts[0] as TextPart).text += `\n\n[Error loading content for attached file: ${attachment.fileName}]`;
           }
-        } catch (error) {
-          console.error(`Error fetching content for file ${attachment.fileName} (ID: ${attachment.fileId}):`, error);
-          (userMessageContentParts[0] as TextPart).text += `\n\n[Error loading content for attached file: ${attachment.fileName}]`;
         }
       }
     }
-     // Update processedUserInput to reflect any appended text from non-image files or errors
-    processedUserInput = (userMessageContentParts[0] as TextPart).text;
+    // IMPORTANT: processedUserInput for DB storage should ideally be the original text part,
+    // without appended file contents if the file is sent as a separate blob.
+    // The userMessageContentParts[0] is the TextPart.
+    // If files were attached as blobs, their text content is NOT in userMessageContentParts[0].text.
+    // If files were attached by appending text, their content IS in userMessageContentParts[0].text.
+    // For simplicity in this change, we'll keep processedUserInput reflecting the primary text part.
+    // The original user input is already stored in metadata.
+    processedUserInput = (userMessageContentParts.find(part => part.type === 'text') as TextPart)?.text || userInput;
   }
 
   const userMessage = new Message({
     sessionId: new mongoose.Types.ObjectId(session._id),
     sender: 'user',
-    content: processedUserInput, // Store the primary text input here for DB
+    // Store the user's original typed text, or the text part if it was modified by errors/fallbacks.
+    // Avoid storing large extracted PDF text here if the PDF is sent as a blob.
+    content: (userMessageContentParts.find(part => part.type === 'text') as TextPart)?.text || userInput,
     assistantId: new mongoose.Types.ObjectId(assistant._id),
     userId: new mongoose.Types.ObjectId(session.userId),
     timestamp: new Date(),
