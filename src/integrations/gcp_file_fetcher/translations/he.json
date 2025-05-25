@@ -1,0 +1,7 @@
+{
+  "serviceName": "מביא קבצים מ-GCP",
+  "fetchFileContent": {
+    "actionTitle": "הבא תוכן קובץ מ-GCP",
+    "description": "מאחזר תוכן של קובץ המאוחסן ב-Google Cloud Storage לפי מזהה הקובץ שלו."
+  }
+}
