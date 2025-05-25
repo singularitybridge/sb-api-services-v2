@@ -165,22 +165,17 @@ export const handleSessionMessage = async (
           const pdfBufferResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'buffer' });
 
           if (pdfBufferResult.success && pdfBufferResult.data instanceof Buffer) {
-            if (providerKey === 'google' || providerKey === 'anthropic') {
-              // Google and Anthropic: continue using the existing approach
-              userMessageContentParts.push({
-                type: 'file',
-                content: new Uint8Array(pdfBufferResult.data),
-                mimeType: 'application/pdf',
-              });
-              console.log(`${providerKey} PDF attachment processed as FilePart: ${attachment.fileName}`);
-            } else if (providerKey === 'openai') {
-              // OpenAI: use modern FilePart for PDFs (GPT-4o and newer support this)
-              userMessageContentParts.push({
-                type: 'file',
-                data: new Uint8Array(pdfBufferResult.data),
-                mimeType: 'application/pdf',
-              });
-              console.log(`OpenAI PDF attachment processed as FilePart: ${attachment.fileName}`);
+            // For now, use text extraction approach for all providers until file parts are fully stable
+            const fileContentResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'string' });
+            if (fileContentResult.success && typeof fileContentResult.data === 'string') {
+              let pdfTextToAppend = fileContentResult.data;
+              const MAX_PDF_TEXT_CHARS = 7000;
+              if (pdfTextToAppend.length > MAX_PDF_TEXT_CHARS) {
+                pdfTextToAppend = pdfTextToAppend.substring(0, MAX_PDF_TEXT_CHARS) + "\n\n[...PDF text truncated due to length...]\n";
+                console.log(`Truncated extracted PDF text for ${attachment.fileName} to ${MAX_PDF_TEXT_CHARS} characters.`);
+              }
+              (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached PDF: ${attachment.fileName} ---\n${pdfTextToAppend}\n--- End of File ---`;
+              console.log(`${providerKey} PDF attachment processed as text extraction: ${attachment.fileName}`);
             } else {
               // Fallback for unknown providers: text extraction
               const fileContentResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'string' });
