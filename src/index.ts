@@ -59,6 +59,7 @@ import { contentRouter } from './routes/content.routes';
 import { contentTypeRouter } from './routes/content-type.routes';
 import integrationRouter from './routes/integration.routes';
 import { teamRouter } from './routes/team.routes';
+import memoryRouter from './routes/memory.routes'; // Added import for memory router
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -130,6 +131,7 @@ app.use(
   integrationRouter
 );
 app.use('/teams', verifyTokenMiddleware, verifyAccess(), teamRouter);
+app.use('/memory', verifyTokenMiddleware, verifyAccess(), memoryRouter); // Added memory router
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);
