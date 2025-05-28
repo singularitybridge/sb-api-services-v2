@@ -25,7 +25,7 @@ steps:
       - '-c'
       - |
         trap "echo 'FAILURE' > /workspace/build_status" EXIT
-        gcloud run services update $_SERVICE_NAME --platform=managed --image=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID --region=$_DEPLOY_REGION --quiet
+        gcloud run services update $_SERVICE_NAME --platform=managed --image=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA --service-account=sb-api-services@sb-api-services-404915.iam.gserviceaccount.com --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID --region=$_DEPLOY_REGION --quiet
         trap - EXIT
     id: Deploy
 

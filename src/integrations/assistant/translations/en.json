@@ -24,5 +24,13 @@
   "errorAssistantNotFound": "Assistant not found",
   "errorRetrieveAssistants": "Failed to retrieve assistants",
   "errorSetAssistant": "Failed to set assistant",
-  "errorCreateAssistant": "Failed to create new assistant"
+  "errorCreateAssistant": "Failed to create new assistant",
+  "getCurrentAssistant": {
+    "actionTitle": "Get Current Assistant",
+    "description": "Get the current assistant's information for the session"
+  },
+  "updateCurrentAssistant": {
+    "actionTitle": "Update Current Assistant",
+    "description": "Update the current assistant's information (name, description, LLM model, LLM provider, LLM prompt). Only provided fields will be updated."
+  }
 }

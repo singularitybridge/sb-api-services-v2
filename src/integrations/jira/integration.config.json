@@ -1,0 +1,7 @@
+{
+  "name": "jira",
+  "icon": "jira",
+  "apiKeyName": "jira_api_token",
+  "actionCreator": "createJiraActions",
+  "actionsFile": "jira.actions.ts"
+}

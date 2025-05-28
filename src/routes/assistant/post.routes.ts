@@ -2,8 +2,9 @@ import { Router } from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { validateApiKeys, getApiKey, refreshApiKeyCache } from '../../services/api.key.service';
 import { Assistant } from '../../models/Assistant';
-import { createAssistant } from '../../services/oai.assistant.service';
+// OpenAI Assistant API calls removed as it's deprecated in favor of Vercel AI
 import { createDefaultAssistant } from '../../services/assistant.service';
+import mongoose from 'mongoose'; // Added for ObjectId generation
 
 const router = Router();
 
@@ -19,23 +20,14 @@ router.post(
         companyId: req.user?.companyId,
       };
       const newAssistant = new Assistant(assistantData);
-      const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
+      // const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string; // Not needed
 
+      // Generate a unique ID for assistantId instead of getting it from OpenAI
+      newAssistant.assistantId = new mongoose.Types.ObjectId().toString();
       await newAssistant.save();
 
-      const openAIAssistant = await createAssistant(
-        apiKey,
-        assistantData.companyId,
-        newAssistant._id,
-        assistantData.name,
-        assistantData.description,
-        assistantData.llmModel,
-        assistantData.llmPrompt,
-        assistantData.allowedActions
-      );
-
-      newAssistant.assistantId = openAIAssistant.id;
-      await newAssistant.save();
+      // OpenAI assistant creation removed as it's deprecated in favor of Vercel AI
+      console.log(`Created assistant ${newAssistant._id} in local database only`);
 
       res.send(newAssistant);
     } catch (err) {

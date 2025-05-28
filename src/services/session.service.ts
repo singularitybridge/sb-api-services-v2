@@ -1,10 +1,11 @@
 import { Assistant } from '../models/Assistant';
 import { ISession, Session } from '../models/Session';
 import { CustomError, NotFoundError } from '../utils/errors';
-import { createNewThread, deleteThread } from './oai.thread.service';
+// OpenAI thread service calls removed as it's deprecated in favor of Vercel AI
 import { ChannelType } from '../types/ChannelType';
 import { getApiKey, ApiKeyType } from './api.key.service';
 import { SupportedLanguage } from './discovery.service';
+import mongoose from 'mongoose'; // Added for ObjectId generation
 
 export const sessionFriendlyAggreationQuery = [
   {
@@ -104,7 +105,8 @@ export const getSessionOrCreate = async (
   userId: string,
   companyId: string,
   channel: ChannelType = ChannelType.WEB,
-  language: string = 'en'
+  language: string = 'en',
+  lastAssistantId?: string // Added lastAssistantId parameter
 ) => {
 
   const findSession = async () => {
@@ -128,26 +130,40 @@ export const getSessionOrCreate = async (
 
   console.log('No existing session found. Attempting to create a new one.');
 
-  const defaultAssistant = await Assistant.findOne({ companyId });
-
-  if (!defaultAssistant) {
-    console.error(`No default assistant available for companyId: ${companyId}`);
-    throw new Error('No default assistant available for this company');
+  let assistantToUseId;
+  if (lastAssistantId) {
+    // Validate if the lastAssistantId is a valid assistant for the company
+    const assistant = await Assistant.findOne({ _id: lastAssistantId, companyId });
+    if (assistant) {
+      assistantToUseId = assistant._id;
+    } else {
+      console.warn(`Last assistant ID ${lastAssistantId} not found or not valid for company ${companyId}. Falling back to default.`);
+    }
   }
 
-  const threadId = await createNewThread(apiKey);
+  if (!assistantToUseId) {
+    const defaultAssistant = await Assistant.findOne({ companyId });
+    if (!defaultAssistant) {
+      console.error(`No default assistant available for companyId: ${companyId}`);
+      throw new Error('No default assistant available for this company');
+    }
+    assistantToUseId = defaultAssistant._id;
+  }
+
+  // Generate a unique ID for threadId instead of getting it from OpenAI
+  const threadId = new mongoose.Types.ObjectId().toString();
 
   try {
     session = await Session.create({
       userId,
       companyId,
-      assistantId: defaultAssistant._id,
+      assistantId: assistantToUseId, // Use determined assistantId
       active: true,
-      threadId,
+      threadId, // Use the locally generated threadId
       channel,
       language,
     });
-    console.log(`New session created: ${session._id}`);
+    console.log(`New session created: ${session._id} with assistant ${assistantToUseId}`);
   } catch (error: any) {
     if (error.code === 11000) {
       console.log('Duplicate key error encountered. Attempting to fetch existing session.');
@@ -179,11 +195,11 @@ export const endSession = async (apiKey: string, sessionId: string): Promise<boo
   }
 
   try {
-    await deleteThread(apiKey, session.threadId);
+    // OpenAI thread deletion removed as it's deprecated in favor of Vercel AI
     session.active = false;
     await session.save();
 
-    console.log(`Session ended, sessionId: ${sessionId}, userId: ${session.userId}, channel: ${session.channel}`);
+    console.log(`Session ended locally, sessionId: ${sessionId}, userId: ${session.userId}, channel: ${session.channel}`);
     return true;
   } catch (error: any) {
     console.error('Error ending session:', error);

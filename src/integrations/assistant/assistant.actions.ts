@@ -1,5 +1,11 @@
 import { ActionContext, FunctionFactory } from '../actions/types';
-import { getAssistants, setAssistant, createNewAssistant } from './assistant.service';
+import { 
+  getAssistants, 
+  setAssistant, 
+  createNewAssistant, 
+  getCurrentAssistant,
+  updateCurrentAssistant // Added import
+} from './assistant.service';
 import { IIdentifier } from '../../models/Assistant';
 
 const createAssistantActions = (context: ActionContext): FunctionFactory => ({
@@ -102,6 +108,43 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
         voice, 
         conversationStarters
       );
+    },
+  },
+
+  getCurrentAssistant: {
+    description: "Get the current assistant's information for the session",
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    function: async () => {
+      return await getCurrentAssistant(context.sessionId);
+    },
+  },
+
+  updateCurrentAssistant: {
+    description: 'Update the current assistant with new information. Only provided fields (name, description, llmModel, llmProvider, llmPrompt) will be updated.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'New name (title) for the assistant' },
+        description: { type: 'string', description: 'New description for the assistant' },
+        llmModel: { type: 'string', description: 'New LLM model identifier (e.g., gpt-4o-mini)' },
+        llmProvider: { type: 'string', enum: ['openai', 'google', 'anthropic'], description: 'New LLM provider' },
+        llmPrompt: { type: 'string', description: 'New LLM prompt for the assistant' }, // Added llmPrompt
+      },
+      required: [], // No fields are strictly required for a partial update
+      additionalProperties: false,
+    },
+    function: async (params: {
+      name?: string;
+      description?: string;
+      llmModel?: string;
+      llmProvider?: 'openai' | 'google' | 'anthropic';
+      llmPrompt?: string; // Added llmPrompt
+    }) => {
+      return await updateCurrentAssistant(context.sessionId, params);
     },
   },
 });

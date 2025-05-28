@@ -17,11 +17,13 @@ export interface IAssistant extends Document {
   conversationStarters: IIdentifier[];
   voice: string;
   language: string;
-  llmModel: string;
+  llmModel: string; // Existing field, will now be the primary model identifier
   llmPrompt: string;
+  llmProvider: 'openai' | 'google' | 'anthropic'; // New field for provider
   companyId: string;
   allowedActions: string[];
   avatarImage?: string;
+  teams?: mongoose.Schema.Types.ObjectId[];
 }
 
 const AssistantSchema: Schema = new Schema({
@@ -31,11 +33,18 @@ const AssistantSchema: Schema = new Schema({
   conversationStarters: { type: [IdentifierSchema], required: true, default: [] },
   voice: { type: String, required: true },
   language: { type: String, required: true },
-  llmModel: { type: String, required: false },
+  llmModel: { type: String, required: false }, // Existing field, will store model name like 'gpt-4.1-mini'
   llmPrompt: { type: String, required: false },
+  llmProvider: { // New field for provider
+    type: String,
+    enum: ['openai', 'google', 'anthropic'],
+    default: 'openai', // Default provider
+    required: true
+  },
   companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
   allowedActions: [{ type: String, required: false }],
   avatarImage: { type: String, required: false, default: 'default-avatar' },
+  teams: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: false }],
 });
 
 export const Assistant = mongoose.model<IAssistant>(

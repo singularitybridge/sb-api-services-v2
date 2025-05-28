@@ -6,6 +6,23 @@ import { VectorStore } from '../models/VectorStore';
 import { createFunctionFactory, ActionContext, FunctionFactory, FunctionDefinition, sanitizeFunctionName } from '../integrations/actions/factory';
 import { SupportedLanguage } from './discovery.service';
 
+// Helper function to extract o3-mini model info for API calls
+// This preserves the original model name in the database while transforming it for API calls
+const extractO3MiniModelInfo = (model: string): { baseModel: string; reasoningEffort?: 'low' | 'medium' | 'high' } => {
+  // Check if the model follows the pattern o3-mini-{level}
+  const o3MiniMatch = model.match(/^o3-mini-(low|medium|high)$/);
+  
+  if (o3MiniMatch) {
+    return {
+      baseModel: 'o3-mini',
+      reasoningEffort: o3MiniMatch[1] as 'low' | 'medium' | 'high'
+    };
+  }
+  
+  // Return the original model if it doesn't match the pattern
+  return { baseModel: model };
+};
+
 export const getAssistants = async (apiKey: string) => {
   const openaiClient = getOpenAIClient(apiKey);
 
@@ -59,19 +76,30 @@ export const updateAssistantById = async (
   // Create function definitions based on allowed actions
   const functionTools = await createFunctionDefinitions(allowedActions);
 
+  // Extract model info for o3-mini models (only for API call, not for storage)
+  const { baseModel, reasoningEffort } = extractO3MiniModelInfo(model);
+
   try {
+    // Create the update parameters
+    const updateParams: any = {
+      instructions,
+      name,
+      description,
+      model: baseModel, // Use the transformed model name for the API call
+      tools: [
+        { type: 'file_search' },
+        ...functionTools
+      ],
+    };
+
+    // Add reasoning_effort parameter if applicable
+    if (reasoningEffort) {
+      updateParams.reasoning_effort = reasoningEffort;
+    }
+
     const updatedAssistant = await openaiClient.beta.assistants.update(
       assistantId,
-      {
-        instructions,
-        name,
-        description,
-        model,
-        tools: [
-          { type: 'file_search' },
-          ...functionTools
-        ],
-      },
+      updateParams
     );
 
     // Validate that all allowed actions are present in the updated assistant
@@ -111,17 +139,28 @@ export const createAssistant = async (
   // Create function definitions based on allowed actions
   const functionTools = await createFunctionDefinitions(allowedActions);
 
+  // Extract model info for o3-mini models (only for API call, not for storage)
+  const { baseModel, reasoningEffort } = extractO3MiniModelInfo(model);
+
   try {
-    const assistant = await openaiClient.beta.assistants.create({
+    // Create the assistant parameters
+    const createParams: any = {
       name,
       description,
       instructions,
-      model,
+      model: baseModel, // Use the transformed model name for the API call
       tools: [
         { type: 'file_search' },
         ...functionTools
       ],
-    });
+    };
+
+    // Add reasoning_effort parameter if applicable
+    if (reasoningEffort) {
+      createParams.reasoning_effort = reasoningEffort;
+    }
+
+    const assistant = await openaiClient.beta.assistants.create(createParams);
 
     // Create a new vector store
     const vectorStore = await openaiClient.beta.vectorStores.create({

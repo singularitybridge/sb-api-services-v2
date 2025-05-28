@@ -8,6 +8,7 @@ export type ApiKeyType =
   | 'openai_api_key'
   | 'labs11_api_key'
   | 'google_api_key'
+  | 'anthropic_api_key' // Added anthropic_api_key
   | 'twilio_api_key'
   | 'jsonbin_api_key'
   | 'getimg_api_key'
@@ -17,7 +18,10 @@ export type ApiKeyType =
   | 'telegram_bot_api_key'
   | 'linear_api_key'
   | 'executor_agent_url'
-  | 'executor_agent_token';
+  | 'executor_agent_token'
+  | 'jira_api_token'
+  | 'jira_domain'
+  | 'jira_email';
 
 // Initialize cache with a 15-minute TTL (time to live)
 const apiKeyCache = new NodeCache({ stdTTL: 900 });

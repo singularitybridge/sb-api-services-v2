@@ -2,8 +2,10 @@ import VoiceResponse from 'twilio/lib/twiml/VoiceResponse';
 import { Assistant } from '../../models/Assistant';
 import { Session } from '../../models/Session';
 import { User } from '../../models/User';
-import { deleteThread, createNewThread } from '../oai.thread.service';
+// import { deleteThread, createNewThread } from '../oai.thread.service'; // Removed, OpenAI specific
+import { ChannelType } from '../../types/ChannelType'; // Added import
 import { transcribeAudioWhisper } from '../speech.recognition.service';
+import mongoose from 'mongoose'; // Added for ObjectId generation
 import { getCurrentTimeAndDay } from '../context.service';
 import { Twilio } from 'twilio';
 import { ApiKey } from '../verification.service';
@@ -34,7 +36,7 @@ export const handleVoiceCallEnded = async (
 
   if (!session) return false;
 
-  deleteThread(apiKey, session.threadId);
+  // deleteThread(apiKey, session.threadId); // Removed, OpenAI specific
   session.active = false;
   await session.save();
 
@@ -69,10 +71,10 @@ export const handleVoiceRequest = async (
   });
 
   if (!session) {
-    const threadId = await createNewThread(apiKey);
+    const threadId = new mongoose.Types.ObjectId().toString(); // Generate local threadId
 
     session = new Session({
-      threadId: threadId,
+      threadId: threadId, // Use locally generated threadId
       userId: user._id,
       assistantId: assistant.assistantId,
       active: true,
@@ -81,22 +83,25 @@ export const handleVoiceRequest = async (
   }
 
   if (firstTime !== false) {
-    const response = await handleSessionMessage(
-      apiKey,
-      `this is a conversation with ${
-        user.name
-      }, start with greeting the user. ${getCurrentTimeAndDay()}`,
-      session.id      
-    );
-    const limitedResponse = response.substring(0, 1200); // Limit response to 1200 characters
+    const userInput = `this is a conversation with ${user.name}, start with greeting the user. ${getCurrentTimeAndDay()}`;
+    // Assuming Twilio voice sessions might use ChannelType.WEB or a generic channel if not specifically defined
+    // TODO: Consider adding a ChannelType.VOICE or ChannelType.TWILIO if distinct channel logic is needed.
+    const response = await handleSessionMessage(userInput, session.id, ChannelType.WEB);
 
-    // generate intro message
-    const audioResponse = await generateAudio('', limitedResponse);
-    if (audioResponse.success && audioResponse.data?.audioUrl) {
-      twiml.play(audioResponse.data.audioUrl);
+    if (typeof response === 'string') {
+      const limitedResponse = response.substring(0, 1200); // Limit response to 1200 characters
+      // generate intro message
+      const audioResponse = await generateAudio('', limitedResponse);
+      if (audioResponse.success && audioResponse.data?.audioUrl) {
+        twiml.play(audioResponse.data.audioUrl);
+      } else {
+        console.error('Failed to generate audio:', audioResponse.error);
+        twiml.say('I apologize, but I am unable to generate audio at the moment.');
+      }
     } else {
-      console.error('Failed to generate audio:', audioResponse.error);
-      twiml.say('I apologize, but I am unable to generate audio at the moment.');
+      // Handle cases where response is not a string (should not happen with non-streaming call)
+      console.error('handleSessionMessage did not return a string for voice intro.');
+      twiml.say('I encountered an issue processing the initial message.');
     }
   }
 
@@ -149,20 +154,23 @@ export const handleVoiceRecordingRequest = async (
     return twiml.toString();
   }
 
-  const response = await handleSessionMessage(
-    apiKey,
-    '', // or SpeechResult when uncommented
-    session._id,
-  );
+  // TODO: Consider adding a ChannelType.VOICE or ChannelType.TWILIO
+  const response = await handleSessionMessage('', session.id, ChannelType.WEB); // Corrected arguments, using empty string for userInput
 
-  const limitedResponse = response.substring(0, 1200); // Limit response to 1200 characters
-  const audioResponse = await generateAudio('', limitedResponse);
+  if (typeof response === 'string') {
+    const limitedResponse = response.substring(0, 1200); // Limit response to 1200 characters
+    const audioResponse = await generateAudio('', limitedResponse);
 
-  if (audioResponse.success && audioResponse.data?.audioUrl) {
-    twiml.play(audioResponse.data.audioUrl);
+    if (audioResponse.success && audioResponse.data?.audioUrl) {
+      twiml.play(audioResponse.data.audioUrl);
+    } else {
+      console.error('Failed to generate audio:', audioResponse.error);
+      twiml.say('I apologize, but I am unable to generate audio at the moment.');
+    }
   } else {
-    console.error('Failed to generate audio:', audioResponse.error);
-    twiml.say('I apologize, but I am unable to generate audio at the moment.');
+    // Handle cases where response is not a string
+    console.error('handleSessionMessage did not return a string for voice recording response.');
+    twiml.say('I encountered an issue processing your recording.');
   }
 
   twiml.redirect('/twilio/voice?firstTime=false');

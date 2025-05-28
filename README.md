@@ -41,6 +41,7 @@ The SB Agent Portal integrates with various third-party services. The following 
 10. Telegram Bot
 11. Linear
 12. Code Indexer
+13. JIRA
 
 Each integration requires an API key, which can be managed through the Company settings. These integrations collectively enhance the capabilities of the AI agents, allowing them to perform a wide range of tasks across different domains and communication channels.
 
@@ -54,6 +55,22 @@ The Code Indexer integration allows AI agents to scan, index, and interact with 
 
 This integration is particularly useful for tasks involving code analysis, refactoring, and development assistance.
 
+### JIRA Integration
+
+The JIRA integration enables AI agents to interact with JIRA projects and tickets. It provides the following capabilities:
+
+- Create new JIRA tickets with customizable fields
+- Fetch tickets from specific JIRA projects
+- Retrieve detailed information about individual tickets
+
+To configure the JIRA integration, you need to set up the following API keys in your Company settings:
+
+- `jira_api_token`: Your JIRA API token
+- `jira_domain`: Your JIRA domain (e.g., 'your-company' for 'your-company.atlassian.net')
+- `jira_email`: The email address associated with your JIRA account
+
+You can obtain these credentials from your JIRA account settings and API tokens page.
+
 ### Vector Search Functionality
 
 The SB Agent Portal now includes vector search capabilities for content items. This feature allows for more efficient and accurate searching based on semantic similarity. Key aspects of this functionality include:
@@ -61,6 +78,17 @@ The SB Agent Portal now includes vector search capabilities for content items. T
 - Generation of embeddings for content items using OpenAI's text-embedding-ada-002 model
 - Storage of embeddings alongside content items in the database
 - Ability to perform vector similarity searches on content items
+
+### Teams Functionality
+
+The SB Agent Portal includes a Teams feature that allows you to organize AI assistants into logical groups. Each team can have multiple assistants, and each assistant can belong to multiple teams. Key aspects of this functionality include:
+
+- Creation and management of teams with name, description, and optional icon
+- Assignment of assistants to one or more teams
+- Filtering assistants by team membership
+- Company-specific team management
+
+For more detailed information about the Teams feature, please refer to the [Teams Feature Documentation](docs/teams-feature.md).
 
 ## Getting Started
 
