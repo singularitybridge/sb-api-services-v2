@@ -307,3 +307,74 @@ export const addTicketToCurrentSprint = async (
     return { success: false, error: `Failed to add ticket ${params.issueKey} to current sprint on board ${params.boardId}: ${errorMessage}` };
   }
 };
+
+export const searchJiraUsers = async (
+  sessionId: string,
+  companyId: string,
+  params: {
+    query?: string;
+    startAt?: number;
+    maxResults?: number;
+    accountId?: string; // Added accountId for specific user search
+  }
+) => {
+  try {
+    const client = await initializeClient(companyId);
+    const searchParams: any = { // Using 'any' for flexibility with jira.js types
+      query: params.query || '',
+      startAt: params.startAt || 0,
+      maxResults: params.maxResults || 50,
+    };
+    // The jira.js library's findUsers method doesn't directly support searching by accountId in its primary params.
+    // If a specific accountId is provided, and the query is empty, we might adjust the query or rely on JIRA's behavior.
+    // For now, we'll pass the query as is. If accountId is the primary search, it should be part of the query string.
+    // Alternatively, a different endpoint/method might be needed for direct accountId lookup if `findUsers` is insufficient.
+    // For simplicity, we assume `query` can contain the accountId if needed, or JIRA's search is smart enough.
+
+    const users: Version3Models.User[] = await client.userSearch.findUsers(searchParams);
+
+    // Simplify user data before returning
+    const simplifiedUsers = users.map(user => ({
+      accountId: user.accountId,
+      displayName: user.displayName,
+      emailAddress: user.emailAddress, // Subject to JIRA privacy settings
+      avatarUrls: user.avatarUrls,
+      active: user.active,
+    }));
+
+    return { success: true, data: simplifiedUsers };
+  } catch (error: any) {
+    return { success: false, error: `Failed to search JIRA users: ${error?.message || 'Unknown error'}` };
+  }
+};
+
+export const assignJiraTicket = async (
+  sessionId: string,
+  companyId: string,
+  params: {
+    issueIdOrKey: string;
+    accountId: string | null; // accountId of the user to assign, or null to unassign
+  }
+) => {
+  try {
+    // We will use the existing updateJiraTicket function.
+    // The JIRA API expects the assignee to be set via the 'fields' object.
+    // If accountId is null, the ticket will be unassigned.
+    const fieldsToUpdate = {
+      assignee: params.accountId ? { accountId: params.accountId } : null,
+    };
+
+    // Call the generic updateJiraTicket function
+    const result = await updateJiraTicket(sessionId, companyId, {
+      issueIdOrKey: params.issueIdOrKey,
+      fields: fieldsToUpdate,
+    });
+
+    // The updateJiraTicket function already returns { success: boolean, data?: any, error?: string }
+    return result;
+  } catch (error: any) {
+    // This catch block might be redundant if updateJiraTicket handles its own errors,
+    // but it's here for safety.
+    return { success: false, error: `Failed to assign JIRA ticket: ${error?.message || 'Unknown error'}` };
+  }
+};
