@@ -24,5 +24,23 @@
     "parameters": {
       "issueIdOrKey": "מזהה או מפתח של כרטיס ה-JIRA"
     }
+  },
+  "searchUsers": {
+    "actionTitle": "חיפוש משתמשי JIRA",
+    "description": "חפש משתמשים ב-JIRA לפי שם, אימייל או מזהה חשבון.",
+    "parameters": {
+      "query": "שאילתת חיפוש לשם משתמש או אימייל",
+      "startAt": "אינדקס התחלה עבור עימוד",
+      "maxResults": "מספר מקסימלי של משתמשים להחזרה",
+      "accountId": "מזהה חשבון משתמש JIRA ספציפי לחיפוש"
+    }
+  },
+  "assignTicket": {
+    "actionTitle": "הקצאת כרטיס JIRA",
+    "description": "הקצה כרטיס JIRA למשתמש ספציפי או בטל הקצאה.",
+    "parameters": {
+      "issueIdOrKey": "מזהה או מפתח של כרטיס ה-JIRA",
+      "accountId": "מזהה חשבון משתמש JIRA להקצאת הכרטיס (או null לביטול הקצאה)"
+    }
   }
 }

@@ -5,7 +5,9 @@ import {
   getJiraTicketById,
   addCommentToJiraTicket,
   updateJiraTicket,
-  addTicketToCurrentSprint as addTicketToCurrentSprintService
+  addTicketToCurrentSprint as addTicketToCurrentSprintService,
+  searchJiraUsers, // Added import for searchJiraUsers
+  assignJiraTicket // Added import for assignJiraTicket
 } from './jira.service';
 
 // Argument types for JIRA actions
@@ -38,6 +40,19 @@ interface UpdateTicketArgs {
 interface AddTicketToCurrentSprintArgs {
   boardId: string;
   issueKey: string;
+}
+
+// New argument types for user search and assignment
+interface SearchUsersArgs {
+  query?: string;
+  startAt?: number;
+  maxResults?: number;
+  accountId?: string;
+}
+
+interface AssignTicketArgs {
+  issueIdOrKey: string;
+  accountId: string | null; // Allow null for unassigning
 }
 
 const projectKeyParamDefinition = {
@@ -142,6 +157,39 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
     },
     function: async (params: AddTicketToCurrentSprintArgs): Promise<any> => {
       return await addTicketToCurrentSprintService(context.sessionId, context.companyId, params);
+    },
+  },
+  searchUsers: {
+    description: 'Searches for JIRA users by query (name, email) or account ID.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query for user name or email.' },
+        startAt: { type: 'number', description: 'Starting index for pagination (default: 0).' },
+        maxResults: { type: 'number', description: 'Maximum number of users to return (default: 50).' },
+        accountId: { type: 'string', description: 'Specific JIRA user account ID to search for.' }
+      },
+      // `required` can be an empty array if no parameters are strictly required for a basic search
+      required: [], 
+      additionalProperties: false, // No other properties allowed
+    },
+    function: async (params: SearchUsersArgs): Promise<any> => {
+      return await searchJiraUsers(context.sessionId, context.companyId, params);
+    },
+  },
+  assignTicket: {
+    description: 'Assigns a JIRA ticket to a specified user account ID, or unassigns it if accountId is null.',
+    parameters: {
+      type: 'object',
+      properties: {
+        issueIdOrKey: { type: 'string', description: 'ID or key of the JIRA ticket.' },
+        accountId: { type: ['string', 'null'], description: 'JIRA user account ID to assign the ticket to. Pass null to unassign.' }
+      },
+      required: ['issueIdOrKey', 'accountId'], // accountId is required, even if null
+      additionalProperties: false,
+    },
+    function: async (params: AssignTicketArgs): Promise<any> => {
+      return await assignJiraTicket(context.sessionId, context.companyId, params);
     },
   },
 });
