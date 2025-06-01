@@ -9,7 +9,7 @@ interface ReplicatePredictionOptions {
 }
 
 const POLLING_CONFIG = {
-  maxWaitTime: 300000,     // 5 minutes max wait
+  maxWaitTime: 600000,     // 10 minutes max wait
   initialInterval: 1000,   // Start checking after 1 second
   maxInterval: 5000,       // Max 5 seconds between checks
   backoffMultiplier: 1.5   // Exponential backoff
