@@ -21,8 +21,8 @@
     "node",
     "typescript"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "Avi Osipov",
+  "license": "MIT",
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.12",
     "@ai-sdk/google": "^1.2.18",
