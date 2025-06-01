@@ -1,0 +1,7 @@
+{
+  "name": "replicate",
+  "icon": "cpu",
+  "apiKeyName": "replicate_api_key",
+  "actionCreator": "createReplicateActions",
+  "actionsFile": "replicate.actions.ts"
+}
