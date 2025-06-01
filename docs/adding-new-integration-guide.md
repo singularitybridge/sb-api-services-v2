@@ -97,6 +97,7 @@ The configuration file provides metadata about your integration for the system t
   "actionsFile": "your_integration.actions.ts"
 }
 ```
+**Note on `apiKeyName`**: The value provided for `apiKeyName` (e.g., `"YOUR_INTEGRATION_API_KEY"`) must correspond to a type defined in the `ApiKeyType` union in `src/services/api.key.service.ts`. If you are introducing a new API key for your integration, ensure you add its type (e.g., `'your_integration_api_key'`) to the `ApiKeyType` definition.
 
 ### 3.4. Translation Files (`translations/en.json` and `translations/he.json`)
 
@@ -151,7 +152,10 @@ Provide user-facing strings in both English and Hebrew.
 
 ### 5.3. API Key Management
 
-- Retrieve the integration's API key using the `getApiKey` function from the API key service.
+- Retrieve the integration's API key using the `getApiKey` function from the API key service (e.g., `await getApiKey(companyId, 'your_integration_api_key')`).
+- **Crucially**, the key type used here (e.g., `'your_integration_api_key'`) must be the same string that is:
+    1.  Defined as the `apiKeyName` in your `integration.config.json`.
+    2.  Added to the `ApiKeyType` union in `src/services/api.key.service.ts`.
 - Handle cases where the API key is missing by **throwing an appropriate error**.
 
 ---
@@ -250,11 +254,33 @@ export const createYourIntegrationActions = (context: ActionContext): FunctionFa
 
 - **Handle HTTP Errors:** Throw exceptions for non-2xx HTTP responses.
 - **Retry Mechanism:** Implement retry logic for transient errors (e.g., network issues) with exponential backoff.
+- **Verify External API Payloads:** Meticulously check the expected request body structure for external APIs. Incorrect or extraneous fields can lead to validation errors (e.g., HTTP 422). Refer directly to the external API's documentation to ensure your request payloads are accurate.
 
 ### 9.2. Security Considerations
 
 - **API Keys:** Retrieve and store API keys securely. **Do not log API keys** in any environment.
 - **Input Sanitization:** Always sanitize inputs before sending them to external services.
+
+### 9.3. Asynchronous Operations and Polling
+
+Some external APIs operate asynchronously. For example, you might initiate a task (like generating an image or report) and then need to poll an endpoint periodically to check its status and retrieve the result once completed.
+- **Polling Logic:** If implementing polling, do so in the `.service.ts` file. Include mechanisms for timeouts and reasonable polling intervals to avoid excessive requests.
+- **Status Updates:** Consider how to communicate the status of such long-running operations back to the user or calling system if needed, though the action executor generally handles 'started', 'completed', 'failed'.
+
+### 9.4. Corresponding UI Updates
+
+Adding a new backend integration, especially one that requires an API key, often necessitates updates in the frontend application. Common UI files to consider include:
+- **Translation Files:** (e.g., `sb-chat-ui/src/locale/en/translation.json`, `sb-chat-ui/src/locale/he/translation.json`)
+    - Add placeholder text for new API key input fields in the company/settings pages.
+- **Field Configuration Files:** (e.g., `sb-chat-ui/src/store/fieldConfigs/companyFieldConfigs.ts`)
+    - Add configuration for the new API key so that an input field is rendered in the UI, allowing users to save the key. The `key` property in this configuration must match the `ApiKeyType` used in the backend.
+- **UI Components for Actions:** While the backend discovery service provides metadata, the frontend will need to:
+    - Dynamically render UI elements (forms, buttons) for the new integration's actions.
+    - Handle user input for action parameters.
+    - Make API calls to the backend to execute actions.
+    - Display results or errors.
+
+Ensure that the `apiKeyName` from your backend `integration.config.json` is consistently used when defining field configurations and translation keys in the UI.
 
 ---
 
@@ -282,4 +308,3 @@ export const createYourIntegrationActions = (context: ActionContext): FunctionFa
 
 - **Action Status Handling:** Ensure that actions are marked as 'failed' when exceptions occur.
 - **Proper Error Messages:** Verify that detailed error messages are included in the action’s failure details.
-
