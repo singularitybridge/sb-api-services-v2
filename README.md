@@ -1,5 +1,7 @@
 # SB Agent Portal
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 SB Agent Portal is a powerful project designed to manage AI agents, enabling them to follow instructions, work with data using Retrieval-Augmented Generation (RAG), and perform actions through function calling.
 
 ## Project Overview
@@ -131,8 +133,22 @@ For more detailed instructions, please refer to our development documentation.
 
 ## Contributing
 
-We welcome contributions to the SB Agent Portal. Please read our contributing guidelines before submitting pull requests.
+We welcome contributions to the SB Agent Portal! Here's how you can contribute:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/your-feature-name`)
+3. Make your changes
+4. Add tests if applicable
+5. Commit your changes (`git commit -am 'Add some feature'`)
+6. Push to the branch (`git push origin feature/your-feature-name`)
+7. Create a Pull Request
+
+Please make sure to:
+- Follow the existing code style
+- Write clear commit messages
+- Include tests for new functionality
+- Update documentation as needed
 
 ## License
 
-This project is licensed under [INSERT LICENSE HERE]. Please see the LICENSE file for more details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
