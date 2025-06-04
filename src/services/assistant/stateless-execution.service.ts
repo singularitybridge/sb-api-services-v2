@@ -7,7 +7,7 @@ import { FunctionCall } from '../../integrations/actions/types';
 import { getApiKey } from '../api.key.service';
 import { fetchGcpFileContent } from '../../integrations/gcp_file_fetcher/gcp_file_fetcher.service';
 import axios from 'axios';
-import { generateText, tool, streamText, CoreMessage, StreamTextResult, Tool, ImagePart, TextPart } from 'ai';
+import { generateText, tool, streamText, CoreMessage, StreamTextResult, Tool, ImagePart, TextPart, generateObject } from 'ai';
 import { z, ZodTypeAny } from 'zod';
 import { trimToWindow } from '../../utils/tokenWindow';
 import { getProvider } from './provider.service';
@@ -26,6 +26,23 @@ const cleanActionAnnotations = (text: string): string => {
 const generateMessageId = (): string => {
   return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 };
+
+// Helper function to extract JSON string from potential markdown code blocks
+const extractJsonFromString = (text: string): string => {
+  const trimmedText = text.trim();
+  // Regex to find ```json ... ``` or ``` ... ```
+  const markdownRegex = /^```(?:json)?\s*([\s\S]*?)\s*```$/;
+  const match = trimmedText.match(markdownRegex);
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+  return trimmedText; // Return original text if no markdown block found
+};
+
+interface ResponseFormat {
+  type: 'json_object' | 'json_schema';
+  schema?: z.ZodSchema<any>; // For json_schema type
+}
 
 interface Attachment {
   fileId: string;
@@ -49,6 +66,7 @@ export const executeAssistantStateless = async (
   companyId: string,
   userId: string, // Added userId for context if needed by tools
   attachments?: Attachment[],
+  responseFormat?: ResponseFormat, // Add responseFormat parameter
   metadata?: Record<string, string>
 ): Promise<string | StreamTextResult<Record<string, Tool<any, any>>, unknown> | Record<string, any>> => {
   console.log(`Executing stateless assistant ${assistant.name} (ID: ${assistant._id}) for company ${companyId}`);
@@ -219,6 +237,9 @@ export const executeAssistantStateless = async (
 
   const shouldStream = metadata?.['X-Experimental-Stream'] === 'true';
   
+  // Check if we should use structured output
+  const useStructuredOutput = responseFormat && (responseFormat.type === 'json_object' || responseFormat.type === 'json_schema');
+
   // For stateless execution, we'll use the prompt directly without template processing
   // or provide basic context if needed
   const systemPrompt = assistant.llmPrompt || "You are a helpful assistant.";
@@ -292,6 +313,70 @@ export const executeAssistantStateless = async (
       // This requires a slight modification to how streamResult is consumed or what this function returns.
       // For now, let's assume the route handles the full stream object.
       return streamResult; 
+    } else if (useStructuredOutput) {
+      // Use generateObject for structured JSON output
+      if (responseFormat.type === 'json_schema' && responseFormat.schema) {
+        // Use provided schema
+        const objectResult = await generateObject({
+          model: llm,
+          messages: trimmedMessages,
+          schema: responseFormat.schema,
+          system: providerKey !== 'anthropic' ? systemPrompt : undefined,
+        });
+
+        return {
+          id: generateMessageId(),
+          role: "assistant",
+          content: [{ type: "text", text: { value: "Structured JSON response. See 'data' field." } }],
+          created_at: Math.floor(Date.now() / 1000),
+          assistant_id: assistant._id.toString(),
+          message_type: "json",
+          data: { json: objectResult.object }
+        };
+      } else {
+        // Use json mode (less strict, but ensures valid JSON)
+        const generateTextOptions: Parameters<typeof generateText>[0] = {
+          model: llm,
+          messages: trimmedMessages,
+          tools: relevantTools,
+          maxSteps: 3,
+          system: providerKey !== 'anthropic' ? systemPrompt : undefined,
+        };
+
+        if (providerKey === 'openai') {
+          // @ts-expect-error TODO: Properly type OpenAI-specific params if not in generic GenerateTextOptions
+          generateTextOptions.response_format = { type: 'json_object' };
+        }
+        // For other providers like Google or Anthropic, specific JSON mode flags might differ
+        // or might need to be set when the model instance `llm` is created in `getProvider`.
+        // Anthropic typically uses tool calling for structured JSON, which `generateObject` handles.
+        // Google's Gemini can be instructed via prompt or might have a responseMimeType config.
+
+        const result = await generateText(generateTextOptions);
+
+        // Parse the JSON response
+        let jsonContent;
+        const rawText = result.text;
+        const potentialJsonString = extractJsonFromString(rawText);
+        try {
+          jsonContent = JSON.parse(potentialJsonString);
+        } catch (e) {
+          console.error('Failed to parse JSON response after attempting to extract from markdown:', e);
+          // Log the string that failed to parse for easier debugging
+          console.error('String that failed parsing:', potentialJsonString);
+          jsonContent = { error: 'Failed to parse response as JSON', raw: rawText }; // return original raw text in error
+        }
+
+        return {
+          id: generateMessageId(),
+          role: "assistant",
+          content: [{ type: "text", text: { value: "JSON response. See 'data' field." } }],
+          created_at: Math.floor(Date.now() / 1000),
+          assistant_id: assistant._id.toString(),
+          message_type: "json",
+          data: { json: jsonContent }
+        };
+      }
     } else {
       const generateCallOptions: Parameters<typeof generateText>[0] = {
         model: llm,
