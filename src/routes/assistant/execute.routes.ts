@@ -10,7 +10,7 @@ const generateMessageId = (): string => {
 
 export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
     const { assistantId } = req.params;
-    const { userInput, attachments } = req.body;
+    const { userInput, attachments, responseFormat } = req.body; // Add responseFormat
 
     // Determine if client wants SSE
     const acceptHeader = req.get('Accept');
@@ -79,7 +79,8 @@ export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
           companyId,
           userId,
           attachments,
-          { 'X-Experimental-Stream': 'true' }
+          undefined, // responseFormat is undefined for SSE
+          { 'X-Experimental-Stream': 'true' } // metadata
         );
 
         if (
@@ -115,10 +116,15 @@ export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
           userInput,
           companyId,
           userId,
-          attachments
+          attachments,
+          responseFormat // Pass responseFormat
         );
 
-        if (typeof result === 'object' && 'content' in result) {
+        // Handle structured response
+        if (responseFormat?.type === 'json_object' || responseFormat?.type === 'json_schema') {
+          // The result should already be properly formatted
+          res.json(result);
+        } else if (typeof result === 'object' && 'content' in result) {
           // Result already formatted by service
           res.json(result);
         } else if (typeof result === 'string') {
