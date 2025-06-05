@@ -34,7 +34,10 @@ interface AddCommentArgs {
 
 interface UpdateTicketArgs {
   issueIdOrKey: string;
-  fields?: Record<string, any>;
+  summary?: string;
+  description?: string;
+  assigneeAccountId?: string | null; // To allow unassigning by passing null
+  labels?: string[];
 }
 
 interface AddTicketToCurrentSprintArgs {
@@ -128,18 +131,49 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
       type: 'object',
       properties: {
         issueIdOrKey: { type: 'string', description: 'ID or key of the JIRA ticket to update' },
-        fields: { 
-          type: 'object', 
-          description: 'An object containing the fields to update. For example: {"summary": "New summary", "assignee": {"name": "user@example.com"}, "labels": ["new-label", "another-label"]}. Refer to JIRA API for updatable fields and their structure.'
+        summary: { type: 'string', description: 'New summary for the ticket (optional)' },
+        description: { type: 'string', description: 'New description for the ticket (optional)' },
+        assigneeAccountId: {
+          type: ['string', 'null'],
+          description: 'The account ID of the user to assign the ticket to (optional). Pass null to unassign.'
+        },
+        labels: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'New list of labels for the ticket (optional). This will overwrite existing labels if provided.'
         }
       },
-      required: ['issueIdOrKey'], 
+      required: ['issueIdOrKey'],
       additionalProperties: false,
     },
     function: async (params: UpdateTicketArgs): Promise<any> => {
+      const fieldsToUpdate: Record<string, any> = {};
+
+      if (params.summary !== undefined) {
+        fieldsToUpdate.summary = params.summary;
+      }
+      if (params.description !== undefined) {
+        fieldsToUpdate.description = params.description;
+      }
+      if (params.assigneeAccountId !== undefined) {
+        if (params.assigneeAccountId === null) {
+          fieldsToUpdate.assignee = null; // For unassigning
+        } else if (params.assigneeAccountId) { // Ensure it's a non-empty string
+          fieldsToUpdate.assignee = { accountId: params.assigneeAccountId };
+        }
+        // If assigneeAccountId is an empty string, it's ignored here.
+      }
+      if (params.labels !== undefined) {
+        fieldsToUpdate.labels = params.labels;
+      }
+
+      // It's possible fieldsToUpdate is empty if only issueIdOrKey was provided.
+      // The JIRA API might error or do nothing. This is acceptable.
+      // Alternatively, could add a check: if (Object.keys(fieldsToUpdate).length === 0) return { message: "No update fields provided." }
+
       const serviceParams = {
         issueIdOrKey: params.issueIdOrKey,
-        fields: params.fields ?? {} // Default to empty object if fields is undefined
+        fields: fieldsToUpdate
       };
       return await updateJiraTicket(context.sessionId, context.companyId, serviceParams);
     },
