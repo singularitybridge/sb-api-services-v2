@@ -24,5 +24,23 @@
     "parameters": {
       "issueIdOrKey": "ID or key of the JIRA ticket"
     }
+  },
+  "searchUsers": {
+    "actionTitle": "Search JIRA Users",
+    "description": "Search for users in JIRA by name, email, or account ID.",
+    "parameters": {
+      "query": "Search query for user name or email",
+      "startAt": "Starting index for pagination",
+      "maxResults": "Maximum number of users to return",
+      "accountId": "Specific JIRA user account ID to search for"
+    }
+  },
+  "assignTicket": {
+    "actionTitle": "Assign JIRA Ticket",
+    "description": "Assign a JIRA ticket to a specific user or unassign it.",
+    "parameters": {
+      "issueIdOrKey": "ID or key of the JIRA ticket",
+      "accountId": "JIRA user account ID to assign the ticket to (or null to unassign)"
+    }
   }
 }

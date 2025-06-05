@@ -31,9 +31,11 @@ export async function createJournalEntry(
     journalData.sessionId = session._id;
     
     const newJournal = new Journal(journalData);
+    console.log('journal service :: About to save journal entry...');
     const savedJournal = await newJournal.save();
+    console.log('journal service :: Journal entry saved:', savedJournal._id.toString());
     
-    // Try to store in Pinecone, but don't fail if it errors
+    // Restore Pinecone and subsequent update
     try {
       await upsertVector(
         savedJournal._id.toString(),
@@ -48,13 +50,29 @@ export async function createJournalEntry(
         },
         savedJournal.companyId.toString()
       );
-      // Update isIndexed flag after successful vector creation
-      await Journal.findByIdAndUpdate(savedJournal._id, { isIndexed: true });
+      const embeddingId = savedJournal._id.toString(); 
+      const embeddingModel = "text-embedding-ada-002"; // As per original logic
+      await Journal.findByIdAndUpdate(savedJournal._id, { 
+        isIndexed: true,
+        embeddingId: embeddingId,
+        embeddingModel: embeddingModel,
+      });
       savedJournal.isIndexed = true;
+      savedJournal.embeddingId = embeddingId;
+      savedJournal.embeddingModel = embeddingModel;
+      console.log('journal service :: Pinecone upsert and index update successful for:', savedJournal._id.toString());
     } catch (vectorError) {
-      // Log the error but don't throw it
+      // Log the error but don't throw it (as per original logic for create)
       console.warn('Warning: Failed to store vector in Pinecone:', vectorError);
       console.warn('Journal entry was saved to MongoDB but vector search will not be available for this entry');
+      // Note: If upsertVector fails, isIndexed will remain false, and embedding fields won't be set.
+      // The original code didn't explicitly set them to undefined or isIndexed to false here,
+      // it just meant the findByIdAndUpdate above didn't run or its effects weren't applied to savedJournal in memory.
+      // The DB state would be isIndexed: false (default).
+      // For consistency, let's ensure the returned object reflects this if vectoring fails.
+      savedJournal.isIndexed = false; 
+      savedJournal.embeddingId = undefined;
+      savedJournal.embeddingModel = undefined;
     }
     
     return savedJournal;
@@ -99,10 +117,16 @@ export async function searchJournalEntries(
   query: string,
   companyId: string,
   userId?: string,
+  entryType?: string,
+  tags?: string[],
   limit: number = 10
 ): Promise<IJournal[]> {
   try {
     let journalEntries: IJournal[] = [];
+    const vectorSearchFilter: any = {};
+    if (userId) vectorSearchFilter.userId = { $eq: userId };
+    if (entryType) vectorSearchFilter.entryType = { $eq: entryType };
+    if (tags && tags.length > 0) vectorSearchFilter.tags = { $in: tags };
     
     try {
       const searchResults = await runVectorSearch({
@@ -110,7 +134,7 @@ export async function searchJournalEntries(
         entity: ['journal'],
         companyId,
         limit,
-        filter: userId ? { userId: { $eq: userId } } : {},
+        filter: vectorSearchFilter,
       });
 
       // Get the IDs of matched documents
@@ -133,9 +157,9 @@ export async function searchJournalEntries(
         $text: { $search: query },
       };
       
-      if (userId) {
-        textSearchQuery.userId = new mongoose.Types.ObjectId(userId);
-      }
+      if (userId) textSearchQuery.userId = new mongoose.Types.ObjectId(userId);
+      if (entryType) textSearchQuery.entryType = entryType;
+      if (tags && tags.length > 0) textSearchQuery.tags = { $in: tags };
       
       journalEntries = await Journal.find(textSearchQuery)
         .sort({ score: { $meta: 'textScore' } })
@@ -204,30 +228,56 @@ export async function updateJournalEntry(
   updateData: Partial<IJournal>
 ): Promise<IJournal | null> {
   try {
-    const updatedJournal = await Journal.findByIdAndUpdate(journalId, updateData, { new: true });
+    const originalJournal = await Journal.findById(journalId);
+    if (!originalJournal) {
+      return null; // Or throw an error
+    }
+
+    const updatedJournal = await Journal.findByIdAndUpdate(journalId, updateData, { new: true, runValidators: true });
     
-    if (updatedJournal && updateData.content) {
-      // Try to update vector in Pinecone, but don't fail if it errors
-      try {
-        await upsertVector(
-          updatedJournal._id.toString(),
-          updatedJournal.content,
-          {
-            userId: updatedJournal.userId.toString(),
-            companyId: updatedJournal.companyId.toString(),
-            sessionId: updatedJournal.sessionId.toString(),
-            entryType: updatedJournal.entryType,
-            tags: updatedJournal.tags,
-            timestamp: updatedJournal.timestamp.toISOString(),
-          },
-          updatedJournal.companyId.toString()
-        );
-        // Update isIndexed flag after successful vector update
-        await Journal.findByIdAndUpdate(updatedJournal._id, { isIndexed: true });
-        updatedJournal.isIndexed = true;
-      } catch (vectorError) {
-        console.warn('Warning: Failed to update vector in Pinecone:', vectorError);
-        console.warn('Journal entry was updated in MongoDB but vector search may be out of sync');
+    if (updatedJournal) {
+      const contentChanged = updateData.content && updateData.content !== originalJournal.content;
+      const entryTypeChanged = updateData.entryType && updateData.entryType !== originalJournal.entryType;
+      // For tags, we need a more robust check if they actually changed
+      const tagsChanged = updateData.tags && JSON.stringify(updateData.tags.sort()) !== JSON.stringify(originalJournal.tags.sort());
+
+      if (contentChanged || entryTypeChanged || tagsChanged) {
+        // Try to update vector in Pinecone, but don't fail if it errors
+        try {
+          await upsertVector(
+            updatedJournal._id.toString(),
+            updatedJournal.content, // Use the new content
+            {
+              userId: updatedJournal.userId.toString(),
+              companyId: updatedJournal.companyId.toString(),
+              sessionId: updatedJournal.sessionId.toString(),
+              entryType: updatedJournal.entryType,
+              tags: updatedJournal.tags,
+              timestamp: updatedJournal.timestamp.toISOString(),
+            },
+            updatedJournal.companyId.toString()
+          );
+          // Update isIndexed flag and embedding details after successful vector update
+          const embeddingId = updatedJournal._id.toString();
+          const embeddingModel = "text-embedding-ada-002"; // Placeholder
+          await Journal.findByIdAndUpdate(updatedJournal._id, { 
+            isIndexed: true,
+            embeddingId: embeddingId,
+            embeddingModel: embeddingModel,
+          });
+          updatedJournal.isIndexed = true;
+          updatedJournal.embeddingId = embeddingId;
+          updatedJournal.embeddingModel = embeddingModel;
+
+        } catch (vectorError) {
+          console.warn('Warning: Failed to update vector in Pinecone:', vectorError);
+          console.warn('Journal entry was updated in MongoDB but vector search may be out of sync');
+          // If vector update fails, we might want to mark isIndexed as false or handle differently
+          await Journal.findByIdAndUpdate(updatedJournal._id, { isIndexed: false, embeddingId: undefined, embeddingModel: undefined });
+          updatedJournal.isIndexed = false;
+          updatedJournal.embeddingId = undefined;
+          updatedJournal.embeddingModel = undefined;
+        }
       }
     }
     

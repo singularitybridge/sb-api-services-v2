@@ -50,11 +50,15 @@ const validateBotToken = async (token: string): Promise<boolean> => {
 
 export const initializeTelegramBots = async () => {
   try {
-    const companies = await getCompanies(null);
+    logger.info('Telegram integration is currently disabled. Skipping bot initialization.');
+    return; // Early exit to disable Telegram bot initialization
 
-    for (const company of companies) {
-      try {
-        const companyId = normalizeCompanyId(company._id);
+    /*
+    // const companies = await getCompanies(null); // Temporarily disabled
+
+    // for (const company of companies) { // Temporarily disabled
+      // try { // Temporarily disabled
+        // const companyId = normalizeCompanyId(company._id); // Temporarily disabled
         const telegramBotToken = await getApiKey(companyId, 'telegram_bot_api_key');
 
         if (!telegramBotToken) {
@@ -68,8 +72,9 @@ export const initializeTelegramBots = async () => {
           continue;
         }
 
-        const bot = new TelegramBot(telegramBotToken, { polling: true });
+        const bot = new TelegramBot(telegramBotToken, { polling: false }); // Changed polling to false
         bot.on('polling_error', (error: any) => {
+          // Polling is disabled, but we'll keep the error handler in case it's enabled elsewhere or for other error types.
           logger.warn(`Telegram polling error: ${companyId}`, { error: error.message });
         });
 
@@ -164,9 +169,10 @@ export const initializeTelegramBots = async () => {
 
         logger.info(`✓ Bot ready for company ${companyId}`);
       } catch (error: any) {
-        logger.error(`Bot init failed for ${company._id}: ${error.message}`);
-      }
-    }
+        // logger.error(`Bot init failed for ${company._id}: ${error.message}`); // Temporarily disabled
+      // } // Temporarily disabled
+    // } // Temporarily disabled
+    */
   } catch (error: any) {
     logger.error(`Telegram bots initialization failed: ${error.message}`);
   }

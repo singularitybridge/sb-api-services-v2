@@ -1,3 +1,21 @@
+const { MongoMemoryServer } = require('mongodb-memory-server');
+let mongod;
+
+global.beforeAll(async () => {
+  mongod = await MongoMemoryServer.create();
+  const uri = mongod.getUri();
+  process.env.MONGODB_URI = uri;
+  process.env.MONGODB_DB_NAME = 'jest-test-db'; // Use a dedicated test DB name
+  // console.log(`MongoDB Memory Server URI: ${uri}`); // For debugging
+});
+
+global.afterAll(async () => {
+  if (mongod) {
+    await mongod.stop();
+  }
+  // Mongoose connection is typically closed by the app or individual test suites
+});
+
 // Suppress deprecation warnings
 const originalWarn = console.warn;
 console.warn = (...args) => {
@@ -17,13 +35,13 @@ process.emitWarning = (warning, type, ...args) => {
 };
 
 // Suppress console.error during tests
-const originalError = console.error;
-console.error = (...args) => {
-  if (process.env.NODE_ENV === 'test') {
-    return;
-  }
-  originalError.apply(console, args);
-};
+// const originalError = console.error;
+// console.error = (...args) => {
+//   if (process.env.NODE_ENV === 'test') {
+//     // return; // Temporarily disabled to see Mongoose errors
+//   }
+//   originalError.apply(console, args);
+// };
 
 // Mock OpenAI for tests
 jest.mock('openai', () => {

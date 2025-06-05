@@ -1,0 +1,38 @@
+{
+  "serviceName": "Replicate AI Models",
+  "serviceDescription": "Run various AI models from Replicate, including image generation, background removal, and more. Outputs are handled based on model type, with images uploaded to cloud storage.",
+  "runReplicateModel": {
+    "actionTitle": "Run Replicate Model",
+    "description": "Run any model on Replicate by providing the model identifier and input object. Handles image outputs by uploading to storage.",
+    "parameters": {
+      "model": "The Replicate model identifier (e.g., 'owner/model-name' or 'owner/model-name:version-id').",
+      "input": "A JSON object containing the input parameters for the specified model.",
+      "outputType": "Optional: Specify the expected output type to help guide processing. Defaults to 'image' if output is a URL.",
+      "filename": "Optional: If the output is an image, this will be used as the filename when uploading to storage."
+    },
+    "errors": {
+      "invalidModel": "Invalid model identifier: Must be a non-empty string.",
+      "invalidInput": "Invalid input: Must be a JSON object.",
+      "predictionFailed": "Replicate prediction failed or timed out.",
+      "apiKeyMissing": "Replicate API key not found."
+    },
+    "success": "Replicate model executed successfully."
+  },
+  "runReplicateImageModel": {
+    "actionTitle": "Run Replicate Image Model",
+    "description": "Run an image-generating or image-processing model on Replicate. The image output will be uploaded to storage.",
+    "parameters": {
+      "model": "The Replicate model identifier for an image model.",
+      "input": "A JSON object containing the input parameters for the image model.",
+      "filename": "Optional: Custom filename for the generated/processed image when uploading to storage."
+    },
+    "errors": {
+      "invalidModel": "Invalid model identifier: Must be a non-empty string.",
+      "invalidInput": "Invalid input: Must be a JSON object.",
+      "predictionFailed": "Replicate image model prediction failed or timed out.",
+      "apiKeyMissing": "Replicate API key not found.",
+      "imageProcessingFailed": "Failed to download or upload the image from Replicate."
+    },
+    "success": "Replicate image model executed successfully. Image available at: {{imageUrl}}"
+  }
+}

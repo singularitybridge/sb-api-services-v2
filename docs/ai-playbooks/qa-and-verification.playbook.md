@@ -84,6 +84,16 @@ curl 'http://localhost:3000/resources/resource_id' \
 
 Remember to replace USER_PROVIDED_TOKEN with the actual token provided by the user for authentication.
 
+### 3. Verify Action Execution Messages
+
+- **Objective**: Ensure that action execution messages (e.g., "Action started...", "Action completed...") are displayed correctly in the chat UI.
+- **Steps**:
+    1. Trigger an action that is expected to show execution messages (e.g., "Create a journal entry with title 'Test' and content 'This is a test.'").
+    2. Observe the chat UI for the appearance of "Action started..." and "Action completed..." messages.
+    3. Verify that the messages accurately reflect the status and details of the action.
+    4. **Troubleshooting**: If action execution messages are not appearing or updating, try restarting the development server. This can resolve issues related to stale state or caching.
+- **Expected Outcome**: Action execution messages appear and update correctly, providing real-time feedback on the action's progress.
+
 ## Documentation Review
 
 As part of the QA process, ensure that all documentation is up-to-date:

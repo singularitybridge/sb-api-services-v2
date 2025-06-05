@@ -15,8 +15,9 @@ import { Types } from 'mongoose';
 
 interface JournalEntryArgs {
   content: string;
-  entryType?: string;
+  entryType: string; // Made required
   tags?: string[];
+  metadata?: Record<string, any>; // Added metadata
 }
 
 interface GetJournalEntriesArgs {
@@ -35,6 +36,8 @@ interface SearchJournalEntriesArgs {
   query: string;
   limit?: number;
   scope?: 'user' | 'company';
+  entryType?: string; // Added entryType
+  tags?: string[]; // Added tags
 }
 
 export const createJournalActions = (
@@ -48,14 +51,18 @@ export const createJournalActions = (
       type: 'object',
       properties: {
         content: { type: 'string', description: 'The content of the journal entry' },
-        entryType: { type: 'string', description: 'The type of the journal entry' },
+        entryType: { 
+          type: 'string', 
+          description: 'The type of the journal entry'
+        },
         tags: { type: 'array', items: { type: 'string' }, description: 'Tags for the journal entry' },
+        metadata: { type: 'object', description: 'Additional metadata for the journal entry', additionalProperties: true },
       },
-      required: ['content'],
+      required: ['content', 'entryType'], // entryType is now required
       additionalProperties: false,
     },
     function: async (args: JournalEntryArgs) => {
-      const { content, entryType, tags } = args;
+      const { content, entryType, tags, metadata } = args;
       const { companyId, sessionId } = context;
 
       if (!sessionId) {
@@ -88,6 +95,7 @@ export const createJournalActions = (
             content,
             entryType,
             tags,
+            metadata,
             userId: new Types.ObjectId(session.userId),
             companyId: new Types.ObjectId(companyId),
           },
@@ -120,18 +128,27 @@ export const createJournalActions = (
         },
         limit: { 
           type: 'number', 
-          description: 'Maximum number of entries to return' 
+          description: 'Maximum number of entries to return'
         },
-        scope: { 
-          type: 'string', 
+        scope: {
+          type: 'string',
           enum: ['user', 'company'],
-          description: 'Search entries for current user only or all company entries' 
+          description: 'Search entries for current user only or all company entries'
+        },
+        entryType: {
+          type: 'string',
+          description: 'Filter by entry type'
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Filter by tags'
         },
       },
       required: ['query'],
       additionalProperties: false,
     },
-    function: async ({ query, limit = 10, scope = 'user' }: SearchJournalEntriesArgs) => {
+    function: async ({ query, limit = 10, scope = 'user', entryType, tags }: SearchJournalEntriesArgs) => {
       try {
         const { companyId, sessionId } = context;
 
@@ -162,6 +179,8 @@ export const createJournalActions = (
           query,
           companyId,
           scope === 'user' ? session.userId : undefined,
+          entryType,
+          tags,
           limit
         );
         return { success: true, data: entries };

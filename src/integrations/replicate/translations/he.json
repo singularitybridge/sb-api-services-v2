@@ -1,0 +1,38 @@
+{
+  "serviceName": "מודלים של Replicate AI",
+  "serviceDescription": "הפעל מודלים שונים של AI מ-Replicate, כולל יצירת תמונות, הסרת רקע ועוד. התוצרים מטופלים בהתאם לסוג המודל, ותמונות מועלות לאחסון בענן.",
+  "runReplicateModel": {
+    "actionTitle": "הפעל מודל Replicate",
+    "description": "הפעל כל מודל ב-Replicate על ידי ציון מזהה המודל ואובייקט הקלט. מטפל בפלט תמונות על ידי העלאה לאחסון.",
+    "parameters": {
+      "model": "מזהה המודל ב-Replicate (למשל, 'owner/model-name' או 'owner/model-name:version-id').",
+      "input": "אובייקט JSON המכיל את פרמטרי הקלט עבור המודל שצוין.",
+      "outputType": "אופציונלי: ציין את סוג הפלט הצפוי כדי לסייע בעיבוד. ברירת המחדל היא 'image' אם הפלט הוא URL.",
+      "filename": "אופציונלי: אם הפלט הוא תמונה, זה ישמש כשם הקובץ בעת העלאה לאחסון."
+    },
+    "errors": {
+      "invalidModel": "מזהה מודל לא תקין: חייב להיות מחרוזת לא ריקה.",
+      "invalidInput": "קלט לא תקין: חייב להיות אובייקט JSON.",
+      "predictionFailed": "חיזוי Replicate נכשל או פג תוקפו.",
+      "apiKeyMissing": "מפתח API של Replicate לא נמצא."
+    },
+    "success": "מודל Replicate בוצע בהצלחה."
+  },
+  "runReplicateImageModel": {
+    "actionTitle": "הפעל מודל תמונה Replicate",
+    "description": "הפעל מודל יצירת תמונות או עיבוד תמונות ב-Replicate. פלט התמונה יועלה לאחסון.",
+    "parameters": {
+      "model": "מזהה מודל התמונה ב-Replicate.",
+      "input": "אובייקט JSON המכיל את פרמטרי הקלט עבור מודל התמונה.",
+      "filename": "אופציונלי: שם קובץ מותאם אישית לתמונה שנוצרה/עובדה בעת העלאה לאחסון."
+    },
+    "errors": {
+      "invalidModel": "מזהה מודל לא תקין: חייב להיות מחרוזת לא ריקה.",
+      "invalidInput": "קלט לא תקין: חייב להיות אובייקט JSON.",
+      "predictionFailed": "חיזוי מודל התמונה Replicate נכשל או פג תוקפו.",
+      "apiKeyMissing": "מפתח API של Replicate לא נמצא.",
+      "imageProcessingFailed": "נכשל בהורדה או העלאה של התמונה מ-Replicate."
+    },
+    "success": "מודל התמונה Replicate בוצע בהצלחה. התמונה זמינה ב: {{imageUrl}}"
+  }
+}

@@ -17,6 +17,7 @@ export type ApiKeyType =
   | 'photoroom_api_key'
   | 'telegram_bot_api_key'
   | 'linear_api_key'
+  | 'replicate_api_key'
   | 'executor_agent_url'
   | 'executor_agent_token'
   | 'jira_api_token'
