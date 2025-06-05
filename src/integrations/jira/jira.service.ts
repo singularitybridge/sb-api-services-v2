@@ -202,20 +202,16 @@ export const updateJiraTicket = async (
 
     // The jira.js library expects no response for editIssue, so we don't assign it.
     // A successful call implies the update worked.
-    console.log(`[DEBUG] jira.service.ts: updateJiraTicket called for ${params.issueIdOrKey} with fields:`, JSON.stringify(params.fields, null, 2)); // DEBUG
     await client.issues.editIssue({
       issueIdOrKey: params.issueIdOrKey,
       fields: params.fields
     });
-    console.log(`[DEBUG] jira.service.ts: editIssue successful for ${params.issueIdOrKey}`); // DEBUG
     // Refetch the issue to return its updated state
     const updatedIssue = await client.issues.getIssue({
       issueIdOrKey: params.issueIdOrKey
     });
-    console.log(`[DEBUG] jira.service.ts: Fetched updated issue ${params.issueIdOrKey}, assignee:`, updatedIssue.fields?.assignee?.displayName); // DEBUG
     return { success: true, data: updatedIssue };
   } catch (error: any) {
-    console.error(`[DEBUG] jira.service.ts: Error in updateJiraTicket for ${params.issueIdOrKey}:`, error); // DEBUG
     return { success: false, error: `Failed to update JIRA ticket: ${error?.message || 'Unknown error'}` };
   }
 };
