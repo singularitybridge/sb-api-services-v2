@@ -107,10 +107,7 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
       additionalProperties: false,
     },
     function: async (params: GetTicketArgs): Promise<any> => {
-      console.log(`[DEBUG] jira.actions.ts: getTicket called with params:`, params); // DEBUG
-      const result = await getJiraTicketById(context.sessionId, context.companyId, params);
-      console.log(`[DEBUG] jira.actions.ts: getTicket result:`, result); // DEBUG
-      return result;
+      return await getJiraTicketById(context.sessionId, context.companyId, params);
     },
   },
   addComment: {
