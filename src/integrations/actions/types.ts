@@ -4,6 +4,8 @@ export interface ActionContext {
   sessionId: string;
   companyId: string;
   language: SupportedLanguage;
+  userId?: string;
+  isStateless?: boolean;
 }
 
 export interface FunctionDefinition<T = any> {

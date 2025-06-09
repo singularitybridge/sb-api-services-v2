@@ -118,7 +118,7 @@ export const handleSessionMessage = async (
   metadata?: Record<string, string>,
   attachments?: Attachment[]
 ): Promise<string | StreamTextResult<Record<string, Tool<any, any>>, unknown>> => { 
-  console.log(`Handling session message for session ${sessionId} on channel ${channel}`);
+  // console.log(`Handling session message for session ${sessionId} on channel ${channel}`);
   const session = await Session.findById(sessionId);
   if (!session || !session.active || session.channel !== channel) {
     throw new Error('Invalid or inactive session, or channel mismatch');
@@ -131,7 +131,7 @@ export const handleSessionMessage = async (
   if (!assistant) {
     throw new Error('Assistant not found');
   }
-  console.log(`Fetched assistant details: Provider='${assistant.llmProvider}', Model='${assistant.llmModel}'`);
+  // console.log(`Fetched assistant details: Provider='${assistant.llmProvider}', Model='${assistant.llmModel}'`);
   const providerKey = assistant.llmProvider;
   let processedUserInput = userInput;
   // This will hold the parts for the user's message, including text, image, and file parts
@@ -139,11 +139,11 @@ export const handleSessionMessage = async (
   const userMessageContentParts: (TextPart | ImagePart | any)[] = [{ type: 'text', text: processedUserInput }];
 
   if (attachments && attachments.length > 0) {
-    console.log(`Processing ${attachments.length} attachments for session ${sessionId} with provider ${providerKey}`);
+    // console.log(`Processing ${attachments.length} attachments for session ${sessionId} with provider ${providerKey}`);
     for (const attachment of attachments) {
       if (attachment.mimeType.startsWith('image/')) {
         try {
-          console.log(`Fetching image: ${attachment.fileName} from ${attachment.url}`);
+          // console.log(`Fetching image: ${attachment.fileName} from ${attachment.url}`);
           const response = await axios.get(attachment.url, { responseType: 'arraybuffer' });
           const imageBuffer = Buffer.from(response.data);
           
@@ -153,15 +153,15 @@ export const handleSessionMessage = async (
             image: new Uint8Array(imageBuffer),
             mimeType: attachment.mimeType,
           });
-          console.log(`Image attachment processed as Uint8Array for ${providerKey}: ${attachment.fileName}`);
+          // console.log(`Image attachment processed as Uint8Array for ${providerKey}: ${attachment.fileName}`);
         } catch (error) {
-          console.error(`Error fetching or processing image data from URL ${attachment.url} for ${attachment.fileName}:`, error);
+          // console.error(`Error fetching or processing image data from URL ${attachment.url} for ${attachment.fileName}:`, error);
           // Append error info to the text part of the user message
           (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load image: ${attachment.fileName}]`;
         }
       } else if (attachment.fileId && attachment.mimeType === 'application/pdf') { // Modern PDF handling
         try {
-          console.log(`Fetching PDF content AS BUFFER: ${attachment.fileName} (ID: ${attachment.fileId}) for ${providerKey}`);
+          // console.log(`Fetching PDF content AS BUFFER: ${attachment.fileName} (ID: ${attachment.fileId}) for ${providerKey}`);
           const pdfBufferResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'buffer' });
 
           if (pdfBufferResult.success && pdfBufferResult.data instanceof Buffer) {
@@ -172,10 +172,10 @@ export const handleSessionMessage = async (
               const MAX_PDF_TEXT_CHARS = 7000;
               if (pdfTextToAppend.length > MAX_PDF_TEXT_CHARS) {
                 pdfTextToAppend = pdfTextToAppend.substring(0, MAX_PDF_TEXT_CHARS) + "\n\n[...PDF text truncated due to length...]\n";
-                console.log(`Truncated extracted PDF text for ${attachment.fileName} to ${MAX_PDF_TEXT_CHARS} characters.`);
+                // console.log(`Truncated extracted PDF text for ${attachment.fileName} to ${MAX_PDF_TEXT_CHARS} characters.`);
               }
               (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached PDF: ${attachment.fileName} ---\n${pdfTextToAppend}\n--- End of File ---`;
-              console.log(`${providerKey} PDF attachment processed as text extraction: ${attachment.fileName}`);
+              // console.log(`${providerKey} PDF attachment processed as text extraction: ${attachment.fileName}`);
             } else {
               // Fallback for unknown providers: text extraction
               const fileContentResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'string' });
@@ -184,17 +184,17 @@ export const handleSessionMessage = async (
               } else {
                 (userMessageContentParts[0] as TextPart).text += `\n\n[PDF omitted: provider ${providerKey} does not support files]`;
               }
-              console.log(`PDF processed as text fallback for ${providerKey}: ${attachment.fileName}`);
+              // console.log(`PDF processed as text fallback for ${providerKey}: ${attachment.fileName}`);
             }
           } else {
-            console.warn(`Could not fetch PDF as buffer: ${attachment.fileName}. Error: ${pdfBufferResult.error || 'Unknown error'}. Falling back to text extraction.`);
+            // console.warn(`Could not fetch PDF as buffer: ${attachment.fileName}. Error: ${pdfBufferResult.error || 'Unknown error'}. Falling back to text extraction.`);
             const fileContentResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'string' });
             if (fileContentResult.success && typeof fileContentResult.data === 'string') {
               let pdfTextToAppend = fileContentResult.data;
               const MAX_PDF_TEXT_CHARS = 7000;
               if (pdfTextToAppend.length > MAX_PDF_TEXT_CHARS) {
                 pdfTextToAppend = pdfTextToAppend.substring(0, MAX_PDF_TEXT_CHARS) + "\n\n[...PDF text truncated due to length...]\n";
-                console.log(`Truncated extracted PDF text for ${attachment.fileName} to ${MAX_PDF_TEXT_CHARS} characters.`);
+                // console.log(`Truncated extracted PDF text for ${attachment.fileName} to ${MAX_PDF_TEXT_CHARS} characters.`);
               }
               (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached PDF (text fallback): ${attachment.fileName} ---\n${pdfTextToAppend}\n--- End of File ---`;
             } else {
@@ -202,23 +202,23 @@ export const handleSessionMessage = async (
             }
           }
         } catch (error) {
-          console.error(`Error fetching/processing PDF ${attachment.fileName}:`, error);
+          // console.error(`Error fetching/processing PDF ${attachment.fileName}:`, error);
           (userMessageContentParts[0] as TextPart).text += `\n\n[Error loading PDF: ${attachment.fileName}]`;
         }
       } else if (attachment.fileId) { // Other non-image files (TXT, CSV, etc.)
         try {
-          console.log(`Fetching non-image file content AS TEXT: ${attachment.fileName} (ID: ${attachment.fileId}) for provider ${providerKey}`);
+          // console.log(`Fetching non-image file content AS TEXT: ${attachment.fileName} (ID: ${attachment.fileId}) for provider ${providerKey}`);
           const fileContentResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'string' });
           
           if (fileContentResult.success && typeof fileContentResult.data === 'string') {
             (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached File: ${attachment.fileName} ---\n${fileContentResult.data}\n--- End of File: ${attachment.fileName} ---`;
-            console.log(`Non-image file content (text) appended for ${providerKey}: ${attachment.fileName}`);
+            // console.log(`Non-image file content (text) appended for ${providerKey}: ${attachment.fileName}`);
           } else {
-            console.warn(`Could not fetch content for file: ${attachment.fileName} (ID: ${attachment.fileId}). Result: ${JSON.stringify(fileContentResult)}`);
+            // console.warn(`Could not fetch content for file: ${attachment.fileName} (ID: ${attachment.fileId}). Result: ${JSON.stringify(fileContentResult)}`);
             (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load content for attached file: ${attachment.fileName}]`;
           }
         } catch (error) {
-          console.error(`Error fetching content for file ${attachment.fileName} (ID: ${attachment.fileId}):`, error);
+          // console.error(`Error fetching content for file ${attachment.fileName} (ID: ${attachment.fileId}):`, error);
           (userMessageContentParts[0] as TextPart).text += `\n\n[Error loading content for attached file: ${attachment.fileName}]`;
         }
       }
@@ -271,7 +271,7 @@ export const handleSessionMessage = async (
 
   if (toolsCache.has(cacheKey)) {
     toolsForSdk = toolsCache.get(cacheKey)!;
-    console.log(`Using cached toolsForSdk for assistant ${assistant._id}`);
+    // console.log(`Using cached toolsForSdk for assistant ${assistant._id}`);
   } else {
     toolsForSdk = {};
     const functionFactory = await createFunctionFactory(actionContext, assistant.allowedActions);
@@ -316,12 +316,12 @@ export const handleSessionMessage = async (
     const currentFuncName = funcName;
     
     let executeFunc = async (args: any) => {
-      console.log(`[Tool Execution] Function ${currentFuncName} called with sessionId from closure: ${sessionId}`);
+      // console.log(`[Tool Execution] Function ${currentFuncName} called with sessionId from closure: ${sessionId}`);
       const currentSession = await Session.findById(sessionId);
       if (!currentSession) {
         throw new Error('Session not found during tool execution');
       }
-      console.log(`[Tool Execution] Retrieved current session ID: ${currentSession._id.toString()}, company ID: ${currentSession.companyId.toString()}`);
+      // console.log(`[Tool Execution] Retrieved current session ID: ${currentSession._id.toString()}, company ID: ${currentSession.companyId.toString()}`);
       
       const functionCallPayload: FunctionCall = { function: { name: currentFuncName, arguments: JSON.stringify(args) } };
       const { result, error } = await executeFunctionCall(
@@ -331,7 +331,7 @@ export const handleSessionMessage = async (
         assistant.allowedActions
       );
       if (error) {
-        console.error(`Error in tool ${currentFuncName} execution:`, error);
+        // console.error(`Error in tool ${currentFuncName} execution:`, error);
         throw new Error(typeof error === 'string' ? error : (error as any)?.message || 'Tool execution failed');
       }
       return result;
@@ -358,7 +358,7 @@ export const handleSessionMessage = async (
       toolsForSdk[funcName] = tool({ description: funcDef.description, parameters: zodSchema, execute: executeFunc });
     }
     toolsCache.set(cacheKey, toolsForSdk);
-    console.log(`Cached toolsForSdk for assistant ${assistant._id}`);
+    // console.log(`Cached toolsForSdk for assistant ${assistant._id}`);
   }
   
   let modelIdentifier = assistant.llmModel || 'gpt-4o-mini'; 
@@ -367,12 +367,14 @@ export const handleSessionMessage = async (
 
   if (providerKey === 'google' && modelIdentifier && !modelIdentifier.startsWith('models/')) {
     modelIdentifier = `models/${modelIdentifier}`;
-    console.log(`Prefixed Google model ID: ${modelIdentifier}`);
+    // console.log(`Prefixed Google model ID: ${modelIdentifier}`);
   }
     
-  console.log(`Using LLM provider: ${providerKey}, model: ${modelIdentifier} for session ${sessionId}`);
-  const shouldStream = metadata?.['X-Experimental-Stream'] === 'true';
-  console.log(`Should stream: ${shouldStream}`);
+  // console.log(`Using LLM provider: ${providerKey}, model: ${modelIdentifier} for session ${sessionId}`);
+  let shouldStream = metadata?.['X-Experimental-Stream'] === 'true';
+  // console.log(`Original shouldStream: ${shouldStream}`);
+  // shouldStream = false; // DIAGNOSTIC: Force non-streaming // REVERTED
+  // console.log(`Forced shouldStream: ${shouldStream}`);
 
   const systemPrompt = await processTemplate(assistant.llmPrompt, sessionId.toString());
 
@@ -384,14 +386,14 @@ export const handleSessionMessage = async (
   };
 
   const messagesForLlm: CoreMessage[] = [...history, userMessageForLlm];
-  console.log('Messages prepared for LLM (content parts might be complex):', 
-    messagesForLlm.map(m => ({ 
-      role: m.role, 
-      contentPreview: Array.isArray(m.content) 
-        ? m.content.map(p => p.type === 'text' ? `${p.type}: ${p.text.substring(0,50)}...` : `${p.type}: [${(p as ImagePart).mimeType || 'image data'}]`).join(', ')
-        : typeof m.content === 'string' ? m.content.substring(0,100) + '...' : 'Unknown content structure'
-    }))
-  );
+  // console.log('Messages prepared for LLM (content parts might be complex):', 
+  //   messagesForLlm.map(m => ({ 
+  //     role: m.role, 
+  //     contentPreview: Array.isArray(m.content) 
+  //       ? m.content.map(p => p.type === 'text' ? `${p.type}: ${p.text.substring(0,50)}...` : `${p.type}: [${(p as ImagePart).mimeType || 'image data'}]`).join(', ')
+  //       : typeof m.content === 'string' ? m.content.substring(0,100) + '...' : 'Unknown content structure'
+  //   }))
+  // );
   
   const TOKEN_LIMITS = {
     google: { 'gemini-1.5': 20000, default: 7000 }, 
@@ -428,10 +430,10 @@ export const handleSessionMessage = async (
   }
   
   let { trimmedMessages, tokensInPrompt: actualTokensInPrompt } = trimToWindow(messagesForLlm, maxPromptTokens); 
-  console.log(`Manual trim: Target tokens: ${maxPromptTokens}, Actual: ${actualTokensInPrompt}, Original msgs: ${messagesForLlm.length}, Trimmed msgs: ${trimmedMessages.length}`);
+  // console.log(`Manual trim: Target tokens: ${maxPromptTokens}, Actual: ${actualTokensInPrompt}, Original msgs: ${messagesForLlm.length}, Trimmed msgs: ${trimmedMessages.length}`);
 
   if (providerKey === 'anthropic') {
-    console.log('Anthropic provider: Prepending system prompt to messages array as well.');
+    // console.log('Anthropic provider: Prepending system prompt to messages array as well.');
     trimmedMessages = [{ role: 'system', content: systemPrompt }, ...trimmedMessages.filter(m => m.role !== 'system')];
   }
 
@@ -442,7 +444,7 @@ export const handleSessionMessage = async (
     const llm = getProvider(providerKey, modelIdentifier, llmApiKey as string);
 
     const slimToolsForIntent = (input: string, allTools: Record<string, Tool<any, any>>): Record<string, Tool<any, any>> => {
-      console.log(`Tool slimming disabled for input: "${input}". Returning all ${Object.keys(allTools).length} tools.`);
+      // console.log(`Tool slimming disabled for input: "${input}". Returning all ${Object.keys(allTools).length} tools.`);
       return allTools;
     };
     const relevantTools = slimToolsForIntent(userInput, toolsForSdk);
@@ -452,13 +454,14 @@ export const handleSessionMessage = async (
       model: llm,
       messages: trimmedMessages, // This now contains correctly formatted multimodal messages
       tools: relevantTools,
-      maxSteps: 3,
+      maxSteps: 5,
+      maxRetries: 2,
     };
     if (systemPrompt !== undefined) {
       streamCallOptions.system = systemPrompt;
     }
     // No separate experimental_attachments or attachments field needed here if images are part of CoreMessage.content
-    console.log('Calling streamText. Multimodal content is part of the messages array.');
+    // console.log('Calling streamText. Multimodal content is part of the messages array.'); // Removed for potential SSE interference
     const streamResult = await streamText(streamCallOptions);
       
       (async () => {
@@ -467,10 +470,10 @@ export const handleSessionMessage = async (
           const toolCalls = await streamResult.toolCalls; 
           const toolResults = await streamResult.toolResults;
 
-          console.log('Stream finished, saving full assistant message to DB.');
-          if (finalText) console.log('Final text length:', finalText.length);
-          if (toolCalls) console.log('Tool Calls:', JSON.stringify(toolCalls, null, 2));
-          if (toolResults) console.log('Tool Results:', JSON.stringify(toolResults, null, 2));
+          // console.log('Stream finished, saving full assistant message to DB.'); 
+          // if (finalText) console.log('Final text length (for DB):', finalText.length);
+          // if (toolCalls) console.log('Tool Calls (for DB):', JSON.stringify(toolCalls, null, 2));
+          // if (toolResults) console.log('Tool Results (for DB):', JSON.stringify(toolResults, null, 2));
           
           const cleanedText = cleanActionAnnotations(finalText);
           const processedResponse = await processTemplate(cleanedText, sessionId.toString());
@@ -499,38 +502,39 @@ export const handleSessionMessage = async (
           
           const assistantMessage = new Message(assistantMessageData);
           await assistantMessage.save();
-          console.log('Assistant message from streamed response (with potential tool data) saved to DB.');
+          // console.log('Assistant message from streamed response (with potential tool data) saved to DB.');
 
         } catch (dbError) {
-          console.error('Error saving streamed assistant message to DB:', dbError);
+          // console.error('Error saving streamed assistant message to DB:', dbError);
         }
       })().catch(streamProcessingError => {
-        console.error('Error processing full streamed text for DB save:', streamProcessingError);
+        // console.error('Error processing full streamed text for DB save:', streamProcessingError);
       });
 
-      console.log(`Returning stream object for session ${sessionId} for client consumption.`);
+      // console.log(`Returning stream object for session ${sessionId} for client consumption.`); 
       return streamResult;
     } else {
     const generateCallOptions: Parameters<typeof generateText>[0] = {
       model: llm,
       messages: trimmedMessages, // This now contains correctly formatted multimodal messages
       tools: relevantTools,
-      maxSteps: 3,
+      maxSteps: 5,
+      maxRetries: 2,
     };
     if (systemPrompt !== undefined) {
       generateCallOptions.system = systemPrompt;
     }
     // No separate experimental_attachments or attachments field needed here
-    console.log('Calling generateText. Multimodal content is part of the messages array.');
+    // console.log('Calling generateText. Multimodal content is part of the messages array.');
     const result = await generateText(generateCallOptions);
     aggregatedResponse = result.text;
     finalLlmResult = result;
 
       if (finalLlmResult.toolCalls && finalLlmResult.toolCalls.length > 0) {
-        console.log('Tool Calls from generateText:', JSON.stringify(finalLlmResult.toolCalls, null, 2));
+        // console.log('Tool Calls from generateText:', JSON.stringify(finalLlmResult.toolCalls, null, 2));
       }
       if (finalLlmResult.toolResults && finalLlmResult.toolResults.length > 0) {
-        console.log('Tool Results from generateText:', JSON.stringify(finalLlmResult.toolResults, null, 2));
+        // console.log('Tool Results from generateText:', JSON.stringify(finalLlmResult.toolResults, null, 2));
       }
     }
   } catch (error: any) { 
@@ -541,12 +545,12 @@ export const handleSessionMessage = async (
             errorMessage.includes('permission denied') || 
             errorMessage.includes('api key not valid') ||
             errorMessage.includes('invalid api key')) {
-            console.error('Gemini API Error (detected by message):', error);
+            // console.error('Gemini API Error (detected by message):', error);
             specificGeminiError = true;
         }
     }
     if (!specificGeminiError) {
-        console.error('Error during LLM processing or tool execution:', error);
+        // console.error('Error during LLM processing or tool execution:', error);
     }
     throw error;
   }
@@ -588,7 +592,7 @@ export const handleSessionMessage = async (
   }
   
   if (shouldStream) {
-    console.error("Reached end of function in streaming mode without returning stream. This shouldn't happen.");
+    // console.error("Reached end of function in streaming mode without returning stream. This shouldn't happen.");
     throw new Error("Internal error: Failed to return stream in streaming mode.");
   }
   

@@ -55,10 +55,17 @@ const prepareActionExecution = async (
   }
 
   const processedArgs = await Promise.all(
-    Object.entries(args).map(async ([key, value]) => [
-      key,
-      typeof value === 'string' ? await processTemplate(value, sessionId) : value
-    ])
+    Object.entries(args).map(async ([key, value]) => {
+      if (typeof value === 'string') {
+        return [key, await processTemplate(value, sessionId)];
+      }
+      if (typeof value === 'object' && value !== null) {
+        // Recursively process nested objects
+        const nestedProcessedArgs = await prepareActionExecution(functionName, value as Record<string, unknown>, sessionId, sessionLanguage);
+        return [key, nestedProcessedArgs.processedArgs];
+      }
+      return [key, value];
+    })
   );
 
   return {
@@ -156,10 +163,10 @@ export const executeFunctionCall = async (
         return { result: `Error: ${result.error || 'Action failed'}` };
       } else {
         // If success is true, publish completed message and return result
-        await sendActionUpdate(sessionId, 'completed', { ...executionDetails, output: result });
+        await sendActionUpdate(activeSessionId, 'completed', { ...executionDetails, output: result });
         if (isFileSearch) {
           // Complete the file search notification
-          await sendActionUpdate(sessionId, 'completed', {
+          await sendActionUpdate(activeSessionId, 'completed', {
             id: uuidv4(),
             actionId: 'file_search_notification',
             serviceName: 'File Search Notification',
@@ -182,7 +189,7 @@ export const executeFunctionCall = async (
       const args = JSON.parse(call.function.arguments);
       const input = Object.keys(args).length > 0 ? args : {};
       
-      await sendActionUpdate(sessionId, 'failed', {
+      await sendActionUpdate(activeSessionId, 'failed', {
         id: uuidv4(),
         actionId: convertOpenAIFunctionName(functionName),
         serviceName: failedActionInfo?.serviceName || 'unknown',
