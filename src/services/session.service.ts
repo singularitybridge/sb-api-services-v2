@@ -100,6 +100,14 @@ export const getSessionById = async (sessionId: string): Promise<ISession> => {
   return session;
 };
 
+export const getCurrentSession = async (
+  userId: string,
+  companyId: string,
+  channel: ChannelType = ChannelType.WEB
+): Promise<ISession | null> => {
+  return await Session.findOne({ userId, companyId, channel, active: true });
+};
+
 export const getSessionOrCreate = async (
   apiKey: string,
   userId: string,
