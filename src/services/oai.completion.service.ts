@@ -48,7 +48,7 @@ export const getCompletionResponse = async (
   apiKey: string,
   systemPrompt: string,
   userInput: string,
-  model: string = 'gpt-4o',
+  model: string = 'gpt-4o-mini',
   temperature: number = 0.7,
   pdfUrl?: string
 ): Promise<string> => {
