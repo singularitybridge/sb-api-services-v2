@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { FunctionFactory, ActionContext, FunctionCall, ActionInfo, ExecutionDetails } from './types';
 import { processTemplate } from '../../services/template.service';
 import { discoverActionById } from '../../services/integration.service';
-import { getSessionById } from '../../services/session.service';
+import { getCurrentSession, getSessionById } from '../../services/session.service';
 import { SupportedLanguage } from '../../services/discovery.service';
 import { createFunctionFactory } from './loaders';
 import { publishActionMessage } from './publishers';
@@ -76,9 +76,15 @@ export const executeFunctionCall = async (
   allowedActions: string[]
 ): Promise<{ result?: unknown; error?: DetailedError }> => {
   console.log(`[executeFunctionCall] Starting execution with sessionId: ${sessionId}, companyId: ${companyId}`);
+  
+  // Get the current session to ensure we have the latest session ID
   const session = await getSessionById(sessionId);
-  const sessionLanguage = session.language as SupportedLanguage;
-  const context: ActionContext = { sessionId, companyId, language: sessionLanguage };
+  const currentSession = await getCurrentSession(session.userId, companyId);
+  const activeSessionId = currentSession ? currentSession._id.toString() : sessionId;
+
+  const updatedSession = await getSessionById(activeSessionId);
+  const sessionLanguage = updatedSession.language as SupportedLanguage;
+  const context: ActionContext = { sessionId: activeSessionId, companyId, language: sessionLanguage };
   const functionFactory = await createFunctionFactory(context, allowedActions);
 
   const functionName = call.function.name;
