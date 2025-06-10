@@ -4,7 +4,10 @@ import {
   setAssistant, 
   createNewAssistant, 
   getCurrentAssistant,
-  updateCurrentAssistant // Added import
+  updateAssistantById,
+  askAnotherAssistant,
+  getTeams,
+  getAssistantsByTeam
 } from './assistant.service';
 import { IIdentifier } from '../../models/Assistant';
 
@@ -123,28 +126,100 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
     },
   },
 
-  updateCurrentAssistant: {
-    description: 'Update the current assistant with new information. Only provided fields (name, description, llmModel, llmProvider, llmPrompt) will be updated.',
+  updateAssistantById: {
+    description: 'Update a specific assistant by ID with new information. Only provided fields (name, description, llmModel, llmProvider, llmPrompt) will be updated.',
     parameters: {
       type: 'object',
       properties: {
+        assistantId: { type: 'string', description: 'The ID of the assistant to update' },
         name: { type: 'string', description: 'New name (title) for the assistant' },
         description: { type: 'string', description: 'New description for the assistant' },
         llmModel: { type: 'string', description: 'New LLM model identifier (e.g., gpt-4o-mini)' },
         llmProvider: { type: 'string', enum: ['openai', 'google', 'anthropic'], description: 'New LLM provider' },
-        llmPrompt: { type: 'string', description: 'New LLM prompt for the assistant' }, // Added llmPrompt
+        llmPrompt: { type: 'string', description: 'New LLM prompt for the assistant' },
       },
-      required: [], // No fields are strictly required for a partial update
+      required: ['assistantId'], // assistantId is now required
       additionalProperties: false,
     },
     function: async (params: {
+      assistantId: string; // Added assistantId
       name?: string;
       description?: string;
       llmModel?: string;
       llmProvider?: 'openai' | 'google' | 'anthropic';
-      llmPrompt?: string; // Added llmPrompt
+      llmPrompt?: string;
     }) => {
-      return await updateCurrentAssistant(context.sessionId, params);
+      const { assistantId, ...updateData } = params;
+      return await updateAssistantById(context.sessionId, assistantId, updateData);
+    },
+  },
+
+  askAssistant: {
+    description: 'Ask another assistant to handle a specific task and return the response. Useful for delegating specialized tasks to expert assistants.',
+    parameters: {
+      type: 'object',
+      properties: {
+        assistantId: {
+          type: 'string',
+          description: 'The ID of the target assistant to ask',
+        },
+        task: {
+          type: 'string',
+          description: 'The task or prompt to send to the target assistant',
+        },
+      },
+      required: ['assistantId', 'task'],
+      additionalProperties: false,
+    },
+    function: async ({ assistantId, task }: { assistantId: string; task: string }) => {
+      if (context.isStateless) {
+        return await askAnotherAssistant(context.sessionId, assistantId, task, context.companyId, context.userId);
+      }
+      return await askAnotherAssistant(context.sessionId, assistantId, task);
+    },
+  },
+
+  getTeams: {
+    description: 'Get a list of all teams for the current user\'s company',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    function: async () => {
+      try {
+        const teams = await getTeams(context.sessionId);
+        return { success: true, data: teams }; 
+      } catch (error) {
+        throw error; // Re-throw to be caught by the executor
+      }
+    },
+  },
+
+  getAssistantsByTeam: {
+    description: 'Get a list of assistants for a specific team',
+    parameters: {
+      type: 'object',
+      properties: {
+        teamId: {
+          type: 'string',
+          description: 'The ID of the team',
+        },
+        lean: {
+          type: 'boolean',
+          description: 'If true, returns a lean representation of assistants. Defaults to true.',
+          default: true,
+        }
+      },
+      required: ['teamId'],
+    },
+    function: async ({ teamId, lean = true }: { teamId: string, lean?: boolean }) => {
+      try {
+        const assistants = await getAssistantsByTeam(context.sessionId, teamId, lean);
+        return { success: true, data: assistants };
+      } catch (error) {
+        throw error; // Re-throw to be caught by the executor
+      }
     },
   },
 });

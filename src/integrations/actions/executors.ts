@@ -94,6 +94,8 @@ export const executeFunctionCall = async (
   const context: ActionContext = { sessionId: activeSessionId, companyId, language: sessionLanguage };
   const functionFactory = await createFunctionFactory(context, allowedActions);
 
+  console.log(`[executeFunctionCall] Allowed actions for session ${activeSessionId}:`, JSON.stringify(allowedActions)); // Added logging
+
   const functionName = call.function.name;
   const originalActionId = functionName;
 

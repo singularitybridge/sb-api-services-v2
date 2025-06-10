@@ -20,15 +20,25 @@ export const uploadFile = async (file: Express.Multer.File): Promise<string> => 
   const timestamp = new Date().toISOString();
 
   // Upload with cache control headers
-  await blob.save(file.buffer, {
+  const metadata: any = {
+    contentType: file.mimetype,
+    cacheControl: 'no-cache, no-store, must-revalidate',
+    lastModified: timestamp,
     metadata: {
-      contentType: file.mimetype,
-      cacheControl: 'no-cache, no-store, must-revalidate',
-      lastModified: timestamp,
-      metadata: {
-        updateTimestamp: timestamp
-      }
-    },
+      updateTimestamp: timestamp
+    }
+  };
+
+  // Set Content-Disposition to inline for common viewable image types
+  if (file.mimetype && (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf')) {
+    metadata.contentDisposition = 'inline';
+  } else {
+    // For other types, or if unsure, let it default or explicitly set to attachment
+    // metadata.contentDisposition = 'attachment'; // Optional: explicit attachment
+  }
+
+  await blob.save(file.buffer, {
+    metadata: metadata,
   });
 
   // Generate signed URL with cache-busting parameter
@@ -49,15 +59,21 @@ export const uploadBuffer = async (companyId: string, filename: string, buffer: 
   const timestamp = new Date().toISOString();
 
   // Upload with cache control headers
-  await blob.save(buffer, {
+  const metadataBuffer: any = {
+    contentType: contentType,
+    cacheControl: 'no-cache, no-store, must-revalidate',
+    lastModified: timestamp,
     metadata: {
-      contentType: contentType,
-      cacheControl: 'no-cache, no-store, must-revalidate',
-      lastModified: timestamp,
-      metadata: {
-        updateTimestamp: timestamp
-      }
-    },
+      updateTimestamp: timestamp
+    }
+  };
+
+  if (contentType && (contentType.startsWith('image/') || contentType === 'application/pdf')) {
+    metadataBuffer.contentDisposition = 'inline';
+  }
+
+  await blob.save(buffer, {
+    metadata: metadataBuffer,
   });
 
   // Generate signed URL with cache-busting parameter

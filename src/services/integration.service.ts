@@ -25,6 +25,7 @@ export async function triggerAction(
   companyId: string,
   allowedActions: string[]
 ): Promise<IntegrationActionResult> {
+  console.log(`[triggerAction] Entered. Integration: ${integrationName}, Service: ${service}, SessionID: ${sessionId}, CompanyID: ${companyId}`);
   try {
     const fullServiceId = sanitizeFunctionName(`${integrationName}.${service}`);
     

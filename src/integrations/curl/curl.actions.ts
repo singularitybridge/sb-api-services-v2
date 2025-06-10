@@ -3,7 +3,6 @@ import { performCurlRequest } from './curl.service';
 
 interface CurlRequestArgs {
   curlCommand: string;
-  maxResponseChars?: number;
 }
 
 export interface CurlActionResponse {
@@ -24,17 +23,13 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
           type: 'string',
           description: 'The complete curl command to execute',
         },
-        maxResponseChars: {
-          type: 'number',
-          description: 'Maximum number of characters to return in the response',
-        },
       },
       required: ['curlCommand'],
       additionalProperties: false,
     },
     function: async (args: CurlRequestArgs) => {
       try {
-        const { curlCommand, maxResponseChars } = args;
+        const { curlCommand } = args;
 
         // Call the service to perform the request
         const response = await performCurlRequest(context, curlCommand);
@@ -48,15 +43,6 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
           truncated: false,          // Initialize truncated to false
           success: response.status >= 200 && response.status < 300 && !response.error // Success if 2xx and no explicit error from service
         };
-
-        // Only handle truncation if specified and data is a string
-        if (maxResponseChars && typeof result.data === 'string') {
-          if (result.data.length > maxResponseChars) {
-            result.data = result.data.substring(0, maxResponseChars);
-            result.truncated = true; // Set to true if action truncates
-          }
-        }
-        // If not truncated by this action, result.truncated remains false (its initial value)
 
         return result;
       } catch (error: any) {

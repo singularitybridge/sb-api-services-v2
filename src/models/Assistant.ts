@@ -20,6 +20,7 @@ export interface IAssistant extends Document {
   llmModel: string; // Existing field, will now be the primary model identifier
   llmPrompt: string;
   llmProvider: 'openai' | 'google' | 'anthropic'; // New field for provider
+  maxTokens?: number; // New field for token limit
   companyId: string;
   allowedActions: string[];
   avatarImage?: string;
@@ -41,6 +42,7 @@ const AssistantSchema: Schema = new Schema({
     default: 'openai', // Default provider
     required: true
   },
+  maxTokens: { type: Number, required: false, default: 25000 }, // Default to 25k tokens
   companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
   allowedActions: [{ type: String, required: false }],
   avatarImage: { type: String, required: false, default: 'default-avatar' },

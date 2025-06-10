@@ -1,6 +1,9 @@
 {
   "name": "curl",
-  "icon": "square-terminal", 
+  "title": "cURL",
+  "description": "Perform cURL requests to any API",
+  "category": "Development",
+  "icon": "square-terminal",
   "actionCreator": "createCurlActions",
   "actionsFile": "curl.actions.ts"
 }
