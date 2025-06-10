@@ -32,5 +32,17 @@
   "updateCurrentAssistant": {
     "actionTitle": "עדכן סוכן נוכחי",
     "description": "עדכן את פרטי הסוכן הנוכחי (שם, תיאור, מודל LLM, ספק LLM, הנחיית LLM). רק שדות שסופקו יעודכנו."
+  },
+  "askAssistant": {
+    "actionTitle": "שאל סוכן AI",
+    "description": "בקש מסוכן AI אחר לטפל במשימה ספציפית והחזר את התגובה. שימושי להאצלת משימות מיוחדות לסוכני מומחים."
+  },
+  "getTeams": {
+    "actionTitle": "קבל צוותים",
+    "description": "קבל רשימה של כל הצוותים עבור החברה הנוכחית של המשתמש"
+  },
+  "getAssistantsByTeam": {
+    "actionTitle": "קבל סוכנים לפי צוות",
+    "description": "קבל רשימה של סוכנים עבור צוות ספציפי"
   }
 }

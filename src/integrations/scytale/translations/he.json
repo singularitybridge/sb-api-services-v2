@@ -1,0 +1,11 @@
+{
+  "serviceName": "Scytale AI",
+  "getQuestionnaires": {
+    "actionTitle": "קבל שאלונים",
+    "description": "מאחזר את כל השאלונים מ-Scytale AI."
+  },
+  "getQuestionnaire": {
+    "actionTitle": "קבל שאלון לפי מזהה",
+    "description": "מאחזר שאלון בודד לפי המזהה שלו מ-Scytale AI."
+  }
+}

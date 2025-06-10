@@ -32,5 +32,17 @@
   "updateCurrentAssistant": {
     "actionTitle": "Update Current Assistant",
     "description": "Update the current assistant's information (name, description, LLM model, LLM provider, LLM prompt). Only provided fields will be updated."
+  },
+  "askAssistant": {
+    "actionTitle": "Ask Assistant",
+    "description": "Ask another assistant to handle a specific task and return the response. Useful for delegating specialized tasks to expert assistants."
+  },
+  "getTeams": {
+    "actionTitle": "Get Teams",
+    "description": "Get a list of all teams for the current user's company"
+  },
+  "getAssistantsByTeam": {
+    "actionTitle": "Get Assistants by Team",
+    "description": "Get a list of assistants for a specific team"
   }
 }

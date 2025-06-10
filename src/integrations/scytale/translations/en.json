@@ -1,0 +1,11 @@
+{
+  "serviceName": "Scytale AI",
+  "getQuestionnaires": {
+    "actionTitle": "Get Questionnaires",
+    "description": "Fetches all questionnaires from Scytale AI."
+  },
+  "getQuestionnaire": {
+    "actionTitle": "Get Questionnaire by ID",
+    "description": "Fetches a single questionnaire by its ID from Scytale AI."
+  }
+}
