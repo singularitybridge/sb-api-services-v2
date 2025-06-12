@@ -123,31 +123,103 @@ export const getJiraTicketById = async (
   companyId: string,
   params: {
     issueIdOrKey: string;
+    fieldsToFetch?: string[]; // Optional parameter for specific fields
   }
 ) => {
   try {
     const client = await initializeClient(companyId);
 
+    let fieldsParameter: string[];
+    if (params.fieldsToFetch && params.fieldsToFetch.length > 0) {
+      // If specific fields are requested (e.g., ['*all'] or ['summary', 'status'])
+      fieldsParameter = params.fieldsToFetch;
+    } else {
+      // Default to a curated list of essential fields
+      fieldsParameter = [
+        'summary',
+        'status',
+        'issuetype',
+        'assignee',
+        'reporter',
+        'priority',
+        'created',
+        'updated',
+        'description', // Still needed for descriptionText
+        'labels',
+        'project',
+        'resolution',
+        'duedate',
+        // Add other commonly needed fields here
+      ];
+    }
+
     const issue = await client.issues.getIssue({
-      issueIdOrKey: params.issueIdOrKey
+      issueIdOrKey: params.issueIdOrKey,
+      fields: fieldsParameter,
+      // expand: '', // Keep expand minimal unless specifically requested
     });
 
-    // Simplify the ticket data before returning
-    const simplifiedIssue = {
-      key: issue.key,
-      summary: issue.fields?.summary,
-      status: issue.fields?.status?.name,
-      description: issue.fields?.description?.content?.[0]?.content?.[0]?.text, // Extract text from ADF
-      assignee: issue.fields?.assignee?.displayName,
-      reporter: issue.fields?.reporter?.displayName,
-      created: issue.fields?.created,
-      updated: issue.fields?.updated,
-      // You can add other essential fields here if needed
-      // For example, to include all fields for debugging or more complex scenarios:
-      // rawFields: issue.fields 
-    };
-    
-    return { success: true, data: simplifiedIssue };
+    // Convert ADF description to plain text if description was fetched
+    const descriptionText = issue.fields?.description ? adfToText(issue.fields.description) : undefined;
+
+    // If '*all' was requested, return the full structure as before, plus descriptionText
+    if (fieldsParameter.includes('*all')) {
+       const responseData = {
+        ...issue, 
+        fields: {
+          ...issue.fields,
+          descriptionText, 
+        },
+      };
+      return { success: true, data: responseData };
+    } else {
+      // Construct a curated response object based on specifically requested or default fields
+      const curatedIssueData: Record<string, any> = {
+        id: issue.id,
+        key: issue.key,
+        self: issue.self,
+        fields: {},
+      };
+
+      if (issue.fields) {
+        const isDefaultFieldRequest = !params.fieldsToFetch || params.fieldsToFetch.length === 0;
+
+        for (const fieldName of fieldsParameter) {
+          if (issue.fields.hasOwnProperty(fieldName)) {
+            let fieldValue = issue.fields[fieldName];
+            // Simplify common nested objects for default requests
+            if (isDefaultFieldRequest) {
+              if (fieldName === 'status' && fieldValue?.name) fieldValue = fieldValue.name;
+              else if (fieldName === 'issuetype' && fieldValue?.name) fieldValue = fieldValue.name;
+              else if (fieldName === 'assignee' && fieldValue?.displayName) fieldValue = fieldValue.displayName;
+              else if (fieldName === 'reporter' && fieldValue?.displayName) fieldValue = fieldValue.displayName;
+              else if (fieldName === 'priority' && fieldValue?.name) fieldValue = fieldValue.name;
+              else if (fieldName === 'project' && fieldValue?.name) fieldValue = { key: fieldValue.key, name: fieldValue.name }; // Keep key and name for project
+              // For labels, if it's an array of strings, it's already simple. If it's an array of objects, simplify.
+              else if (fieldName === 'labels' && Array.isArray(fieldValue) && fieldValue.length > 0 && typeof fieldValue[0] === 'object') {
+                fieldValue = fieldValue.map((label: any) => (typeof label === 'object' ? label.name || label : label));
+              }
+            }
+            curatedIssueData.fields[fieldName] = fieldValue;
+          }
+        }
+        
+        if (fieldsParameter.includes('description') && descriptionText !== undefined) {
+          curatedIssueData.fields.descriptionText = descriptionText;
+          // If it's a default request, we might not want the full ADF description object
+          // unless 'description' was specifically requested in a non-default scenario.
+          // The current logic includes 'description' in defaultFields, so ADF will be there.
+          // If we want to remove ADF for default, we'd adjust defaultFields or the logic here.
+          if (isDefaultFieldRequest && curatedIssueData.fields.description && curatedIssueData.fields.descriptionText) {
+             // For default view, prioritize descriptionText and remove the verbose ADF object
+             delete curatedIssueData.fields.description;
+          } else if (issue.fields.description) { // Ensure original ADF is present if requested and available
+             curatedIssueData.fields.description = issue.fields.description;
+          }
+        }
+      }
+      return { success: true, data: curatedIssueData };
+    }
   } catch (error: any) {
     return { success: false, error: `Failed to fetch JIRA ticket: ${error?.message || 'Unknown error'}` };
   }
@@ -305,6 +377,171 @@ export const addTicketToCurrentSprint = async (
     // Check if the error is from Jira client or a generic one
     const errorMessage = error.message || (error.errorMessages && error.errorMessages.join(', ')) || 'Unknown error';
     return { success: false, error: `Failed to add ticket ${params.issueKey} to current sprint on board ${params.boardId}: ${errorMessage}` };
+  }
+};
+
+// Helper function to convert Atlassian Document Format (ADF) to plain text
+const adfToText = (adfNode: any): string => {
+  if (!adfNode) {
+    return '';
+  }
+
+  let resultText = '';
+
+  function processNode(node: any) {
+    if (!node) return;
+
+    switch (node.type) {
+      case 'text':
+        resultText += node.text || '';
+        break;
+      case 'paragraph':
+        if (node.content) {
+          node.content.forEach(processNode);
+        }
+        resultText += '\n'; // Add a newline after each paragraph
+        break;
+      case 'heading':
+        if (node.content) {
+          node.content.forEach(processNode);
+        }
+        resultText += '\n';
+        break;
+      case 'bulletList':
+      case 'orderedList':
+        if (node.content) {
+          node.content.forEach((listItem: any, index: number) => {
+            if (node.type === 'orderedList') {
+              resultText += `${index + 1}. `;
+            } else {
+              resultText += '- ';
+            }
+            if (listItem.content) {
+              listItem.content.forEach(processNode); // listItem usually contains paragraphs
+            }
+            // processNode already adds a newline for paragraphs within list items
+          });
+        }
+        break;
+      case 'listItem': // Should be handled by bulletList/orderedList, but good to have
+        if (node.content) {
+          node.content.forEach(processNode);
+        }
+        break;
+      case 'codeBlock':
+        if (node.content) {
+          node.content.forEach((textNode: any) => {
+            if (textNode.type === 'text') {
+              resultText += textNode.text + '\n';
+            }
+          });
+        }
+        break;
+      case 'blockquote':
+        if (node.content) {
+          node.content.forEach((pNode: any) => { // blockquote usually contains paragraphs
+            resultText += '> ';
+            processNode(pNode); // processNode will add newline for paragraph
+          });
+        }
+        break;
+      case 'panel':
+        if (node.content) {
+          node.content.forEach(processNode);
+        }
+        resultText += '\n';
+        break;
+      case 'hardBreak':
+        resultText += '\n';
+        break;
+      case 'mention':
+        resultText += node.attrs?.text || '[mention]';
+        break;
+      case 'emoji':
+        resultText += node.attrs?.shortName || '[emoji]';
+        break;
+      case 'inlineCard':
+      case 'blockCard':
+        resultText += node.attrs?.url || '[card link]';
+        break;
+      // Tables are complex, basic text extraction for now
+      case 'table':
+        if (node.content) {
+          node.content.forEach((row: any) => { // tableRow
+            if (row.content) {
+              row.content.forEach((cell: any) => { // tableCell
+                if (cell.content) cell.content.forEach(processNode);
+                resultText += '\t'; // Tab between cells
+              });
+              resultText += '\n'; // Newline after row
+            }
+          });
+        }
+        break;
+      default:
+        if (node.content && Array.isArray(node.content)) {
+          node.content.forEach(processNode);
+        }
+        break;
+    }
+  }
+
+  if (adfNode.type === 'doc' && adfNode.content) {
+    adfNode.content.forEach(processNode);
+  } else {
+    // If it's not a full doc, try processing it directly (e.g. if a single node is passed)
+    processNode(adfNode);
+  }
+  
+  // Clean up multiple newlines
+  return resultText.replace(/\n\s*\n/g, '\n').trim();
+};
+
+
+export const getJiraTicketFields = async (sessionId: string, companyId: string) => {
+  try {
+    const client = await initializeClient(companyId);
+    // Corrected: getFields is typically under issueFields or a similar namespace
+    const fields = await client.issueFields.getFields(); 
+    return { success: true, data: fields };
+  } catch (error: any) {
+    return { success: false, error: `Failed to fetch JIRA fields: ${error?.message || 'Unknown error'}` };
+  }
+};
+
+export const getJiraTicketComments = async (
+  sessionId: string,
+  companyId: string,
+  params: {
+    issueIdOrKey: string;
+    startAt?: number;
+    maxResults?: number;
+    orderBy?: string; // e.g., '-created' for newest first
+    expand?: string; // e.g., 'renderedBody'
+  }
+) => {
+  try {
+    const client = await initializeClient(companyId);
+    const comments = await client.issueComments.getComments({
+      issueIdOrKey: params.issueIdOrKey,
+      startAt: params.startAt,
+      maxResults: params.maxResults,
+      orderBy: params.orderBy,
+      expand: params.expand,
+    });
+
+    // Optionally, convert ADF in comment bodies to plain text
+    if (comments.comments) {
+      comments.comments.forEach(comment => {
+        if (comment.body) {
+          // @ts-ignore
+          comment.bodyText = adfToText(comment.body);
+        }
+      });
+    }
+    return { success: true, data: comments };
+  } catch (error: any) {
+    return { success: false, error: `Failed to fetch JIRA ticket comments: ${error?.message || 'Unknown error'}` };
   }
 };
 

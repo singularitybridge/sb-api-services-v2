@@ -72,7 +72,7 @@ export const executeAssistantStateless = async (
   console.log(`Executing stateless assistant ${assistant.name} (ID: ${assistant._id}) for company ${companyId}`);
 
   const providerKey = assistant.llmProvider;
-  const userMessageContentParts: (TextPart | ImagePart | any)[] = [{ type: 'text', text: userInput }];
+  const userMessageContentParts: (TextPart | ImagePart)[] = [{ type: 'text', text: userInput }];
 
   if (attachments && attachments.length > 0) {
     console.log(`Processing ${attachments.length} attachments for stateless execution with provider ${providerKey}`);
@@ -115,10 +115,15 @@ export const executeAssistantStateless = async (
       } else if (attachment.fileId) {
         try {
           const fileContentResult = await fetchGcpFileContent("stateless_execution", companyId, { fileId: attachment.fileId, returnAs: 'string' });
-          if (fileContentResult.success && typeof fileContentResult.data === 'string') {
-            (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached File: ${attachment.fileName} ---\n${fileContentResult.data}\n--- End of File ---`;
-          } else {
-            (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load file: ${attachment.fileName}]`;
+            if (fileContentResult.success && typeof fileContentResult.data === 'string') {
+              let fileTextToAppend = fileContentResult.data;
+              const MAX_FILE_TEXT_CHARS = 10000; // Max characters for appended file content
+              if (fileTextToAppend.length > MAX_FILE_TEXT_CHARS) {
+                fileTextToAppend = fileTextToAppend.substring(0, MAX_FILE_TEXT_CHARS) + `\n\n[...File text truncated: ${attachment.fileName}...]\n`;
+              }
+              (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached File: ${attachment.fileName} ---\n${fileTextToAppend}\n--- End of File ---`;
+            } else {
+              (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load file: ${attachment.fileName}]`;
           }
         } catch (error) {
           console.error(`Error processing file ${attachment.fileName}:`, error);
@@ -288,6 +293,60 @@ export const executeAssistantStateless = async (
   }
 
   let { trimmedMessages } = trimToWindow(messagesForLlm, maxPromptTokens);
+
+  // If after trimming, messagesForLlm is empty, it means the initial content was too large.
+  // This can happen if userInput + appended files exceed maxPromptTokens significantly.
+  if (trimmedMessages.length === 0 && messagesForLlm.length > 0 && messagesForLlm[0].content) {
+    console.warn('Initial message content too large, attempting aggressive truncation.');
+    const originalMessage = messagesForLlm[0];
+    let contentForRetrim: string | TextPart[] | undefined = undefined;
+
+    // Define aggressive character limit (e.g., 75% of maxTokens, assuming ~3 chars/token)
+    const aggressiveCharLimit = Math.floor(maxPromptTokens * 0.75 * 3);
+
+    if (Array.isArray(originalMessage.content)) {
+      // Explicitly cast to the known type of userMessageContentParts
+      const contentParts = originalMessage.content as (TextPart | ImagePart)[];
+      // Filter out only text parts, concatenate them, and then truncate.
+      const textParts = contentParts.filter(
+        (p: TextPart | ImagePart): p is TextPart => p.type === 'text'
+      );
+      if (textParts.length > 0) {
+        let combinedText = textParts.map(p => p.text).join('\n');
+        if (combinedText.length > aggressiveCharLimit) {
+          combinedText = combinedText.substring(0, aggressiveCharLimit) + "\n\n[...Content aggressively truncated...]\n";
+        }
+        contentForRetrim = [{ type: 'text', text: combinedText }];
+      }
+    } else if (typeof originalMessage.content === 'string') {
+      // Handle if original content is a simple string
+      let textContent = originalMessage.content;
+      if (textContent.length > aggressiveCharLimit) {
+        textContent = textContent.substring(0, aggressiveCharLimit) + "\n\n[...Content aggressively truncated...]\n";
+      }
+      contentForRetrim = textContent;
+    }
+
+    if (contentForRetrim) {
+      let aggressivelyTrimmedMessage: CoreMessage;
+      if (typeof contentForRetrim === 'string') {
+        // Explicitly set role to 'user' as originalMessage is known to be a user message here
+        aggressivelyTrimmedMessage = { role: 'user', content: contentForRetrim };
+      } else { // contentForRetrim is TextPart[]
+        // Explicitly set role to 'user'
+        aggressivelyTrimmedMessage = { role: 'user', content: contentForRetrim };
+      }
+      const reTrimResult = trimToWindow([aggressivelyTrimmedMessage], maxPromptTokens);
+      trimmedMessages = reTrimResult.trimmedMessages;
+      if (trimmedMessages.length === 0) {
+        console.error("Failed to trim message even after aggressive truncation. Prompt will likely be empty.");
+      } else {
+        console.log("Aggressive truncation successful, proceeding with trimmed message.");
+      }
+    } else {
+      console.error("Aggressive truncation: No text content found or suitable for re-trimming in the original message.");
+    }
+  }
 
   if (providerKey === 'anthropic') {
     trimmedMessages = [{ role: 'system', content: systemPrompt }, ...trimmedMessages.filter(m => m.role !== 'system')];
