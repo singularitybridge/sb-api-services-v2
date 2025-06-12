@@ -9,7 +9,14 @@ import {
   updateJiraTicket,
   addTicketToCurrentSprint as addTicketToCurrentSprintService,
   searchJiraUsers, // Added import for searchJiraUsers
-  assignJiraTicket // Added import for assignJiraTicket
+  assignJiraTicket, // Added import for assignJiraTicket
+  getActiveSprintForBoard as getActiveSprintForBoardService,
+  getIssuesForSprint as getIssuesForSprintService,
+  moveIssueToSprint as moveIssueToSprintService,
+  moveIssueToBacklog as moveIssueToBacklogService,
+  getAvailableTransitions as getAvailableTransitionsService,
+  transitionIssue as transitionIssueService,
+  setStoryPoints as setStoryPointsService // Import the new service function
 } from './jira.service';
 
 // Argument types for JIRA actions
@@ -60,6 +67,43 @@ interface SearchUsersArgs {
 interface AssignTicketArgs {
   issueIdOrKey: string;
   accountId: string | null; // Allow null for unassigning
+}
+
+interface GetActiveSprintForBoardArgs {
+  boardId: string;
+}
+
+interface GetIssuesForSprintArgs {
+  sprintId: string;
+  projectKey?: string;
+  maxResults?: number;
+  startAt?: number;
+  fields?: string[]; // Optional: Array of field names to fetch
+}
+
+interface MoveIssueToSprintArgs {
+  issueKey: string;
+  targetSprintId: string;
+}
+
+interface MoveIssueToBacklogArgs {
+  issueKey: string;
+}
+
+interface GetAvailableTransitionsArgs {
+  issueIdOrKey: string;
+}
+
+interface TransitionIssueArgs {
+  issueIdOrKey: string;
+  transitionId: string;
+  comment?: string;
+  fields?: Record<string, any>; // For fields like resolution { name: "Done" }
+}
+
+interface SetStoryPointsArgs {
+  issueIdOrKey: string;
+  storyPoints: number | null; // Allow null to clear
 }
 
 interface GetTicketCommentsArgs {
@@ -255,6 +299,130 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
     },
     function: async (params: AssignTicketArgs): Promise<any> => {
       return await assignJiraTicket(context.sessionId, context.companyId, params);
+    },
+  },
+  getActiveSprintForBoard: {
+    description: 'Gets the active sprint details for a specific JIRA board.',
+    parameters: {
+      type: 'object',
+      properties: {
+        boardId: { type: 'string', description: 'The ID of the JIRA board.' }
+      },
+      required: ['boardId'],
+      additionalProperties: false,
+    },
+    function: async (params: GetActiveSprintForBoardArgs): Promise<any> => {
+      return await getActiveSprintForBoardService(context.sessionId, context.companyId, params);
+    },
+  },
+  getIssuesForSprint: {
+    description: 'Gets issues for a specific JIRA sprint. Supports pagination and field selection.',
+    parameters: {
+      type: 'object',
+      properties: {
+        sprintId: { type: 'string', description: 'The ID of the JIRA sprint.' },
+        projectKey: { type: 'string', description: 'Optional: JIRA project key to further scope issues (if JQL is used by service).' },
+        maxResults: { type: 'number', description: 'Maximum number of issues to fetch (default: 50).' },
+        startAt: { type: 'number', description: 'Starting index for pagination (default: 0).' },
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional: Array of field names to fetch (e.g., ["summary", "status"]). Defaults to a curated set if omitted.'
+        }
+      },
+      required: ['sprintId'],
+      additionalProperties: false,
+    },
+    function: async (params: GetIssuesForSprintArgs): Promise<any> => {
+      return await getIssuesForSprintService(context.sessionId, context.companyId, {
+        sprintId: params.sprintId,
+        projectKey: params.projectKey,
+        maxResults: params.maxResults,
+        startAt: params.startAt,
+        fieldsToFetch: params.fields
+      });
+    },
+  },
+  moveIssueToSprint: {
+    description: 'Moves a JIRA issue to a specified sprint.',
+    parameters: {
+      type: 'object',
+      properties: {
+        issueKey: { type: 'string', description: 'The key of the JIRA issue (e.g., "PROJ-123").' },
+        targetSprintId: { type: 'string', description: 'The ID of the target JIRA sprint.' }
+      },
+      required: ['issueKey', 'targetSprintId'],
+      additionalProperties: false,
+    },
+    function: async (params: MoveIssueToSprintArgs): Promise<any> => {
+      return await moveIssueToSprintService(context.sessionId, context.companyId, params);
+    },
+  },
+  moveIssueToBacklog: {
+    description: 'Moves a JIRA issue to the backlog.',
+    parameters: {
+      type: 'object',
+      properties: {
+        issueKey: { type: 'string', description: 'The key of the JIRA issue (e.g., "PROJ-123").' }
+      },
+      required: ['issueKey'],
+      additionalProperties: false,
+    },
+    function: async (params: MoveIssueToBacklogArgs): Promise<any> => {
+      return await moveIssueToBacklogService(context.sessionId, context.companyId, params);
+    },
+  },
+  getAvailableTransitions: {
+    description: 'Gets the available workflow transitions for a JIRA issue.',
+    parameters: {
+      type: 'object',
+      properties: {
+        issueIdOrKey: { type: 'string', description: 'The ID or key of the JIRA issue.' }
+      },
+      required: ['issueIdOrKey'],
+      additionalProperties: false,
+    },
+    function: async (params: GetAvailableTransitionsArgs): Promise<any> => {
+      return await getAvailableTransitionsService(context.sessionId, context.companyId, params);
+    },
+  },
+  transitionIssue: {
+    description: 'Transitions a JIRA issue to a new status using a transition ID. Optionally add a comment or set fields like resolution.',
+    parameters: {
+      type: 'object',
+      properties: {
+        issueIdOrKey: { type: 'string', description: 'The ID or key of the JIRA issue.' },
+        transitionId: { type: 'string', description: 'The ID of the workflow transition to perform.' },
+        comment: { type: 'string', description: 'Optional: A comment to add during the transition.' },
+        fields: { 
+          type: 'object', 
+          description: 'Optional: Fields to set during the transition (e.g., resolution: { name: "Done" }). Provide as a JSON object.',
+          additionalProperties: true 
+        }
+      },
+      required: ['issueIdOrKey', 'transitionId'],
+      additionalProperties: false,
+    },
+    function: async (params: TransitionIssueArgs): Promise<any> => {
+      return await transitionIssueService(context.sessionId, context.companyId, params);
+    },
+  },
+  setStoryPoints: {
+    description: 'Sets or clears the story points for a JIRA issue. Attempts to find the story points field ID automatically.',
+    parameters: {
+      type: 'object',
+      properties: {
+        issueIdOrKey: { type: 'string', description: 'The ID or key of the JIRA issue.' },
+        storyPoints: { 
+          type: ['number', 'null'], 
+          description: 'The number of story points to set. Pass null to clear story points.' 
+        }
+      },
+      required: ['issueIdOrKey', 'storyPoints'],
+      additionalProperties: false,
+    },
+    function: async (params: SetStoryPointsArgs): Promise<any> => {
+      return await setStoryPointsService(context.sessionId, context.companyId, params);
     },
   },
   getTicketFields: {
