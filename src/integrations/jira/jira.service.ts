@@ -51,21 +51,7 @@ export const createJiraTicket = async (
         project: {
           key: params.projectKey
         },
-        description: {
-          type: 'doc',
-          version: 1,
-          content: [
-            {
-              type: 'paragraph',
-              content: [
-                {
-                  text: params.description,
-                  type: 'text'
-                }
-              ]
-            }
-          ]
-        }
+        description: markdownToAdf(params.description)
       }
     });
 
@@ -81,20 +67,38 @@ export const fetchJiraTickets = async (
   params: {
     projectKey: string;
     maxResults?: number;
+    fieldsToFetch?: string[]; // Added for specific fields
   }
 ) => {
   try {
     const client = await initializeClient(companyId);
     const maxResults = params.maxResults || 50;
 
+    // Define default fields if not provided, including sprint (customfield_10020)
+    const defaultFieldsToFetch = ['summary', 'status', 'description', 'customfield_10020'];
+    let fieldsToRequest = (params.fieldsToFetch && params.fieldsToFetch.length > 0)
+      ? params.fieldsToFetch
+      : defaultFieldsToFetch;
+
+    // Ensure essential base fields for processing are included if custom fields are requested
+    // This is important if the user specifies fields but omits 'description' or 'status'
+    // which are needed for simplified output.
+    if (params.fieldsToFetch && params.fieldsToFetch.length > 0) {
+        if (!fieldsToRequest.includes('description')) fieldsToRequest.push('description');
+        if (!fieldsToRequest.includes('status')) fieldsToRequest.push('status');
+        // customfield_10020 for sprint info might be explicitly requested or part of default
+    }
+
+
     let startAt = 0;
-    let allTickets: Version3Models.Issue[] = [];
+    let allSimplifiedTickets: any[] = []; // Correctly define allSimplifiedTickets
     
     while (true) {
       const response = await client.issueSearch.searchForIssuesUsingJql({
+        jql: `project = ${params.projectKey}`,
+        fields: fieldsToRequest, // Use the determined fieldsToRequest
         startAt,
         maxResults,
-        jql: `project = ${params.projectKey}`
       });
       
       const issues = response.issues || [];
@@ -102,17 +106,63 @@ export const fetchJiraTickets = async (
         break;
       }
       
-      allTickets = allTickets.concat(issues);
+      const simplifiedIssues = issues.map(issue => {
+        const descriptionText = issue.fields?.description ? adfToText(issue.fields.description) : undefined;
+        let sprintInfo: any = null;
+        if (issue.fields?.customfield_10020 && Array.isArray(issue.fields.customfield_10020) && issue.fields.customfield_10020.length > 0) {
+          sprintInfo = issue.fields.customfield_10020.map((sprint: any) => ({
+            id: sprint.id,
+            name: sprint.name,
+            state: sprint.state,
+            boardId: sprint.boardId,
+            goal: sprint.goal,
+            startDate: sprint.startDate,
+            endDate: sprint.endDate,
+          }));
+        } else if (issue.fields?.customfield_10020) {
+            sprintInfo = {
+                id: issue.fields.customfield_10020.id,
+                name: issue.fields.customfield_10020.name,
+                state: issue.fields.customfield_10020.state,
+                boardId: issue.fields.customfield_10020.boardId,
+            };
+        }
+
+        const curatedFields: Record<string, any> = {};
+        // Iterate over the fields that were actually requested for the JQL query
+        fieldsToRequest.forEach((fieldName: string) => { // Explicitly type fieldName
+          if (issue.fields && issue.fields.hasOwnProperty(fieldName)) {
+            if (fieldName === 'description') {
+              curatedFields.descriptionText = descriptionText; // Always use the text version
+            } else if (fieldName === 'status' && issue.fields.status?.name) {
+              curatedFields.status = issue.fields.status.name; // Simplified status
+            } else if (fieldName === 'customfield_10020') {
+              curatedFields.sprintInfo = sprintInfo; // Simplified sprint info
+            } else {
+              curatedFields[fieldName] = issue.fields[fieldName]; // Other fields as-is
+            }
+          }
+        });
+        
+        // Return the simplified ticket structure directly
+        return {
+          key: issue.key,
+          summary: curatedFields.summary || issue.fields?.summary, // Prefer curated summary if available
+          status: curatedFields.status,    // Already simplified status name
+          sprintInfo: curatedFields.sprintInfo // Already processed sprintInfo
+        };
+      });
+
+      allSimplifiedTickets = allSimplifiedTickets.concat(simplifiedIssues);
       startAt += maxResults;
 
-      // If we've reached the requested limit, stop
-      if (params.maxResults && allTickets.length >= params.maxResults) {
-        allTickets = allTickets.slice(0, params.maxResults);
+      if (params.maxResults && allSimplifiedTickets.length >= params.maxResults) {
+        allSimplifiedTickets = allSimplifiedTickets.slice(0, params.maxResults);
         break;
       }
     }
     
-    return { success: true, data: allTickets };
+    return { success: true, data: allSimplifiedTickets };
   } catch (error: any) {
     return { success: false, error: `Failed to fetch JIRA tickets: ${error?.message || 'Unknown error'}` };
   }
@@ -238,22 +288,7 @@ export const addCommentToJiraTicket = async (
 
     const comment = await client.issueComments.addComment({
       issueIdOrKey: params.issueIdOrKey,
-      // Attempting to use 'comment' as the key for ADF instead of 'body'
-      comment: { 
-        type: 'doc',
-        version: 1,
-        content: [
-          {
-            type: 'paragraph',
-            content: [
-              {
-                text: params.commentBody,
-                type: 'text'
-              }
-            ]
-          }
-        ]
-      }
+      comment: markdownToAdf(params.commentBody) // Reverted to 'comment' key as per jira.js type expectation
     });
     return { success: true, data: comment };
   } catch (error: any) {
@@ -271,18 +306,28 @@ export const updateJiraTicket = async (
 ) => {
   try {
     const client = await initializeClient(companyId);
+    
+    const fieldsToUpdate = { ...params.fields };
+
+    // If description is being updated, convert it from Markdown to ADF
+    if (fieldsToUpdate.description && typeof fieldsToUpdate.description === 'string') {
+      fieldsToUpdate.description = markdownToAdf(fieldsToUpdate.description);
+    }
 
     // The jira.js library expects no response for editIssue, so we don't assign it.
     // A successful call implies the update worked.
     await client.issues.editIssue({
       issueIdOrKey: params.issueIdOrKey,
-      fields: params.fields
+      fields: fieldsToUpdate // Use the potentially modified fieldsToUpdate
     });
-    // Refetch the issue to return its updated state
-    const updatedIssue = await client.issues.getIssue({
-      issueIdOrKey: params.issueIdOrKey
-    });
-    return { success: true, data: updatedIssue };
+    // Return a concise success message instead of the full ticket to avoid Pusher payload limits
+    return { 
+      success: true, 
+      data: { 
+        id: params.issueIdOrKey, 
+        message: `Ticket ${params.issueIdOrKey} updated successfully.` 
+      } 
+    };
   } catch (error: any) {
     return { success: false, error: `Failed to update JIRA ticket: ${error?.message || 'Unknown error'}` };
   }
@@ -495,6 +540,207 @@ const adfToText = (adfNode: any): string => {
   
   // Clean up multiple newlines
   return resultText.replace(/\n\s*\n/g, '\n').trim();
+};
+
+// Helper function to convert Markdown to Atlassian Document Format (ADF)
+export const markdownToAdf = (markdown: string): any => {
+  if (!markdown || typeof markdown !== 'string') {
+    return {
+      type: 'doc',
+      version: 1,
+      content: [],
+    };
+  }
+
+  const adfContent: any[] = [];
+  const lines = markdown.split('\n');
+
+  let inList = false;
+  let listType: 'bulletList' | 'orderedList' | null = null;
+  let listItems: any[] = [];
+  let inCodeBlock = false;
+  let codeBlockContent = '';
+
+  const processInlineFormatting = (text: string): any[] => {
+    const inlineElements: any[] = [];
+    let remainingText = text;
+
+    // Regex for bold, italic, and bold+italic
+    // Order matters: bold+italic, then bold, then italic
+    const formattingRules = [
+      { type: 'strong', regex: /\*\*\*([^\*]+)\*\*\*/g, markType: 'strong', innerMarkType: 'em' }, // ***bolditalic***
+      { type: 'strong', regex: /\*\*([^\*]+)\*\*/g, markType: 'strong' }, // **bold**
+      { type: '__', regex: /__([^_]+)__/g, markType: 'strong' }, // __bold__
+      { type: 'em', regex: /\*([^\*]+)\*/g, markType: 'em' }, // *italic*
+      { type: '_', regex: /_([^_]+)_/g, markType: 'em' }, // _italic_
+    ];
+    
+    // Simplified inline processing: iterate and segment text
+    // This is a basic approach and might not handle complex nesting perfectly
+    // A more robust parser would build an AST.
+
+    let lastIndex = 0;
+    // Placeholder for a more sophisticated inline parser
+    // For now, we'll just handle simple cases or pass text through.
+    // A full markdown inline parser is complex.
+    // This basic version will look for the first match of any rule.
+
+    // For simplicity in this step, we'll just create a text node.
+    // A proper implementation would parse inline elements.
+    if (text.trim().length > 0) {
+        // Basic bold and italic handling (non-nested)
+        let currentText = text;
+        const segments: any[] = [];
+        
+        // Process bold and italic (simple, non-nested)
+        // This is a very simplified inline parser.
+        // It splits by ** and * and then reassembles.
+        
+        // Split by bold markers first
+        const boldParts = currentText.split(/\*\*|__/);
+        boldParts.forEach((part, i) => {
+            if (i % 2 === 1) { // This part was between **...** or __...__
+                segments.push({ type: 'text', text: part, marks: [{ type: 'strong' }] });
+            } else {
+                // Split by italic markers
+                const italicParts = part.split(/\*|_/);
+                italicParts.forEach((italicPart, j) => {
+                    if (j % 2 === 1) { // This part was between *...* or _..._
+                        segments.push({ type: 'text', text: italicPart, marks: [{ type: 'em' }] });
+                    } else if (italicPart) {
+                        segments.push({ type: 'text', text: italicPart });
+                    }
+                });
+            }
+        });
+        
+        // Filter out empty text nodes that might result from splitting
+        return segments.filter(s => s.text && s.text.length > 0);
+
+    }
+    return [];
+  };
+  
+  const flushList = () => {
+    if (inList && listType && listItems.length > 0) {
+      adfContent.push({
+        type: listType,
+        content: listItems,
+      });
+    }
+    inList = false;
+    listType = null;
+    listItems = [];
+  };
+
+  const flushCodeBlock = () => {
+    if (inCodeBlock && codeBlockContent.length > 0) {
+      adfContent.push({
+        type: 'codeBlock',
+        content: [{ type: 'text', text: codeBlockContent.trimEnd() }], // Trim trailing newline
+      });
+    }
+    inCodeBlock = false;
+    codeBlockContent = '';
+  };
+
+
+  for (const line of lines) {
+    // Code Blocks (```)
+    if (line.startsWith('```')) {
+      if (inCodeBlock) {
+        flushCodeBlock();
+      } else {
+        flushList(); // End any open list
+        inCodeBlock = true;
+        // language can be extracted here if needed: line.substring(3)
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeBlockContent += line + '\n';
+      continue;
+    }
+
+    // Headings
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)/);
+    if (headingMatch) {
+      flushList();
+      const level = headingMatch[1].length;
+      const text = headingMatch[2];
+      adfContent.push({
+        type: 'heading',
+        attrs: { level },
+        content: processInlineFormatting(text),
+      });
+      continue;
+    }
+
+    // Unordered Lists
+    const ulMatch = line.match(/^(\s*)([\-\*\+])\s+(.*)/);
+    if (ulMatch) {
+      if (!inList || listType !== 'bulletList') {
+        flushList();
+        inList = true;
+        listType = 'bulletList';
+      }
+      listItems.push({
+        type: 'listItem',
+        content: [{ type: 'paragraph', content: processInlineFormatting(ulMatch[3]) }],
+      });
+      continue;
+    }
+
+    // Ordered Lists
+    const olMatch = line.match(/^(\s*)(\d+)\.\s+(.*)/);
+    if (olMatch) {
+      if (!inList || listType !== 'orderedList') {
+        flushList();
+        inList = true;
+        listType = 'orderedList';
+      }
+      listItems.push({
+        type: 'listItem',
+        content: [{ type: 'paragraph', content: processInlineFormatting(olMatch[3]) }],
+      });
+      continue;
+    }
+    
+    // If it's not a list item, and we were in a list, flush it.
+    if (inList && !ulMatch && !olMatch) {
+        flushList();
+    }
+
+    // Paragraphs (or empty lines which might break paragraphs)
+    if (line.trim() === '') {
+      flushList(); // End list if an empty line is encountered
+      // ADF doesn't typically represent multiple empty lines as separate paragraphs.
+      // We can choose to add an empty paragraph or just let it be a break.
+      // For simplicity, we'll treat consecutive empty lines as a single break.
+      // If the last element was not a paragraph, this might start a new one.
+      // Or, if ADF handles this naturally, we might not need special handling.
+      // Let's assume for now that non-list, non-heading, non-codeblock lines become paragraphs.
+    } else {
+      flushList(); // Ensure list is flushed before a new paragraph
+      adfContent.push({
+        type: 'paragraph',
+        content: processInlineFormatting(line),
+      });
+    }
+  }
+
+  flushList(); // Ensure any trailing list is flushed
+  flushCodeBlock(); // Ensure any trailing code block is flushed
+  
+  // Filter out empty paragraphs that might have been created by inline processing returning empty
+  const finalContent = adfContent.filter(node => !(node.type === 'paragraph' && (!node.content || node.content.length === 0)));
+
+  return {
+    type: 'doc',
+    version: 1,
+    content: finalContent.length > 0 ? finalContent : [{ type: 'paragraph', content: [] }], // Ensure content is never empty
+  };
 };
 
 
