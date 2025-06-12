@@ -328,7 +328,7 @@ export const handleSessionMessage = async (
     const zodSchema = Object.keys(zodShape).length > 0 ? z.object(zodShape) : z.object({});
     const currentFuncName = funcName;
     
-    let executeFunc = async (args: any) => {
+    const executeFunc = async (args: any) => {
       // console.log(`[Tool Execution] Function ${currentFuncName} called with sessionId from closure: ${sessionId}`);
       const currentSession = await Session.findById(sessionId);
       if (!currentSession) {
@@ -350,24 +350,6 @@ export const handleSessionMessage = async (
       return result;
     };
     
-    if (currentFuncName === 'jira_fetchTickets') { 
-      executeFunc = async (args: any) => {
-        const currentSession = await Session.findById(sessionId);
-        if (!currentSession) {
-          throw new Error('Session not found during tool execution');
-        }
-        
-        const { result: rawResult, error } = await executeFunctionCall(
-          { function: { name: currentFuncName, arguments: JSON.stringify(args) } }, 
-          currentSession._id.toString(), 
-          currentSession.companyId.toString(), 
-          assistant.allowedActions
-        );
-        if (error) throw new Error(typeof error === 'string' ? error : (error as any)?.message || 'Tool execution failed');
-        if (Array.isArray(rawResult)) return rawResult.map((ticket: any) => ({ key: ticket.key, summary: ticket.fields?.summary, status: ticket.fields?.status?.name }));
-        return rawResult; 
-      };
-    }
       toolsForSdk[funcName] = tool({ description: funcDef.description, parameters: zodSchema, execute: executeFunc });
     }
     toolsCache.set(cacheKey, toolsForSdk);

@@ -23,6 +23,7 @@ interface CreateTicketArgs {
 interface FetchTicketsArgs {
   projectKey: string;
   maxResults?: number; // Default handled in service
+  fields?: string[]; // Optional: Array of field names to fetch
 }
 
 interface GetTicketArgs {
@@ -98,13 +99,23 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
       type: 'object',
       properties: {
         projectKey: projectKeyParamDefinition,
-        maxResults: { type: 'number', description: 'Maximum number of tickets to fetch' } // Removed default: 50
+        maxResults: { type: 'number', description: 'Maximum number of tickets to fetch' }, // Removed default: 50
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional: Array of field names to fetch (e.g., ["summary", "status"], or ["*all"] for all fields). Defaults to a curated set (id, key, summary, status, descriptionText, sprintInfo) if omitted.'
+        }
       },
       required: ['projectKey'],
       additionalProperties: false,
     },
     function: async (params: FetchTicketsArgs): Promise<any> => {
-      return await fetchJiraTickets(context.sessionId, context.companyId, params);
+      // Pass the fields parameter to the service function
+      return await fetchJiraTickets(context.sessionId, context.companyId, {
+        projectKey: params.projectKey,
+        maxResults: params.maxResults,
+        fieldsToFetch: params.fields // Pass the new optional fields
+      });
     },
   },
   getTicket: {
