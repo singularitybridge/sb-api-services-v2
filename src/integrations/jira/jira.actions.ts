@@ -3,6 +3,8 @@ import {
   createJiraTicket, 
   fetchJiraTickets, 
   getJiraTicketById,
+  getJiraTicketFields, // Added import for getJiraTicketFields
+  getJiraTicketComments, // Added import for getJiraTicketComments
   addCommentToJiraTicket,
   updateJiraTicket,
   addTicketToCurrentSprint as addTicketToCurrentSprintService,
@@ -25,6 +27,7 @@ interface FetchTicketsArgs {
 
 interface GetTicketArgs {
   issueIdOrKey: string;
+  fields?: string[]; // Optional: Array of field names to fetch, e.g., ["summary", "status", "*all"]
 }
 
 interface AddCommentArgs {
@@ -56,6 +59,14 @@ interface SearchUsersArgs {
 interface AssignTicketArgs {
   issueIdOrKey: string;
   accountId: string | null; // Allow null for unassigning
+}
+
+interface GetTicketCommentsArgs {
+  issueIdOrKey: string;
+  startAt?: number;
+  maxResults?: number;
+  orderBy?: string;
+  expand?: string;
 }
 
 const projectKeyParamDefinition = {
@@ -97,17 +108,26 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
     },
   },
   getTicket: {
-    description: 'Gets a specific JIRA ticket by ID or key',
+    description: 'Gets a specific JIRA ticket by ID or key. Optionally specify which fields to retrieve.',
     parameters: {
       type: 'object',
       properties: {
-        issueIdOrKey: { type: 'string', description: 'ID or key of the JIRA ticket' }
+        issueIdOrKey: { type: 'string', description: 'ID or key of the JIRA ticket.' },
+        fields: { 
+          type: 'array', 
+          items: { type: 'string' },
+          description: 'Optional: Array of field names to fetch (e.g., ["summary", "status"], or ["*all"] for all fields). Defaults to a curated set if omitted.' 
+        }
       },
       required: ['issueIdOrKey'],
       additionalProperties: false,
     },
     function: async (params: GetTicketArgs): Promise<any> => {
-      return await getJiraTicketById(context.sessionId, context.companyId, params);
+      // Pass the fields parameter to the service function
+      return await getJiraTicketById(context.sessionId, context.companyId, { 
+        issueIdOrKey: params.issueIdOrKey, 
+        fieldsToFetch: params.fields 
+      });
     },
   },
   addComment: {
@@ -224,6 +244,36 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
     },
     function: async (params: AssignTicketArgs): Promise<any> => {
       return await assignJiraTicket(context.sessionId, context.companyId, params);
+    },
+  },
+  getTicketFields: {
+    description: 'Gets all available fields in JIRA.',
+    parameters: {
+      type: 'object',
+      properties: {}, // No parameters needed
+      required: [], // Added empty required array
+      additionalProperties: false,
+    },
+    function: async (): Promise<any> => { // No params expected for this action
+      return await getJiraTicketFields(context.sessionId, context.companyId);
+    },
+  },
+  getTicketComments: {
+    description: 'Gets comments for a specific JIRA ticket.',
+    parameters: {
+      type: 'object',
+      properties: {
+        issueIdOrKey: { type: 'string', description: 'ID or key of the JIRA ticket.' },
+        startAt: { type: 'number', description: 'Starting index for pagination (optional).' },
+        maxResults: { type: 'number', description: 'Maximum number of comments to return (optional).' },
+        orderBy: { type: 'string', description: 'Order of comments e.g., "-created" for newest first (optional).' },
+        expand: { type: 'string', description: 'Fields to expand, e.g., "renderedBody" (optional).' }
+      },
+      required: ['issueIdOrKey'],
+      additionalProperties: false,
+    },
+    function: async (params: GetTicketCommentsArgs): Promise<any> => {
+      return await getJiraTicketComments(context.sessionId, context.companyId, params);
     },
   },
 });

@@ -478,9 +478,7 @@ export const handleSessionMessage = async (
     if (systemPrompt !== undefined) {
       streamCallOptions.system = systemPrompt;
     }
-    // No separate experimental_attachments or attachments field needed here if images are part of CoreMessage.content
-    // console.log('Calling streamText. Multimodal content is part of the messages array.'); // Removed for potential SSE interference
-    console.log(`[handleSessionMessage] About to call streamText for session ${sessionId}. Options:`, JSON.stringify(streamCallOptions, null, 2));
+    
     let streamResult;
     try {
       streamResult = await streamText(streamCallOptions);

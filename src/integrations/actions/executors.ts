@@ -110,7 +110,7 @@ export const executeFunctionCall = async (
       const { executionId, convertedActionId, actionInfo, processedArgs } = await prepareActionExecution(
         functionName,
         args,
-        sessionId,
+        activeSessionId, // Changed to activeSessionId
         sessionLanguage
       );
 
@@ -129,8 +129,8 @@ export const executeFunctionCall = async (
         input
       };
 
-      console.log(`[executeFunctionCall] Sending 'started' update for action ${convertedActionId} to session ${sessionId}`);
-      await sendActionUpdate(sessionId, 'started', executionDetails);
+      console.log(`[executeFunctionCall] Sending 'started' update for action ${convertedActionId} to session ${activeSessionId}`); // Changed to activeSessionId
+      await sendActionUpdate(activeSessionId, 'started', executionDetails); // Changed to activeSessionId
 
       // Improved file search detection
       const isFileSearch = functionName === 'file_search' ||
@@ -139,7 +139,7 @@ export const executeFunctionCall = async (
 
       if (isFileSearch) {
         // Publish a notification for file search detection
-        await sendActionUpdate(sessionId, 'started', {
+        await sendActionUpdate(activeSessionId, 'started', { // Changed to activeSessionId
           id: uuidv4(),
           actionId: 'file_search_notification',
           serviceName: 'File Search Notification',
@@ -159,7 +159,7 @@ export const executeFunctionCall = async (
         // If the result is not successful, publish failed message and return error result (not throw)
         // This ensures the LLM gets the error information as a tool result
         const errorDetails = extractErrorDetails(result.error || 'Unknown error');
-        await sendActionUpdate(sessionId, 'failed', { ...executionDetails, output: result, error: errorDetails });
+        await sendActionUpdate(activeSessionId, 'failed', { ...executionDetails, output: result, error: errorDetails }); // Changed to activeSessionId
         
         // Return error result so AI SDK provides it to LLM as tool result
         return { result: `Error: ${result.error || 'Action failed'}` };
