@@ -425,6 +425,452 @@ export const addTicketToCurrentSprint = async (
   }
 };
 
+export const getActiveSprintForBoard = async (
+  sessionId: string,
+  companyId: string,
+  params: {
+    boardId: string;
+  }
+) => {
+  try {
+    const client = await initializeClient(companyId);
+    const boardIdNumber = parseInt(params.boardId, 10);
+    if (isNaN(boardIdNumber)) {
+      return { success: false, error: 'Invalid boardId. It must be a number.' };
+    }
+
+    const activeSprintsResponse: any = await new Promise((resolve, reject) => {
+      client.sendRequest(
+        {
+          method: 'GET',
+          url: `/rest/agile/1.0/board/${boardIdNumber}/sprint?state=active`,
+        },
+        (error: any, data: any) => {
+          if (error) {
+            const jiraError = error?.error || error;
+            let message = 'Failed to get active sprints.';
+            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) {
+              message = jiraError.errorMessages.join(' ');
+            } else if (jiraError?.message) {
+              message = jiraError.message;
+            } else if (typeof jiraError === 'string') {
+              message = jiraError;
+            }
+            reject(new Error(message));
+          } else {
+            resolve(data);
+          }
+        }
+      );
+    });
+
+    if (!activeSprintsResponse || !activeSprintsResponse.values || activeSprintsResponse.values.length === 0) {
+      return { success: false, error: `No active sprint found for board ID ${params.boardId}.` };
+    }
+
+    const activeSprint = activeSprintsResponse.values[0];
+    // Use originBoardId as returned by the Jira API for sprints fetched via board
+    if (!activeSprint.id || !activeSprint.name || !activeSprint.state || activeSprint.originBoardId === undefined) {
+      return { success: false, error: `Active sprint data is incomplete. Sprint data: ${JSON.stringify(activeSprint)}` };
+    }
+
+    return { 
+      success: true, 
+      data: {
+        id: activeSprint.id,
+        name: activeSprint.name,
+        state: activeSprint.state,
+        boardId: activeSprint.originBoardId, // Changed to originBoardId
+        goal: activeSprint.goal, // goal can be null or empty
+        startDate: activeSprint.startDate,
+        endDate: activeSprint.endDate,
+      } 
+    };
+  } catch (error: any) {
+    const errorMessage = error.message || (error.errorMessages && error.errorMessages.join(', ')) || 'Unknown error fetching active sprint';
+    return { success: false, error: `Failed to get active sprint for board ${params.boardId}: ${errorMessage}` };
+  }
+};
+
+export const getIssuesForSprint = async (
+  sessionId: string,
+  companyId: string,
+  params: {
+    sprintId: string;
+    projectKey?: string; 
+    maxResults?: number;
+    startAt?: number;
+    fieldsToFetch?: string[];
+  }
+) => {
+  try {
+    const client = await initializeClient(companyId);
+    const sprintIdNumber = parseInt(params.sprintId, 10);
+    if (isNaN(sprintIdNumber)) {
+      return { success: false, error: 'Invalid sprintId. It must be a number.' };
+    }
+
+    const maxResults = params.maxResults || 50;
+    const startAt = params.startAt || 0;
+    
+    const defaultFieldsToFetch = ['summary', 'status', 'description', 'assignee', 'issuetype', 'priority'];
+    let fieldsToRequest = (params.fieldsToFetch && params.fieldsToFetch.length > 0)
+      ? params.fieldsToFetch
+      : defaultFieldsToFetch;
+
+    if (params.fieldsToFetch && params.fieldsToFetch.length > 0) {
+        if (!fieldsToRequest.includes('description')) fieldsToRequest.push('description');
+        if (!fieldsToRequest.includes('status')) fieldsToRequest.push('status');
+    }
+    
+    const response: any = await new Promise((resolve, reject) => {
+      client.sendRequest(
+        {
+          method: 'GET',
+          url: `/rest/agile/1.0/sprint/${sprintIdNumber}/issue`,
+          params: { 
+            startAt: startAt,
+            maxResults: maxResults,
+            fields: fieldsToRequest.join(','),
+          },
+        },
+        (error: any, data: any) => {
+          if (error) {
+            const jiraError = error?.error || error;
+            let message = `Failed to get issues for sprint ${sprintIdNumber}.`;
+            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) {
+              message = jiraError.errorMessages.join(' ');
+            } else if (jiraError?.message) {
+              message = jiraError.message;
+            } else if (typeof jiraError === 'string') {
+              message = jiraError;
+            }
+            reject(new Error(message));
+          } else {
+            resolve(data);
+          }
+        }
+      );
+    });
+
+    const issues = response.issues || [];
+    if (!issues.length && response.total === 0) {
+        return { success: true, data: [], message: `No issues found for sprint ID ${params.sprintId}.` };
+    }
+    
+    const simplifiedIssues = issues.map((issue: any) => {
+      const descriptionText = issue.fields?.description ? adfToText(issue.fields.description) : undefined;
+      
+      const curatedFields: Record<string, any> = {};
+      fieldsToRequest.forEach((fieldName: string) => {
+        if (issue.fields && issue.fields.hasOwnProperty(fieldName)) {
+          if (fieldName === 'description') {
+            curatedFields.descriptionText = descriptionText;
+          } else if (fieldName === 'status' && issue.fields.status?.name) {
+            curatedFields.status = issue.fields.status.name;
+          } else if (fieldName === 'assignee' && issue.fields.assignee?.displayName) {
+            curatedFields.assignee = issue.fields.assignee.displayName;
+             curatedFields.assigneeAccountId = issue.fields.assignee.accountId;
+          } else if (fieldName === 'issuetype' && issue.fields.issuetype?.name) {
+            curatedFields.issuetype = issue.fields.issuetype.name;
+          } else if (fieldName === 'priority' && issue.fields.priority?.name) {
+            curatedFields.priority = issue.fields.priority.name;
+          }
+           else {
+            curatedFields[fieldName] = issue.fields[fieldName];
+          }
+        }
+      });
+
+      return {
+        id: issue.id,
+        key: issue.key,
+        summary: issue.fields?.summary,
+        ...curatedFields 
+      };
+    });
+
+    return { 
+        success: true, 
+        data: simplifiedIssues, 
+        total: response.total, 
+        maxResults: response.maxResults,
+        startAt: response.startAt 
+    };
+
+  } catch (error: any) {
+    const errorMessage = error.message || (error.errorMessages && error.errorMessages.join(', ')) || 'Unknown error fetching issues for sprint';
+    return { success: false, error: `Failed to get issues for sprint ${params.sprintId}: ${errorMessage}` };
+  }
+};
+
+export const moveIssueToSprint = async (
+  sessionId: string,
+  companyId: string,
+  params: {
+    issueKey: string;
+    targetSprintId: string;
+  }
+) => {
+  try {
+    const client = await initializeClient(companyId);
+    const targetSprintIdNumber = parseInt(params.targetSprintId, 10);
+
+    if (isNaN(targetSprintIdNumber)) {
+      return { success: false, error: 'Invalid targetSprintId. It must be a number.' };
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      client.sendRequest(
+        {
+          method: 'POST',
+          url: `/rest/agile/1.0/sprint/${targetSprintIdNumber}/issue`,
+          data: {
+            issues: [params.issueKey],
+          },
+        },
+        (error: any, data: any) => {
+          if (error) {
+            const jiraError = error?.error || error;
+            let message = `Failed to move issue ${params.issueKey} to sprint ${targetSprintIdNumber}.`;
+            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) {
+              message = jiraError.errorMessages.join(' ');
+            } else if (jiraError?.errors && Object.keys(jiraError.errors).length > 0) {
+              message = Object.values(jiraError.errors).join(' ');
+            }
+            else if (jiraError?.message) {
+              message = jiraError.message;
+            } else if (typeof jiraError === 'string') {
+              message = jiraError;
+            }
+            reject(new Error(message));
+          } else {
+            resolve();
+          }
+        }
+      );
+    });
+
+    return `Ticket ${params.issueKey} successfully moved to sprint ID ${targetSprintIdNumber}.`; // Return only string on success
+
+  } catch (error: any) {
+    const errorMessage = error.message || (error.errorMessages && error.errorMessages.join(', ')) || `Unknown error moving issue ${params.issueKey} to sprint ${params.targetSprintId}`;
+    return { success: false, error: errorMessage };
+  }
+};
+
+export const moveIssueToBacklog = async (
+  sessionId: string,
+  companyId: string,
+  params: {
+    issueKey: string;
+    // boardId?: string; // Consider if board context is needed by API or for logic
+  }
+) => {
+  try {
+    const client = await initializeClient(companyId);
+
+    // Use the Agile API to move issues to the backlog
+    // POST /rest/agile/1.0/backlog/issue
+    // Body: { "issues": ["ISSUE-KEY-1", "ISSUE-KEY-2"] }
+    // This endpoint might also implicitly remove the issue from its current sprint.
+    await new Promise<void>((resolve, reject) => {
+      client.sendRequest(
+        {
+          method: 'POST',
+          url: `/rest/agile/1.0/backlog/issue`,
+          data: {
+            issues: [params.issueKey],
+          },
+        },
+        (error: any, data: any) => {
+          if (error) {
+            const jiraError = error?.error || error;
+            let message = `Failed to move issue ${params.issueKey} to backlog.`;
+            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) {
+              message = jiraError.errorMessages.join(' ');
+            } else if (jiraError?.errors && Object.keys(jiraError.errors).length > 0) {
+              message = Object.values(jiraError.errors).join(' ');
+            } else if (jiraError?.message) {
+              message = jiraError.message;
+            } else if (typeof jiraError === 'string') {
+              message = jiraError;
+            }
+            reject(new Error(message));
+          } else {
+            // A 204 No Content is typical for successful POSTs.
+            resolve();
+          }
+        }
+      );
+    });
+
+    return { success: true, message: `Ticket ${params.issueKey} successfully moved to backlog.` };
+
+  } catch (error: any) {
+    const errorMessage = error.message || (error.errorMessages && error.errorMessages.join(', ')) || `Unknown error moving issue ${params.issueKey} to backlog`;
+    return { success: false, error: errorMessage };
+  }
+};
+
+export const getAvailableTransitions = async (
+  sessionId: string,
+  companyId: string,
+  params: {
+    issueIdOrKey: string;
+  }
+) => {
+  try {
+    const client = await initializeClient(companyId);
+    
+    // Use the jira.js client method to get transitions
+    // GET /rest/api/2/issue/{issueIdOrKey}/transitions
+    const transitionsResponse = await client.issues.getTransitions({
+      issueIdOrKey: params.issueIdOrKey,
+    });
+
+    // The response typically includes an array of transition objects.
+    // Each transition object has id, name, and a 'to' status object.
+    // We can return this directly or simplify if needed. For now, return as is.
+    if (!transitionsResponse || !transitionsResponse.transitions) {
+      return { success: false, error: `No transitions found or error fetching transitions for issue ${params.issueIdOrKey}.` };
+    }
+
+    return { success: true, data: transitionsResponse.transitions };
+
+  } catch (error: any) {
+    const errorMessage = error.message || (error.errorMessages && error.errorMessages.join(', ')) || `Unknown error fetching transitions for issue ${params.issueIdOrKey}`;
+    return { success: false, error: errorMessage };
+  }
+};
+
+export const transitionIssue = async (
+  sessionId: string,
+  companyId: string,
+  params: {
+    issueIdOrKey: string;
+    transitionId: string;
+    comment?: string;
+    fields?: Record<string, any>; // For fields like resolution
+  }
+) => {
+  try {
+    const client = await initializeClient(companyId);
+
+    const payload: any = {
+      transition: {
+        id: params.transitionId,
+      },
+    };
+
+    if (params.comment) {
+      payload.update = {
+        comment: [
+          {
+            add: markdownToAdf(params.comment),
+          },
+        ],
+      };
+    }
+
+    if (params.fields) {
+      payload.fields = params.fields;
+      // Example: if resolution needs to be set:
+      // params.fields = { resolution: { name: "Done" } }
+    }
+    
+    // Use the jira.js client method to perform the transition
+    // POST /rest/api/2/issue/{issueIdOrKey}/transitions
+    await client.issues.doTransition({
+      issueIdOrKey: params.issueIdOrKey,
+      transition: payload.transition, // Pass only the transition part of the payload here
+      fields: payload.fields, // Pass fields if any
+      update: payload.update, // Pass update (for comment) if any
+    });
+    
+    // Successful transition usually returns a 204 No Content.
+    return { success: true, message: `Issue ${params.issueIdOrKey} successfully transitioned using transition ID ${params.transitionId}.` };
+
+  } catch (error: any) {
+    // Attempt to parse Jira's specific error messages if available
+    let detailedError = '';
+    if (error.response && error.response.data && error.response.data.errorMessages) {
+      detailedError = error.response.data.errorMessages.join('; ');
+    } else if (error.response && error.response.data && error.response.data.errors) {
+      detailedError = Object.entries(error.response.data.errors)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join('; ');
+    }
+    const errorMessage = detailedError || error.message || `Unknown error transitioning issue ${params.issueIdOrKey}`;
+    return { success: false, error: `Failed to transition issue: ${errorMessage}` };
+  }
+};
+
+// Cache for story points field ID
+let storyPointsFieldIdCache: string | null = null;
+
+const findStoryPointsFieldId = async (sessionId: string, companyId: string): Promise<string | null> => {
+  if (storyPointsFieldIdCache) {
+    return storyPointsFieldIdCache;
+  }
+
+  try {
+    const fieldsResult = await getJiraTicketFields(sessionId, companyId);
+    if (fieldsResult.success && Array.isArray(fieldsResult.data)) {
+      // Common names for Story Points field. This list can be expanded.
+      const commonStoryPointsFieldNames = ['Story Points', 'Story Point Estimate', 'Σ Story Points'];
+      const storyPointField = fieldsResult.data.find(field => 
+        commonStoryPointsFieldNames.some(name => field.name?.toLowerCase() === name.toLowerCase()) &&
+        (field.schema?.type === 'number' || field.schema?.custom === 'com.atlassian.jira.plugin.system.customfieldtypes:float') // Check schema type
+      );
+      
+      if (storyPointField && storyPointField.id) {
+        storyPointsFieldIdCache = storyPointField.id;
+        return storyPointField.id;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Error finding story points field ID:', error);
+    return null;
+  }
+};
+
+export const setStoryPoints = async (
+  sessionId: string,
+  companyId: string,
+  params: {
+    issueIdOrKey: string;
+    storyPoints: number | null; // Allow null to clear story points
+  }
+) => {
+  try {
+    const storyPointsFieldId = await findStoryPointsFieldId(sessionId, companyId);
+
+    if (!storyPointsFieldId) {
+      return { 
+        success: false, 
+        error: 'Could not automatically determine the Story Points field ID. Please ensure it is configured or check field names.' 
+      };
+    }
+
+    const fieldsToUpdate = {
+      [storyPointsFieldId]: params.storyPoints,
+    };
+
+    // Call the generic updateJiraTicket function
+    return await updateJiraTicket(sessionId, companyId, {
+      issueIdOrKey: params.issueIdOrKey,
+      fields: fieldsToUpdate,
+    });
+
+  } catch (error: any) {
+    const errorMessage = error.message || `Unknown error setting story points for issue ${params.issueIdOrKey}`;
+    return { success: false, error: `Failed to set story points: ${errorMessage}` };
+  }
+};
+
+
 // Helper function to convert Atlassian Document Format (ADF) to plain text
 const adfToText = (adfNode: any): string => {
   if (!adfNode) {
