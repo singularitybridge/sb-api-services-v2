@@ -425,6 +425,86 @@ export const addTicketToCurrentSprint = async (
   }
 };
 
+export const getSprintsForBoard = async (
+  sessionId: string,
+  companyId: string,
+  params: {
+    boardId: string;
+    state?: string; // e.g., "active", "future", "closed", "active,future"
+    startAt?: number;
+    maxResults?: number;
+  }
+) => {
+  try {
+    const client = await initializeClient(companyId);
+    const boardIdNumber = parseInt(params.boardId, 10);
+    if (isNaN(boardIdNumber)) {
+      return { success: false, error: 'Invalid boardId. It must be a number.' };
+    }
+
+    const requestParams: any = {
+      startAt: params.startAt || 0,
+      maxResults: params.maxResults || 50,
+      state: params.state || 'active,future', // Default to active and future sprints
+    };
+
+    const sprintsResponse: any = await new Promise((resolve, reject) => {
+      client.sendRequest(
+        {
+          method: 'GET',
+          url: `/rest/agile/1.0/board/${boardIdNumber}/sprint`,
+          params: requestParams,
+        },
+        (error: any, data: any) => {
+          if (error) {
+            const jiraError = error?.error || error;
+            let message = `Failed to get sprints for board ${boardIdNumber}.`;
+            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) {
+              message = jiraError.errorMessages.join(' ');
+            } else if (jiraError?.message) {
+              message = jiraError.message;
+            } else if (typeof jiraError === 'string') {
+              message = jiraError;
+            }
+            reject(new Error(message));
+          } else {
+            resolve(data);
+          }
+        }
+      );
+    });
+
+    if (!sprintsResponse || !Array.isArray(sprintsResponse.values)) {
+      return { success: false, error: `Error fetching sprints for board ID ${params.boardId}. Unexpected response format.` };
+    }
+    
+    const sprints = sprintsResponse.values.map((sprint: any) => ({
+      id: sprint.id,
+      name: sprint.name,
+      state: sprint.state,
+      boardId: sprint.originBoardId, // Use originBoardId
+      goal: sprint.goal,
+      startDate: sprint.startDate,
+      endDate: sprint.endDate,
+      completeDate: sprint.completeDate, // Include completeDate if available
+    }));
+
+    return { 
+      success: true, 
+      data: {
+        sprints: sprints,
+        maxResults: sprintsResponse.maxResults,
+        startAt: sprintsResponse.startAt,
+        isLast: sprintsResponse.isLast, // Useful for pagination
+        total: sprintsResponse.total // If available in response, else undefined
+      }
+    };
+  } catch (error: any) {
+    const errorMessage = error.message || (error.errorMessages && error.errorMessages.join(', ')) || `Unknown error fetching sprints for board ${params.boardId}`;
+    return { success: false, error: errorMessage };
+  }
+};
+
 export const getActiveSprintForBoard = async (
   sessionId: string,
   companyId: string,
@@ -651,7 +731,70 @@ export const moveIssueToSprint = async (
       );
     });
 
-    return `Ticket ${params.issueKey} successfully moved to sprint ID ${targetSprintIdNumber}.`; // Return only string on success
+    // After successfully moving the issue, fetch the board details for the target sprint
+    // to then fetch all sprints for that board.
+    let boardIdToFetchSprints: number | undefined;
+    try {
+      const sprintDetailsResponse: any = await new Promise((resolve, reject) => {
+        client.sendRequest(
+          {
+            method: 'GET',
+            url: `/rest/agile/1.0/sprint/${targetSprintIdNumber}`,
+          },
+          (err: any, sprintData: any) => {
+            if (err) {
+              reject(new Error(`Failed to fetch details for target sprint ${targetSprintIdNumber}: ${err.message || JSON.stringify(err)}`));
+            } else {
+              resolve(sprintData);
+            }
+          }
+        );
+      });
+
+      if (sprintDetailsResponse && sprintDetailsResponse.originBoardId) {
+        boardIdToFetchSprints = sprintDetailsResponse.originBoardId;
+      } else {
+        // Fallback or error if boardId cannot be determined
+        console.warn(`Could not determine boardId for sprint ${targetSprintIdNumber}. Sprint details: ${JSON.stringify(sprintDetailsResponse)}`);
+        // Proceed without sprint list if boardId is missing, but log it.
+        // Or, could return an error/partial success here.
+        // For now, let's return success for the move, but data will be just a message.
+         return { 
+          success: true, 
+          message: `Ticket ${params.issueKey} successfully moved to sprint ID ${targetSprintIdNumber}. Could not fetch updated sprint list as board ID was not found for the target sprint.`
+        };
+      }
+    } catch (sprintFetchError: any) {
+      console.error(`Error fetching target sprint details: ${sprintFetchError.message}`);
+       return { 
+        success: true, 
+        message: `Ticket ${params.issueKey} successfully moved to sprint ID ${targetSprintIdNumber}. Error fetching updated sprint list: ${sprintFetchError.message}`
+      };
+    }
+
+    if (boardIdToFetchSprints) {
+      const sprintsDataResult = await getSprintsForBoard(sessionId, companyId, { boardId: boardIdToFetchSprints.toString() });
+      if (sprintsDataResult.success) {
+        return { 
+          success: true, 
+          message: `Ticket ${params.issueKey} successfully moved to sprint ID ${targetSprintIdNumber}.`,
+          data: sprintsDataResult.data // This should match the user's expected output structure
+        };
+      } else {
+        // If fetching sprints fails, still indicate the move was successful but sprints couldn't be fetched.
+        return { 
+          success: true, 
+          message: `Ticket ${params.issueKey} successfully moved to sprint ID ${targetSprintIdNumber}. Failed to fetch updated sprint list: ${sprintsDataResult.error}`,
+          data: null // Or some indicator that sprint list is unavailable
+        };
+      }
+    } else {
+      // This case should ideally be handled by the checks above, but as a fallback:
+      return { 
+        success: true, 
+        message: `Ticket ${params.issueKey} successfully moved to sprint ID ${targetSprintIdNumber}, but could not retrieve updated sprint list.` 
+      };
+    }
 
   } catch (error: any) {
     const errorMessage = error.message || (error.errorMessages && error.errorMessages.join(', ')) || `Unknown error moving issue ${params.issueKey} to sprint ${params.targetSprintId}`;
