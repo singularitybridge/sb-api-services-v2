@@ -38,8 +38,15 @@ export const yourIntegrationFunction = async (
   sessionId: string,
   companyId: string,
   params: any
-): Promise<{ success: boolean; data?: any }> => {
+): Promise<{ success: boolean; data?: any; message?: string; error?: string }> => {
+  // Service functions should return a clear success status. 
+  // The `data` field should contain the primary payload of a successful operation. 
+  // A `message` can provide a human-readable summary. 
+  // If an operation fails within the service but doesn't warrant an exception 
+  // (e.g., a partial success or a known non-critical issue), an `error` string 
+  // can be returned with `success: false`. However, for most failures, throwing an exception is preferred.
   if (!params.requiredField) {
+    // For validation errors or critical issues, throwing an exception is often better.
     throw new Error('The requiredField parameter is missing.');
   }
 
@@ -76,7 +83,23 @@ export const createYourIntegrationActions = (context: ActionContext): FunctionFa
       additionalProperties: false,
     },
     function: async (params: any) => {
-      return await yourIntegrationFunction(context.sessionId, context.companyId, params);
+      const result = await yourIntegrationFunction(context.sessionId, context.companyId, params);
+      // The object returned by this function is what the system's execution layer 
+      // (e.g., `executeFunctionCall`) processes. Ensure this return value is structured appropriately.
+      // If the action's output is intended for an AI model, the AI SDK might have specific 
+      // expectations for the format (e.g., a simple string or a particular object structure).
+      // The `data` field in the returned object is conventionally used for the primary payload.
+      // In many cases, returning the full 'result' object from the service is appropriate.
+      if (result.success) {
+        // Example: return result; // To return { success: true, data: ..., message: ... }
+        // Example: return result.data; // To return only the main data payload
+        // Example: return result.message; // If a simple string message is expected
+        return result; // Adjust based on what the calling system/AI expects
+      } else {
+        // If the service indicates failure without throwing an exception, 
+        // the action should throw one to be handled by the global error handler.
+        throw new Error(result.error || 'Action failed due to an unspecified service error from integration.');
+      }
     },
   },
 });
@@ -121,8 +144,9 @@ Provide user-facing strings in both English and Hebrew.
 
 ### 4.1. Error Handling
 
-- **Use Exceptions for Errors:** Action functions should **throw exceptions** when errors occur.
+- **Use Exceptions for Errors:** Action functions should **throw exceptions** when errors occur. This is the primary way to signal failure.
 - **Consistent Error Handling by Executor:** The executor will handle errors uniformly by catching exceptions and publishing 'failed' statuses.
+- **Structured Error Details:** If your integration interacts with external APIs that return structured errors (e.g., with status codes and detailed response bodies, similar to an `APICallError` from the AI SDK), ensure your service layer propagates these details within the thrown exception if possible (e.g., by throwing a custom error class or an error with additional properties). The system's global error handler (`src/middleware/errorHandler.middleware.ts`) is designed to recognize such rich error objects and can provide more detailed feedback to the UI.
   
 ### 4.2. Naming Conventions
 
@@ -182,8 +206,8 @@ Provide user-facing strings in both English and Hebrew.
 
 ### 7.1. Uniform Error Handling
 
-- **Throw Exceptions:** Always throw exceptions within action functions for consistency.
-- **No Error Fields in Results:** Remove the error fields from action return objects. Rely on exceptions to indicate failures.
+- **Throw Exceptions:** Always throw exceptions from action functions or service functions to indicate operational failures. This ensures consistency with the global error handling mechanism.
+- **No `error` Fields in Successful Results:** For successful operations (`success: true`), the action should return the data payload (e.g., in a `data` field or as a direct string/object if appropriate). Avoid including an `error` field in successful responses. The service layer might internally use `{ success: false, error: "..." }` for non-exceptional failures it handles, but the action should convert these to exceptions.
 
 ### 7.2. Input Validation
 

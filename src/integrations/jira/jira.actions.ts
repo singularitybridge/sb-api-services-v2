@@ -412,6 +412,8 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
       additionalProperties: false,
     },
     function: async (params: TransitionIssueArgs): Promise<any> => {
+      // The service now returns { success: boolean, message?: string, data?: any, error?: string }
+      // The 'data' field will contain the list of available transitions if successful.
       return await transitionIssueService(context.sessionId, context.companyId, params);
     },
   },

@@ -848,9 +848,18 @@ export const moveIssueToBacklog = async (
       );
     });
 
-    return { success: true, message: `Ticket ${params.issueKey} successfully moved to backlog.` };
+    const successMessage = `Ticket ${params.issueKey} successfully moved to backlog.`;
+    const result = {
+      success: true,
+      data: { // Ensure the primary output is within the 'data' field
+        message: successMessage
+      }
+    };
+    console.log(`[JiraService] moveIssueToBacklog successful for ${params.issueKey}. Returning: ${JSON.stringify(result)}`);
+    return result;
 
   } catch (error: any) {
+    console.error(`[JiraService] moveIssueToBacklog failed for ${params.issueKey}. Error: ${error.message}`);
     const errorMessage = error.message || (error.errorMessages && error.errorMessages.join(', ')) || `Unknown error moving issue ${params.issueKey} to backlog`;
     return { success: false, error: errorMessage };
   }
@@ -932,7 +941,24 @@ export const transitionIssue = async (
     });
     
     // Successful transition usually returns a 204 No Content.
-    return { success: true, message: `Issue ${params.issueIdOrKey} successfully transitioned using transition ID ${params.transitionId}.` };
+    // After successful transition, fetch the new available transitions for the issue.
+    const newTransitionsResult = await getAvailableTransitions(sessionId, companyId, { issueIdOrKey: params.issueIdOrKey });
+
+    if (newTransitionsResult.success) {
+      return { 
+        success: true, 
+        message: `Issue ${params.issueIdOrKey} successfully transitioned using transition ID ${params.transitionId}.`,
+        data: newTransitionsResult.data // This is the list of available transitions
+      };
+    } else {
+      // Transition was successful, but fetching new transitions failed.
+      // Return success for the transition but include the error for fetching transitions.
+      return { 
+        success: true, 
+        message: `Issue ${params.issueIdOrKey} successfully transitioned. However, failed to fetch updated available transitions: ${newTransitionsResult.error}`,
+        data: [] // Or null, to indicate transitions couldn't be fetched
+      };
+    }
 
   } catch (error: any) {
     // Attempt to parse Jira's specific error messages if available
