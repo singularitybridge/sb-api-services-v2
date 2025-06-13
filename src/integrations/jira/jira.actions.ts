@@ -16,7 +16,8 @@ import {
   moveIssueToBacklog as moveIssueToBacklogService,
   getAvailableTransitions as getAvailableTransitionsService,
   transitionIssue as transitionIssueService,
-  setStoryPoints as setStoryPointsService // Import the new service function
+  setStoryPoints as setStoryPointsService,
+  getSprintsForBoard as getSprintsForBoardService // Import the new service function
 } from './jira.service';
 
 // Argument types for JIRA actions
@@ -104,6 +105,13 @@ interface TransitionIssueArgs {
 interface SetStoryPointsArgs {
   issueIdOrKey: string;
   storyPoints: number | null; // Allow null to clear
+}
+
+interface GetSprintsForBoardArgs {
+  boardId: string;
+  state?: string; // e.g., "active", "future", "closed", "active,future"
+  startAt?: number;
+  maxResults?: number;
 }
 
 interface GetTicketCommentsArgs {
@@ -423,6 +431,23 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
     },
     function: async (params: SetStoryPointsArgs): Promise<any> => {
       return await setStoryPointsService(context.sessionId, context.companyId, params);
+    },
+  },
+  getSprintsForBoard: {
+    description: 'Gets sprints for a specific JIRA board, optionally filtered by state (e.g., "active", "future", "closed"). Supports pagination.',
+    parameters: {
+      type: 'object',
+      properties: {
+        boardId: { type: 'string', description: 'The ID of the JIRA board.' },
+        state: { type: 'string', description: 'Optional: Filter sprints by state (e.g., "active", "future", "closed", or "active,future"). Defaults to "active,future".' },
+        startAt: { type: 'number', description: 'Optional: Starting index for pagination (default: 0).' },
+        maxResults: { type: 'number', description: 'Optional: Maximum number of sprints to return (default: 50).' }
+      },
+      required: ['boardId'],
+      additionalProperties: false,
+    },
+    function: async (params: GetSprintsForBoardArgs): Promise<any> => {
+      return await getSprintsForBoardService(context.sessionId, context.companyId, params);
     },
   },
   getTicketFields: {
