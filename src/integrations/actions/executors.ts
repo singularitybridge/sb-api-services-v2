@@ -154,6 +154,7 @@ export const executeFunctionCall = async (
       }
 
       const result = await functionFactory[functionName].function(processedArgs) as ActionResult;
+      console.log(`[executeFunctionCall] Raw result from ${functionName}:`, JSON.stringify(result, null, 2));
 
       if (!result.success) {
         // If the result is not successful, publish failed message and return error result (not throw)
@@ -161,8 +162,9 @@ export const executeFunctionCall = async (
         const errorDetails = extractErrorDetails(result.error || 'Unknown error');
         await sendActionUpdate(activeSessionId, 'failed', { ...executionDetails, output: result, error: errorDetails }); // Changed to activeSessionId
         
-        // Return error result so AI SDK provides it to LLM as tool result
-        return { result: `Error: ${result.error || 'Action failed'}` };
+        const errorReturn = { result: `Error: ${result.error || 'Action failed'}` };
+        console.log(`[executeFunctionCall] Returning error to AI SDK for ${functionName}:`, JSON.stringify(errorReturn, null, 2));
+        return errorReturn;
       } else {
         // If success is true, publish completed message and return result
         await sendActionUpdate(activeSessionId, 'completed', { ...executionDetails, output: result });
@@ -181,10 +183,12 @@ export const executeFunctionCall = async (
             input: { message: 'File search completed. Results retrieved and incorporated into the response.' }
           });
         }
-        return { result: result.data };
+        const successReturn = { result: result.data };
+        console.log(`[executeFunctionCall] Returning success data to AI SDK for ${functionName}:`, JSON.stringify(successReturn, null, 2));
+        return successReturn;
       }
     } catch (error) {
-      console.error(`Error executing function ${functionName}:`, error);
+      console.error(`[executeFunctionCall] Error executing function ${functionName}:`, error);
 
       const failedActionInfo = await discoverActionById(convertOpenAIFunctionName(functionName), sessionLanguage);
       const errorDetails = extractErrorDetails(error);
