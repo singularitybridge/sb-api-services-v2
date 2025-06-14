@@ -19,6 +19,7 @@ import {
   setStoryPoints as setStoryPointsService,
   getSprintsForBoard as getSprintsForBoardService // Import the new service function
 } from './jira.service';
+import { StandardActionResult } from '../actions/types'; // Import StandardActionResult
 
 // Argument types for JIRA actions
 interface CreateTicketArgs {
@@ -100,6 +101,34 @@ interface TransitionIssueArgs {
   transitionId: string;
   comment?: string;
   fields?: Record<string, any>; // For fields like resolution { name: "Done" }
+}
+
+// Define the type for the data payload of transitionIssue action
+interface JiraTransitionStatus {
+  self: string;
+  description: string;
+  iconUrl: string;
+  name: string;
+  id: string;
+  statusCategory: {
+    self: string;
+    id: number;
+    key: string;
+    colorName: string;
+    name: string;
+  };
+}
+
+interface JiraTransition {
+  id: string;
+  name: string;
+  to: JiraTransitionStatus;
+  hasScreen: boolean;
+  isGlobal: boolean;
+  isInitial: boolean;
+  isAvailable: boolean;
+  isConditional: boolean;
+  isLooped?: boolean; // Optional as per user example
 }
 
 interface SetStoryPointsArgs {
@@ -411,10 +440,23 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
       required: ['issueIdOrKey', 'transitionId'],
       additionalProperties: false,
     },
-    function: async (params: TransitionIssueArgs): Promise<any> => {
-      // The service now returns { success: boolean, message?: string, data?: any, error?: string }
-      // The 'data' field will contain the list of available transitions if successful.
-      return await transitionIssueService(context.sessionId, context.companyId, params);
+    function: async (params: TransitionIssueArgs): Promise<StandardActionResult<JiraTransition[]>> => {
+      const result = await transitionIssueService(context.sessionId, context.companyId, params);
+
+      if (result.success) {
+        // The service already returns a compatible structure for StandardActionResult
+        // when result.success is true.
+        // Ensure the returned object strictly matches StandardActionResult.
+        return {
+          success: true, // This must be true
+          message: result.message,
+          data: result.data as JiraTransition[] // Cast data to the expected type
+        };
+      } else {
+        // If the service returns success: false, throw an error.
+        // (Ideally, services should throw exceptions directly for failures)
+        throw new Error(result.error || 'JIRA transition failed due to an unspecified service error.');
+      }
     },
   },
   setStoryPoints: {
