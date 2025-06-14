@@ -1,10 +1,57 @@
 import { Version3Client, Version3Models } from 'jira.js';
 import { getApiKey, ApiKeyType } from '../../services/api.key.service';
 
-let client: Version3Client | null = null;
+// --- BEGIN NEW TYPES ---
+export interface Result<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string; // Optional: for non-error messages or additional context
+}
 
-const initializeClient = async (companyId: string) => {
-  if (client) return client;
+export interface JiraBoard {
+  id: number;
+  self: string;
+  name: string;
+  type: string; // e.g., 'scrum', 'kanban'
+  location?: { // Optional: If provided by API for project context
+    projectId?: number;
+    projectKey?: string;
+    projectName?: string;
+  };
+}
+
+export interface JiraSprint {
+  id: number;
+  self?: string;
+  state: 'active' | 'future' | 'closed' | string; // Allow other states as string
+  name: string;
+  startDate?: string;
+  endDate?: string;
+  completeDate?: string;
+  originBoardId?: number; // Typically the board this sprint belongs to
+  goal?: string;
+}
+// --- END NEW TYPES ---
+
+let client: Version3Client | null = null;
+// --- BEGIN NEW CACHE VARIABLES ---
+let sprintFieldIdCache: string | null = null;
+// --- END NEW CACHE VARIABLES ---
+
+const initializeClient = async (companyId: string): Promise<Version3Client> => {
+  // Removed 'if (client) return client;' to ensure fresh client if companyId changes context,
+  // or ensure client is re-initialized if previous init failed for a different company.
+  // If client management needs to be per-company, a Map could be used.
+  // For now, assume one client instance is okay, but re-init if called with different companyId logic.
+  // Or, more simply, always re-init for safety in a stateless function call context.
+  // Let's stick to the original simple caching for now, assuming companyId context is managed by caller.
+  if (client) { // Simple cache, assuming same company context for subsequent calls within a short timeframe
+      // A more robust solution might involve a map of clients per companyId or invalidating on companyId change.
+      // For now, this matches the original behavior.
+      return client;
+  }
+
 
   const apiToken = await getApiKey(companyId, 'jira_api_token');
   const domain = await getApiKey(companyId, 'jira_domain');
@@ -29,8 +76,250 @@ const initializeClient = async (companyId: string) => {
   return client;
 };
 
+// --- BEGIN NEW SERVICE FUNCTIONS ---
+
+export const getBoardsForProject = async (
+  companyId: string,
+  projectKey: string
+): Promise<Result<{ boards: JiraBoard[] }>> => {
+  try {
+    const jiraClient = await initializeClient(companyId);
+    // Jira Agile API endpoint for getting all boards for a project
+    // GET /rest/agile/1.0/board?projectKeyOrId={projectKeyOrId}
+    // This endpoint supports pagination (startAt, maxResults), but for boards per project,
+    // the number is usually small. We'll fetch up to a reasonable limit.
+    const response: any = await new Promise((resolve, reject) => {
+      jiraClient.sendRequest(
+        {
+          method: 'GET',
+          url: `/rest/agile/1.0/board`,
+          params: {
+            projectKeyOrId: projectKey,
+            maxResults: 50, // Fetch up to 50 boards, should be plenty for one project
+          },
+        },
+        (error: any, data: any) => {
+          if (error) {
+            const jiraError = error?.error || error;
+            let message = `Failed to get boards for project ${projectKey}.`;
+            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) {
+              message = jiraError.errorMessages.join(' ');
+            } else if (jiraError?.message) {
+              message = jiraError.message;
+            }
+            reject(new Error(message));
+          } else {
+            resolve(data);
+          }
+        }
+      );
+    });
+
+    if (!response || !Array.isArray(response.values)) {
+      return { success: false, error: `Error fetching boards for project ${projectKey}. Unexpected response format.` };
+    }
+
+    const boards: JiraBoard[] = response.values.map((board: any) => ({
+      id: board.id,
+      self: board.self,
+      name: board.name,
+      type: board.type,
+      location: board.location ? { // Map location if it exists
+        projectId: board.location.projectId,
+        projectKey: board.location.projectKey,
+        projectName: board.location.projectName,
+      } : undefined,
+    }));
+
+    return { success: true, data: { boards } };
+  } catch (error: any) {
+    return { success: false, error: `Failed to get boards for project ${projectKey}: ${error.message || 'Unknown error'}` };
+  }
+};
+
+export const resolveBoardForProject = async (
+  companyId: string,
+  projectKey: string
+): Promise<Result<{ board?: JiraBoard; ambiguousBoards?: JiraBoard[] }>> => {
+  const boardsResult = await getBoardsForProject(companyId, projectKey);
+
+  if (!boardsResult.success || !boardsResult.data) {
+    return { success: false, error: boardsResult.error || 'Failed to retrieve boards for project.' };
+  }
+
+  const allBoards = boardsResult.data.boards;
+
+  if (allBoards.length === 0) {
+    return { success: false, error: `No agile boards found for project ${projectKey}.` };
+  }
+
+  const scrumBoards = allBoards.filter(b => b.type?.toLowerCase() === 'scrum');
+
+  if (scrumBoards.length === 1) {
+    return { success: true, data: { board: scrumBoards[0] } };
+  }
+
+  if (scrumBoards.length > 1) {
+    return { 
+      success: true, // Still a success in terms of fetching, but ambiguous
+      message: `Multiple Scrum boards found for project ${projectKey}.`,
+      data: { ambiguousBoards: scrumBoards } 
+    };
+  }
+
+  // If no scrum boards, but other types of boards exist
+  if (allBoards.length > 0) {
+     if (allBoards.length === 1) {
+        // If only one board exists and it's not scrum, return it but maybe with a note.
+        return { 
+            success: true, 
+            data: { board: allBoards[0] },
+            message: `Found one board of type '${allBoards[0].type}'. Using this board.`
+        };
+    }
+    // If multiple non-scrum boards exist
+    return { 
+      success: true, 
+      message: `No Scrum boards found, but other types exist for project ${projectKey}.`,
+      data: { ambiguousBoards: allBoards } 
+    };
+  }
+  
+  // Should be covered by allBoards.length === 0, but as a fallback
+  return { success: false, error: `Could not resolve a suitable board for project ${projectKey}.` };
+};
+
+
+export const findSprintFieldId = async (companyId: string): Promise<Result<{ fieldId: string | null }>> => {
+  if (sprintFieldIdCache) {
+    return { success: true, data: { fieldId: sprintFieldIdCache } };
+  }
+
+  try {
+    // Assuming getJiraTicketFields is already defined and exported in this file
+    // It should use initializeClient(companyId)
+    const fieldsResult = await getJiraTicketFieldsInternal(companyId); // Use an internal version or ensure getJiraTicketFields is suitable
+
+    if (fieldsResult.success && Array.isArray(fieldsResult.data)) {
+      const commonSprintFieldNames = ['Sprint', 'Target Sprint']; // Add more known names if necessary
+      const sprintField = fieldsResult.data.find((field: any) =>
+        commonSprintFieldNames.some(name => field.name?.toLowerCase() === name.toLowerCase()) &&
+        (field.schema?.type === 'array' && field.schema?.items === 'sprint' || // Standard Jira Cloud sprint field
+         field.schema?.custom?.toLowerCase().includes('sprint') || // For some server versions or specific custom field types
+         field.clauseNames?.includes('sprint')) // Another heuristic
+      );
+
+      if (sprintField && sprintField.id) {
+        sprintFieldIdCache = sprintField.id;
+        return { success: true, data: { fieldId: sprintField.id } };
+      }
+      // If not found, try the common default customfield_10020 as a fallback
+      // This is less robust but can be a practical fallback.
+      // However, relying on dynamic discovery is better.
+      // For now, let's not hardcode a fallback here to encourage proper discovery.
+      return { success: true, data: { fieldId: null }, message: 'Sprint field ID not found by common names/schema.' };
+    }
+    return { success: false, error: fieldsResult.error || 'Failed to fetch Jira fields for sprint ID discovery.' };
+  } catch (error: any) {
+    console.error('Error finding sprint field ID:', error);
+    return { success: false, error: `Error finding sprint field ID: ${error.message}` };
+  }
+};
+
+// Internal helper, assuming getJiraTicketFields is defined below and exported
+// This is to avoid circular dependency issues if called from top-level.
+const getJiraTicketFieldsInternal = async (companyId: string): Promise<Result<any[]>> => {
+  try {
+    const jiraClient = await initializeClient(companyId);
+    const fields = await jiraClient.issueFields.getFields();
+    return { success: true, data: fields };
+  } catch (error: any) {
+    return { success: false, error: `Failed to fetch JIRA fields: ${error?.message || 'Unknown error'}` };
+  }
+};
+
+
+export const getSprintsForResolvedBoard = async (
+  companyId: string,
+  board: JiraBoard,
+  state?: string // e.g., "active", "future", "closed", "active,future"
+): Promise<Result<{ sprints: JiraSprint[], rawResponse?: any }>> => {
+  try {
+    const jiraClient = await initializeClient(companyId);
+    const boardIdNumber = board.id; // Already a number from JiraBoard type
+
+    const requestParams: any = {
+      state: state || 'active,future', // Default to active and future sprints
+      // Add pagination params if needed, though getSprintsForBoard already handles this.
+      // This function is a wrapper, so it might just pass through.
+      // For simplicity, let's assume the underlying getSprintsForBoard handles pagination.
+    };
+    
+    // Re-using the core logic of existing getSprintsForBoard by calling it
+    // We need to ensure getSprintsForBoard is adapted or this function replicates its core API call
+    // Let's replicate the core API call for clarity here:
+    const sprintsResponse: any = await new Promise((resolve, reject) => {
+      jiraClient.sendRequest(
+        {
+          method: 'GET',
+          url: `/rest/agile/1.0/board/${boardIdNumber}/sprint`,
+          params: {
+            state: requestParams.state,
+            startAt: 0, // Fetch all for this simplified version, or add pagination
+            maxResults: 50 // Default limit
+          },
+        },
+        (error: any, data: any) => {
+          if (error) {
+            const jiraError = error?.error || error;
+            let message = `Failed to get sprints for board ${boardIdNumber}.`;
+            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) message = jiraError.errorMessages.join(' ');
+            else if (jiraError?.message) message = jiraError.message;
+            reject(new Error(message));
+          } else {
+            resolve(data);
+          }
+        }
+      );
+    });
+
+    if (!sprintsResponse || !Array.isArray(sprintsResponse.values)) {
+      return { success: false, error: `Error fetching sprints for board ID ${board.id}. Unexpected response format.` };
+    }
+    
+    const sprints: JiraSprint[] = sprintsResponse.values.map((sprint: any) => ({
+      id: sprint.id,
+      self: sprint.self,
+      state: sprint.state,
+      name: sprint.name,
+      startDate: sprint.startDate,
+      endDate: sprint.endDate,
+      completeDate: sprint.completeDate,
+      originBoardId: sprint.originBoardId || board.id, // Use originBoardId if available, else the board.id passed in
+      goal: sprint.goal,
+    }));
+
+    return { 
+      success: true, 
+      data: {
+        sprints: sprints,
+        rawResponse: { // Include pagination info from response if needed by caller
+            maxResults: sprintsResponse.maxResults,
+            startAt: sprintsResponse.startAt,
+            isLast: sprintsResponse.isLast,
+            total: sprintsResponse.total
+        }
+      }
+    };
+  } catch (error: any) {
+    return { success: false, error: `Failed to get sprints for board ${board.name} (ID: ${board.id}): ${error.message || 'Unknown error'}` };
+  }
+};
+
+// --- END NEW SERVICE FUNCTIONS ---
+
 export const createJiraTicket = async (
-  sessionId: string,
+  sessionId: string, // sessionId might not be used if context is companyId based
   companyId: string,
   params: {
     summary: string;
@@ -38,11 +327,11 @@ export const createJiraTicket = async (
     projectKey: string;
     issueType?: string;
   }
-) => {
+): Promise<Result<Version3Models.CreatedIssue>> => {
   try {
-    const client = await initializeClient(companyId);
+    const jiraClient = await initializeClient(companyId);
 
-    const newIssue = await client.issues.createIssue({
+    const newIssue = await jiraClient.issues.createIssue({
       fields: {
         summary: params.summary,
         issuetype: {
@@ -65,38 +354,54 @@ export const fetchJiraTickets = async (
   sessionId: string,
   companyId: string,
   params: {
-    projectKey: string;
+    projectKey?: string; // Make projectKey optional if JQL is provided
+    jql?: string; // Add jql as an optional parameter
     maxResults?: number;
-    fieldsToFetch?: string[]; // Added for specific fields
+    fieldsToFetch?: string[]; 
   }
-) => {
+): Promise<Result<any[]>> => {
   try {
-    const client = await initializeClient(companyId);
+    const jiraClient = await initializeClient(companyId);
     const maxResults = params.maxResults || 50;
 
-    // Define default fields if not provided, including sprint (customfield_10020)
-    const defaultFieldsToFetch = ['summary', 'status', 'description', 'customfield_10020'];
+    // Attempt to use dynamically found sprint field ID, fallback to hardcoded if necessary
+    let sprintFieldIdentifier = sprintFieldIdCache;
+    if (!sprintFieldIdentifier) {
+        const sprintIdResult = await findSprintFieldId(companyId);
+        if (sprintIdResult.success && sprintIdResult.data?.fieldId) {
+            sprintFieldIdentifier = sprintIdResult.data.fieldId;
+        } else {
+            console.warn(`Could not dynamically find sprint field ID, falling back to customfield_10020. Error: ${sprintIdResult.error}`);
+            sprintFieldIdentifier = 'customfield_10020'; // Fallback
+        }
+    }
+    
+    const defaultFieldsToFetch = ['summary', 'status', 'description', sprintFieldIdentifier];
     let fieldsToRequest = (params.fieldsToFetch && params.fieldsToFetch.length > 0)
       ? params.fieldsToFetch
       : defaultFieldsToFetch;
 
-    // Ensure essential base fields for processing are included if custom fields are requested
-    // This is important if the user specifies fields but omits 'description' or 'status'
-    // which are needed for simplified output.
     if (params.fieldsToFetch && params.fieldsToFetch.length > 0) {
         if (!fieldsToRequest.includes('description')) fieldsToRequest.push('description');
         if (!fieldsToRequest.includes('status')) fieldsToRequest.push('status');
-        // customfield_10020 for sprint info might be explicitly requested or part of default
+        if (!fieldsToRequest.includes(sprintFieldIdentifier) && defaultFieldsToFetch.includes(sprintFieldIdentifier)) {
+            fieldsToRequest.push(sprintFieldIdentifier);
+        }
     }
 
 
     let startAt = 0;
-    let allSimplifiedTickets: any[] = []; // Correctly define allSimplifiedTickets
+    let allSimplifiedTickets: any[] = []; 
     
     while (true) {
-      const response = await client.issueSearch.searchForIssuesUsingJql({
-        jql: `project = ${params.projectKey}`,
-        fields: fieldsToRequest, // Use the determined fieldsToRequest
+      const jqlQuery = params.jql || `project = "${params.projectKey}"`; // Use provided JQL or default to projectKey
+      if (!params.jql && !params.projectKey) {
+        return { success: false, error: 'Either projectKey or JQL must be provided to fetch tickets.' };
+      }
+
+      const response = await jiraClient.issueSearch.searchForIssuesUsingJql({
+        jql: jqlQuery,
+        fields: fieldsToRequest, 
         startAt,
         maxResults,
       });
@@ -109,47 +414,55 @@ export const fetchJiraTickets = async (
       const simplifiedIssues = issues.map(issue => {
         const descriptionText = issue.fields?.description ? adfToText(issue.fields.description) : undefined;
         let sprintInfo: any = null;
-        if (issue.fields?.customfield_10020 && Array.isArray(issue.fields.customfield_10020) && issue.fields.customfield_10020.length > 0) {
-          sprintInfo = issue.fields.customfield_10020.map((sprint: any) => ({
+        const sprintFieldData = issue.fields ? issue.fields[sprintFieldIdentifier!] : null;
+
+        if (sprintFieldData && Array.isArray(sprintFieldData) && sprintFieldData.length > 0) {
+          sprintInfo = sprintFieldData.map((sprint: any) => ({
             id: sprint.id,
             name: sprint.name,
             state: sprint.state,
-            boardId: sprint.boardId,
+            boardId: sprint.boardId || sprint.originBoardId, // Prefer boardId, fallback to originBoardId
             goal: sprint.goal,
             startDate: sprint.startDate,
             endDate: sprint.endDate,
           }));
-        } else if (issue.fields?.customfield_10020) {
+        } else if (sprintFieldData && typeof sprintFieldData === 'object' && sprintFieldData.id) { // Single sprint object
             sprintInfo = {
-                id: issue.fields.customfield_10020.id,
-                name: issue.fields.customfield_10020.name,
-                state: issue.fields.customfield_10020.state,
-                boardId: issue.fields.customfield_10020.boardId,
+                id: sprintFieldData.id,
+                name: sprintFieldData.name,
+                state: sprintFieldData.state,
+                boardId: sprintFieldData.boardId || sprintFieldData.originBoardId,
+                goal: sprintFieldData.goal,
+                startDate: sprintFieldData.startDate,
+                endDate: sprintFieldData.endDate,
             };
         }
 
         const curatedFields: Record<string, any> = {};
-        // Iterate over the fields that were actually requested for the JQL query
-        fieldsToRequest.forEach((fieldName: string) => { // Explicitly type fieldName
+        fieldsToRequest.forEach((fieldName: string) => { 
           if (issue.fields && issue.fields.hasOwnProperty(fieldName)) {
             if (fieldName === 'description') {
-              curatedFields.descriptionText = descriptionText; // Always use the text version
+              curatedFields.descriptionText = descriptionText; 
             } else if (fieldName === 'status' && issue.fields.status?.name) {
-              curatedFields.status = issue.fields.status.name; // Simplified status
-            } else if (fieldName === 'customfield_10020') {
-              curatedFields.sprintInfo = sprintInfo; // Simplified sprint info
+              curatedFields.status = issue.fields.status.name; 
+            } else if (fieldName === sprintFieldIdentifier) {
+              curatedFields.sprintInfo = sprintInfo; 
             } else {
-              curatedFields[fieldName] = issue.fields[fieldName]; // Other fields as-is
+              curatedFields[fieldName] = issue.fields[fieldName]; 
             }
           }
         });
         
-        // Return the simplified ticket structure directly
         return {
+          id: issue.id, // Added id
           key: issue.key,
-          summary: curatedFields.summary || issue.fields?.summary, // Prefer curated summary if available
-          status: curatedFields.status,    // Already simplified status name
-          sprintInfo: curatedFields.sprintInfo // Already processed sprintInfo
+          self: issue.self, // Added self
+          summary: curatedFields.summary || issue.fields?.summary, 
+          status: curatedFields.status,    
+          sprintInfo: curatedFields.sprintInfo,
+          // Include other curated fields if they were requested and processed
+          ...Object.fromEntries(Object.entries(curatedFields).filter(([key]) => !['summary', 'status', 'sprintInfo', 'descriptionText'].includes(key))),
+          descriptionText: curatedFields.descriptionText // ensure descriptionText is at top level
         };
       });
 
@@ -173,57 +486,61 @@ export const getJiraTicketById = async (
   companyId: string,
   params: {
     issueIdOrKey: string;
-    fieldsToFetch?: string[]; // Optional parameter for specific fields
+    fieldsToFetch?: string[]; 
   }
-) => {
+): Promise<Result<any>> => {
   try {
-    const client = await initializeClient(companyId);
+    const jiraClient = await initializeClient(companyId);
+    let sprintFieldIdentifier = sprintFieldIdCache || (await findSprintFieldId(companyId)).data?.fieldId || 'customfield_10020';
+
 
     let fieldsParameter: string[];
     if (params.fieldsToFetch && params.fieldsToFetch.length > 0) {
-      // If specific fields are requested (e.g., ['*all'] or ['summary', 'status'])
       fieldsParameter = params.fieldsToFetch;
+      if (!fieldsParameter.includes(sprintFieldIdentifier) && sprintFieldIdentifier !== 'customfield_10020') { // Ensure dynamic sprint field is included if not default
+          fieldsParameter.push(sprintFieldIdentifier);
+      }
     } else {
-      // Default to a curated list of essential fields
       fieldsParameter = [
-        'summary',
-        'status',
-        'issuetype',
-        'assignee',
-        'reporter',
-        'priority',
-        'created',
-        'updated',
-        'description', // Still needed for descriptionText
-        'labels',
-        'project',
-        'resolution',
-        'duedate',
-        // Add other commonly needed fields here
+        'summary', 'status', 'issuetype', 'assignee', 'reporter',
+        'priority', 'created', 'updated', 'description', 'labels',
+        'project', 'resolution', 'duedate', sprintFieldIdentifier
       ];
     }
 
-    const issue = await client.issues.getIssue({
+    const issue = await jiraClient.issues.getIssue({
       issueIdOrKey: params.issueIdOrKey,
       fields: fieldsParameter,
-      // expand: '', // Keep expand minimal unless specifically requested
     });
 
-    // Convert ADF description to plain text if description was fetched
     const descriptionText = issue.fields?.description ? adfToText(issue.fields.description) : undefined;
+    
+    let sprintInfo: any = null;
+    const sprintFieldData = issue.fields ? issue.fields[sprintFieldIdentifier] : null;
+     if (sprintFieldData && Array.isArray(sprintFieldData) && sprintFieldData.length > 0) {
+        sprintInfo = sprintFieldData.map((sprint: any) => ({
+        id: sprint.id, name: sprint.name, state: sprint.state, boardId: sprint.boardId || sprint.originBoardId,
+        goal: sprint.goal, startDate: sprint.startDate, endDate: sprint.endDate,
+        }));
+    } else if (sprintFieldData && typeof sprintFieldData === 'object' && sprintFieldData.id) {
+        sprintInfo = {
+            id: sprintFieldData.id, name: sprintFieldData.name, state: sprintFieldData.state, boardId: sprintFieldData.boardId || sprintFieldData.originBoardId,
+            goal: sprintFieldData.goal, startDate: sprintFieldData.startDate, endDate: sprintFieldData.endDate,
+        };
+    }
 
-    // If '*all' was requested, return the full structure as before, plus descriptionText
+
     if (fieldsParameter.includes('*all')) {
        const responseData = {
         ...issue, 
         fields: {
           ...issue.fields,
           descriptionText, 
+          sprintInfo // Add processed sprintInfo
         },
       };
       return { success: true, data: responseData };
     } else {
-      // Construct a curated response object based on specifically requested or default fields
       const curatedIssueData: Record<string, any> = {
         id: issue.id,
         key: issue.key,
@@ -237,18 +554,20 @@ export const getJiraTicketById = async (
         for (const fieldName of fieldsParameter) {
           if (issue.fields.hasOwnProperty(fieldName)) {
             let fieldValue = issue.fields[fieldName];
-            // Simplify common nested objects for default requests
             if (isDefaultFieldRequest) {
               if (fieldName === 'status' && fieldValue?.name) fieldValue = fieldValue.name;
               else if (fieldName === 'issuetype' && fieldValue?.name) fieldValue = fieldValue.name;
               else if (fieldName === 'assignee' && fieldValue?.displayName) fieldValue = fieldValue.displayName;
               else if (fieldName === 'reporter' && fieldValue?.displayName) fieldValue = fieldValue.displayName;
               else if (fieldName === 'priority' && fieldValue?.name) fieldValue = fieldValue.name;
-              else if (fieldName === 'project' && fieldValue?.name) fieldValue = { key: fieldValue.key, name: fieldValue.name }; // Keep key and name for project
-              // For labels, if it's an array of strings, it's already simple. If it's an array of objects, simplify.
+              else if (fieldName === 'project' && fieldValue?.name) fieldValue = { key: fieldValue.key, name: fieldValue.name };
               else if (fieldName === 'labels' && Array.isArray(fieldValue) && fieldValue.length > 0 && typeof fieldValue[0] === 'object') {
                 fieldValue = fieldValue.map((label: any) => (typeof label === 'object' ? label.name || label : label));
+              } else if (fieldName === sprintFieldIdentifier) {
+                fieldValue = sprintInfo; // Use processed sprintInfo
               }
+            } else if (fieldName === sprintFieldIdentifier) {
+                 fieldValue = sprintInfo; // Also use processed sprintInfo for specific requests
             }
             curatedIssueData.fields[fieldName] = fieldValue;
           }
@@ -256,17 +575,25 @@ export const getJiraTicketById = async (
         
         if (fieldsParameter.includes('description') && descriptionText !== undefined) {
           curatedIssueData.fields.descriptionText = descriptionText;
-          // If it's a default request, we might not want the full ADF description object
-          // unless 'description' was specifically requested in a non-default scenario.
-          // The current logic includes 'description' in defaultFields, so ADF will be there.
-          // If we want to remove ADF for default, we'd adjust defaultFields or the logic here.
           if (isDefaultFieldRequest && curatedIssueData.fields.description && curatedIssueData.fields.descriptionText) {
-             // For default view, prioritize descriptionText and remove the verbose ADF object
              delete curatedIssueData.fields.description;
-          } else if (issue.fields.description) { // Ensure original ADF is present if requested and available
+          } else if (issue.fields.description && !isDefaultFieldRequest) { 
              curatedIssueData.fields.description = issue.fields.description;
           }
         }
+         // Ensure sprintInfo is in fields if it was part of fieldsParameter
+        if (fieldsParameter.includes(sprintFieldIdentifier) && sprintInfo !== null) {
+            curatedIssueData.fields.sprintInfo = sprintInfo;
+            // If the original sprint field (e.g. customfield_10020) was also requested and is different from 'sprintInfo', keep it.
+            // Otherwise, if it's the same as sprintFieldIdentifier, it's already handled.
+            if (sprintFieldIdentifier !== 'sprintInfo' && curatedIssueData.fields[sprintFieldIdentifier]) {
+                // it's already set
+            } else if (sprintFieldIdentifier === 'sprintInfo' && issue.fields[sprintFieldIdentifier]) {
+                 curatedIssueData.fields[sprintFieldIdentifier] = issue.fields[sprintFieldIdentifier]; // keep original if different
+            }
+        }
+
+
       }
       return { success: true, data: curatedIssueData };
     }
@@ -282,13 +609,13 @@ export const addCommentToJiraTicket = async (
     issueIdOrKey: string;
     commentBody: string;
   }
-) => {
+): Promise<Result<Version3Models.Comment>> => {
   try {
-    const client = await initializeClient(companyId);
+    const jiraClient = await initializeClient(companyId);
 
-    const comment = await client.issueComments.addComment({
+    const comment = await jiraClient.issueComments.addComment({
       issueIdOrKey: params.issueIdOrKey,
-      comment: markdownToAdf(params.commentBody) // Reverted to 'comment' key as per jira.js type expectation
+      comment: markdownToAdf(params.commentBody) 
     });
     return { success: true, data: comment };
   } catch (error: any) {
@@ -301,26 +628,41 @@ export const updateJiraTicket = async (
   companyId: string,
   params: {
     issueIdOrKey: string;
-    fields: { [key: string]: any }; // Flexible fields for update
+    fields: { [key: string]: any }; 
   }
-) => {
+): Promise<Result<{ id: string; message: string; }>> => {
   try {
-    const client = await initializeClient(companyId);
+    const jiraClient = await initializeClient(companyId);
     
     const fieldsToUpdate = { ...params.fields };
 
-    // If description is being updated, convert it from Markdown to ADF
     if (fieldsToUpdate.description && typeof fieldsToUpdate.description === 'string') {
       fieldsToUpdate.description = markdownToAdf(fieldsToUpdate.description);
     }
+    
+    // If sprint is being updated, ensure it uses the dynamically found field ID
+    // This part assumes that if 'sprint' is a key in fieldsToUpdate, its value is the sprint ID.
+    if (fieldsToUpdate.sprint && typeof fieldsToUpdate.sprint === 'number' || typeof fieldsToUpdate.sprint === 'string') {
+        const sprintIdResult = await findSprintFieldId(companyId);
+        if (sprintIdResult.success && sprintIdResult.data?.fieldId) {
+            const dynamicSprintFieldId = sprintIdResult.data.fieldId;
+            if (dynamicSprintFieldId !== 'sprint') { // Avoid replacing if 'sprint' is the actual field ID
+                 fieldsToUpdate[dynamicSprintFieldId] = fieldsToUpdate.sprint;
+                 delete fieldsToUpdate.sprint; // Remove the generic 'sprint' key
+            }
+        } else {
+            // Fallback or error if dynamic sprint field ID not found
+            console.warn(`Sprint field ID not found dynamically for update. Attempting with 'sprint' key or default customfield_10020 if that was intended.`);
+            // If the intention was to use a known custom field, it should be passed directly.
+            // For now, if 'sprint' was passed, and we couldn't map it, it might fail or Jira might ignore it.
+        }
+    }
 
-    // The jira.js library expects no response for editIssue, so we don't assign it.
-    // A successful call implies the update worked.
-    await client.issues.editIssue({
+
+    await jiraClient.issues.editIssue({
       issueIdOrKey: params.issueIdOrKey,
-      fields: fieldsToUpdate // Use the potentially modified fieldsToUpdate
+      fields: fieldsToUpdate 
     });
-    // Return a concise success message instead of the full ticket to avoid Pusher payload limits
     return { 
       success: true, 
       data: { 
@@ -337,40 +679,29 @@ export const addTicketToCurrentSprint = async (
   sessionId: string,
   companyId: string,
   params: {
-    boardId: string; // Jira board ID is usually a number, but API might accept string
+    boardId: string; 
     issueKey: string;
   }
-) => {
+): Promise<Result<{ message: string }>> => {
   try {
-    const client = await initializeClient(companyId);
-
-    // 1. Get active sprints for the board
-    // jira.js expects boardId to be a number.
+    const jiraClient = await initializeClient(companyId);
     const boardIdNumber = parseInt(params.boardId, 10);
     if (isNaN(boardIdNumber)) {
       return { success: false, error: 'Invalid boardId. It must be a number.' };
     }
 
-    // 1. Get active sprints for the board using sendRequest, wrapped in a Promise
     const activeSprintsResponse: any = await new Promise((resolve, reject) => {
-      client.sendRequest(
+      jiraClient.sendRequest(
         {
           method: 'GET',
           url: `/rest/agile/1.0/board/${boardIdNumber}/sprint?state=active`,
         },
         (error: any, data: any) => {
           if (error) {
-            // The error object from jira.js might be complex.
-            // Try to extract a meaningful message.
-            const jiraError = error?.error || error; // error.error might contain { errorMessages: [], errors: {} }
+            const jiraError = error?.error || error;
             let message = 'Failed to get active sprints.';
-            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) {
-              message = jiraError.errorMessages.join(' ');
-            } else if (jiraError?.message) {
-              message = jiraError.message;
-            } else if (typeof jiraError === 'string') {
-              message = jiraError;
-            }
+            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) message = jiraError.errorMessages.join(' ');
+            else if (jiraError?.message) message = jiraError.message;
             reject(new Error(message));
           } else {
             resolve(data);
@@ -388,9 +719,8 @@ export const addTicketToCurrentSprint = async (
       return { success: false, error: `Active sprint found but it does not have a valid ID or name. Sprint data: ${JSON.stringify(activeSprint)}` };
     }
 
-    // 2. Add the issue to the active sprint using sendRequest, wrapped in a Promise
     await new Promise<void>((resolve, reject) => {
-      client.sendRequest(
+      jiraClient.sendRequest(
         {
           method: 'POST',
           url: `/rest/agile/1.0/sprint/${activeSprint.id}/issue`,
@@ -398,17 +728,12 @@ export const addTicketToCurrentSprint = async (
             issues: [params.issueKey],
           },
         },
-        (error: any, data: any) => { // Assuming POST might not return significant data on success
+        (error: any, data: any) => { 
           if (error) {
             const jiraError = error?.error || error;
             let message = `Failed to add issue ${params.issueKey} to sprint ${activeSprint.id}.`;
-            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) {
-              message = jiraError.errorMessages.join(' ');
-            } else if (jiraError?.message) {
-              message = jiraError.message;
-            } else if (typeof jiraError === 'string') {
-              message = jiraError;
-            }
+            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) message = jiraError.errorMessages.join(' ');
+            else if (jiraError?.message) message = jiraError.message;
             reject(new Error(message));
           } else {
             resolve();
@@ -417,9 +742,8 @@ export const addTicketToCurrentSprint = async (
       );
     });
 
-    return { success: true, message: `Ticket ${params.issueKey} successfully added to sprint '${activeSprint.name}' (ID: ${activeSprint.id}).` };
+    return { success: true, data: { message: `Ticket ${params.issueKey} successfully added to sprint '${activeSprint.name}' (ID: ${activeSprint.id}).` }};
   } catch (error: any) {
-    // Check if the error is from Jira client or a generic one
     const errorMessage = error.message || (error.errorMessages && error.errorMessages.join(', ')) || 'Unknown error';
     return { success: false, error: `Failed to add ticket ${params.issueKey} to current sprint on board ${params.boardId}: ${errorMessage}` };
   }
@@ -430,13 +754,13 @@ export const getSprintsForBoard = async (
   companyId: string,
   params: {
     boardId: string;
-    state?: string; // e.g., "active", "future", "closed", "active,future"
+    state?: string; 
     startAt?: number;
     maxResults?: number;
   }
-) => {
+): Promise<Result<{ sprints: JiraSprint[], maxResults?: number, startAt?: number, isLast?: boolean, total?: number }>> => {
   try {
-    const client = await initializeClient(companyId);
+    const jiraClient = await initializeClient(companyId);
     const boardIdNumber = parseInt(params.boardId, 10);
     if (isNaN(boardIdNumber)) {
       return { success: false, error: 'Invalid boardId. It must be a number.' };
@@ -445,11 +769,11 @@ export const getSprintsForBoard = async (
     const requestParams: any = {
       startAt: params.startAt || 0,
       maxResults: params.maxResults || 50,
-      state: params.state || 'active,future', // Default to active and future sprints
+      state: params.state || 'active,future', 
     };
 
     const sprintsResponse: any = await new Promise((resolve, reject) => {
-      client.sendRequest(
+      jiraClient.sendRequest(
         {
           method: 'GET',
           url: `/rest/agile/1.0/board/${boardIdNumber}/sprint`,
@@ -459,13 +783,8 @@ export const getSprintsForBoard = async (
           if (error) {
             const jiraError = error?.error || error;
             let message = `Failed to get sprints for board ${boardIdNumber}.`;
-            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) {
-              message = jiraError.errorMessages.join(' ');
-            } else if (jiraError?.message) {
-              message = jiraError.message;
-            } else if (typeof jiraError === 'string') {
-              message = jiraError;
-            }
+            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) message = jiraError.errorMessages.join(' ');
+            else if (jiraError?.message) message = jiraError.message;
             reject(new Error(message));
           } else {
             resolve(data);
@@ -478,15 +797,16 @@ export const getSprintsForBoard = async (
       return { success: false, error: `Error fetching sprints for board ID ${params.boardId}. Unexpected response format.` };
     }
     
-    const sprints = sprintsResponse.values.map((sprint: any) => ({
+    const sprints: JiraSprint[] = sprintsResponse.values.map((sprint: any) => ({
       id: sprint.id,
+      self: sprint.self,
       name: sprint.name,
       state: sprint.state,
-      boardId: sprint.originBoardId, // Use originBoardId
+      originBoardId: sprint.originBoardId, 
       goal: sprint.goal,
       startDate: sprint.startDate,
       endDate: sprint.endDate,
-      completeDate: sprint.completeDate, // Include completeDate if available
+      completeDate: sprint.completeDate, 
     }));
 
     return { 
@@ -495,8 +815,8 @@ export const getSprintsForBoard = async (
         sprints: sprints,
         maxResults: sprintsResponse.maxResults,
         startAt: sprintsResponse.startAt,
-        isLast: sprintsResponse.isLast, // Useful for pagination
-        total: sprintsResponse.total // If available in response, else undefined
+        isLast: sprintsResponse.isLast, 
+        total: sprintsResponse.total 
       }
     };
   } catch (error: any) {
@@ -511,16 +831,16 @@ export const getActiveSprintForBoard = async (
   params: {
     boardId: string;
   }
-) => {
+): Promise<Result<JiraSprint>> => {
   try {
-    const client = await initializeClient(companyId);
+    const jiraClient = await initializeClient(companyId);
     const boardIdNumber = parseInt(params.boardId, 10);
     if (isNaN(boardIdNumber)) {
       return { success: false, error: 'Invalid boardId. It must be a number.' };
     }
 
     const activeSprintsResponse: any = await new Promise((resolve, reject) => {
-      client.sendRequest(
+      jiraClient.sendRequest(
         {
           method: 'GET',
           url: `/rest/agile/1.0/board/${boardIdNumber}/sprint?state=active`,
@@ -529,13 +849,8 @@ export const getActiveSprintForBoard = async (
           if (error) {
             const jiraError = error?.error || error;
             let message = 'Failed to get active sprints.';
-            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) {
-              message = jiraError.errorMessages.join(' ');
-            } else if (jiraError?.message) {
-              message = jiraError.message;
-            } else if (typeof jiraError === 'string') {
-              message = jiraError;
-            }
+            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) message = jiraError.errorMessages.join(' ');
+            else if (jiraError?.message) message = jiraError.message;
             reject(new Error(message));
           } else {
             resolve(data);
@@ -548,24 +863,23 @@ export const getActiveSprintForBoard = async (
       return { success: false, error: `No active sprint found for board ID ${params.boardId}.` };
     }
 
-    const activeSprint = activeSprintsResponse.values[0];
-    // Use originBoardId as returned by the Jira API for sprints fetched via board
-    if (!activeSprint.id || !activeSprint.name || !activeSprint.state || activeSprint.originBoardId === undefined) {
-      return { success: false, error: `Active sprint data is incomplete. Sprint data: ${JSON.stringify(activeSprint)}` };
+    const activeSprintData = activeSprintsResponse.values[0];
+    if (!activeSprintData.id || !activeSprintData.name || !activeSprintData.state || activeSprintData.originBoardId === undefined) {
+      return { success: false, error: `Active sprint data is incomplete. Sprint data: ${JSON.stringify(activeSprintData)}` };
     }
 
-    return { 
-      success: true, 
-      data: {
-        id: activeSprint.id,
-        name: activeSprint.name,
-        state: activeSprint.state,
-        boardId: activeSprint.originBoardId, // Changed to originBoardId
-        goal: activeSprint.goal, // goal can be null or empty
-        startDate: activeSprint.startDate,
-        endDate: activeSprint.endDate,
-      } 
+    const activeSprint: JiraSprint = {
+        id: activeSprintData.id,
+        self: activeSprintData.self,
+        name: activeSprintData.name,
+        state: activeSprintData.state,
+        originBoardId: activeSprintData.originBoardId, 
+        goal: activeSprintData.goal, 
+        startDate: activeSprintData.startDate,
+        endDate: activeSprintData.endDate,
     };
+
+    return { success: true, data: activeSprint };
   } catch (error: any) {
     const errorMessage = error.message || (error.errorMessages && error.errorMessages.join(', ')) || 'Unknown error fetching active sprint';
     return { success: false, error: `Failed to get active sprint for board ${params.boardId}: ${errorMessage}` };
@@ -582,9 +896,9 @@ export const getIssuesForSprint = async (
     startAt?: number;
     fieldsToFetch?: string[];
   }
-) => {
+): Promise<Result<{ issues: any[], total?: number, maxResults?: number, startAt?: number, message?: string }>> => {
   try {
-    const client = await initializeClient(companyId);
+    const jiraClient = await initializeClient(companyId);
     const sprintIdNumber = parseInt(params.sprintId, 10);
     if (isNaN(sprintIdNumber)) {
       return { success: false, error: 'Invalid sprintId. It must be a number.' };
@@ -593,7 +907,9 @@ export const getIssuesForSprint = async (
     const maxResults = params.maxResults || 50;
     const startAt = params.startAt || 0;
     
-    const defaultFieldsToFetch = ['summary', 'status', 'description', 'assignee', 'issuetype', 'priority'];
+    let sprintFieldIdentifier = sprintFieldIdCache || (await findSprintFieldId(companyId)).data?.fieldId || 'customfield_10020';
+
+    const defaultFieldsToFetch = ['summary', 'status', 'description', 'assignee', 'issuetype', 'priority', sprintFieldIdentifier];
     let fieldsToRequest = (params.fieldsToFetch && params.fieldsToFetch.length > 0)
       ? params.fieldsToFetch
       : defaultFieldsToFetch;
@@ -601,10 +917,13 @@ export const getIssuesForSprint = async (
     if (params.fieldsToFetch && params.fieldsToFetch.length > 0) {
         if (!fieldsToRequest.includes('description')) fieldsToRequest.push('description');
         if (!fieldsToRequest.includes('status')) fieldsToRequest.push('status');
+        if (!fieldsToRequest.includes(sprintFieldIdentifier) && defaultFieldsToFetch.includes(sprintFieldIdentifier)) {
+            fieldsToRequest.push(sprintFieldIdentifier);
+        }
     }
     
     const response: any = await new Promise((resolve, reject) => {
-      client.sendRequest(
+      jiraClient.sendRequest(
         {
           method: 'GET',
           url: `/rest/agile/1.0/sprint/${sprintIdNumber}/issue`,
@@ -612,19 +931,15 @@ export const getIssuesForSprint = async (
             startAt: startAt,
             maxResults: maxResults,
             fields: fieldsToRequest.join(','),
+            jql: params.projectKey ? `project = ${params.projectKey}` : undefined // Optional JQL filter by projectKey
           },
         },
         (error: any, data: any) => {
           if (error) {
             const jiraError = error?.error || error;
             let message = `Failed to get issues for sprint ${sprintIdNumber}.`;
-            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) {
-              message = jiraError.errorMessages.join(' ');
-            } else if (jiraError?.message) {
-              message = jiraError.message;
-            } else if (typeof jiraError === 'string') {
-              message = jiraError;
-            }
+            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) message = jiraError.errorMessages.join(' ');
+            else if (jiraError?.message) message = jiraError.message;
             reject(new Error(message));
           } else {
             resolve(data);
@@ -633,12 +948,12 @@ export const getIssuesForSprint = async (
       );
     });
 
-    const issues = response.issues || [];
-    if (!issues.length && response.total === 0) {
-        return { success: true, data: [], message: `No issues found for sprint ID ${params.sprintId}.` };
+    const issuesFromResponse = response.issues || [];
+    if (!issuesFromResponse.length && response.total === 0) {
+        return { success: true, data: {issues: []}, message: `No issues found for sprint ID ${params.sprintId}.` };
     }
     
-    const simplifiedIssues = issues.map((issue: any) => {
+    const simplifiedIssues = issuesFromResponse.map((issue: any) => {
       const descriptionText = issue.fields?.description ? adfToText(issue.fields.description) : undefined;
       
       const curatedFields: Record<string, any> = {};
@@ -650,11 +965,15 @@ export const getIssuesForSprint = async (
             curatedFields.status = issue.fields.status.name;
           } else if (fieldName === 'assignee' && issue.fields.assignee?.displayName) {
             curatedFields.assignee = issue.fields.assignee.displayName;
-             curatedFields.assigneeAccountId = issue.fields.assignee.accountId;
+            curatedFields.assigneeAccountId = issue.fields.assignee.accountId;
           } else if (fieldName === 'issuetype' && issue.fields.issuetype?.name) {
             curatedFields.issuetype = issue.fields.issuetype.name;
           } else if (fieldName === 'priority' && issue.fields.priority?.name) {
             curatedFields.priority = issue.fields.priority.name;
+          } else if (fieldName === sprintFieldIdentifier) {
+            // Sprint info for issues fetched via sprint/issue endpoint might be simpler or absent
+            // We might need to re-fetch sprint details if not present or rely on context
+            curatedFields.sprintInfo = issue.fields[sprintFieldIdentifier]; // Take raw for now
           }
            else {
             curatedFields[fieldName] = issue.fields[fieldName];
@@ -672,10 +991,12 @@ export const getIssuesForSprint = async (
 
     return { 
         success: true, 
-        data: simplifiedIssues, 
-        total: response.total, 
-        maxResults: response.maxResults,
-        startAt: response.startAt 
+        data: { 
+            issues: simplifiedIssues, 
+            total: response.total, 
+            maxResults: response.maxResults,
+            startAt: response.startAt 
+        }
     };
 
   } catch (error: any) {
@@ -691,9 +1012,9 @@ export const moveIssueToSprint = async (
     issueKey: string;
     targetSprintId: string;
   }
-) => {
+): Promise<Result<any>> => { // Simplified return type's generic part
   try {
-    const client = await initializeClient(companyId);
+    const jiraClient = await initializeClient(companyId);
     const targetSprintIdNumber = parseInt(params.targetSprintId, 10);
 
     if (isNaN(targetSprintIdNumber)) {
@@ -701,7 +1022,7 @@ export const moveIssueToSprint = async (
     }
 
     await new Promise<void>((resolve, reject) => {
-      client.sendRequest(
+      jiraClient.sendRequest(
         {
           method: 'POST',
           url: `/rest/agile/1.0/sprint/${targetSprintIdNumber}/issue`,
@@ -713,16 +1034,9 @@ export const moveIssueToSprint = async (
           if (error) {
             const jiraError = error?.error || error;
             let message = `Failed to move issue ${params.issueKey} to sprint ${targetSprintIdNumber}.`;
-            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) {
-              message = jiraError.errorMessages.join(' ');
-            } else if (jiraError?.errors && Object.keys(jiraError.errors).length > 0) {
-              message = Object.values(jiraError.errors).join(' ');
-            }
-            else if (jiraError?.message) {
-              message = jiraError.message;
-            } else if (typeof jiraError === 'string') {
-              message = jiraError;
-            }
+            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) message = jiraError.errorMessages.join(' ');
+            else if (jiraError?.errors && Object.keys(jiraError.errors).length > 0) message = Object.values(jiraError.errors).join(' ');
+            else if (jiraError?.message) message = jiraError.message;
             reject(new Error(message));
           } else {
             resolve();
@@ -731,22 +1045,17 @@ export const moveIssueToSprint = async (
       );
     });
 
-    // After successfully moving the issue, fetch the board details for the target sprint
-    // to then fetch all sprints for that board.
     let boardIdToFetchSprints: number | undefined;
     try {
       const sprintDetailsResponse: any = await new Promise((resolve, reject) => {
-        client.sendRequest(
+        jiraClient.sendRequest(
           {
             method: 'GET',
             url: `/rest/agile/1.0/sprint/${targetSprintIdNumber}`,
           },
           (err: any, sprintData: any) => {
-            if (err) {
-              reject(new Error(`Failed to fetch details for target sprint ${targetSprintIdNumber}: ${err.message || JSON.stringify(err)}`));
-            } else {
-              resolve(sprintData);
-            }
+            if (err) reject(new Error(`Failed to fetch details for target sprint ${targetSprintIdNumber}: ${err.message || JSON.stringify(err)}`));
+            else resolve(sprintData);
           }
         );
       });
@@ -754,11 +1063,7 @@ export const moveIssueToSprint = async (
       if (sprintDetailsResponse && sprintDetailsResponse.originBoardId) {
         boardIdToFetchSprints = sprintDetailsResponse.originBoardId;
       } else {
-        // Fallback or error if boardId cannot be determined
         console.warn(`Could not determine boardId for sprint ${targetSprintIdNumber}. Sprint details: ${JSON.stringify(sprintDetailsResponse)}`);
-        // Proceed without sprint list if boardId is missing, but log it.
-        // Or, could return an error/partial success here.
-        // For now, let's return success for the move, but data will be just a message.
          return { 
           success: true, 
           message: `Ticket ${params.issueKey} successfully moved to sprint ID ${targetSprintIdNumber}. Could not fetch updated sprint list as board ID was not found for the target sprint.`
@@ -773,29 +1078,39 @@ export const moveIssueToSprint = async (
     }
 
     if (boardIdToFetchSprints) {
+      // Use the existing getSprintsForBoard which returns Result<...>
       const sprintsDataResult = await getSprintsForBoard(sessionId, companyId, { boardId: boardIdToFetchSprints.toString() });
-      if (sprintsDataResult.success) {
-        return { 
-          success: true, 
-          message: `Ticket ${params.issueKey} successfully moved to sprint ID ${targetSprintIdNumber}.`,
-          data: sprintsDataResult.data // This should match the user's expected output structure
+      if (sprintsDataResult.success && sprintsDataResult.data) {
+        return {
+          success: true,
+          message: `Ticket ${params.issueKey} successfully moved to sprint ID ${targetSprintIdNumber}. Sprint list retrieved.`,
+          data: { // Outer data for Result<any>
+            operationStatus: `Moved issue ${params.issueKey} to sprint ${targetSprintIdNumber}.`,
+            sprintListMessage: "Updated sprint list.",
+            sprintListData: sprintsDataResult.data 
+          }
         };
       } else {
-        // If fetching sprints fails, still indicate the move was successful but sprints couldn't be fetched.
-        return { 
-          success: true, 
-          message: `Ticket ${params.issueKey} successfully moved to sprint ID ${targetSprintIdNumber}. Failed to fetch updated sprint list: ${sprintsDataResult.error}`,
-          data: null // Or some indicator that sprint list is unavailable
+        return {
+          success: true, // Move itself was successful, but sprint list fetch failed
+          message: `Ticket ${params.issueKey} successfully moved to sprint ID ${targetSprintIdNumber}. Failed to fetch updated sprint list: ${sprintsDataResult.error || 'Unknown reason'}.`,
+          data: {
+            operationStatus: `Moved issue ${params.issueKey} to sprint ${targetSprintIdNumber}.`,
+            sprintListMessage: `Failed to fetch updated sprint list: ${sprintsDataResult.error || 'Unknown reason'}.`
+          }
         };
       }
     } else {
-      // This case should ideally be handled by the checks above, but as a fallback:
-      return { 
-        success: true, 
-        message: `Ticket ${params.issueKey} successfully moved to sprint ID ${targetSprintIdNumber}, but could not retrieve updated sprint list.` 
+      // This case means boardIdToFetchSprints was undefined
+      return {
+        success: true,
+        message: `Ticket ${params.issueKey} successfully moved to sprint ID ${targetSprintIdNumber}, but could not retrieve updated sprint list as board ID was not determined.`,
+        data: {
+            operationStatus: `Moved issue ${params.issueKey} to sprint ${targetSprintIdNumber}.`,
+            sprintListMessage: "Could not retrieve updated sprint list as board ID was not determined for the target sprint."
+        }
       };
     }
-
   } catch (error: any) {
     const errorMessage = error.message || (error.errorMessages && error.errorMessages.join(', ')) || `Unknown error moving issue ${params.issueKey} to sprint ${params.targetSprintId}`;
     return { success: false, error: errorMessage };
@@ -807,18 +1122,12 @@ export const moveIssueToBacklog = async (
   companyId: string,
   params: {
     issueKey: string;
-    // boardId?: string; // Consider if board context is needed by API or for logic
   }
-) => {
+): Promise<Result<{ message: string }>> => {
   try {
-    const client = await initializeClient(companyId);
-
-    // Use the Agile API to move issues to the backlog
-    // POST /rest/agile/1.0/backlog/issue
-    // Body: { "issues": ["ISSUE-KEY-1", "ISSUE-KEY-2"] }
-    // This endpoint might also implicitly remove the issue from its current sprint.
+    const jiraClient = await initializeClient(companyId);
     await new Promise<void>((resolve, reject) => {
-      client.sendRequest(
+      jiraClient.sendRequest(
         {
           method: 'POST',
           url: `/rest/agile/1.0/backlog/issue`,
@@ -830,18 +1139,11 @@ export const moveIssueToBacklog = async (
           if (error) {
             const jiraError = error?.error || error;
             let message = `Failed to move issue ${params.issueKey} to backlog.`;
-            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) {
-              message = jiraError.errorMessages.join(' ');
-            } else if (jiraError?.errors && Object.keys(jiraError.errors).length > 0) {
-              message = Object.values(jiraError.errors).join(' ');
-            } else if (jiraError?.message) {
-              message = jiraError.message;
-            } else if (typeof jiraError === 'string') {
-              message = jiraError;
-            }
+            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) message = jiraError.errorMessages.join(' ');
+            else if (jiraError?.errors && Object.keys(jiraError.errors).length > 0) message = Object.values(jiraError.errors).join(' ');
+            else if (jiraError?.message) message = jiraError.message;
             reject(new Error(message));
           } else {
-            // A 204 No Content is typical for successful POSTs.
             resolve();
           }
         }
@@ -849,17 +1151,12 @@ export const moveIssueToBacklog = async (
     });
 
     const successMessage = `Ticket ${params.issueKey} successfully moved to backlog.`;
-    const result = {
+    return {
       success: true,
-      data: { // Ensure the primary output is within the 'data' field
-        message: successMessage
-      }
+      data: { message: successMessage }
     };
-    console.log(`[JiraService] moveIssueToBacklog successful for ${params.issueKey}. Returning: ${JSON.stringify(result)}`);
-    return result;
 
   } catch (error: any) {
-    console.error(`[JiraService] moveIssueToBacklog failed for ${params.issueKey}. Error: ${error.message}`);
     const errorMessage = error.message || (error.errorMessages && error.errorMessages.join(', ')) || `Unknown error moving issue ${params.issueKey} to backlog`;
     return { success: false, error: errorMessage };
   }
@@ -871,19 +1168,13 @@ export const getAvailableTransitions = async (
   params: {
     issueIdOrKey: string;
   }
-) => {
+): Promise<Result<any[]>> => { // Changed Version3Models.Transition[] to any[]
   try {
-    const client = await initializeClient(companyId);
-    
-    // Use the jira.js client method to get transitions
-    // GET /rest/api/2/issue/{issueIdOrKey}/transitions
-    const transitionsResponse = await client.issues.getTransitions({
+    const jiraClient = await initializeClient(companyId);
+    const transitionsResponse = await jiraClient.issues.getTransitions({
       issueIdOrKey: params.issueIdOrKey,
     });
 
-    // The response typically includes an array of transition objects.
-    // Each transition object has id, name, and a 'to' status object.
-    // We can return this directly or simplify if needed. For now, return as is.
     if (!transitionsResponse || !transitionsResponse.transitions) {
       return { success: false, error: `No transitions found or error fetching transitions for issue ${params.issueIdOrKey}.` };
     }
@@ -903,96 +1194,61 @@ export const transitionIssue = async (
     issueIdOrKey: string;
     transitionId: string;
     comment?: string;
-    fields?: Record<string, any>; // For fields like resolution
+    fields?: Record<string, any>; 
   }
-) => {
+): Promise<Result<any[]>> => { // Changed Version3Models.Transition[] to any[]
   try {
-    const client = await initializeClient(companyId);
-
-    const payload: any = {
-      transition: {
-        id: params.transitionId,
-      },
-    };
-
-    if (params.comment) {
-      payload.update = {
-        comment: [
-          {
-            add: markdownToAdf(params.comment),
-          },
-        ],
-      };
-    }
-
-    if (params.fields) {
-      payload.fields = params.fields;
-      // Example: if resolution needs to be set:
-      // params.fields = { resolution: { name: "Done" } }
-    }
+    const jiraClient = await initializeClient(companyId);
+    const payload: any = { transition: { id: params.transitionId } };
+    if (params.comment) payload.update = { comment: [{ add: markdownToAdf(params.comment) }] };
+    if (params.fields) payload.fields = params.fields;
     
-    // Use the jira.js client method to perform the transition
-    // POST /rest/api/2/issue/{issueIdOrKey}/transitions
-    await client.issues.doTransition({
+    await jiraClient.issues.doTransition({
       issueIdOrKey: params.issueIdOrKey,
-      transition: payload.transition, // Pass only the transition part of the payload here
-      fields: payload.fields, // Pass fields if any
-      update: payload.update, // Pass update (for comment) if any
+      transition: payload.transition, 
+      fields: payload.fields, 
+      update: payload.update, 
     });
     
-    // Successful transition usually returns a 204 No Content.
-    // After successful transition, fetch the new available transitions for the issue.
     const newTransitionsResult = await getAvailableTransitions(sessionId, companyId, { issueIdOrKey: params.issueIdOrKey });
 
-    if (newTransitionsResult.success) {
+    if (newTransitionsResult.success && newTransitionsResult.data) {
       return { 
         success: true, 
         message: `Issue ${params.issueIdOrKey} successfully transitioned using transition ID ${params.transitionId}.`,
-        data: newTransitionsResult.data // This is the list of available transitions
+        data: newTransitionsResult.data 
       };
     } else {
-      // Transition was successful, but fetching new transitions failed.
-      // Return success for the transition but include the error for fetching transitions.
       return { 
         success: true, 
-        message: `Issue ${params.issueIdOrKey} successfully transitioned. However, failed to fetch updated available transitions: ${newTransitionsResult.error}`,
-        data: [] // Or null, to indicate transitions couldn't be fetched
+        message: `Issue ${params.issueIdOrKey} successfully transitioned. However, failed to fetch updated available transitions: ${newTransitionsResult.error || 'Unknown error'}`,
+        data: [] 
       };
     }
-
   } catch (error: any) {
-    // Attempt to parse Jira's specific error messages if available
     let detailedError = '';
-    if (error.response && error.response.data && error.response.data.errorMessages) {
-      detailedError = error.response.data.errorMessages.join('; ');
-    } else if (error.response && error.response.data && error.response.data.errors) {
-      detailedError = Object.entries(error.response.data.errors)
-        .map(([key, value]) => `${key}: ${value}`)
-        .join('; ');
-    }
+    if (error.response && error.response.data && error.response.data.errorMessages) detailedError = error.response.data.errorMessages.join('; ');
+    else if (error.response && error.response.data && error.response.data.errors) detailedError = Object.entries(error.response.data.errors).map(([key, value]) => `${key}: ${value}`).join('; ');
     const errorMessage = detailedError || error.message || `Unknown error transitioning issue ${params.issueIdOrKey}`;
     return { success: false, error: `Failed to transition issue: ${errorMessage}` };
   }
 };
 
-// Cache for story points field ID
 let storyPointsFieldIdCache: string | null = null;
 
-const findStoryPointsFieldId = async (sessionId: string, companyId: string): Promise<string | null> => {
+const findStoryPointsFieldId = async (companyId: string): Promise<string | null> => { // Removed sessionId as it's not used
   if (storyPointsFieldIdCache) {
     return storyPointsFieldIdCache;
   }
-
   try {
-    const fieldsResult = await getJiraTicketFields(sessionId, companyId);
+    // Use the internal helper to avoid direct export/import cycle if getJiraTicketFields was also modified
+    const fieldsResult = await getJiraTicketFieldsInternal(companyId);
     if (fieldsResult.success && Array.isArray(fieldsResult.data)) {
-      // Common names for Story Points field. This list can be expanded.
       const commonStoryPointsFieldNames = ['Story Points', 'Story Point Estimate', 'Σ Story Points'];
-      const storyPointField = fieldsResult.data.find(field => 
+      const storyPointField = fieldsResult.data.find((field: any) => 
         commonStoryPointsFieldNames.some(name => field.name?.toLowerCase() === name.toLowerCase()) &&
-        (field.schema?.type === 'number' || field.schema?.custom === 'com.atlassian.jira.plugin.system.customfieldtypes:float') // Check schema type
+        (field.schema?.type === 'number' || field.schema?.custom === 'com.atlassian.jira.plugin.system.customfieldtypes:float')
       );
-      
       if (storyPointField && storyPointField.id) {
         storyPointsFieldIdCache = storyPointField.id;
         return storyPointField.id;
@@ -1010,364 +1266,106 @@ export const setStoryPoints = async (
   companyId: string,
   params: {
     issueIdOrKey: string;
-    storyPoints: number | null; // Allow null to clear story points
+    storyPoints: number | null; 
   }
-) => {
+): Promise<Result<{ id: string; message: string; }>> => {
   try {
-    const storyPointsFieldId = await findStoryPointsFieldId(sessionId, companyId);
-
+    const storyPointsFieldId = await findStoryPointsFieldId(companyId); // Pass companyId
     if (!storyPointsFieldId) {
       return { 
         success: false, 
         error: 'Could not automatically determine the Story Points field ID. Please ensure it is configured or check field names.' 
       };
     }
-
-    const fieldsToUpdate = {
-      [storyPointsFieldId]: params.storyPoints,
-    };
-
-    // Call the generic updateJiraTicket function
+    const fieldsToUpdate = { [storyPointsFieldId]: params.storyPoints };
     return await updateJiraTicket(sessionId, companyId, {
       issueIdOrKey: params.issueIdOrKey,
       fields: fieldsToUpdate,
     });
-
   } catch (error: any) {
     const errorMessage = error.message || `Unknown error setting story points for issue ${params.issueIdOrKey}`;
     return { success: false, error: `Failed to set story points: ${errorMessage}` };
   }
 };
 
-
-// Helper function to convert Atlassian Document Format (ADF) to plain text
 const adfToText = (adfNode: any): string => {
-  if (!adfNode) {
-    return '';
-  }
-
+  if (!adfNode) return '';
   let resultText = '';
-
   function processNode(node: any) {
     if (!node) return;
-
     switch (node.type) {
-      case 'text':
-        resultText += node.text || '';
-        break;
-      case 'paragraph':
-        if (node.content) {
-          node.content.forEach(processNode);
-        }
-        resultText += '\n'; // Add a newline after each paragraph
-        break;
-      case 'heading':
-        if (node.content) {
-          node.content.forEach(processNode);
-        }
-        resultText += '\n';
-        break;
-      case 'bulletList':
-      case 'orderedList':
-        if (node.content) {
-          node.content.forEach((listItem: any, index: number) => {
-            if (node.type === 'orderedList') {
-              resultText += `${index + 1}. `;
-            } else {
-              resultText += '- ';
-            }
-            if (listItem.content) {
-              listItem.content.forEach(processNode); // listItem usually contains paragraphs
-            }
-            // processNode already adds a newline for paragraphs within list items
-          });
-        }
-        break;
-      case 'listItem': // Should be handled by bulletList/orderedList, but good to have
-        if (node.content) {
-          node.content.forEach(processNode);
-        }
-        break;
-      case 'codeBlock':
-        if (node.content) {
-          node.content.forEach((textNode: any) => {
-            if (textNode.type === 'text') {
-              resultText += textNode.text + '\n';
-            }
-          });
-        }
-        break;
-      case 'blockquote':
-        if (node.content) {
-          node.content.forEach((pNode: any) => { // blockquote usually contains paragraphs
-            resultText += '> ';
-            processNode(pNode); // processNode will add newline for paragraph
-          });
-        }
-        break;
-      case 'panel':
-        if (node.content) {
-          node.content.forEach(processNode);
-        }
-        resultText += '\n';
-        break;
-      case 'hardBreak':
-        resultText += '\n';
-        break;
-      case 'mention':
-        resultText += node.attrs?.text || '[mention]';
-        break;
-      case 'emoji':
-        resultText += node.attrs?.shortName || '[emoji]';
-        break;
-      case 'inlineCard':
-      case 'blockCard':
-        resultText += node.attrs?.url || '[card link]';
-        break;
-      // Tables are complex, basic text extraction for now
-      case 'table':
-        if (node.content) {
-          node.content.forEach((row: any) => { // tableRow
-            if (row.content) {
-              row.content.forEach((cell: any) => { // tableCell
-                if (cell.content) cell.content.forEach(processNode);
-                resultText += '\t'; // Tab between cells
-              });
-              resultText += '\n'; // Newline after row
-            }
-          });
-        }
-        break;
-      default:
-        if (node.content && Array.isArray(node.content)) {
-          node.content.forEach(processNode);
-        }
-        break;
+      case 'text': resultText += node.text || ''; break;
+      case 'paragraph': case 'heading':
+        if (node.content) node.content.forEach(processNode);
+        resultText += '\n'; break;
+      case 'bulletList': case 'orderedList':
+        if (node.content) node.content.forEach((listItem: any, index: number) => {
+          if (node.type === 'orderedList') resultText += `${index + 1}. `;
+          else resultText += '- ';
+          if (listItem.content) listItem.content.forEach(processNode);
+        }); break;
+      case 'listItem': if (node.content) node.content.forEach(processNode); break;
+      case 'codeBlock': if (node.content) node.content.forEach((textNode: any) => { if (textNode.type === 'text') resultText += textNode.text + '\n'; }); break;
+      case 'blockquote': if (node.content) node.content.forEach((pNode: any) => { resultText += '> '; processNode(pNode); }); break;
+      case 'panel': if (node.content) node.content.forEach(processNode); resultText += '\n'; break;
+      case 'hardBreak': resultText += '\n'; break;
+      case 'mention': resultText += node.attrs?.text || '[mention]'; break;
+      case 'emoji': resultText += node.attrs?.shortName || '[emoji]'; break;
+      case 'inlineCard': case 'blockCard': resultText += node.attrs?.url || '[card link]'; break;
+      case 'table': if (node.content) node.content.forEach((row: any) => { if (row.content) row.content.forEach((cell: any) => { if (cell.content) cell.content.forEach(processNode); resultText += '\t'; }); resultText += '\n'; }); break;
+      default: if (node.content && Array.isArray(node.content)) node.content.forEach(processNode); break;
     }
   }
-
-  if (adfNode.type === 'doc' && adfNode.content) {
-    adfNode.content.forEach(processNode);
-  } else {
-    // If it's not a full doc, try processing it directly (e.g. if a single node is passed)
-    processNode(adfNode);
-  }
-  
-  // Clean up multiple newlines
+  if (adfNode.type === 'doc' && adfNode.content) adfNode.content.forEach(processNode);
+  else processNode(adfNode);
   return resultText.replace(/\n\s*\n/g, '\n').trim();
 };
 
-// Helper function to convert Markdown to Atlassian Document Format (ADF)
 export const markdownToAdf = (markdown: string): any => {
-  if (!markdown || typeof markdown !== 'string') {
-    return {
-      type: 'doc',
-      version: 1,
-      content: [],
-    };
-  }
-
+  if (!markdown || typeof markdown !== 'string') return { type: 'doc', version: 1, content: [] };
   const adfContent: any[] = [];
   const lines = markdown.split('\n');
-
-  let inList = false;
-  let listType: 'bulletList' | 'orderedList' | null = null;
-  let listItems: any[] = [];
-  let inCodeBlock = false;
-  let codeBlockContent = '';
-
+  let inList = false; let listType: 'bulletList' | 'orderedList' | null = null; let listItems: any[] = [];
+  let inCodeBlock = false; let codeBlockContent = '';
   const processInlineFormatting = (text: string): any[] => {
-    const inlineElements: any[] = [];
-    let remainingText = text;
-
-    // Regex for bold, italic, and bold+italic
-    // Order matters: bold+italic, then bold, then italic
-    const formattingRules = [
-      { type: 'strong', regex: /\*\*\*([^\*]+)\*\*\*/g, markType: 'strong', innerMarkType: 'em' }, // ***bolditalic***
-      { type: 'strong', regex: /\*\*([^\*]+)\*\*/g, markType: 'strong' }, // **bold**
-      { type: '__', regex: /__([^_]+)__/g, markType: 'strong' }, // __bold__
-      { type: 'em', regex: /\*([^\*]+)\*/g, markType: 'em' }, // *italic*
-      { type: '_', regex: /_([^_]+)_/g, markType: 'em' }, // _italic_
-    ];
-    
-    // Simplified inline processing: iterate and segment text
-    // This is a basic approach and might not handle complex nesting perfectly
-    // A more robust parser would build an AST.
-
-    let lastIndex = 0;
-    // Placeholder for a more sophisticated inline parser
-    // For now, we'll just handle simple cases or pass text through.
-    // A full markdown inline parser is complex.
-    // This basic version will look for the first match of any rule.
-
-    // For simplicity in this step, we'll just create a text node.
-    // A proper implementation would parse inline elements.
-    if (text.trim().length > 0) {
-        // Basic bold and italic handling (non-nested)
-        let currentText = text;
-        const segments: any[] = [];
-        
-        // Process bold and italic (simple, non-nested)
-        // This is a very simplified inline parser.
-        // It splits by ** and * and then reassembles.
-        
-        // Split by bold markers first
-        const boldParts = currentText.split(/\*\*|__/);
-        boldParts.forEach((part, i) => {
-            if (i % 2 === 1) { // This part was between **...** or __...__
-                segments.push({ type: 'text', text: part, marks: [{ type: 'strong' }] });
-            } else {
-                // Split by italic markers
-                const italicParts = part.split(/\*|_/);
-                italicParts.forEach((italicPart, j) => {
-                    if (j % 2 === 1) { // This part was between *...* or _..._
-                        segments.push({ type: 'text', text: italicPart, marks: [{ type: 'em' }] });
-                    } else if (italicPart) {
-                        segments.push({ type: 'text', text: italicPart });
-                    }
-                });
-            }
+    if (!text.trim()) return [];
+    const segments: any[] = []; let currentText = text;
+    const boldParts = currentText.split(/\*\*|__/);
+    boldParts.forEach((part, i) => {
+      if (i % 2 === 1) segments.push({ type: 'text', text: part, marks: [{ type: 'strong' }] });
+      else {
+        const italicParts = part.split(/\*|_/);
+        italicParts.forEach((italicPart, j) => {
+          if (j % 2 === 1) segments.push({ type: 'text', text: italicPart, marks: [{ type: 'em' }] });
+          else if (italicPart) segments.push({ type: 'text', text: italicPart });
         });
-        
-        // Filter out empty text nodes that might result from splitting
-        return segments.filter(s => s.text && s.text.length > 0);
-
-    }
-    return [];
+      }
+    });
+    return segments.filter(s => s.text && s.text.length > 0);
   };
-  
-  const flushList = () => {
-    if (inList && listType && listItems.length > 0) {
-      adfContent.push({
-        type: listType,
-        content: listItems,
-      });
-    }
-    inList = false;
-    listType = null;
-    listItems = [];
-  };
-
-  const flushCodeBlock = () => {
-    if (inCodeBlock && codeBlockContent.length > 0) {
-      adfContent.push({
-        type: 'codeBlock',
-        content: [{ type: 'text', text: codeBlockContent.trimEnd() }], // Trim trailing newline
-      });
-    }
-    inCodeBlock = false;
-    codeBlockContent = '';
-  };
-
-
+  const flushList = () => { if (inList && listType && listItems.length > 0) adfContent.push({ type: listType, content: listItems }); inList = false; listType = null; listItems = []; };
+  const flushCodeBlock = () => { if (inCodeBlock && codeBlockContent.length > 0) adfContent.push({ type: 'codeBlock', content: [{ type: 'text', text: codeBlockContent.trimEnd() }] }); inCodeBlock = false; codeBlockContent = ''; };
   for (const line of lines) {
-    // Code Blocks (```)
-    if (line.startsWith('```')) {
-      if (inCodeBlock) {
-        flushCodeBlock();
-      } else {
-        flushList(); // End any open list
-        inCodeBlock = true;
-        // language can be extracted here if needed: line.substring(3)
-      }
-      continue;
-    }
-
-    if (inCodeBlock) {
-      codeBlockContent += line + '\n';
-      continue;
-    }
-
-    // Headings
+    if (line.startsWith('```')) { if (inCodeBlock) flushCodeBlock(); else { flushList(); inCodeBlock = true; } continue; }
+    if (inCodeBlock) { codeBlockContent += line + '\n'; continue; }
     const headingMatch = line.match(/^(#{1,6})\s+(.*)/);
-    if (headingMatch) {
-      flushList();
-      const level = headingMatch[1].length;
-      const text = headingMatch[2];
-      adfContent.push({
-        type: 'heading',
-        attrs: { level },
-        content: processInlineFormatting(text),
-      });
-      continue;
-    }
-
-    // Unordered Lists
+    if (headingMatch) { flushList(); const level = headingMatch[1].length; const text = headingMatch[2]; adfContent.push({ type: 'heading', attrs: { level }, content: processInlineFormatting(text) }); continue; }
     const ulMatch = line.match(/^(\s*)([\-\*\+])\s+(.*)/);
-    if (ulMatch) {
-      if (!inList || listType !== 'bulletList') {
-        flushList();
-        inList = true;
-        listType = 'bulletList';
-      }
-      listItems.push({
-        type: 'listItem',
-        content: [{ type: 'paragraph', content: processInlineFormatting(ulMatch[3]) }],
-      });
-      continue;
-    }
-
-    // Ordered Lists
+    if (ulMatch) { if (!inList || listType !== 'bulletList') { flushList(); inList = true; listType = 'bulletList'; } listItems.push({ type: 'listItem', content: [{ type: 'paragraph', content: processInlineFormatting(ulMatch[3]) }] }); continue; }
     const olMatch = line.match(/^(\s*)(\d+)\.\s+(.*)/);
-    if (olMatch) {
-      if (!inList || listType !== 'orderedList') {
-        flushList();
-        inList = true;
-        listType = 'orderedList';
-      }
-      listItems.push({
-        type: 'listItem',
-        content: [{ type: 'paragraph', content: processInlineFormatting(olMatch[3]) }],
-      });
-      continue;
-    }
-    
-    // If it's not a list item, and we were in a list, flush it.
-    if (inList && !ulMatch && !olMatch) {
-        flushList();
-    }
-
-    // Paragraphs (or empty lines which might break paragraphs)
-    if (line.trim() === '') {
-      flushList(); // End list if an empty line is encountered
-      // ADF doesn't typically represent multiple empty lines as separate paragraphs.
-      // We can choose to add an empty paragraph or just let it be a break.
-      // For simplicity, we'll treat consecutive empty lines as a single break.
-      // If the last element was not a paragraph, this might start a new one.
-      // Or, if ADF handles this naturally, we might not need special handling.
-      // Let's assume for now that non-list, non-heading, non-codeblock lines become paragraphs.
-    } else {
-      flushList(); // Ensure list is flushed before a new paragraph
-      adfContent.push({
-        type: 'paragraph',
-        content: processInlineFormatting(line),
-      });
-    }
+    if (olMatch) { if (!inList || listType !== 'orderedList') { flushList(); inList = true; listType = 'orderedList'; } listItems.push({ type: 'listItem', content: [{ type: 'paragraph', content: processInlineFormatting(olMatch[3]) }] }); continue; }
+    if (inList && !ulMatch && !olMatch) flushList();
+    if (line.trim() === '') flushList();
+    else { flushList(); adfContent.push({ type: 'paragraph', content: processInlineFormatting(line) }); }
   }
-
-  flushList(); // Ensure any trailing list is flushed
-  flushCodeBlock(); // Ensure any trailing code block is flushed
-  
-  // Filter out empty paragraphs that might have been created by inline processing returning empty
+  flushList(); flushCodeBlock();
   const finalContent = adfContent.filter(node => !(node.type === 'paragraph' && (!node.content || node.content.length === 0)));
-
-  return {
-    type: 'doc',
-    version: 1,
-    content: finalContent.length > 0 ? finalContent : [{ type: 'paragraph', content: [] }], // Ensure content is never empty
-  };
+  return { type: 'doc', version: 1, content: finalContent.length > 0 ? finalContent : [{ type: 'paragraph', content: [] }] };
 };
 
-
-export const getJiraTicketFields = async (sessionId: string, companyId: string) => {
-  try {
-    const client = await initializeClient(companyId);
-    // Corrected: getFields is typically under issueFields or a similar namespace
-    const fields = await client.issueFields.getFields(); 
-    return { success: true, data: fields };
-  } catch (error: any) {
-    return { success: false, error: `Failed to fetch JIRA fields: ${error?.message || 'Unknown error'}` };
-  }
+export const getJiraTicketFields = async (sessionId: string, companyId: string): Promise<Result<any[]>> => {
+  // This is the public version, ensure it calls the internal one or has the same logic
+  return getJiraTicketFieldsInternal(companyId);
 };
 
 export const getJiraTicketComments = async (
@@ -1377,25 +1375,23 @@ export const getJiraTicketComments = async (
     issueIdOrKey: string;
     startAt?: number;
     maxResults?: number;
-    orderBy?: string; // e.g., '-created' for newest first
-    expand?: string; // e.g., 'renderedBody'
+    orderBy?: string; 
+    expand?: string; 
   }
-) => {
+): Promise<Result<Version3Models.PageOfComments>> => {
   try {
-    const client = await initializeClient(companyId);
-    const comments = await client.issueComments.getComments({
+    const jiraClient = await initializeClient(companyId);
+    const comments = await jiraClient.issueComments.getComments({
       issueIdOrKey: params.issueIdOrKey,
       startAt: params.startAt,
       maxResults: params.maxResults,
       orderBy: params.orderBy,
       expand: params.expand,
     });
-
-    // Optionally, convert ADF in comment bodies to plain text
     if (comments.comments) {
       comments.comments.forEach(comment => {
-        if (comment.body) {
-          // @ts-ignore
+        if (comment.body && typeof comment.body === 'object') { // Ensure body is ADF object
+          // @ts-ignore // Add bodyText if body is ADF
           comment.bodyText = adfToText(comment.body);
         }
       });
@@ -1413,33 +1409,20 @@ export const searchJiraUsers = async (
     query?: string;
     startAt?: number;
     maxResults?: number;
-    accountId?: string; // Added accountId for specific user search
+    accountId?: string; 
   }
-) => {
+): Promise<Result<Partial<Version3Models.User>[]>> => { // Return type simplified
   try {
-    const client = await initializeClient(companyId);
-    const searchParams: any = { // Using 'any' for flexibility with jira.js types
-      query: params.query || '',
-      startAt: params.startAt || 0,
-      maxResults: params.maxResults || 50,
-    };
-    // The jira.js library's findUsers method doesn't directly support searching by accountId in its primary params.
-    // If a specific accountId is provided, and the query is empty, we might adjust the query or rely on JIRA's behavior.
-    // For now, we'll pass the query as is. If accountId is the primary search, it should be part of the query string.
-    // Alternatively, a different endpoint/method might be needed for direct accountId lookup if `findUsers` is insufficient.
-    // For simplicity, we assume `query` can contain the accountId if needed, or JIRA's search is smart enough.
-
-    const users: Version3Models.User[] = await client.userSearch.findUsers(searchParams);
-
-    // Simplify user data before returning
+    const jiraClient = await initializeClient(companyId);
+    const searchParams: any = { query: params.query || '', startAt: params.startAt || 0, maxResults: params.maxResults || 50 };
+    const users: Version3Models.User[] = await jiraClient.userSearch.findUsers(searchParams);
     const simplifiedUsers = users.map(user => ({
       accountId: user.accountId,
       displayName: user.displayName,
-      emailAddress: user.emailAddress, // Subject to JIRA privacy settings
+      emailAddress: user.emailAddress, 
       avatarUrls: user.avatarUrls,
       active: user.active,
     }));
-
     return { success: true, data: simplifiedUsers };
   } catch (error: any) {
     return { success: false, error: `Failed to search JIRA users: ${error?.message || 'Unknown error'}` };
@@ -1451,28 +1434,16 @@ export const assignJiraTicket = async (
   companyId: string,
   params: {
     issueIdOrKey: string;
-    accountId: string | null; // accountId of the user to assign, or null to unassign
+    accountId: string | null; 
   }
-) => {
+): Promise<Result<{ id: string; message: string; }>> => {
   try {
-    // We will use the existing updateJiraTicket function.
-    // The JIRA API expects the assignee to be set via the 'fields' object.
-    // If accountId is null, the ticket will be unassigned.
-    const fieldsToUpdate = {
-      assignee: params.accountId ? { accountId: params.accountId } : null,
-    };
-
-    // Call the generic updateJiraTicket function
-    const result = await updateJiraTicket(sessionId, companyId, {
+    const fieldsToUpdate = { assignee: params.accountId ? { accountId: params.accountId } : null };
+    return await updateJiraTicket(sessionId, companyId, {
       issueIdOrKey: params.issueIdOrKey,
       fields: fieldsToUpdate,
     });
-
-    // The updateJiraTicket function already returns { success: boolean, data?: any, error?: string }
-    return result;
   } catch (error: any) {
-    // This catch block might be redundant if updateJiraTicket handles its own errors,
-    // but it's here for safety.
     return { success: false, error: `Failed to assign JIRA ticket: ${error?.message || 'Unknown error'}` };
   }
 };

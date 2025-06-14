@@ -86,7 +86,8 @@ export const publishActionMessage = async (
     // Create the complete message structure with truncated data for Pusher
     const truncatedMessageData = {
       ...messageData,
-      output: messageData.output ? truncateForPusher(messageData.output) : messageData.output
+      output: messageData.output ? truncateForPusher(messageData.output) : messageData.output,
+      error: messageData.error ? truncateForPusher(messageData.error) : messageData.error // Truncate error object as well
     };
 
     const completeMessage = {

@@ -103,6 +103,8 @@ export const executeFunctionCall = async (
   console.log(`[executeFunctionCall] Raw arguments: ${call.function.arguments}`);
 
   if (functionName in functionFactory) {
+    let executionDetails: ExecutionDetails | undefined; // Initialize as undefined to fix TypeScript error
+    
     try {
       const args = JSON.parse(call.function.arguments) as Record<string, unknown>;
       console.log(`[executeFunctionCall] Parsed arguments:`, args);
@@ -116,7 +118,7 @@ export const executeFunctionCall = async (
 
       const input = Object.keys(processedArgs).length > 0 ? processedArgs : {};
 
-      const executionDetails: ExecutionDetails = {
+      executionDetails = {
         id: executionId,
         actionId: convertedActionId,
         serviceName: actionInfo.serviceName,
@@ -190,28 +192,60 @@ export const executeFunctionCall = async (
     } catch (error) {
       console.error(`[executeFunctionCall] Error executing function ${functionName}:`, error);
 
-      const failedActionInfo = await discoverActionById(convertOpenAIFunctionName(functionName), sessionLanguage);
       const errorDetails = extractErrorDetails(error);
-      const args = JSON.parse(call.function.arguments);
-      const input = Object.keys(args).length > 0 ? args : {};
       
-      await sendActionUpdate(activeSessionId, 'failed', {
-        id: uuidv4(),
-        actionId: convertOpenAIFunctionName(functionName),
-        serviceName: failedActionInfo?.serviceName || 'unknown',
-        actionTitle: failedActionInfo?.actionTitle || 'unknown',
-        actionDescription: failedActionInfo?.description || 'unknown',
-        icon: failedActionInfo?.icon || '',
-        args,
-        originalActionId: functionName,
-        language: sessionLanguage,
-        input,        
-        error: errorDetails
-      });
+      // If executionDetails was set (error occurred after sending 'started'), reuse it
+      // Otherwise, create new execution details for the failed message
+      if (executionDetails) {
+        // Reuse the executionId from the started message to ensure update works properly
+        await sendActionUpdate(activeSessionId, 'failed', {
+          ...executionDetails, // Use the same execution details from the try block
+          // Include both output and error for consistency with the non-thrown error case
+          output: { 
+            success: false, 
+            error: errorDetails.message,
+            errorDetails: errorDetails // Include full error details in output as well
+          },
+          error: errorDetails
+        });
+      } else {
+        // Error occurred before executionDetails was set, create new details
+        const failedActionInfo = await discoverActionById(convertOpenAIFunctionName(functionName), sessionLanguage);
+        const args = JSON.parse(call.function.arguments);
+        const input = Object.keys(args).length > 0 ? args : {};
+        
+        await sendActionUpdate(activeSessionId, 'failed', {
+          id: uuidv4(),
+          actionId: convertOpenAIFunctionName(functionName),
+          serviceName: failedActionInfo?.serviceName || 'unknown',
+          actionTitle: failedActionInfo?.actionTitle || 'unknown',
+          actionDescription: failedActionInfo?.description || 'unknown',
+          icon: failedActionInfo?.icon || '',
+          args,
+          originalActionId: functionName,
+          language: sessionLanguage,
+          input,
+          // Include both output and error for consistency with the non-thrown error case
+          output: { 
+            success: false, 
+            error: errorDetails.message,
+            errorDetails: errorDetails // Include full error details in output as well
+          },
+          error: errorDetails
+        });
+      }
 
-      return { error: errorDetails };
+      // Standardize the return to the AI SDK to always have a 'result' field for errors
+      // The Pusher message already contains the full 'errorDetails' object.
+      const sdkErrorReturn = { result: `Error: ${errorDetails.name} - ${errorDetails.message}` };
+      console.log(`[executeFunctionCall] Returning error to AI SDK for ${functionName} (from catch block):`, JSON.stringify(sdkErrorReturn, null, 2));
+      return sdkErrorReturn;
     }
   } else {
-    return { error: { message: `Function ${functionName} not implemented in the factory` } };
+    // This case should also align with the { result: "Error: ..." } structure.
+    // For consistency with the above, let's use { result: "Error: ..." }
+    const notImplementedError = { message: `Function ${functionName} not implemented in the factory` };
+    console.warn(`[executeFunctionCall] ${notImplementedError.message}`);
+    return { result: `Error: ${notImplementedError.message}` };
   }
 };

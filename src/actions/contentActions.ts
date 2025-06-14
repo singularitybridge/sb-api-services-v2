@@ -1,6 +1,13 @@
 import { Session } from '../models/Session';
 import * as ContentService from '../services/content.service';
-import { ActionContext, FunctionFactory } from '../integrations/actions/types';
+import { ActionContext, FunctionFactory, StandardActionResult } from '../integrations/actions/types';
+import { IContentItem } from '../models/ContentItem';
+
+// Define data types for StandardActionResult payloads
+type CreateContentData = IContentItem;
+type GetContentData = IContentItem[];
+type UpdateContentData = IContentItem;
+type DeleteContentData = { message: string }; // Or simply use 'undefined' if no specific data needed
 
 export const createContentActions = (
   context: ActionContext,
@@ -26,49 +33,40 @@ export const createContentActions = (
       },
       required: ['contentTypeId', 'data', 'artifactKey'],
     },
-    function: async (args: { contentTypeId: string; data: any; artifactKey: string }) => {
+    function: async (args: { contentTypeId: string; data: any; artifactKey: string }): Promise<StandardActionResult<CreateContentData>> => {
+      const session = await Session.findById(context.sessionId);
+      if (!session) {
+        throw new Error('Invalid session');
+      }
+
+      if (!args.data || typeof args.data !== 'object') {
+        throw new Error('Invalid data provided: Data must be a non-null object');
+      }
+
       try {
-        const session = await Session.findById(context.sessionId);
-        if (!session) {
-          return { success: false, description: 'Invalid session' };
-        }
-
-        if (!args.data || typeof args.data !== 'object') {
-          return {
-            success: false,
-            description: 'Invalid data provided',
-            details: { error: 'Data must be a non-null object' },
-          };
-        }
-
+        // Assuming ContentService.createContentItem throws on internal error or returns IContentItem
+        // If it can return { error: string, details: any }, that needs to be handled by throwing
         const result = await ContentService.createContentItem(
           session.companyId,
           args.contentTypeId,
           args.data,
           args.artifactKey,
         );
-        if ('error' in result) {
-          return {
-            success: false,
-            description: result.error,
-            details: result.details,
-          };
+        
+        // Check if the service returned an error structure instead of throwing
+        if (typeof result === 'object' && result !== null && 'error' in result && typeof result.error === 'string') {
+           throw new Error(`Failed to create content item: ${result.error} ${result.details ? JSON.stringify(result.details) : ''}`);
         }
+
         return {
           success: true,
-          description: 'Content item created successfully',
-          data: result,
+          message: 'Content item created successfully',
+          data: result as CreateContentData, // Cast to ensure type alignment
         };
       } catch (error) {
         console.error('Error creating content item:', error);
-        return {
-          success: false,
-          description: 'Failed to create content item',
-          details: {
-            error: error instanceof Error ? error.message : 'Unknown error',
-            stack: error instanceof Error ? error.stack : undefined,
-          },
-        };
+        // Re-throw the error to be caught by the global error handler
+        throw new Error(error instanceof Error ? error.message : 'Failed to create content item due to an unknown error');
       }
     },
   },
@@ -107,12 +105,12 @@ export const createContentActions = (
       orderBy?: string;
       limit?: number;
       skip?: number;
-    }) => {
+    }): Promise<StandardActionResult<GetContentData>> => {
+      const session = await Session.findById(context.sessionId);
+      if (!session) {
+        throw new Error('Invalid session');
+      }
       try {
-        const session = await Session.findById(context.sessionId);
-        if (!session) {
-          return { success: false, description: 'Invalid session' };
-        }
         const contentItems = await ContentService.getContentItems(
           session.companyId,
           args.contentTypeId,
@@ -123,15 +121,12 @@ export const createContentActions = (
         );
         return {
           success: true,
-          description: 'Content items retrieved successfully',
+          message: 'Content items retrieved successfully',
           data: contentItems,
         };
       } catch (error) {
         console.error('Error getting content items:', error);
-        return {
-          success: false,
-          description: 'Failed to retrieve content items',
-        };
+        throw new Error(error instanceof Error ? error.message : 'Failed to retrieve content items');
       }
     },
   },
@@ -170,12 +165,12 @@ export const createContentActions = (
       orderBy?: string;
       limit?: number;
       skip?: number;
-    }) => {
+    }): Promise<StandardActionResult<GetContentData>> => {
+      const session = await Session.findById(context.sessionId);
+      if (!session) {
+        throw new Error('Invalid session');
+      }
       try {
-        const session = await Session.findById(context.sessionId);
-        if (!session) {
-          return { success: false, description: 'Invalid session' };
-        }
         const contentItems = await ContentService.getContentItemsByArtifactKey(
           session.companyId,
           args.artifactKey,
@@ -186,15 +181,12 @@ export const createContentActions = (
         );
         return {
           success: true,
-          description: 'Content items retrieved successfully',
+          message: 'Content items retrieved successfully by artifact key',
           data: contentItems,
         };
       } catch (error) {
         console.error('Error getting content items by artifact key:', error);
-        return {
-          success: false,
-          description: 'Failed to retrieve content items by artifact key',
-        };
+        throw new Error(error instanceof Error ? error.message : 'Failed to retrieve content items by artifact key');
       }
     },
   },
@@ -216,33 +208,30 @@ export const createContentActions = (
       },
       required: ['itemId', 'data'],
     },
-    function: async (args: { itemId: string; data: any; artifactKey?: string }) => {
+    function: async (args: { itemId: string; data: any; artifactKey?: string }): Promise<StandardActionResult<UpdateContentData>> => {
+      const session = await Session.findById(context.sessionId);
+      if (!session) {
+        throw new Error('Invalid session');
+      }
       try {
-        const session = await Session.findById(context.sessionId);
-        if (!session) {
-          return { success: false, description: 'Invalid session' };
-        }
         const result = await ContentService.updateContentItem(
           args.itemId,
           session.companyId,
           args.data,
-          args.artifactKey || '',
+          args.artifactKey || '', // Pass empty string if undefined, service might handle it
         );
-        if ('error' in result) {
-          return {
-            success: false,
-            description: result.error,
-            details: result.details,
-          };
+        
+        if (typeof result === 'object' && result !== null && 'error' in result && typeof result.error === 'string') {
+          throw new Error(`Failed to update content item: ${result.error} ${result.details ? JSON.stringify(result.details) : ''}`);
         }
         return {
           success: true,
-          description: 'Content item updated successfully',
-          data: result,
+          message: 'Content item updated successfully',
+          data: result as UpdateContentData,
         };
       } catch (error) {
         console.error('Error updating content item:', error);
-        return { success: false, description: 'Failed to update content item' };
+        throw new Error(error instanceof Error ? error.message : 'Failed to update content item');
       }
     },
   },
@@ -259,30 +248,29 @@ export const createContentActions = (
       },
       required: ['itemId'],
     },
-    function: async (args: { itemId: string }) => {
+    function: async (args: { itemId: string }): Promise<StandardActionResult<DeleteContentData>> => {
+      const session = await Session.findById(context.sessionId);
+      if (!session) {
+        throw new Error('Invalid session');
+      }
       try {
-        const session = await Session.findById(context.sessionId);
-        if (!session) {
-          return { success: false, description: 'Invalid session' };
-        }
-        const result = await ContentService.deleteContentItem(
+        const wasDeleted = await ContentService.deleteContentItem(
           args.itemId,
           session.companyId,
         );
-        if (result) {
+        if (wasDeleted) {
           return {
             success: true,
-            description: 'Content item deleted successfully',
+            message: 'Content item deleted successfully',
+            data: { message: 'Content item deleted successfully' } 
           };
         } else {
-          return {
-            success: false,
-            description: 'Content item not found or could not be deleted',
-          };
+          // If service returns false, it implies a failure that wasn't an exception (e.g., item not found)
+          throw new Error('Content item not found or could not be deleted.');
         }
       } catch (error) {
         console.error('Error deleting content item:', error);
-        return { success: false, description: 'Failed to delete content item' };
+        throw new Error(error instanceof Error ? error.message : 'Failed to delete content item');
       }
     },
   },

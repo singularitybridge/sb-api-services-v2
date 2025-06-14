@@ -15,6 +15,12 @@ The SB Agent Portal provides a comprehensive suite of tools and services for cre
 
 This system is built with a microservices architecture, utilizing TypeScript and modern JavaScript (ES6+) practices, with a preference for functional programming over object-oriented programming.
 
+## Developer Documentation
+
+For detailed information on the internal workings, particularly regarding the creation and execution of actions and integrations, please refer to the:
+
+-   **[Integrations Framework Documentation](./docs/integrations_framework/README.md)**
+
 ## Available Services
 
 [... existing services content ...]

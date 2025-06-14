@@ -1,5 +1,7 @@
-import { ActionContext, FunctionFactory } from '../../integrations/actions/types';
-import { sendEmail } from './sendgrid.service';
+import { ActionContext, FunctionFactory, StandardActionResult } from '../actions/types'; // Corrected path for FunctionFactory
+import { sendEmail as sendEmailService } from './sendgrid.service';
+import { executeAction, ExecuteActionOptions } from '../actions/executor';
+import { ActionValidationError } from '../../utils/actionErrors';
 
 interface SendEmailArgs {
   to: string;
@@ -7,6 +9,21 @@ interface SendEmailArgs {
   text: string;
   html: string;
 }
+
+// R type for StandardActionResult<R>
+interface SendEmailResponseData {
+  message?: string; // Service returns a message on success
+}
+
+// S type for serviceCall lambda's response
+interface ServiceCallLambdaResponse {
+  success: boolean;
+  data?: SendEmailResponseData;
+  error?: string;
+  description?: string; // For executeAction if success is false
+}
+
+const SERVICE_NAME = 'sendGridService';
 
 export const createSendGridActions = (context: ActionContext): FunctionFactory => ({
   sendEmail: {
@@ -35,56 +52,44 @@ export const createSendGridActions = (context: ActionContext): FunctionFactory =
       required: ['to', 'subject', 'text', 'html'],
       additionalProperties: false,
     },
-    function: async (args: SendEmailArgs) => {
-
+    function: async (args: SendEmailArgs): Promise<StandardActionResult<SendEmailResponseData>> => {
       const { to, subject, text, html } = args;
 
-      // Verify that 'to' is a valid email address
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(to)) {
-        console.error('sendEmail: Invalid email address', to);
-        return {
-          error: 'Invalid email address',
-          message: 'The provided email address is not valid.',
-        };
+        throw new ActionValidationError('The provided email address is not valid.');
       }
-
-      // Verify that subject, text, and html are non-empty strings
       if (typeof subject !== 'string' || subject.trim().length === 0) {
-        console.error('sendEmail: Invalid subject', subject);
-        return {
-          error: 'Invalid subject',
-          message: 'The subject must be a non-empty string.',
-        };
+        throw new ActionValidationError('The subject must be a non-empty string.');
       }
-
       if (typeof text !== 'string' || text.trim().length === 0) {
-        console.error('sendEmail: Invalid text content', text);
-        return {
-          error: 'Invalid text content',
-          message: 'The text content must be a non-empty string.',
-        };
+        throw new ActionValidationError('The text content must be a non-empty string.');
       }
-
       if (typeof html !== 'string' || html.trim().length === 0) {
-        console.error('sendEmail: Invalid html content', html);
-        return {
-          error: 'Invalid HTML content',
-          message: 'The HTML content must be a non-empty string.',
-        };
+        throw new ActionValidationError('The HTML content must be a non-empty string.');
       }
 
-      try {
-        console.log('sendEmail: Calling sendEmail service');
-        const result = await sendEmail(context.companyId, { to, subject, text, html });
-        return result;
-      } catch (error) {
-        console.error('sendEmail: Error sending email', error);
-        return {
-          error: 'Email sending failed',
-          message: 'Failed to send the email using SendGrid API.',
-        };
-      }
+      return executeAction<SendEmailResponseData, ServiceCallLambdaResponse>(
+        'sendEmail',
+        async (): Promise<ServiceCallLambdaResponse> => {
+          // sendEmailService returns: { success: boolean; message?: string; error?: string }
+          const serviceResult = await sendEmailService(context.companyId!, { to, subject, text, html });
+          return { 
+            success: serviceResult.success, 
+            data: serviceResult.success ? { message: serviceResult.message } : undefined, 
+            description: serviceResult.error,
+            error: serviceResult.error 
+          };
+        },
+        { 
+          serviceName: SERVICE_NAME,
+          // Default dataExtractor (res => res.data) will work
+        }
+      );
     },
   },
 });

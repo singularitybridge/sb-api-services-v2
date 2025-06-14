@@ -1,15 +1,17 @@
-import { ActionContext, FunctionFactory, FunctionDefinition } from '../actions/types'; // Added FunctionDefinition
+import { ActionContext, FunctionFactory, FunctionDefinition, StandardActionResult } from '../actions/types';
+import { executeAction } from '../actions/executor'; // Import executeAction
 import { 
+  // Existing service imports
   createJiraTicket, 
   fetchJiraTickets, 
   getJiraTicketById,
-  getJiraTicketFields, // Added import for getJiraTicketFields
-  getJiraTicketComments, // Added import for getJiraTicketComments
+  getJiraTicketFields,
+  getJiraTicketComments,
   addCommentToJiraTicket,
   updateJiraTicket,
   addTicketToCurrentSprint as addTicketToCurrentSprintService,
-  searchJiraUsers, // Added import for searchJiraUsers
-  assignJiraTicket, // Added import for assignJiraTicket
+  searchJiraUsers,
+  assignJiraTicket,
   getActiveSprintForBoard as getActiveSprintForBoardService,
   getIssuesForSprint as getIssuesForSprintService,
   moveIssueToSprint as moveIssueToSprintService,
@@ -17,511 +19,488 @@ import {
   getAvailableTransitions as getAvailableTransitionsService,
   transitionIssue as transitionIssueService,
   setStoryPoints as setStoryPointsService,
-  getSprintsForBoard as getSprintsForBoardService // Import the new service function
+  getSprintsForBoard as getSprintsForBoardService,
+
+  // --- BEGIN NEW SERVICE IMPORTS ---
+  resolveBoardForProject,
+  getSprintsForResolvedBoard,
+  // Types needed for new actions
+  JiraBoard,
+  JiraSprint,
+  Result
+  // --- END NEW SERVICE IMPORTS ---
 } from './jira.service';
-import { StandardActionResult } from '../actions/types'; // Import StandardActionResult
 
-// Argument types for JIRA actions
-interface CreateTicketArgs {
-  summary: string;
-  description: string;
+// --- BEGIN EXISTING INTERFACES (condensed for brevity) ---
+interface CreateTicketArgs { summary: string; description: string; projectKey: string; issueType?: string; }
+interface FetchTicketsArgs { projectKey: string; maxResults?: number; fields?: string[]; }
+interface GetTicketArgs { issueIdOrKey: string; fields?: string[]; }
+interface AddCommentArgs { issueIdOrKey: string; commentBody: string; }
+interface UpdateTicketArgs { issueIdOrKey: string; summary?: string; description?: string; assigneeAccountId?: string | null; labels?: string[]; }
+interface AddTicketToCurrentSprintArgs { boardId: string; issueKey: string; }
+interface SearchUsersArgs { query?: string; startAt?: number; maxResults?: number; accountId?: string; }
+interface AssignTicketArgs { issueIdOrKey: string; accountId: string | null; }
+interface GetActiveSprintForBoardArgs { boardId: string; }
+interface GetIssuesForSprintArgs { sprintId: string; projectKey?: string; maxResults?: number; startAt?: number; fields?: string[]; }
+interface MoveIssueToSprintArgs { issueKey: string; targetSprintId: string; }
+interface MoveIssueToBacklogArgs { issueKey: string; }
+interface GetAvailableTransitionsArgs { issueIdOrKey: string; }
+interface TransitionIssueArgs { issueIdOrKey: string; transitionId: string; comment?: string; fields?: Record<string, any>; }
+interface JiraTransitionStatus { self: string; description: string; iconUrl: string; name: string; id: string; statusCategory: { self: string; id: number; key: string; colorName: string; name: string; }; }
+interface JiraTransition { id: string; name: string; to: JiraTransitionStatus; hasScreen: boolean; isGlobal: boolean; isInitial: boolean; isAvailable: boolean; isConditional: boolean; isLooped?: boolean; }
+interface SetStoryPointsArgs { issueIdOrKey: string; storyPoints: number | null; }
+interface GetSprintsForBoardArgs { boardId: string; state?: string; startAt?: number; maxResults?: number; }
+interface GetTicketCommentsArgs { issueIdOrKey: string; startAt?: number; maxResults?: number; orderBy?: string; expand?: string; }
+// --- END EXISTING INTERFACES ---
+
+
+// --- BEGIN NEW INTERFACES ---
+interface GetProjectSprintsArgs {
   projectKey: string;
-  issueType?: string; // Default handled in service
+  sprintState?: 'active' | 'future' | 'closed' | string; // Allow common states or combined string
 }
 
-interface FetchTicketsArgs {
-  projectKey: string;
-  maxResults?: number; // Default handled in service
-  fields?: string[]; // Optional: Array of field names to fetch
-}
+// Describes how the target sprint is specified
+type TargetSprintDescriptor = 
+  | 'active' 
+  | 'next' 
+  | { sprintId: string } 
+  | { sprintName: string };
 
-interface GetTicketArgs {
-  issueIdOrKey: string;
-  fields?: string[]; // Optional: Array of field names to fetch, e.g., ["summary", "status", "*all"]
+interface MoveIssuesToProjectSprintArgs {
+  projectKey?: string; // Optional if boardId is provided
+  boardId?: string;    // Optional if projectKey is provided
+  issueKeys: string[];
+  targetSprintDescriptor: TargetSprintDescriptor;
+  jqlQueryForIssues?: string; // Optional: if issues are to be fetched by JQL instead of explicit keys
 }
+// --- END NEW INTERFACES ---
 
-interface AddCommentArgs {
-  issueIdOrKey: string;
-  commentBody: string;
-}
-
-interface UpdateTicketArgs {
-  issueIdOrKey: string;
-  summary?: string;
-  description?: string;
-  assigneeAccountId?: string | null; // To allow unassigning by passing null
-  labels?: string[];
-}
-
-interface AddTicketToCurrentSprintArgs {
-  boardId: string;
-  issueKey: string;
-}
-
-// New argument types for user search and assignment
-interface SearchUsersArgs {
-  query?: string;
-  startAt?: number;
-  maxResults?: number;
-  accountId?: string;
-}
-
-interface AssignTicketArgs {
-  issueIdOrKey: string;
-  accountId: string | null; // Allow null for unassigning
-}
-
-interface GetActiveSprintForBoardArgs {
-  boardId: string;
-}
-
-interface GetIssuesForSprintArgs {
-  sprintId: string;
-  projectKey?: string;
-  maxResults?: number;
-  startAt?: number;
-  fields?: string[]; // Optional: Array of field names to fetch
-}
-
-interface MoveIssueToSprintArgs {
-  issueKey: string;
-  targetSprintId: string;
-}
-
-interface MoveIssueToBacklogArgs {
-  issueKey: string;
-}
-
-interface GetAvailableTransitionsArgs {
-  issueIdOrKey: string;
-}
-
-interface TransitionIssueArgs {
-  issueIdOrKey: string;
-  transitionId: string;
-  comment?: string;
-  fields?: Record<string, any>; // For fields like resolution { name: "Done" }
-}
-
-// Define the type for the data payload of transitionIssue action
-interface JiraTransitionStatus {
-  self: string;
-  description: string;
-  iconUrl: string;
-  name: string;
-  id: string;
-  statusCategory: {
-    self: string;
-    id: number;
-    key: string;
-    colorName: string;
-    name: string;
-  };
-}
-
-interface JiraTransition {
-  id: string;
-  name: string;
-  to: JiraTransitionStatus;
-  hasScreen: boolean;
-  isGlobal: boolean;
-  isInitial: boolean;
-  isAvailable: boolean;
-  isConditional: boolean;
-  isLooped?: boolean; // Optional as per user example
-}
-
-interface SetStoryPointsArgs {
-  issueIdOrKey: string;
-  storyPoints: number | null; // Allow null to clear
-}
-
-interface GetSprintsForBoardArgs {
-  boardId: string;
-  state?: string; // e.g., "active", "future", "closed", "active,future"
-  startAt?: number;
-  maxResults?: number;
-}
-
-interface GetTicketCommentsArgs {
-  issueIdOrKey: string;
-  startAt?: number;
-  maxResults?: number;
-  orderBy?: string;
-  expand?: string;
-}
 
 const projectKeyParamDefinition = {
-  type: 'string' as const, // Use 'as const' for literal type
+  type: 'string' as const,
   description: 'JIRA project key (e.g., "PROJ"). This is essential for targeting the correct project.'
 };
 
 export const createJiraActions = (context: ActionContext): FunctionFactory => ({
-  createTicket: {
+  // --- BEGIN EXISTING ACTIONS (condensed for brevity, ensure they remain) ---
+  createTicket: { /* ... existing definition ... */ 
     description: 'Creates a new JIRA ticket',
-    parameters: {
-      type: 'object',
-      properties: {
-        summary: { type: 'string', description: 'Title of the ticket' },
-        description: { type: 'string', description: 'Detailed description of the ticket' },
-        projectKey: projectKeyParamDefinition,
-        issueType: { type: 'string', description: 'Type of issue (e.g., Task, Bug)' } // Removed default: 'Task'
-      },
-      required: ['summary', 'description', 'projectKey'],
-      additionalProperties: false,
-    },
-    function: async (params: CreateTicketArgs): Promise<any> => {
-      return await createJiraTicket(context.sessionId, context.companyId, params);
+    parameters: { type: 'object', properties: { summary: { type: 'string' }, description: { type: 'string' }, projectKey: projectKeyParamDefinition, issueType: { type: 'string' } }, required: ['summary', 'description', 'projectKey'] },
+    function: async (params: CreateTicketArgs): Promise<StandardActionResult<any>> => {
+      const result = await createJiraTicket(context.sessionId, context.companyId, params);
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to create JIRA ticket');
     },
   },
-  fetchTickets: {
+  fetchTickets: { /* ... existing definition ... */ 
     description: 'Fetches JIRA tickets from a project',
+    parameters: { type: 'object', properties: { projectKey: projectKeyParamDefinition, maxResults: { type: 'number' }, fields: { type: 'array', items: { type: 'string' } } }, required: ['projectKey'] },
+    function: async (params: FetchTicketsArgs): Promise<StandardActionResult<any[]>> => { // Assuming data is an array of tickets
+      // Define R_FetchTicketsData (data payload for StandardActionResult)
+      // For now, let's assume it's any[] as per original Promise<StandardActionResult<any>>
+      // Define S_FetchTicketsServiceResponse (expected return from serviceCallLambda)
+      interface S_FetchTicketsServiceResponse {
+        success: boolean;
+        data?: any[]; // Should match R_FetchTicketsData
+        description?: string;
+      }
+
+      return executeAction<any[], S_FetchTicketsServiceResponse>(
+        'jira.fetchTickets', // Full action name
+        async (): Promise<S_FetchTicketsServiceResponse> => {
+          const serviceResult = await fetchJiraTickets(context.sessionId, context.companyId, { 
+            projectKey: params.projectKey, 
+            jql: undefined, 
+            maxResults: params.maxResults, 
+            fieldsToFetch: params.fields 
+          });
+
+          if (serviceResult.success) {
+            return {
+              success: true,
+              data: serviceResult.data as any[] // Cast if necessary
+            };
+          } else {
+            return {
+              success: false,
+              description: serviceResult.error || 'Failed to fetch JIRA tickets from service.'
+            };
+          }
+        },
+        { 
+          serviceName: 'JiraService'
+          // actionTitle and actionDescription are part of the main action definition,
+          // not ExecuteActionOptions
+        }
+      );
+    },
+  },
+  getTicket: { /* ... existing definition ... */ 
+    description: 'Gets a specific JIRA ticket by ID or key.',
+    parameters: { type: 'object', properties: { issueIdOrKey: { type: 'string' }, fields: { type: 'array', items: { type: 'string' } } }, required: ['issueIdOrKey'] },
+    function: async (params: GetTicketArgs): Promise<StandardActionResult<any>> => {
+      const result = await getJiraTicketById(context.sessionId, context.companyId, { issueIdOrKey: params.issueIdOrKey, fieldsToFetch: params.fields });
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to get JIRA ticket');
+    },
+  },
+  addComment: { /* ... existing definition ... */ 
+    description: 'Adds a comment to a specific JIRA ticket',
+    parameters: { type: 'object', properties: { issueIdOrKey: { type: 'string' }, commentBody: { type: 'string' } }, required: ['issueIdOrKey', 'commentBody'] },
+    function: async (params: AddCommentArgs): Promise<StandardActionResult<any>> => {
+      const result = await addCommentToJiraTicket(context.sessionId, context.companyId, params);
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to add comment');
+    },
+  },
+  updateTicket: { /* ... existing definition ... */ 
+    description: 'Updates an existing JIRA ticket.',
+    parameters: { type: 'object', properties: { issueIdOrKey: { type: 'string' }, summary: { type: 'string' }, description: { type: 'string' }, assigneeAccountId: { type: ['string', 'null'] }, labels: { type: 'array', items: { type: 'string' } } }, required: ['issueIdOrKey'] },
+    function: async (params: UpdateTicketArgs): Promise<StandardActionResult<any>> => {
+      const fieldsToUpdate: Record<string, any> = {};
+      if (params.summary !== undefined) fieldsToUpdate.summary = params.summary;
+      if (params.description !== undefined) fieldsToUpdate.description = params.description;
+      if (params.assigneeAccountId !== undefined) fieldsToUpdate.assignee = params.assigneeAccountId === null ? null : { accountId: params.assigneeAccountId };
+      if (params.labels !== undefined) fieldsToUpdate.labels = params.labels;
+      const result = await updateJiraTicket(context.sessionId, context.companyId, { issueIdOrKey: params.issueIdOrKey, fields: fieldsToUpdate });
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to update ticket');
+    },
+  },
+  addTicketToCurrentSprint: { /* ... existing definition ... */ 
+    description: 'Adds a JIRA ticket to the current active sprint on a specified board.',
+    parameters: { type: 'object', properties: { boardId: { type: 'string' }, issueKey: { type: 'string' } }, required: ['boardId', 'issueKey'] },
+    function: async (params: AddTicketToCurrentSprintArgs): Promise<StandardActionResult<any>> => {
+      const result = await addTicketToCurrentSprintService(context.sessionId, context.companyId, params);
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to add ticket to current sprint');
+    },
+  },
+  searchUsers: { /* ... existing definition ... */ 
+    description: 'Searches for JIRA users.',
+    parameters: { type: 'object', properties: { query: { type: 'string' }, startAt: { type: 'number' }, maxResults: { type: 'number' }, accountId: { type: 'string' } }, required: [] },
+    function: async (params: SearchUsersArgs): Promise<StandardActionResult<any>> => {
+      const result = await searchJiraUsers(context.sessionId, context.companyId, params);
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to search users');
+    },
+  },
+  assignTicket: { /* ... existing definition ... */ 
+    description: 'Assigns a JIRA ticket to a user.',
+    parameters: { type: 'object', properties: { issueIdOrKey: { type: 'string' }, accountId: { type: ['string', 'null'] } }, required: ['issueIdOrKey', 'accountId'] },
+    function: async (params: AssignTicketArgs): Promise<StandardActionResult<any>> => {
+      const result = await assignJiraTicket(context.sessionId, context.companyId, params);
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to assign ticket');
+    },
+  },
+  getActiveSprintForBoard: { /* ... existing definition ... */ 
+    description: 'Gets the active sprint for a specific JIRA board.',
+    parameters: { type: 'object', properties: { boardId: { type: 'string' } }, required: ['boardId'] },
+    function: async (params: GetActiveSprintForBoardArgs): Promise<StandardActionResult<any>> => {
+      const result = await getActiveSprintForBoardService(context.sessionId, context.companyId, params);
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to get active sprint');
+    },
+  },
+  getIssuesForSprint: { /* ... existing definition ... */ 
+    description: 'Gets issues for a specific JIRA sprint.',
+    parameters: { type: 'object', properties: { sprintId: { type: 'string' }, projectKey: { type: 'string' }, maxResults: { type: 'number' }, startAt: { type: 'number' }, fields: { type: 'array', items: { type: 'string' } } }, required: ['sprintId'] },
+    function: async (params: GetIssuesForSprintArgs): Promise<StandardActionResult<any>> => {
+      const result = await getIssuesForSprintService(context.sessionId, context.companyId, { sprintId: params.sprintId, projectKey: params.projectKey, maxResults: params.maxResults, startAt: params.startAt, fieldsToFetch: params.fields });
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to get issues for sprint');
+    },
+  },
+  moveIssueToSprint: { /* ... existing definition ... */ 
+    description: 'Moves a JIRA issue to a specified sprint.',
+    parameters: { type: 'object', properties: { issueKey: { type: 'string' }, targetSprintId: { type: 'string' } }, required: ['issueKey', 'targetSprintId'] },
+    function: async (params: MoveIssueToSprintArgs): Promise<StandardActionResult<any>> => {
+      const result = await moveIssueToSprintService(context.sessionId, context.companyId, params);
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to move issue to sprint');
+    },
+  },
+  moveIssueToBacklog: { /* ... existing definition ... */ 
+    description: 'Moves a JIRA issue to the backlog.',
+    parameters: { type: 'object', properties: { issueKey: { type: 'string' } }, required: ['issueKey'] },
+    function: async (params: MoveIssueToBacklogArgs): Promise<StandardActionResult<any>> => {
+      const result = await moveIssueToBacklogService(context.sessionId, context.companyId, params);
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to move issue to backlog');
+    },
+  },
+  getAvailableTransitions: { /* ... existing definition ... */ 
+    description: 'Gets available workflow transitions for a JIRA issue.',
+    parameters: { type: 'object', properties: { issueIdOrKey: { type: 'string' } }, required: ['issueIdOrKey'] },
+    function: async (params: GetAvailableTransitionsArgs): Promise<StandardActionResult<any>> => {
+      const result = await getAvailableTransitionsService(context.sessionId, context.companyId, params);
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to get available transitions');
+    },
+  },
+  transitionIssue: { /* ... existing definition ... */ 
+    description: 'Transitions a JIRA issue to a new status.',
+    parameters: { type: 'object', properties: { issueIdOrKey: { type: 'string' }, transitionId: { type: 'string' }, comment: { type: 'string' }, fields: { type: 'object' } }, required: ['issueIdOrKey', 'transitionId'] },
+    function: async (params: TransitionIssueArgs): Promise<StandardActionResult<any[]>> => {
+      const result = await transitionIssueService(context.sessionId, context.companyId, params);
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to transition issue');
+    },
+  },
+  setStoryPoints: { /* ... existing definition ... */ 
+    description: 'Sets or clears story points for a JIRA issue.',
+    parameters: { type: 'object', properties: { issueIdOrKey: { type: 'string' }, storyPoints: { type: ['number', 'null'] } }, required: ['issueIdOrKey', 'storyPoints'] },
+    function: async (params: SetStoryPointsArgs): Promise<StandardActionResult<any>> => {
+      const result = await setStoryPointsService(context.sessionId, context.companyId, params);
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to set story points');
+    },
+  },
+  getSprintsForBoard: { /* ... existing definition ... */ 
+    description: 'Gets sprints for a specific JIRA board.',
+    parameters: { type: 'object', properties: { boardId: { type: 'string' }, state: { type: 'string' }, startAt: { type: 'number' }, maxResults: { type: 'number' } }, required: ['boardId'] },
+    function: async (params: GetSprintsForBoardArgs): Promise<StandardActionResult<any>> => {
+      const result = await getSprintsForBoardService(context.sessionId, context.companyId, params);
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to get sprints for board');
+    },
+  },
+  getTicketFields: { /* ... existing definition ... */ 
+    description: 'Gets all available fields in JIRA.',
+    parameters: { type: 'object', properties: {}, required: [] },
+    function: async (): Promise<StandardActionResult<any>> => {
+      const result = await getJiraTicketFields(context.sessionId, context.companyId);
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to get ticket fields');
+    },
+  },
+  getTicketComments: { /* ... existing definition ... */ 
+    description: 'Gets comments for a specific JIRA ticket.',
+    parameters: { type: 'object', properties: { issueIdOrKey: { type: 'string' }, startAt: { type: 'number' }, maxResults: { type: 'number' }, orderBy: { type: 'string' }, expand: { type: 'string' } }, required: ['issueIdOrKey'] },
+    function: async (params: GetTicketCommentsArgs): Promise<StandardActionResult<any>> => {
+      const result = await getJiraTicketComments(context.sessionId, context.companyId, params);
+      if (result.success) return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to get ticket comments');
+    },
+  },
+  // --- END EXISTING ACTIONS ---
+
+  // --- BEGIN NEW ACTIONS ---
+  getProjectSprints: {
+    description: 'Gets sprints for a JIRA project, resolving board ID automatically. May prompt for board selection if ambiguous.',
     parameters: {
       type: 'object',
       properties: {
         projectKey: projectKeyParamDefinition,
-        maxResults: { type: 'number', description: 'Maximum number of tickets to fetch' }, // Removed default: 50
-        fields: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Optional: Array of field names to fetch (e.g., ["summary", "status"], or ["*all"] for all fields). Defaults to a curated set (id, key, summary, status, descriptionText, sprintInfo) if omitted.'
+        sprintState: { 
+          type: 'string', 
+          description: 'Optional: Filter sprints by state (e.g., "active", "future", "closed", or "active,future"). Defaults to "active,future".',
+          enum: ['active', 'future', 'closed', 'active,future'] 
         }
       },
       required: ['projectKey'],
       additionalProperties: false,
     },
-    function: async (params: FetchTicketsArgs): Promise<any> => {
-      // Pass the fields parameter to the service function
-      return await fetchJiraTickets(context.sessionId, context.companyId, {
-        projectKey: params.projectKey,
-        maxResults: params.maxResults,
-        fieldsToFetch: params.fields // Pass the new optional fields
-      });
-    },
-  },
-  getTicket: {
-    description: 'Gets a specific JIRA ticket by ID or key. Optionally specify which fields to retrieve.',
-    parameters: {
-      type: 'object',
-      properties: {
-        issueIdOrKey: { type: 'string', description: 'ID or key of the JIRA ticket.' },
-        fields: { 
-          type: 'array', 
-          items: { type: 'string' },
-          description: 'Optional: Array of field names to fetch (e.g., ["summary", "status"], or ["*all"] for all fields). Defaults to a curated set if omitted.' 
-        }
-      },
-      required: ['issueIdOrKey'],
-      additionalProperties: false,
-    },
-    function: async (params: GetTicketArgs): Promise<any> => {
-      // Pass the fields parameter to the service function
-      return await getJiraTicketById(context.sessionId, context.companyId, { 
-        issueIdOrKey: params.issueIdOrKey, 
-        fieldsToFetch: params.fields 
-      });
-    },
-  },
-  addComment: {
-    description: 'Adds a comment to a specific JIRA ticket',
-    parameters: {
-      type: 'object',
-      properties: {
-        issueIdOrKey: { type: 'string', description: 'ID or key of the JIRA ticket' },
-        commentBody: { type: 'string', description: 'The text content of the comment' }
-      },
-      required: ['issueIdOrKey', 'commentBody'],
-      additionalProperties: false,
-    },
-    function: async (params: AddCommentArgs): Promise<any> => {
-      return await addCommentToJiraTicket(context.sessionId, context.companyId, params);
-    },
-  },
-  updateTicket: {
-    description: 'Updates an existing JIRA ticket. Provide only the fields you want to change.',
-    parameters: {
-      type: 'object',
-      properties: {
-        issueIdOrKey: { type: 'string', description: 'ID or key of the JIRA ticket to update' },
-        summary: { type: 'string', description: 'New summary for the ticket (optional)' },
-        description: { type: 'string', description: 'New description for the ticket (optional)' },
-        assigneeAccountId: {
-          type: ['string', 'null'],
-          description: 'The account ID of the user to assign the ticket to (optional). Pass null to unassign.'
-        },
-        labels: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'New list of labels for the ticket (optional). This will overwrite existing labels if provided.'
-        }
-      },
-      required: ['issueIdOrKey'],
-      additionalProperties: false,
-    },
-    function: async (params: UpdateTicketArgs): Promise<any> => {
-      const fieldsToUpdate: Record<string, any> = {};
+    function: async (params: GetProjectSprintsArgs): Promise<StandardActionResult<any>> => {
+      const boardResolutionResult = await resolveBoardForProject(context.companyId, params.projectKey);
 
-      if (params.summary !== undefined) {
-        fieldsToUpdate.summary = params.summary;
-      }
-      if (params.description !== undefined) {
-        fieldsToUpdate.description = params.description;
-      }
-      if (params.assigneeAccountId !== undefined) {
-        if (params.assigneeAccountId === null) {
-          fieldsToUpdate.assignee = null; // For unassigning
-        } else if (params.assigneeAccountId) { // Ensure it's a non-empty string
-          fieldsToUpdate.assignee = { accountId: params.assigneeAccountId };
-        }
-        // If assigneeAccountId is an empty string, it's ignored here.
-      }
-      if (params.labels !== undefined) {
-        fieldsToUpdate.labels = params.labels;
+      if (!boardResolutionResult.success && boardResolutionResult.error) { // If error in resolving board
+        throw new Error(boardResolutionResult.error);
       }
 
-      // It's possible fieldsToUpdate is empty if only issueIdOrKey was provided.
-      // The JIRA API might error or do nothing. This is acceptable.
-      // Alternatively, could add a check: if (Object.keys(fieldsToUpdate).length === 0) return { message: "No update fields provided." }
-
-      const serviceParams = {
-        issueIdOrKey: params.issueIdOrKey,
-        fields: fieldsToUpdate
-      };
-      return await updateJiraTicket(context.sessionId, context.companyId, serviceParams);
-    },
-  },
-  addTicketToCurrentSprint: {
-    description: 'Adds a JIRA ticket to the current active sprint on a specified board.',
-    parameters: {
-      type: 'object',
-      properties: {
-        boardId: { type: 'string', description: 'The ID of the JIRA board.' },
-        issueKey: { type: 'string', description: 'The key of the JIRA ticket (e.g., "PROJ-123").' }
-      },
-      required: ['boardId', 'issueKey'],
-      additionalProperties: false,
-    },
-    function: async (params: AddTicketToCurrentSprintArgs): Promise<any> => {
-      return await addTicketToCurrentSprintService(context.sessionId, context.companyId, params);
-    },
-  },
-  searchUsers: {
-    description: 'Searches for JIRA users by query (name, email) or account ID.',
-    parameters: {
-      type: 'object',
-      properties: {
-        query: { type: 'string', description: 'Search query for user name or email.' },
-        startAt: { type: 'number', description: 'Starting index for pagination (default: 0).' },
-        maxResults: { type: 'number', description: 'Maximum number of users to return (default: 50).' },
-        accountId: { type: 'string', description: 'Specific JIRA user account ID to search for.' }
-      },
-      // `required` can be an empty array if no parameters are strictly required for a basic search
-      required: [], 
-      additionalProperties: false, // No other properties allowed
-    },
-    function: async (params: SearchUsersArgs): Promise<any> => {
-      return await searchJiraUsers(context.sessionId, context.companyId, params);
-    },
-  },
-  assignTicket: {
-    description: 'Assigns a JIRA ticket to a specified user account ID, or unassigns it if accountId is null.',
-    parameters: {
-      type: 'object',
-      properties: {
-        issueIdOrKey: { type: 'string', description: 'ID or key of the JIRA ticket.' },
-        accountId: { type: ['string', 'null'], description: 'JIRA user account ID to assign the ticket to. Pass null to unassign.' }
-      },
-      required: ['issueIdOrKey', 'accountId'], // accountId is required, even if null
-      additionalProperties: false,
-    },
-    function: async (params: AssignTicketArgs): Promise<any> => {
-      return await assignJiraTicket(context.sessionId, context.companyId, params);
-    },
-  },
-  getActiveSprintForBoard: {
-    description: 'Gets the active sprint details for a specific JIRA board.',
-    parameters: {
-      type: 'object',
-      properties: {
-        boardId: { type: 'string', description: 'The ID of the JIRA board.' }
-      },
-      required: ['boardId'],
-      additionalProperties: false,
-    },
-    function: async (params: GetActiveSprintForBoardArgs): Promise<any> => {
-      return await getActiveSprintForBoardService(context.sessionId, context.companyId, params);
-    },
-  },
-  getIssuesForSprint: {
-    description: 'Gets issues for a specific JIRA sprint. Supports pagination and field selection.',
-    parameters: {
-      type: 'object',
-      properties: {
-        sprintId: { type: 'string', description: 'The ID of the JIRA sprint.' },
-        projectKey: { type: 'string', description: 'Optional: JIRA project key to further scope issues (if JQL is used by service).' },
-        maxResults: { type: 'number', description: 'Maximum number of issues to fetch (default: 50).' },
-        startAt: { type: 'number', description: 'Starting index for pagination (default: 0).' },
-        fields: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Optional: Array of field names to fetch (e.g., ["summary", "status"]). Defaults to a curated set if omitted.'
-        }
-      },
-      required: ['sprintId'],
-      additionalProperties: false,
-    },
-    function: async (params: GetIssuesForSprintArgs): Promise<any> => {
-      return await getIssuesForSprintService(context.sessionId, context.companyId, {
-        sprintId: params.sprintId,
-        projectKey: params.projectKey,
-        maxResults: params.maxResults,
-        startAt: params.startAt,
-        fieldsToFetch: params.fields
-      });
-    },
-  },
-  moveIssueToSprint: {
-    description: 'Moves a JIRA issue to a specified sprint.',
-    parameters: {
-      type: 'object',
-      properties: {
-        issueKey: { type: 'string', description: 'The key of the JIRA issue (e.g., "PROJ-123").' },
-        targetSprintId: { type: 'string', description: 'The ID of the target JIRA sprint.' }
-      },
-      required: ['issueKey', 'targetSprintId'],
-      additionalProperties: false,
-    },
-    function: async (params: MoveIssueToSprintArgs): Promise<any> => {
-      return await moveIssueToSprintService(context.sessionId, context.companyId, params);
-    },
-  },
-  moveIssueToBacklog: {
-    description: 'Moves a JIRA issue to the backlog.',
-    parameters: {
-      type: 'object',
-      properties: {
-        issueKey: { type: 'string', description: 'The key of the JIRA issue (e.g., "PROJ-123").' }
-      },
-      required: ['issueKey'],
-      additionalProperties: false,
-    },
-    function: async (params: MoveIssueToBacklogArgs): Promise<any> => {
-      return await moveIssueToBacklogService(context.sessionId, context.companyId, params);
-    },
-  },
-  getAvailableTransitions: {
-    description: 'Gets the available workflow transitions for a JIRA issue.',
-    parameters: {
-      type: 'object',
-      properties: {
-        issueIdOrKey: { type: 'string', description: 'The ID or key of the JIRA issue.' }
-      },
-      required: ['issueIdOrKey'],
-      additionalProperties: false,
-    },
-    function: async (params: GetAvailableTransitionsArgs): Promise<any> => {
-      return await getAvailableTransitionsService(context.sessionId, context.companyId, params);
-    },
-  },
-  transitionIssue: {
-    description: 'Transitions a JIRA issue to a new status using a transition ID. Optionally add a comment or set fields like resolution.',
-    parameters: {
-      type: 'object',
-      properties: {
-        issueIdOrKey: { type: 'string', description: 'The ID or key of the JIRA issue.' },
-        transitionId: { type: 'string', description: 'The ID of the workflow transition to perform.' },
-        comment: { type: 'string', description: 'Optional: A comment to add during the transition.' },
-        fields: { 
-          type: 'object', 
-          description: 'Optional: Fields to set during the transition (e.g., resolution: { name: "Done" }). Provide as a JSON object.',
-          additionalProperties: true 
-        }
-      },
-      required: ['issueIdOrKey', 'transitionId'],
-      additionalProperties: false,
-    },
-    function: async (params: TransitionIssueArgs): Promise<StandardActionResult<JiraTransition[]>> => {
-      const result = await transitionIssueService(context.sessionId, context.companyId, params);
-
-      if (result.success) {
-        // The service already returns a compatible structure for StandardActionResult
-        // when result.success is true.
-        // Ensure the returned object strictly matches StandardActionResult.
-        return {
-          success: true, // This must be true
-          message: result.message,
-          data: result.data as JiraTransition[] // Cast data to the expected type
+      // If ambiguous boards, this is a "successful" service call, data contains ambiguousBoards
+      if (boardResolutionResult.success && boardResolutionResult.data?.ambiguousBoards) {
+        return { 
+          success: true, 
+          message: boardResolutionResult.message || `Multiple boards found for project ${params.projectKey}. Please specify one.`,
+          data: { ambiguousBoards: boardResolutionResult.data.ambiguousBoards } // Data for AI to prompt user
         };
-      } else {
-        // If the service returns success: false, throw an error.
-        // (Ideally, services should throw exceptions directly for failures)
-        throw new Error(result.error || 'JIRA transition failed due to an unspecified service error.');
       }
-    },
-  },
-  setStoryPoints: {
-    description: 'Sets or clears the story points for a JIRA issue. Attempts to find the story points field ID automatically.',
-    parameters: {
-      type: 'object',
-      properties: {
-        issueIdOrKey: { type: 'string', description: 'The ID or key of the JIRA issue.' },
-        storyPoints: { 
-          type: ['number', 'null'], 
-          description: 'The number of story points to set. Pass null to clear story points.' 
+
+      if (boardResolutionResult.success && boardResolutionResult.data?.board) {
+        const board = boardResolutionResult.data.board;
+        const sprintsResult = await getSprintsForResolvedBoard(context.companyId, board, params.sprintState);
+        if (sprintsResult.success && sprintsResult.data) {
+          return { success: true, data: { sprints: sprintsResult.data.sprints }, message: sprintsResult.message };
+        } else { // Error fetching sprints for the resolved board
+          throw new Error(sprintsResult.error || `Failed to get sprints for board ${board.name}`);
         }
-      },
-      required: ['issueIdOrKey', 'storyPoints'],
-      additionalProperties: false,
-    },
-    function: async (params: SetStoryPointsArgs): Promise<any> => {
-      return await setStoryPointsService(context.sessionId, context.companyId, params);
+      }
+      // Fallback error if board could not be resolved for other reasons
+      throw new Error(boardResolutionResult.error || 'Could not resolve a board for the project or an unknown error occurred.');
     },
   },
-  getSprintsForBoard: {
-    description: 'Gets sprints for a specific JIRA board, optionally filtered by state (e.g., "active", "future", "closed"). Supports pagination.',
+
+  moveIssuesToProjectSprint: {
+    description: 'Moves specified JIRA issues to a target sprint within a project. Board and sprint are resolved automatically.',
     parameters: {
       type: 'object',
       properties: {
-        boardId: { type: 'string', description: 'The ID of the JIRA board.' },
-        state: { type: 'string', description: 'Optional: Filter sprints by state (e.g., "active", "future", "closed", or "active,future"). Defaults to "active,future".' },
-        startAt: { type: 'number', description: 'Optional: Starting index for pagination (default: 0).' },
-        maxResults: { type: 'number', description: 'Optional: Maximum number of sprints to return (default: 50).' }
+        projectKey: { ...projectKeyParamDefinition, description: projectKeyParamDefinition.description + ' Optional if boardId is provided.' },
+        boardId: { type: 'string', description: 'Optional: Direct JIRA board ID. If provided, projectKey is ignored for board resolution.' },
+        issueKeys: { type: 'array', items: { type: 'string' }, description: 'Array of issue keys to move (e.g., ["PROJ-123", "PROJ-124"]).' },
+        targetSprintDescriptor: {
+          type: 'object', 
+          description: 'Describes the target sprint. Use one of: "active", "next", {sprintId: "ID"}, or {sprintName: "Name"}.',
+          properties: {
+            type: { type: 'string', enum: ['active', 'next', 'sprintId', 'sprintName'], description: 'Type of descriptor.' },
+            value: { type: 'string', description: 'Value for sprintId or sprintName if type is "sprintId" or "sprintName".' }
+          },
+          required: ['type']
+        },
+        jqlQueryForIssues: { type: 'string', description: 'Optional: JQL query to find issues to move. If provided, issueKeys array is ignored.'}
       },
-      required: ['boardId'],
+      // Either issueKeys or jqlQueryForIssues must be present. This is validated in the function logic.
+      // targetSprintDescriptor is required.
+      required: ['targetSprintDescriptor'], 
       additionalProperties: false,
     },
-    function: async (params: GetSprintsForBoardArgs): Promise<any> => {
-      return await getSprintsForBoardService(context.sessionId, context.companyId, params);
+    function: async (params: MoveIssuesToProjectSprintArgs): Promise<StandardActionResult<any>> => {
+      let boardToUse: JiraBoard | undefined;
+
+      if (!params.projectKey && !params.boardId) {
+        throw new Error('Either projectKey or boardId must be provided.');
+      }
+      if (!params.issueKeys?.length && !params.jqlQueryForIssues) {
+          throw new Error('Either issueKeys array or jqlQueryForIssues must be provided.');
+      }
+
+      // 1. Determine Board
+      if (params.boardId) {
+        const boardIdNum = parseInt(params.boardId, 10);
+        if (isNaN(boardIdNum)) throw new Error(`Invalid boardId: ${params.boardId}`);
+        // In a full implementation, one might call a getBoardById service here.
+        // For now, create a partial board object.
+        boardToUse = { id: boardIdNum, name: `Board ${params.boardId}`, type: 'unknown', self: '' }; 
+      } else if (params.projectKey) { // projectKey is asserted to exist if boardId doesn't by the check above
+        const boardResolutionResult = await resolveBoardForProject(context.companyId, params.projectKey);
+        if (!boardResolutionResult.success && boardResolutionResult.error) {
+          throw new Error(boardResolutionResult.error);
+        }
+        if (boardResolutionResult.success && boardResolutionResult.data?.ambiguousBoards) {
+          return { 
+            success: true, // Successful service call, but requires user clarification
+            message: boardResolutionResult.message || `Multiple boards found. Please specify.`,
+            data: { ambiguousBoards: boardResolutionResult.data.ambiguousBoards }
+          };
+        }
+        if (!boardResolutionResult.data?.board) {
+            throw new Error(`Could not resolve a board for project ${params.projectKey}.`);
+        }
+        boardToUse = boardResolutionResult.data.board;
+      }
+
+      if (!boardToUse) { // Should not be reached if logic above is correct
+        throw new Error('Board could not be determined.');
+      }
+
+      // 2. Determine Target Sprint ID
+      let targetSprintId: number | undefined;
+      const descriptor = params.targetSprintDescriptor as any; 
+
+      if (descriptor.type === 'active') {
+        const activeSprintResult = await getSprintsForResolvedBoard(context.companyId, boardToUse, 'active');
+        if (activeSprintResult.success && activeSprintResult.data?.sprints?.length) {
+          targetSprintId = activeSprintResult.data.sprints[0].id;
+        } else {
+          throw new Error(activeSprintResult.error || `No active sprint found for board ${boardToUse.name}.`);
+        }
+      } else if (descriptor.type === 'next') {
+        const futureSprintsResult = await getSprintsForResolvedBoard(context.companyId, boardToUse, 'future');
+        if (futureSprintsResult.success && futureSprintsResult.data?.sprints?.length) {
+          const sortedSprints = [...futureSprintsResult.data.sprints].sort((a, b) => 
+            new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime()
+          );
+          if (sortedSprints.length > 0) {
+            targetSprintId = sortedSprints[0].id;
+          } else {
+            throw new Error(`No future sprints found for board ${boardToUse.name}.`);
+          }
+        } else {
+          throw new Error(futureSprintsResult.error || `No future sprints found for board ${boardToUse.name}.`);
+        }
+      } else if (descriptor.type === 'sprintId' && descriptor.value) {
+        targetSprintId = parseInt(descriptor.value, 10);
+        if (isNaN(targetSprintId)) throw new Error(`Invalid sprintId provided: ${descriptor.value}`);
+      } else if (descriptor.type === 'sprintName' && descriptor.value) {
+        const allSprintsResult = await getSprintsForResolvedBoard(context.companyId, boardToUse, 'active,future,closed');
+        if (allSprintsResult.success && allSprintsResult.data?.sprints) {
+          const foundSprint = allSprintsResult.data.sprints.find(s => s.name.toLowerCase() === descriptor.value.toLowerCase());
+          if (foundSprint) {
+            targetSprintId = foundSprint.id;
+          } else {
+            throw new Error(`Sprint with name "${descriptor.value}" not found on board ${boardToUse.name}.`);
+          }
+        } else {
+          throw new Error(allSprintsResult.error || `Could not fetch sprints to find by name for board ${boardToUse.name}.`);
+        }
+      } else {
+        throw new Error('Invalid targetSprintDescriptor.');
+      }
+
+      if (targetSprintId === undefined) { // Should be caught by specific errors above
+        throw new Error('Target sprint could not be determined.');
+      }
+
+      // 3. Determine Issue Keys
+      let issuesToMoveKeys = params.issueKeys || [];
+      if (params.jqlQueryForIssues) {
+          const projectForJQL = params.projectKey || boardToUse.location?.projectKey;
+          if (!projectForJQL && !params.jqlQueryForIssues.toLowerCase().includes('project =')) {
+              throw new Error('Project key is required for JQL unless JQL specifies the project.');
+          }
+          const jqlResult = await fetchJiraTickets(context.sessionId, context.companyId, { projectKey: projectForJQL, jql: params.jqlQueryForIssues, fieldsToFetch: ['key'] });
+          if (!jqlResult.success || !jqlResult.data) {
+              throw new Error(`Failed to fetch issues with JQL: ${params.jqlQueryForIssues}. ${jqlResult.error || ''}`);
+          }
+          issuesToMoveKeys = jqlResult.data.map((issue: any) => issue.key);
+          if (!issuesToMoveKeys.length) {
+              return { success: true, message: `No issues found matching JQL: ${params.jqlQueryForIssues}. No issues moved.` };
+          }
+      }
+      
+      if (!issuesToMoveKeys.length) { // Check again after potential JQL fetch
+        return { success: true, message: "No issue keys provided or found via JQL to move." };
+      }
+
+      // 4. Move Issues
+      const moveResultsPromises = issuesToMoveKeys.map(issueKey => 
+        moveIssueToSprintService(context.sessionId, context.companyId, {
+          issueKey,
+          targetSprintId: targetSprintId!.toString(), // targetSprintId is confirmed to be defined here
+        }).then(res => ({ issueKey, ...res })) // Add issueKey to result for context
+      );
+      
+      const settledMoveResults = await Promise.allSettled(moveResultsPromises);
+      
+      const finalResults: any[] = [];
+      let allSuccessful = true;
+      settledMoveResults.forEach(settledResult => {
+          if (settledResult.status === 'fulfilled') {
+              finalResults.push(settledResult.value);
+              if (!settledResult.value.success) allSuccessful = false;
+          } else {
+              // Handle rejected promise (should not happen if service returns Result object)
+              finalResults.push({ issueKey: 'unknown', success: false, error: settledResult.reason?.message || 'Move operation failed unexpectedly.' });
+              allSuccessful = false;
+          }
+      });
+
+      const successfulMovesCount = finalResults.filter(r => r.success).length;
+      const failedMovesCount = finalResults.length - successfulMovesCount;
+
+      return {
+        success: allSuccessful, // Overall success if all individual moves were successful
+        message: `Move operation summary: ${successfulMovesCount} issues moved successfully. ${failedMovesCount > 0 ? `${failedMovesCount} issues failed to move.` : ''}`.trim(),
+        data: {
+          targetSprintId,
+          boardId: boardToUse.id,
+          results: finalResults // Array of individual move results
+        }
+      };
     },
   },
-  getTicketFields: {
-    description: 'Gets all available fields in JIRA.',
-    parameters: {
-      type: 'object',
-      properties: {}, // No parameters needed
-      required: [], // Added empty required array
-      additionalProperties: false,
-    },
-    function: async (): Promise<any> => { // No params expected for this action
-      return await getJiraTicketFields(context.sessionId, context.companyId);
-    },
-  },
-  getTicketComments: {
-    description: 'Gets comments for a specific JIRA ticket.',
-    parameters: {
-      type: 'object',
-      properties: {
-        issueIdOrKey: { type: 'string', description: 'ID or key of the JIRA ticket.' },
-        startAt: { type: 'number', description: 'Starting index for pagination (optional).' },
-        maxResults: { type: 'number', description: 'Maximum number of comments to return (optional).' },
-        orderBy: { type: 'string', description: 'Order of comments e.g., "-created" for newest first (optional).' },
-        expand: { type: 'string', description: 'Fields to expand, e.g., "renderedBody" (optional).' }
-      },
-      required: ['issueIdOrKey'],
-      additionalProperties: false,
-    },
-    function: async (params: GetTicketCommentsArgs): Promise<any> => {
-      return await getJiraTicketComments(context.sessionId, context.companyId, params);
-    },
-  },
+  // --- END NEW ACTIONS ---
 });

@@ -1,7 +1,22 @@
-import { ActionContext, FunctionFactory } from '../actions/types';
+import { ActionContext, FunctionFactory, StandardActionResult } from '../actions/types';
 import { ContentTypeIntegrationService } from './content-type.service';
 import { IContentType } from '../../models/ContentType';
 import { Types } from 'mongoose';
+import { executeAction, ExecuteActionOptions } from '../actions/executor';
+import { ActionValidationError, ActionServiceError } from '../../utils/actionErrors';
+
+const SERVICE_NAME = 'contentTypeService';
+
+// Define R types for StandardActionResult<R>
+interface MessageData { message: string; }
+
+// Define S type (service call lambda's response) for executeAction
+interface ServiceLambdaResponse<R_Payload = any> {
+  success: boolean;
+  data?: R_Payload;
+  error?: string; // For service's original error message, if any
+  description?: string; // For executeAction to use if success is false
+}
 
 export const createContentTypeActions = (context: ActionContext): FunctionFactory => ({
   createContentType: {
@@ -28,22 +43,22 @@ export const createContentTypeActions = (context: ActionContext): FunctionFactor
       required: ['name', 'fields'],
       additionalProperties: false,
     },
-    function: async (args: { name: string; fields: Array<{ name: string; type: string; required?: boolean }> }) => {
-      try {
-        const contentTypeData: Partial<IContentType> = {
-          ...args,
-          companyId: new Types.ObjectId(context.companyId)
-        };
-        const contentType = await ContentTypeIntegrationService.createContentType(contentTypeData);
-        return { 
-          success: true, 
-          description: 'Content type created successfully',
-          data: contentType 
-        };
-      } catch (error) {
-        console.error('Error creating content type:', error);
-        return { success: false, description: 'Failed to create content type' };
-      }
+    function: async (args: { name: string; fields: Array<{ name: string; type: string; required?: boolean }> }): Promise<StandardActionResult<IContentType>> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      if (!args.name || !args.fields) throw new ActionValidationError('Name and fields are required.');
+
+      return executeAction<IContentType, ServiceLambdaResponse<IContentType>>(
+        'createContentType',
+        async () => {
+          const contentTypeData: Partial<IContentType> = {
+            ...args,
+            companyId: new Types.ObjectId(context.companyId!)
+          };
+          const contentType = await ContentTypeIntegrationService.createContentType(contentTypeData);
+          return { success: true, data: contentType };
+        },
+        { serviceName: SERVICE_NAME }
+      );
     },
   },
 
@@ -56,18 +71,16 @@ export const createContentTypeActions = (context: ActionContext): FunctionFactor
       required: [],
       additionalProperties: false,
     },
-    function: async () => {
-      try {
-        const contentTypes = await ContentTypeIntegrationService.getAllContentTypes(context.companyId);
-        return { 
-          success: true, 
-          description: 'Content types retrieved successfully',
-          data: contentTypes 
-        };
-      } catch (error) {
-        console.error('Error getting content types:', error);
-        return { success: false, description: 'Failed to retrieve content types' };
-      }
+    function: async (): Promise<StandardActionResult<IContentType[]>> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      return executeAction<IContentType[], ServiceLambdaResponse<IContentType[]>>(
+        'getContentTypes',
+        async () => {
+          const contentTypes = await ContentTypeIntegrationService.getAllContentTypes(context.companyId!);
+          return { success: true, data: contentTypes };
+        },
+        { serviceName: SERVICE_NAME }
+      );
     },
   },
 
@@ -96,22 +109,22 @@ export const createContentTypeActions = (context: ActionContext): FunctionFactor
       required: ['contentTypeId'],
       additionalProperties: false,
     },
-    function: async (args: { contentTypeId: string; name?: string; fields?: Array<{ name: string; type: string; required?: boolean }> }) => {
-      try {
-        const { contentTypeId, ...updateData } = args;
-        const contentType = await ContentTypeIntegrationService.updateContentType(contentTypeId, context.companyId, updateData);
-        if (!contentType) {
-          return { success: false, description: 'Content type not found' };
-        }
-        return { 
-          success: true, 
-          description: 'Content type updated successfully',
-          data: contentType 
-        };
-      } catch (error) {
-        console.error('Error updating content type:', error);
-        return { success: false, description: 'Failed to update content type' };
-      }
+    function: async (args: { contentTypeId: string; name?: string; fields?: Array<{ name: string; type: string; required?: boolean }> }): Promise<StandardActionResult<IContentType>> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      if (!args.contentTypeId) throw new ActionValidationError('contentTypeId is required.');
+      
+      return executeAction<IContentType, ServiceLambdaResponse<IContentType>>(
+        'updateContentType',
+        async () => {
+          const { contentTypeId, ...updateData } = args;
+          const contentType = await ContentTypeIntegrationService.updateContentType(contentTypeId, context.companyId!, updateData);
+          if (!contentType) {
+            throw new ActionServiceError('Content type not found or update failed.', { serviceName: SERVICE_NAME });
+          }
+          return { success: true, data: contentType };
+        },
+        { serviceName: SERVICE_NAME }
+      );
     },
   },
 
@@ -126,20 +139,21 @@ export const createContentTypeActions = (context: ActionContext): FunctionFactor
       required: ['contentTypeId'],
       additionalProperties: false,
     },
-    function: async (args: { contentTypeId: string }) => {
-      try {
-        const result = await ContentTypeIntegrationService.deleteContentType(args.contentTypeId, context.companyId);
-        if (!result) {
-          return { success: false, description: 'Content type not found or could not be deleted' };
-        }
-        return { 
-          success: true, 
-          description: 'Content type deleted successfully' 
-        };
-      } catch (error) {
-        console.error('Error deleting content type:', error);
-        return { success: false, description: 'Failed to delete content type' };
-      }
+    function: async (args: { contentTypeId: string }): Promise<StandardActionResult<MessageData>> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      if (!args.contentTypeId) throw new ActionValidationError('contentTypeId is required.');
+
+      return executeAction<MessageData, ServiceLambdaResponse<MessageData>>(
+        'deleteContentType',
+        async () => {
+          const result = await ContentTypeIntegrationService.deleteContentType(args.contentTypeId, context.companyId!);
+          if (!result) {
+            throw new ActionServiceError('Content type not found or delete failed.', { serviceName: SERVICE_NAME });
+          }
+          return { success: true, data: { message: 'Content type deleted successfully.' } };
+        },
+        { serviceName: SERVICE_NAME }
+      );
     },
   },
 });

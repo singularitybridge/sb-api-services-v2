@@ -12,6 +12,8 @@ import { ChannelType } from '../../types/ChannelType';
 import { IJournal } from '../../models/Journal';
 import { getApiKey } from '../../services/api.key.service';
 import { Types } from 'mongoose';
+import { executeAction } from '../actions/executor';
+import { ActionExecutionError, ActionValidationError } from '../../utils/actionErrors';
 
 interface JournalEntryArgs {
   content: string;
@@ -64,54 +66,45 @@ export const createJournalActions = (
     function: async (args: JournalEntryArgs) => {
       const { content, entryType, tags, metadata } = args;
       const { companyId, sessionId } = context;
+      const actionName = 'createJournalEntry';
 
       if (!sessionId) {
-        return {
-          error: 'Invalid session',
-          message: 'Session ID is required.',
-        };
+        throw new ActionExecutionError('Session ID is required.', { actionName, statusCode: 400 });
+      }
+      // Assuming companyId is guaranteed by ActionContext typing & population
+      // if (!companyId) {
+      //   throw new ActionExecutionError('Company ID is required.', { actionName, statusCode: 400 });
+      // }
+
+      const session = await getSessionById(sessionId);
+      if (!session) {
+        throw new ActionExecutionError('Invalid session.', { actionName, statusCode: 401 });
+      }
+      if (!session.userId) {
+        throw new ActionExecutionError('User ID not found in session.', { actionName, statusCode: 400 });
       }
 
-      try {
-        const session = await getSessionById(sessionId);
+      const apiKey = (await getApiKey(companyId, 'openai_api_key')) || '';
 
-        if (!session) {
-          return {
-            error: 'Invalid session',
-            message: 'Unable to retrieve a valid session.',
-          };
-        }
-
-        if (!session.userId || !companyId) {
-          return {
-            error: 'Missing parameters',
-            message: 'userId and companyId are required to create a journal entry.',
-          };
-        }
-
-        const apiKey = (await getApiKey(companyId, 'openai_api_key')) || '';
-        const result = await createJournalEntry(
-          {
-            content,
-            entryType,
-            tags,
-            metadata,
-            userId: new Types.ObjectId(session.userId),
-            companyId: new Types.ObjectId(companyId),
-          },
-          apiKey,
-          ChannelType.WEB,
-        );
-        return { success: true, data: result };
-      } catch (error) {
-        return {
-          error: 'Create failed',
-          message:
-            error instanceof Error
-              ? error.message
-              : 'An unknown error occurred while creating the journal entry.',
-        };
-      }
+      return executeAction<IJournal>(
+        actionName,
+        async () => {
+          const result = await createJournalEntry(
+            {
+              content,
+              entryType,
+              tags,
+              metadata,
+              userId: new Types.ObjectId(session.userId as string),
+              companyId: new Types.ObjectId(companyId),
+            },
+            apiKey,
+            ChannelType.WEB,
+          );
+          return { success: true, data: result };
+        },
+        { serviceName: 'JournalService' }
+      );
     },
   },
 
@@ -149,50 +142,37 @@ export const createJournalActions = (
       additionalProperties: false,
     },
     function: async ({ query, limit = 10, scope = 'user', entryType, tags }: SearchJournalEntriesArgs) => {
-      try {
-        const { companyId, sessionId } = context;
+      const { companyId, sessionId } = context;
+      const actionName = 'searchJournalEntries';
 
-        if (!sessionId) {
-          return {
-            error: 'Invalid session',
-            message: 'Session ID is required.',
-          };
-        }
-
-        if (!companyId) {
-          return {
-            error: 'Missing parameters',
-            message: 'companyId is required to search journal entries.',
-          };
-        }
-
-        const session = await getSessionById(sessionId);
-
-        if (!session) {
-          return {
-            error: 'Invalid session',
-            message: 'Unable to retrieve a valid session.',
-          };
-        }
-
-        const entries = await searchJournalEntries(
-          query,
-          companyId,
-          scope === 'user' ? session.userId : undefined,
-          entryType,
-          tags,
-          limit
-        );
-        return { success: true, data: entries };
-      } catch (error) {
-        return {
-          error: 'Search failed',
-          message:
-            error instanceof Error
-              ? error.message
-              : 'An unknown error occurred while searching journal entries.',
-        };
+      if (!sessionId) {
+        throw new ActionExecutionError('Session ID is required.', { actionName, statusCode: 400 });
       }
+      // if (!companyId) {
+      //   throw new ActionExecutionError('Company ID is required.', { actionName, statusCode: 400 });
+      // }
+
+      const session = await getSessionById(sessionId);
+      if (!session) {
+        throw new ActionExecutionError('Invalid session.', { actionName, statusCode: 401 });
+      }
+      // session.userId is optional for company scope search, so no explicit check here if scope is 'company'
+
+      return executeAction<IJournal[]>( // Assuming search returns an array of IJournal
+        actionName,
+        async () => {
+          const entries = await searchJournalEntries(
+            query,
+            companyId,
+            scope === 'user' ? session.userId : undefined,
+            entryType,
+            tags,
+            limit
+          );
+          return { success: true, data: entries };
+        },
+        { serviceName: 'JournalService' }
+      );
     },
   },
 
@@ -216,51 +196,40 @@ export const createJournalActions = (
       additionalProperties: false,
     },
     function: async ({ entryType, tags, limit = 25, scope = 'user' }: GetJournalEntriesArgs) => {
-      try {
-        const { companyId, sessionId } = context;
+      const { companyId, sessionId } = context;
+      const actionName = 'getJournalEntries';
 
-        if (!sessionId) {
-          return {
-            error: 'Invalid session',
-            message: 'Session ID is required.',
-          };
-        }
-
-        if (!companyId) {
-          return {
-            error: 'Missing parameters',
-            message: 'companyId is required to get journal entries.',
-          };
-        }
-
-        const session = await getSessionById(sessionId);
-
-        if (!session) {
-          return {
-            error: 'Invalid session',
-            message: 'Unable to retrieve a valid session.',
-          };
-        }
-
-        const entries = await getJournalEntries(
-          session.userId,
-          companyId,
-          undefined,
-          entryType,
-          tags,
-          limit,
-          scope
-        );
-        return { success: true, data: entries };
-      } catch (error) {
-        return {
-          error: 'Fetch failed',
-          message:
-            error instanceof Error
-              ? error.message
-              : 'An unknown error occurred while fetching journal entries.',
-        };
+      if (!sessionId) {
+        throw new ActionExecutionError('Session ID is required.', { actionName, statusCode: 400 });
       }
+      // if (!companyId) {
+      //   throw new ActionExecutionError('Company ID is required.', { actionName, statusCode: 400 });
+      // }
+      
+      const session = await getSessionById(sessionId);
+      if (!session) {
+        throw new ActionExecutionError('Invalid session.', { actionName, statusCode: 401 });
+      }
+      if (!session.userId && scope === 'user') { // userId is required for user scope
+        throw new ActionExecutionError('User ID not found in session for user-scoped query.', { actionName, statusCode: 400 });
+      }
+
+      return executeAction<IJournal[]>( // Assuming get returns an array of IJournal
+        actionName,
+        async () => {
+          const entries = await getJournalEntries(
+            session.userId, // Can be undefined if scope is 'company' and service handles it
+            companyId,
+            undefined, // Assuming this is for a specific context not used here
+            entryType,
+            tags,
+            limit,
+            scope
+          );
+          return { success: true, data: entries };
+        },
+        { serviceName: 'JournalService' }
+      );
     },
   },
 
@@ -284,51 +253,41 @@ export const createJournalActions = (
       additionalProperties: false,
     },
     function: async ({ entryType, tags, limit = 25, scope = 'user' }: GetJournalEntriesArgs) => {
-      try {
-        const { companyId, sessionId } = context;
+      const { companyId, sessionId } = context;
+      const actionName = 'getFriendlyJournalEntries';
 
-        if (!sessionId) {
-          return {
-            error: 'Invalid session',
-            message: 'Session ID is required.',
-          };
-        }
-
-        if (!companyId) {
-          return {
-            error: 'Missing parameters',
-            message: 'companyId is required to get journal entries.',
-          };
-        }
-
-        const session = await getSessionById(sessionId);
-
-        if (!session) {
-          return {
-            error: 'Invalid session',
-            message: 'Unable to retrieve a valid session.',
-          };
-        }
-
-        const entries = await getFriendlyJournalEntries(
-          session.userId,
-          companyId,
-          undefined,
-          entryType,
-          tags,
-          limit,
-          scope
-        );
-        return { success: true, data: entries };
-      } catch (error) {
-        return {
-          error: 'Fetch failed',
-          message:
-            error instanceof Error
-              ? error.message
-              : 'An unknown error occurred while fetching friendly journal entries.',
-        };
+      if (!sessionId) {
+        throw new ActionExecutionError('Session ID is required.', { actionName, statusCode: 400 });
       }
+      // if (!companyId) {
+      //   throw new ActionExecutionError('Company ID is required.', { actionName, statusCode: 400 });
+      // }
+
+      const session = await getSessionById(sessionId);
+      if (!session) {
+        throw new ActionExecutionError('Invalid session.', { actionName, statusCode: 401 });
+      }
+      if (!session.userId && scope === 'user') { // userId is required for user scope
+        throw new ActionExecutionError('User ID not found in session for user-scoped query.', { actionName, statusCode: 400 });
+      }
+      
+      // Assuming FriendlyJournalEntry[] is the return type, using any[] for now
+      return executeAction<any[]>(
+        actionName,
+        async () => {
+          const entries = await getFriendlyJournalEntries(
+            session.userId, // Can be undefined if scope is 'company' and service handles it
+            companyId,
+            undefined, // Assuming this is for a specific context not used here
+            entryType,
+            tags,
+            limit,
+            scope
+          );
+          return { success: true, data: entries };
+        },
+        { serviceName: 'JournalService' }
+      );
     },
   },
 
@@ -347,26 +306,23 @@ export const createJournalActions = (
     },
     function: async (args: UpdateJournalEntryArgs) => {
       const { journalId, updateData } = args;
+      const actionName = 'updateJournalEntry';
 
-      if (!journalId || !updateData) {
-        return {
-          error: 'Missing parameters',
-          message: 'Both journalId and updateData are required.',
-        };
+      if (!journalId) {
+        throw new ActionValidationError('journalId is required.', { fieldErrors: { journalId: 'journalId is required.'} });
+      }
+      if (!updateData || Object.keys(updateData).length === 0) {
+        throw new ActionValidationError('updateData cannot be empty.', { fieldErrors: { updateData: 'updateData cannot be empty.'} });
       }
 
-      try {
-        const result = await updateJournalEntry(journalId, updateData);
-        return { success: true, data: result };
-      } catch (error) {
-        return {
-          error: 'Update failed',
-          message:
-            error instanceof Error
-              ? error.message
-              : 'An unknown error occurred while updating the journal entry.',
-        };
-      }
+      return executeAction<IJournal | null>( // updateJournalEntry might return null if not found, or the updated IJournal
+        actionName,
+        async () => {
+          const result = await updateJournalEntry(journalId, updateData);
+          return { success: true, data: result };
+        },
+        { serviceName: 'JournalService' }
+      );
     },
   },
 
@@ -383,18 +339,20 @@ export const createJournalActions = (
       additionalProperties: false,
     },
     function: async ({ journalId }: { journalId: string }) => {
-      try {
-        const result = await deleteJournalEntry(journalId);
-        return { success: true, data: result };
-      } catch (error) {
-        return {
-          error: 'Delete failed',
-          message:
-            error instanceof Error
-              ? error.message
-              : 'An unknown error occurred while deleting the journal entry.',
-        };
+      const actionName = 'deleteJournalEntry';
+
+      if (!journalId) {
+        throw new ActionValidationError('journalId is required.', { fieldErrors: { journalId: 'journalId is required.'} });
       }
+
+      return executeAction<any>( // Define specific return type if known (e.g., { deletedCount: number } or IJournal | null)
+        actionName,
+        async () => {
+          const result = await deleteJournalEntry(journalId);
+          return { success: true, data: result };
+        },
+        { serviceName: 'JournalService' }
+      );
     },
   },
 });

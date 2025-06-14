@@ -71,23 +71,74 @@ export interface DetailedError {
   message: string;
   name?: string;
   stack?: string;
+  // Properties from ActionExecutionError
+  actionName?: string;
+  originalError?: any;
+  statusCode?: number; // Common, also in ActionValidationError and ActionServiceError
+  // Properties from ActionValidationError
+  fieldErrors?: Record<string, string>;
+  // Properties from ActionServiceError
+  serviceName?: string;
+  serviceResponse?: any;
+  // Generic details bucket
   details?: Record<string, unknown>;
 }
 
+import { ActionExecutionError, ActionValidationError, ActionServiceError, BaseActionError } from '../../utils/actionErrors'; // Import custom errors
+
 export const extractErrorDetails = (error: unknown): DetailedError => {
-  if (error instanceof Error) {
+  if (error instanceof BaseActionError) { // Handle our custom errors first for specific properties
+    const baseDetails: DetailedError = {
+      message: error.message,
+      name: error.name,
+      stack: error.stack,
+    };
+
+    // Add specific properties from custom errors to the top level
+    if (error instanceof ActionExecutionError) {
+      return {
+        ...baseDetails,
+        actionName: error.actionName,
+        originalError: error.originalError, // This might still be complex, consider further processing if needed
+        statusCode: error.statusCode,
+        // Capture any other enumerable properties not explicitly handled, if any
+        details: Object.fromEntries(Object.entries(error).filter(([key]) => !['name', 'message', 'stack', 'actionName', 'originalError', 'statusCode'].includes(key)))
+      };
+    } else if (error instanceof ActionValidationError) {
+      return {
+        ...baseDetails,
+        fieldErrors: error.fieldErrors,
+        statusCode: error.statusCode,
+        details: Object.fromEntries(Object.entries(error).filter(([key]) => !['name', 'message', 'stack', 'fieldErrors', 'statusCode'].includes(key)))
+      };
+    } else if (error instanceof ActionServiceError) {
+      return {
+        ...baseDetails,
+        serviceName: error.serviceName,
+        serviceResponse: error.serviceResponse, // This might still be complex
+        statusCode: error.statusCode,
+        details: Object.fromEntries(Object.entries(error).filter(([key]) => !['name', 'message', 'stack', 'serviceName', 'serviceResponse', 'statusCode'].includes(key)))
+      };
+    }
+    // Fallback for BaseActionError or other derived types not specifically handled above
+    return {
+      ...baseDetails,
+      details: Object.fromEntries(Object.entries(error).filter(([key]) => !['name', 'message', 'stack'].includes(key)))
+    };
+  } else if (error instanceof Error) { // Standard Error
     return {
       message: error.message,
       name: error.name,
       stack: error.stack,
+      // For generic errors, keep other properties in 'details'
       details: Object.fromEntries(Object.entries(error).filter(([key]) => !['name', 'message', 'stack'].includes(key)))
     };
-  } else if (typeof error === 'object' && error !== null) {
+  } else if (typeof error === 'object' && error !== null) { // Plain object error
     return {
       message: String((error as Record<string, unknown>).message || 'Unknown error'),
-      details: error as Record<string, unknown>
+      details: error as Record<string, unknown> // The whole object becomes details
     };
-  } else {
+  } else { // Other types
     return { message: String(error) };
   }
 };

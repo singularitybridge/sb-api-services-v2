@@ -1,40 +1,30 @@
-import { ActionContext, FunctionFactory } from '../actions/types';
+import { ActionContext, FunctionFactory, StandardActionResult } from '../actions/types';
 import * as linearService from './linear.service';
+import { executeAction, ExecuteActionOptions } from '../actions/executor';
+import { ActionValidationError } from '../../utils/actionErrors';
+import { Issue, IssuePayload, User, Team, WorkflowState, CommentPayload } from "@linear/sdk";
 
-interface FetchIssuesArgs {
-  first?: number;
+// Define input argument interfaces
+interface FetchIssuesArgs { first?: number; }
+interface CreateIssueArgs { title: string; description: string; teamId: string; }
+interface UpdateIssueArgs { issueId: string; updateData: { title?: string; status?: string; description?: string; }; }
+interface DeleteIssueArgs { issueId: string; }
+interface FetchIssuesByUserArgs { userId: string; }
+interface FetchIssuesByDateArgs { days: number; }
+interface CreateCommentArgs { issueId: string; body: string; }
+
+// Define R types for StandardActionResult<R>
+interface MessageData { message: string; }
+
+// Define S type (service call lambda's response) for executeAction
+interface ServiceLambdaResponse<R_Payload = any> {
+  success: boolean;
+  data?: R_Payload;
+  error?: string;
+  description?: string;
 }
 
-interface CreateIssueArgs {
-  title: string;
-  description: string;
-  teamId: string;
-}
-
-interface UpdateIssueArgs {
-  issueId: string;
-  updateData: {
-    title?: string;
-    status?: string;
-  };
-}
-
-interface DeleteIssueArgs {
-  issueId: string;
-}
-
-interface FetchIssuesByUserArgs {
-  userId: string;
-}
-
-interface FetchIssuesByDateArgs {
-  days: number;
-}
-
-interface CreateCommentArgs {
-  issueId: string;
-  body: string;
-}
+const SERVICE_NAME = 'linearService';
 
 export const createLinearActions = (context: ActionContext): FunctionFactory => ({
   fetchIssues: {
@@ -51,23 +41,18 @@ export const createLinearActions = (context: ActionContext): FunctionFactory => 
       required: [],
       additionalProperties: false,
     },
-    function: async (args: FetchIssuesArgs) => {
+    function: async (args: FetchIssuesArgs): Promise<StandardActionResult<Issue[]>> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
       const { first = 50 } = args;
-
-      try {
-        const result = await linearService.fetchIssues(context.companyId, first);
-        return {
-          success: true,
-          result: result.data,
-        };
-      } catch (error) {
-        console.error('fetchIssues: Error fetching issues', error);
-        return {
-          success: false,
-          error: 'Failed to fetch issues',
-          message: 'An error occurred while fetching issues from Linear.',
-        };
-      }
+      return executeAction<Issue[], ServiceLambdaResponse<Issue[]>>(
+        'fetchIssues',
+        async () => {
+          const res = await linearService.fetchIssues(context.companyId!, first);
+          // service returns { success: boolean; data?: Issue[]; error?: string }
+          return { ...res, description: res.error }; 
+        },
+        { serviceName: SERVICE_NAME }
+      );
     },
   },
 
@@ -93,23 +78,19 @@ export const createLinearActions = (context: ActionContext): FunctionFactory => 
       required: ['title', 'description', 'teamId'],
       additionalProperties: false,
     },
-    function: async (args: CreateIssueArgs) => {
+    function: async (args: CreateIssueArgs): Promise<StandardActionResult<IssuePayload>> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
       const { title, description, teamId } = args;
-
-      try {
-        const result = await linearService.createIssue(context.companyId, title, description, teamId);
-        return {
-          success: true,
-          result,
-        };
-      } catch (error) {
-        console.error('createLinearIssue: Error creating issue', error);
-        return {
-          success: false,
-          error: 'Failed to create issue',
-          message: 'An error occurred while creating an issue in Linear.',
-        };
-      }
+      if (!title || !description || !teamId) throw new ActionValidationError('Title, description, and teamId are required.');
+      return executeAction<IssuePayload, ServiceLambdaResponse<IssuePayload>>(
+        'createLinearIssue',
+        async () => {
+          const res = await linearService.createIssue(context.companyId!, title, description, teamId);
+          // service returns { success: boolean; data?: IssuePayload; error?: string }
+          return { ...res, description: res.error }; 
+        },
+        { serviceName: SERVICE_NAME }
+      );
     },
   },
 
@@ -130,10 +111,14 @@ export const createLinearActions = (context: ActionContext): FunctionFactory => 
               type: 'string',
               description: 'New title of the issue',
             },
-            status: {
+            status: { // Note: service handles mapping status name to stateId
               type: 'string',
-              description: 'New status of the issue',
+              description: 'New status of the issue (e.g., "Todo", "In Progress")',
             },
+            description: { // Added to interface, ensure service supports it
+                type: 'string',
+                description: 'New description for the issue'
+            }
           },
           description: 'Data to update in the issue',
         },
@@ -141,23 +126,19 @@ export const createLinearActions = (context: ActionContext): FunctionFactory => 
       required: ['issueId', 'updateData'],
       additionalProperties: false,
     },
-    function: async (args: UpdateIssueArgs) => {
+    function: async (args: UpdateIssueArgs): Promise<StandardActionResult<MessageData>> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
       const { issueId, updateData } = args;
-
-      try {
-        await linearService.updateIssue(context.companyId, issueId, updateData);
-        return {
-          success: true,
-          result: { message: 'Issue updated successfully' },
-        };
-      } catch (error) {
-        console.error('updateLinearIssue: Error updating issue', error);
-        return {
-          success: false,
-          error: 'Failed to update issue',
-          message: 'An error occurred while updating the issue in Linear.',
-        };
-      }
+      if (!issueId || !updateData) throw new ActionValidationError('issueId and updateData are required.');
+      return executeAction<MessageData, ServiceLambdaResponse<MessageData>>(
+        'updateLinearIssue',
+        async () => {
+          const res = await linearService.updateIssue(context.companyId!, issueId, updateData);
+          // service returns { success: boolean; error?: string }
+          return { ...res, description: res.error, data: res.success ? { message: 'Issue updated successfully' } : undefined };
+        },
+        { serviceName: SERVICE_NAME }
+      );
     },
   },
 
@@ -175,23 +156,18 @@ export const createLinearActions = (context: ActionContext): FunctionFactory => 
       required: ['issueId'],
       additionalProperties: false,
     },
-    function: async (args: DeleteIssueArgs) => {
-      const { issueId } = args;
-
-      try {
-        await linearService.deleteIssue(context.companyId, issueId);
-        return {
-          success: true,
-          result: { message: 'Issue deleted successfully' },
-        };
-      } catch (error) {
-        console.error('deleteLinearIssue: Error deleting issue', error);
-        return {
-          success: false,
-          error: 'Failed to delete issue',
-          message: 'An error occurred while deleting the issue from Linear.',
-        };
-      }
+    function: async (args: DeleteIssueArgs): Promise<StandardActionResult<MessageData>> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      if (!args.issueId) throw new ActionValidationError('issueId is required.');
+      return executeAction<MessageData, ServiceLambdaResponse<MessageData>>(
+        'deleteLinearIssue',
+        async () => {
+          const res = await linearService.deleteIssue(context.companyId!, args.issueId);
+          // service returns { success: boolean; error?: string }
+          return { ...res, description: res.error, data: res.success ? { message: 'Issue deleted successfully' } : undefined };
+        },
+        { serviceName: SERVICE_NAME }
+      );
     },
   },
 
@@ -204,21 +180,16 @@ export const createLinearActions = (context: ActionContext): FunctionFactory => 
       required: [],
       additionalProperties: false,
     },
-    function: async () => {
-      try {
-        const result = await linearService.fetchAllIssues(context.companyId);
-        return {
-          success: true,
-          result: result.data,
-        };
-      } catch (error) {
-        console.error('fetchAllLinearIssues: Error fetching all issues', error);
-        return {
-          success: false,
-          error: 'Failed to fetch all issues',
-          message: 'An error occurred while fetching all issues from Linear.',
-        };
-      }
+    function: async (): Promise<StandardActionResult<Issue[]>> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      return executeAction<Issue[], ServiceLambdaResponse<Issue[]>>(
+        'fetchAllLinearIssues',
+        async () => {
+          const res = await linearService.fetchAllIssues(context.companyId!);
+          return { ...res, description: res.error };
+        },
+        { serviceName: SERVICE_NAME }
+      );
     },
   },
 
@@ -236,23 +207,17 @@ export const createLinearActions = (context: ActionContext): FunctionFactory => 
       required: ['userId'],
       additionalProperties: false,
     },
-    function: async (args: FetchIssuesByUserArgs) => {
-      const { userId } = args;
-
-      try {
-        const result = await linearService.fetchIssuesByUser(context.companyId, userId);
-        return {
-          success: true,
-          result,
-        };
-      } catch (error) {
-        console.error('fetchLinearIssuesByUser: Error fetching issues by user', error);
-        return {
-          success: false,
-          error: 'Failed to fetch issues by user',
-          message: 'An error occurred while fetching issues for the specified user from Linear.',
-        };
-      }
+    function: async (args: FetchIssuesByUserArgs): Promise<StandardActionResult<Issue[]>> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      if (!args.userId) throw new ActionValidationError('userId is required.');
+      return executeAction<Issue[], ServiceLambdaResponse<Issue[]>>(
+        'fetchLinearIssuesByUser',
+        async () => {
+          const res = await linearService.fetchIssuesByUser(context.companyId!, args.userId);
+          return { ...res, description: res.error };
+        },
+        { serviceName: SERVICE_NAME }
+      );
     },
   },
 
@@ -270,23 +235,17 @@ export const createLinearActions = (context: ActionContext): FunctionFactory => 
       required: ['days'],
       additionalProperties: false,
     },
-    function: async (args: FetchIssuesByDateArgs) => {
-      const { days } = args;
-
-      try {
-        const result = await linearService.fetchIssuesByDate(context.companyId, days);
-        return {
-          success: true,
-          result,
-        };
-      } catch (error) {
-        console.error('fetchLinearIssuesByDate: Error fetching issues by date', error);
-        return {
-          success: false,
-          error: 'Failed to fetch issues by date',
-          message: 'An error occurred while fetching issues within the specified date range from Linear.',
-        };
-      }
+    function: async (args: FetchIssuesByDateArgs): Promise<StandardActionResult<Issue[]>> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      if (args.days === undefined || typeof args.days !== 'number' || args.days <=0) throw new ActionValidationError('days parameter is required and must be a positive number.');
+      return executeAction<Issue[], ServiceLambdaResponse<Issue[]>>(
+        'fetchLinearIssuesByDate',
+        async () => {
+          const res = await linearService.fetchIssuesByDate(context.companyId!, args.days);
+          return { ...res, description: res.error };
+        },
+        { serviceName: SERVICE_NAME }
+      );
     },
   },
 
@@ -299,21 +258,16 @@ export const createLinearActions = (context: ActionContext): FunctionFactory => 
       required: [],
       additionalProperties: false,
     },
-    function: async () => {
-      try {
-        const result = await linearService.fetchUserList(context.companyId);
-        return {
-          success: true,
-          result,
-        };
-      } catch (error) {
-        console.error('fetchLinearUserList: Error fetching user list', error);
-        return {
-          success: false,
-          error: 'Failed to fetch user list',
-          message: 'An error occurred while fetching the list of users from Linear.',
-        };
-      }
+    function: async (): Promise<StandardActionResult<User[]>> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      return executeAction<User[], ServiceLambdaResponse<User[]>>(
+        'fetchLinearUserList',
+        async () => {
+          const res = await linearService.fetchUserList(context.companyId!);
+          return { ...res, description: res.error };
+        },
+        { serviceName: SERVICE_NAME }
+      );
     },
   },
 
@@ -326,21 +280,16 @@ export const createLinearActions = (context: ActionContext): FunctionFactory => 
       required: [],
       additionalProperties: false,
     },
-    function: async () => {
-      try {
-        const result = await linearService.fetchTeams(context.companyId);
-        return {
-          success: true,
-          result,
-        };
-      } catch (error) {
-        console.error('fetchLinearTeams: Error fetching teams', error);
-        return {
-          success: false,
-          error: 'Failed to fetch teams',
-          message: 'An error occurred while fetching the list of teams from Linear.',
-        };
-      }
+    function: async (): Promise<StandardActionResult<Team[]>> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      return executeAction<Team[], ServiceLambdaResponse<Team[]>>(
+        'fetchLinearTeams',
+        async () => {
+          const res = await linearService.fetchTeams(context.companyId!);
+          return { ...res, description: res.error };
+        },
+        { serviceName: SERVICE_NAME }
+      );
     },
   },
 
@@ -353,21 +302,16 @@ export const createLinearActions = (context: ActionContext): FunctionFactory => 
       required: [],
       additionalProperties: false,
     },
-    function: async () => {
-      try {
-        const result = await linearService.fetchIssueStatuses(context.companyId);
-        return {
-          success: true,
-          result,
-        };
-      } catch (error) {
-        console.error('fetchIssueStatuses: Error fetching issue statuses', error);
-        return {
-          success: false,
-          error: 'Failed to fetch issue statuses',
-          message: 'An error occurred while fetching issue statuses from Linear.',
-        };
-      }
+    function: async (): Promise<StandardActionResult<WorkflowState[]>> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      return executeAction<WorkflowState[], ServiceLambdaResponse<WorkflowState[]>>(
+        'fetchIssueStatuses',
+        async () => {
+          const res = await linearService.fetchIssueStatuses(context.companyId!);
+          return { ...res, description: res.error };
+        },
+        { serviceName: SERVICE_NAME }
+      );
     },
   },
 
@@ -389,23 +333,18 @@ export const createLinearActions = (context: ActionContext): FunctionFactory => 
       required: ['issueId', 'body'],
       additionalProperties: false,
     },
-    function: async (args: CreateCommentArgs) => {
+    function: async (args: CreateCommentArgs): Promise<StandardActionResult<CommentPayload>> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
       const { issueId, body } = args;
-
-      try {
-        const result = await linearService.createComment(context.companyId, issueId, body);
-        return {
-          success: true,
-          result,
-        };
-      } catch (error) {
-        console.error('createLinearComment: Error creating comment', error);
-        return {
-          success: false,
-          error: 'Failed to create comment',
-          message: 'An error occurred while creating a comment on the Linear issue.',
-        };
-      }
+      if (!issueId || !body) throw new ActionValidationError('issueId and body are required.');
+      return executeAction<CommentPayload, ServiceLambdaResponse<CommentPayload>>(
+        'createLinearComment',
+        async () => {
+          const res = await linearService.createComment(context.companyId!, issueId, body);
+          return { ...res, description: res.error };
+        },
+        { serviceName: SERVICE_NAME }
+      );
     },
   },
 });

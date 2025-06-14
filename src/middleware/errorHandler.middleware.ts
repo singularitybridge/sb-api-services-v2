@@ -2,9 +2,46 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { CustomError } from '../utils/errors';
+import { ActionExecutionError, ActionServiceError, ActionValidationError, BaseActionError } from '../utils/actionErrors';
 
 export const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunction) => {
-  console.error('Error:', err);
+  console.error('Error Details:', err); // Enhanced logging
+
+  // Handle specific custom action errors first
+  if (err instanceof ActionValidationError) {
+    return res.status(err.statusCode).json({
+      message: err.message,
+      error: err.name,
+      fieldErrors: err.fieldErrors,
+    });
+  }
+
+  if (err instanceof ActionServiceError) {
+    return res.status(err.statusCode).json({
+      message: err.message,
+      error: err.name,
+      serviceName: err.serviceName,
+      serviceResponse: err.serviceResponse,
+    });
+  }
+
+  if (err instanceof ActionExecutionError) {
+    return res.status(err.statusCode).json({
+      message: err.message,
+      error: err.name,
+      actionName: err.actionName,
+      // Consider whether to expose originalError details; might be too verbose or sensitive
+      // originalError: err.originalError ? { name: err.originalError.name, message: err.originalError.message } : undefined,
+    });
+  }
+  
+  // Fallback for any other BaseActionError
+  if (err instanceof BaseActionError) {
+    return res.status((err as any).statusCode || 500).json({ // Cast to any if statusCode is not on BaseActionError directly
+      message: err.message,
+      error: err.name,
+    });
+  }
 
   // Check for AI_APICallError specifically
   // We can check for a unique property or a symbol if available.

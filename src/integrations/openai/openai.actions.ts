@@ -5,6 +5,8 @@ import { getO1CompletionResponse } from '../../services/oai.completion.service';
 import { getApiKey } from '../../services/api.key.service';
 import { getFileContent } from '../code_indexer/code_indexer.service';
 import OpenAI from 'openai';
+import { executeAction } from '../actions/executor';
+import { ActionExecutionError, ActionValidationError } from '../../utils/actionErrors';
 
 type OpenAIVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 type OpenAIModel = 'tts-1' | 'tts-1-hd';
@@ -76,17 +78,20 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
       additionalProperties: false,
     },
     function: async ({ text, voice = 'alloy', model = 'tts-1-hd', textLimit = 256, filename }: GenerateSpeechArgs) => {
-      try {
-        const apiKey = await getApiKey(context.companyId, 'openai_api_key');
-        if (!apiKey) {
-          return { success: false, error: 'OpenAI API key is missing' };
-        }
-        const audioUrl = await generateSpeech(apiKey, text, voice, model, textLimit, filename);
-        return { success: true, data: { audioUrl } };
-      } catch (error) {
-        console.error('Error in generateOpenAiSpeech:', error);
-        return { success: false, error: 'Failed to generate speech with OpenAI' };
+      const actionName = 'generateOpenAiSpeech';
+      const apiKey = await getApiKey(context.companyId, 'openai_api_key');
+      if (!apiKey) {
+        throw new ActionExecutionError('OpenAI API key is missing for this company.', { actionName, statusCode: 400 });
       }
+
+      return executeAction<{ audioUrl: string }>(
+        actionName,
+        async () => {
+          const audioUrl = await generateSpeech(apiKey, text, voice, model, textLimit, filename);
+          return { success: true, data: { audioUrl } };
+        },
+        { serviceName: 'OpenAIService' }
+      );
     },
   },
   transcribeAudioWhisperFromURL: {
@@ -108,17 +113,20 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
       additionalProperties: false,
     },
     function: async ({ audioUrl, language }: TranscribeAudioArgs) => {
-      try {
-        const apiKey = await getApiKey(context.companyId, 'openai_api_key');
-        if (!apiKey) {
-          return { success: false, error: 'OpenAI API key is missing' };
-        }
-        const transcription = await transcribeAudioWhisperFromURL(apiKey, audioUrl, language);
-        return { success: true, data: { transcription } };
-      } catch (error) {
-        console.error('Error in transcribeAudioWhisperFromURL:', error);
-        return { success: false, error: 'Failed to transcribe audio with OpenAI Whisper' };
+      const actionName = 'transcribeAudioWhisperFromURL';
+      const apiKey = await getApiKey(context.companyId, 'openai_api_key');
+      if (!apiKey) {
+        throw new ActionExecutionError('OpenAI API key is missing for this company.', { actionName, statusCode: 400 });
       }
+
+      return executeAction<{ transcription: string }>(
+        actionName,
+        async () => {
+          const transcription = await transcribeAudioWhisperFromURL(apiKey, audioUrl, language);
+          return { success: true, data: { transcription } };
+        },
+        { serviceName: 'OpenAIService' }
+      );
     },
   },
   askO1Model: {
@@ -141,22 +149,28 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
       additionalProperties: false,
     },
     function: async ({ question, model }: AskO1ModelArgs) => {
-      try {
-        const allowedModels: O1Model[] = ['o1-preview', 'o1-mini'];
-        if (!allowedModels.includes(model)) {
-          return { success: false, error: `Invalid model specified. Allowed models are ${allowedModels.join(', ')}` };
-        }
-        const apiKey = await getApiKey(context.companyId, 'openai_api_key');
-        if (!apiKey) {
-          return { success: false, error: 'OpenAI API key is missing' };
-        }
-        const messages: O1Message[] = [{ role: 'user', content: question }];
-        const responseText = await getO1CompletionResponse(apiKey, messages, model);
-        return { success: true, data: { response: responseText } };
-      } catch (error) {
-        console.error('Error in askO1Model:', error);
-        return { success: false, error: 'Failed to get response from OpenAI o1 model' };
+      const actionName = 'askO1Model';
+      const allowedModels: O1Model[] = ['o1-preview', 'o1-mini'];
+      if (!allowedModels.includes(model)) {
+        throw new ActionValidationError(`Invalid model specified. Allowed models are ${allowedModels.join(', ')}`, {
+          fieldErrors: { model: `Invalid model. Allowed: ${allowedModels.join(', ')}` },
+        });
       }
+
+      const apiKey = await getApiKey(context.companyId, 'openai_api_key');
+      if (!apiKey) {
+        throw new ActionExecutionError('OpenAI API key is missing for this company.', { actionName, statusCode: 400 });
+      }
+
+      return executeAction<{ response: string }>(
+        actionName,
+        async () => {
+          const messages: O1Message[] = [{ role: 'user', content: question }];
+          const responseText = await getO1CompletionResponse(apiKey, messages, model);
+          return { success: true, data: { response: responseText } };
+        },
+        { serviceName: 'OpenAIService' }
+      );
     },
   },
   askO1ModelWithFiles: {
@@ -184,29 +198,30 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
       additionalProperties: false,
     },
     function: async ({ question, model, filePaths }: AskO1ModelWithFilesArgs) => {
-      try {
-        const allowedModels: O1Model[] = ['o1-preview', 'o1-mini'];
-        if (!allowedModels.includes(model)) {
-          return { success: false, error: `Invalid model specified. Allowed models are ${allowedModels.join(', ')}` };
-        }
-
-        const apiKey = await getApiKey(context.companyId, 'openai_api_key');
-        if (!apiKey) {
-          return { success: false, error: 'OpenAI API key is missing' };
-        }
-
-        let combinedContext = await loadAndProcessFiles(filePaths);
-        combinedContext = truncateContextIfNecessary(combinedContext, question);
-
-        const messages: O1Message[] = [{ role: 'user', content: `${combinedContext}\n\nQuestion: ${question}` }];
-
-        const responseText = await getO1CompletionResponse(apiKey, messages, model);
-
-        return { success: true, data: { response: responseText } };
-      } catch (error) {
-        console.error('Error in askO1ModelWithFiles:', error);
-        return { success: false, error: 'Failed to get response from OpenAI O1 model' };
+      const actionName = 'askO1ModelWithFiles';
+      const allowedModels: O1Model[] = ['o1-preview', 'o1-mini'];
+      if (!allowedModels.includes(model)) {
+        throw new ActionValidationError(`Invalid model specified. Allowed models are ${allowedModels.join(', ')}`, {
+          fieldErrors: { model: `Invalid model. Allowed: ${allowedModels.join(', ')}` },
+        });
       }
+
+      const apiKey = await getApiKey(context.companyId, 'openai_api_key');
+      if (!apiKey) {
+        throw new ActionExecutionError('OpenAI API key is missing for this company.', { actionName, statusCode: 400 });
+      }
+
+      return executeAction<{ response: string }>(
+        actionName,
+        async () => {
+          let combinedContext = await loadAndProcessFiles(filePaths);
+          combinedContext = truncateContextIfNecessary(combinedContext, question);
+          const messages: O1Message[] = [{ role: 'user', content: `${combinedContext}\n\nQuestion: ${question}` }];
+          const responseText = await getO1CompletionResponse(apiKey, messages, model);
+          return { success: true, data: { response: responseText } };
+        },
+        { serviceName: 'OpenAIService' }
+      );
     },
   },
 });

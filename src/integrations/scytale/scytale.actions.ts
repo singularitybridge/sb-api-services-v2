@@ -1,5 +1,15 @@
 import { ActionContext, FunctionFactory } from '../actions/types';
 import { getQuestionnaires, getQuestionnaireById } from './scytale.service';
+import { executeAction } from '../actions/executor';
+import { ActionValidationError, ActionExecutionError } from '../../utils/actionErrors'; // Added ActionExecutionError just in case, though ActionServiceError is primary from executeAction
+
+// Assuming types for the data payload
+interface ScytaleQuestionnaire {
+  // Define structure based on actual questionnaire object
+  id: string;
+  name: string;
+  // ... other properties
+}
 
 interface GetQuestionnaireByIdArgs {
   questionnaireId: string;
@@ -15,16 +25,24 @@ export const createScytaleActions = (context: ActionContext): FunctionFactory =>
       additionalProperties: false,
     },
     function: async () => {
-      // The service function expects sessionId and companyId, which are in the context
-      const serviceResponse = await getQuestionnaires(context.sessionId, context.companyId);
-      if (!serviceResponse.success) {
-        // If the service function explicitly returned success: false, throw its error.
-        // If the service function threw an error (e.g., network issue, non-2xx response),
-        // that error would have been caught by the executor already.
-        throw new Error(serviceResponse.error || 'Failed to get questionnaires from Scytale AI');
-      }
-      // On success, return the entire object from the service, including { success: true, data: ... }
-      return serviceResponse;
+      const actionName = 'getQuestionnaires';
+      // Assuming context.sessionId and context.companyId are validated/guaranteed by the framework
+      // If not, add checks here:
+      // if (!context.sessionId) throw new ActionExecutionError('Session ID is missing', { actionName, statusCode: 400 });
+      // if (!context.companyId) throw new ActionExecutionError('Company ID is missing', { actionName, statusCode: 400 });
+
+      return executeAction<ScytaleQuestionnaire[]>(
+        actionName,
+        async () => {
+          const serviceResult = await getQuestionnaires(context.sessionId, context.companyId);
+          // Adapt if serviceResult uses 'error' for message instead of 'description'
+          if (!serviceResult.success && serviceResult.error) {
+            return { success: false, description: serviceResult.error, data: serviceResult.data };
+          }
+          return serviceResult; // executeAction expects { success, data, description? }
+        },
+        { serviceName: 'ScytaleService' }
+      );
     },
   },
   getQuestionnaire: {
@@ -38,12 +56,26 @@ export const createScytaleActions = (context: ActionContext): FunctionFactory =>
       additionalProperties: false,
     },
     function: async (params: GetQuestionnaireByIdArgs) => {
-      const serviceResponse = await getQuestionnaireById(context.sessionId, context.companyId, params.questionnaireId);
-      if (!serviceResponse.success) {
-        throw new Error(serviceResponse.error || `Failed to get questionnaire ${params.questionnaireId} from Scytale AI`);
+      const actionName = 'getQuestionnaire';
+      if (!params.questionnaireId) {
+        throw new ActionValidationError('questionnaireId is required.', {
+          fieldErrors: { questionnaireId: 'questionnaireId is required.' },
+        });
       }
-      // On success, return the entire object from the service
-      return serviceResponse;
+      // Assuming context.sessionId and context.companyId are validated/guaranteed
+
+      return executeAction<ScytaleQuestionnaire>(
+        actionName,
+        async () => {
+          const serviceResult = await getQuestionnaireById(context.sessionId, context.companyId, params.questionnaireId);
+          // Adapt if serviceResult uses 'error' for message instead of 'description'
+          if (!serviceResult.success && serviceResult.error) {
+            return { success: false, description: serviceResult.error, data: serviceResult.data };
+          }
+          return serviceResult; // executeAction expects { success, data, description? }
+        },
+        { serviceName: 'ScytaleService' }
+      );
     },
   },
 });
