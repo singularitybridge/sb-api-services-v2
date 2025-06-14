@@ -9,11 +9,25 @@ import {
   dryRunScanCodeProject,
 } from './code_indexer.service';
 import { CodeFileSummary } from './code_indexer.types';
+import { executeAction } from '../actions/executor';
+import { ActionExecutionError } from '../../utils/actionErrors'; // ActionValidationError might be used if specific arg validation is needed
 
-const handleError = (error: unknown, errorMessage: string) => ({
-  success: false,
-  error: error instanceof Error ? error.message : errorMessage,
-});
+// Define data shapes for StandardActionResult for clarity
+interface DryRunScanResultData {
+  scannedFiles: any[]; // Replace any[] with actual type if known (e.g., string[] or specific file info type)
+}
+interface QueryRelevantFilesData {
+  files: CodeFileSummary[];
+}
+interface GetFileContentData {
+  content: string;
+}
+interface ListIndexedFilesData {
+  files: CodeFileSummary[];
+}
+
+// handleError is no longer needed as executeAction will handle errors.
+// const handleError = (error: unknown, errorMessage: string) => ({ ... });
 
 export const createCodeIndexerActions = (context: ActionContext): FunctionFactory => ({
   scanCodeProject: {
@@ -45,13 +59,15 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
       additionalProperties: false,
     },
     function: async (params) => {
-      try {
-        await scanCodeProject({ ...params, companyId: context.companyId });
-        return { success: true };
-      } catch (error) {
-        console.error('Error scanning code project:', error);
-        return handleError(error, 'Error scanning code project');
-      }
+      const actionName = 'scanCodeProject';
+      return executeAction<void>( // No specific data returned on success
+        actionName,
+        async () => {
+          await scanCodeProject({ ...params, companyId: context.companyId });
+          return { success: true };
+        },
+        { serviceName: 'CodeIndexerService' }
+      );
     },
   },
 
@@ -84,13 +100,16 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
       additionalProperties: false,
     },
     function: async (params) => {
-      try {
-        const scannedFiles = await dryRunScanCodeProject(params);
-        return { success: true, scannedFiles };
-      } catch (error) {
-        console.error('Error performing dry run scan of code project:', error);
-        return handleError(error, 'Error performing dry run scan of code project');
-      }
+      const actionName = 'dryRunScanCodeProject';
+      return executeAction<DryRunScanResultData>(
+        actionName,
+        async () => {
+          const scannedFiles = await dryRunScanCodeProject(params);
+          // Original action returned { success: true, scannedFiles }, so data should be { scannedFiles }
+          return { success: true, data: { scannedFiles } };
+        },
+        { serviceName: 'CodeIndexerService' }
+      );
     },
   },
 
@@ -107,13 +126,16 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
       additionalProperties: false,
     },
     function: async (params) => {
-      try {
-        const files = await queryRelevantFiles(params.taskDescription, context.companyId, params.limit);
-        return { success: true, files };
-      } catch (error) {
-        console.error('Error querying relevant files:', error);
-        return handleError(error, 'Error querying relevant files');
-      }
+      const actionName = 'queryRelevantFiles';
+      return executeAction<QueryRelevantFilesData>(
+        actionName,
+        async () => {
+          const files = await queryRelevantFiles(params.taskDescription, context.companyId, params.limit);
+          // Original action returned { success: true, files }, so data should be { files }
+          return { success: true, data: { files } };
+        },
+        { serviceName: 'CodeIndexerService' }
+      );
     },
   },
 
@@ -129,13 +151,16 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
       additionalProperties: false,
     },
     function: async (params) => {
-      try {
-        const content = await getFileContent(params.filePath);
-        return { success: true, content };
-      } catch (error) {
-        console.error('Error getting file content:', error);
-        return handleError(error, 'Error getting file content');
-      }
+      const actionName = 'getFileContent';
+      return executeAction<GetFileContentData>(
+        actionName,
+        async () => {
+          const content = await getFileContent(params.filePath);
+          // Original action returned { success: true, content }, so data should be { content }
+          return { success: true, data: { content } };
+        },
+        { serviceName: 'CodeIndexerService' }
+      );
     },
   },
 
@@ -152,13 +177,15 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
       additionalProperties: false,
     },
     function: async (params) => {
-      try {
-        await editAndSaveFile(params.filePath, params.newContent);
-        return { success: true };
-      } catch (error) {
-        console.error('Error editing and saving file:', error);
-        return handleError(error, 'Error editing and saving file');
-      }
+      const actionName = 'editAndSaveFile';
+      return executeAction<void>( // No specific data returned on success
+        actionName,
+        async () => {
+          await editAndSaveFile(params.filePath, params.newContent);
+          return { success: true };
+        },
+        { serviceName: 'CodeIndexerService' }
+      );
     },
   },
 
@@ -174,13 +201,16 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
       additionalProperties: false,
     },
     function: async (params) => {
-      try {
-        const files = await listIndexedFiles(context.companyId, params.limit);
-        return { success: true, files };
-      } catch (error) {
-        console.error('Error listing indexed files:', error);
-        return handleError(error, 'Error listing indexed files');
-      }
+      const actionName = 'listIndexedFiles';
+      return executeAction<ListIndexedFilesData>(
+        actionName,
+        async () => {
+          const files = await listIndexedFiles(context.companyId, params.limit);
+          // Original action returned { success: true, files }, so data should be { files }
+          return { success: true, data: { files } };
+        },
+        { serviceName: 'CodeIndexerService' }
+      );
     },
   },
 
@@ -194,13 +224,18 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
       additionalProperties: false,
     },
     function: async () => {
-      try {
-        await clearIndexedFiles(context.companyId);
-        return { success: true, message: 'Indexed files cleared successfully' };
-      } catch (error) {
-        console.error('Error clearing indexed files:', error);
-        return handleError(error, 'Error clearing indexed files');
-      }
+      const actionName = 'clearIndexedFiles';
+      return executeAction<void>( // No specific data, success message handled by executeAction option
+        actionName,
+        async () => {
+          await clearIndexedFiles(context.companyId);
+          return { success: true };
+        },
+        { 
+          serviceName: 'CodeIndexerService',
+          successMessage: 'Indexed files cleared successfully' 
+        }
+      );
     },
   },
 });

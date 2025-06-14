@@ -1,5 +1,13 @@
 import { ActionContext, FunctionFactory } from '../actions/types';
 import { getUiContext, executeUiMethod } from './agent_ui.service';
+import { executeAction } from '../actions/executor';
+import { ActionValidationError, ActionExecutionError } from '../../utils/actionErrors';
+
+// Define expected data shapes for StandardActionResult for clarity
+interface UiContextData {
+  uiContext: any; // Replace 'any' with the actual type of UI context
+}
+type UiMethodResult = any; // Replace 'any' with the actual type of UI method result
 
 interface ExecuteUiMethodArgs {
   method: string;
@@ -18,20 +26,24 @@ export const createAgentUiActions = (context: ActionContext): FunctionFactory =>
       additionalProperties: false,
     },
     function: async () => {
-      const result = await getUiContext(context.companyId);
-      
-      if (!result.success) {
-        return {
-          success: false,
-          error: result.error || 'Failed to get UI context',
-          message: 'An error occurred while getting the UI context.',
-        };
-      }
+      const actionName = 'getUiContext';
+      // Assuming context.companyId is validated/guaranteed by the framework
 
-      return {
-        success: true,
-        data: { uiContext: result.data }
-      };
+      return executeAction<UiContextData>(
+        actionName,
+        async () => {
+          const serviceResult = await getUiContext(context.companyId);
+          if (!serviceResult.success && serviceResult.error) {
+            return { success: false, description: serviceResult.error, data: serviceResult.data };
+          }
+          if (serviceResult.success) {
+            return { success: true, data: { uiContext: serviceResult.data } };
+          }
+          // Fallback for unexpected serviceResult structure, though executeAction would likely treat it as error
+          return serviceResult; 
+        },
+        { serviceName: 'AgentUIService' }
+      );
     },
   },
 
@@ -60,29 +72,28 @@ export const createAgentUiActions = (context: ActionContext): FunctionFactory =>
     },
     function: async (args: ExecuteUiMethodArgs) => {
       const { method, pageId, params } = args;
+      const actionName = 'executeUiMethod';
 
-      if (!method || !pageId) {
-        return {
-          success: false,
-          error: 'Invalid parameters',
-          message: 'Method and pageId are required.',
-        };
+      if (!method) {
+        throw new ActionValidationError('Method is required.', { fieldErrors: { method: 'Method is required.' } });
       }
-
-      const result = await executeUiMethod(context.companyId, { method, pageId, params });
-      
-      if (!result.success) {
-        return {
-          success: false,
-          error: result.error || 'Failed to execute UI method',
-          message: 'An error occurred while executing the UI method.',
-        };
+      if (!pageId) {
+        throw new ActionValidationError('pageId is required.', { fieldErrors: { pageId: 'pageId is required.' } });
       }
+      // Assuming context.companyId is validated/guaranteed
 
-      return {
-        success: true,
-        data: result.data
-      };
+      return executeAction<UiMethodResult>(
+        actionName,
+        async () => {
+          const serviceResult = await executeUiMethod(context.companyId, { method, pageId, params });
+          if (!serviceResult.success && serviceResult.error) {
+            return { success: false, description: serviceResult.error, data: serviceResult.data };
+          }
+          // On success, serviceResult.data is used directly by executeAction by default.
+          return serviceResult;
+        },
+        { serviceName: 'AgentUIService' }
+      );
     },
   },
 });

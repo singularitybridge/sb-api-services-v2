@@ -1,5 +1,7 @@
-import { ActionContext, FunctionFactory } from '../actions/types';
-import { generateFluxImage } from './fluximage.service';
+import { ActionContext, FunctionFactory, StandardActionResult } from '../actions/types';
+import { generateFluxImage as generateFluxImageService } from './fluximage.service';
+import { executeAction, ExecuteActionOptions } from '../actions/executor';
+import { ActionValidationError } from '../../utils/actionErrors';
 
 interface FluxImageArgs {
   prompt: string;
@@ -7,6 +9,20 @@ interface FluxImageArgs {
   height?: number;
   filename?: string;
 }
+
+// R type for StandardActionResult<R>
+interface FluxImageResponseData {
+  imageUrl: string;
+}
+
+// S type for serviceCall lambda's response
+interface ServiceCallLambdaResponse {
+  success: boolean;
+  data: FluxImageResponseData;
+  description?: string;
+}
+
+const SERVICE_NAME = 'fluxImageService';
 
 export const createFluxImageActions = (context: ActionContext): FunctionFactory => ({
   generateFluxImage: {
@@ -35,53 +51,36 @@ export const createFluxImageActions = (context: ActionContext): FunctionFactory 
       required: ['prompt'],
       additionalProperties: false,
     },
-    function: async (args: FluxImageArgs) => {
+    function: async (args: FluxImageArgs): Promise<StandardActionResult<FluxImageResponseData>> => {
       const { prompt, width, height, filename } = args;
 
-      // Verify that prompt is a string
-      if (typeof prompt !== 'string' || prompt.trim().length === 0) {
-        console.error('generateFluxImage: Invalid prompt', prompt);
-        return {
-          success: false,
-          error: 'Invalid prompt',
-          message: 'The prompt must be a non-empty string.',
-        };
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
       }
 
-      // Verify width and height if provided
+      if (typeof prompt !== 'string' || prompt.trim().length === 0) {
+        throw new ActionValidationError('The prompt must be a non-empty string.');
+      }
+
       if (width !== undefined && (typeof width !== 'number' || width < 256 || width > 1280 || width % 8 !== 0)) {
-        console.error('generateFluxImage: Invalid width', width);
-        return {
-          success: false,
-          error: 'Invalid width',
-          message: 'The width must be a number between 256 and 1280 and a multiple of 8.',
-        };
+        throw new ActionValidationError('The width must be a number between 256 and 1280 and a multiple of 8.');
       }
 
       if (height !== undefined && (typeof height !== 'number' || height < 256 || height > 1280 || height % 8 !== 0)) {
-        console.error('generateFluxImage: Invalid height', height);
-        return {
-          success: false,
-          error: 'Invalid height',
-          message: 'The height must be a number between 256 and 1280 and a multiple of 8.',
-        };
+        throw new ActionValidationError('The height must be a number between 256 and 1280 and a multiple of 8.');
       }
 
-      try {
-        console.log('generateFluxImage: Calling generateFluxImage service');
-        const imageUrl = await generateFluxImage(context.companyId, { prompt, width, height, filename });
-        return {
-          success: true,
-          data: { imageUrl },
-        };
-      } catch (error) {
-        console.error('generateFluxImage: Error generating image', error);
-        return {
-          success: false,
-          error: 'Image generation failed',
-          message: 'Failed to generate the image using Flux AI.',
-        };
-      }
+      return executeAction<FluxImageResponseData, ServiceCallLambdaResponse>(
+        'generateFluxImage',
+        async (): Promise<ServiceCallLambdaResponse> => {
+          const imageUrl = await generateFluxImageService(context.companyId!, { prompt, width, height, filename });
+          return { success: true, data: { imageUrl } };
+        },
+        { 
+          serviceName: SERVICE_NAME,
+          // Default dataExtractor (res => res.data) will work
+        }
+      );
     },
   },
 });

@@ -1,32 +1,43 @@
 import { ActionContext, FunctionFactory } from '../actions/types';
 import { generateAudio, listModels, listVoices } from './elevenlabs.service';
 import { getApiKey } from '../../services/api.key.service';
+import { executeAction } from '../actions/executor';
+import { ActionExecutionError } from '../../utils/actionErrors';
+
+// Define expected data shapes for StandardActionResult for clarity
+interface GenerateAudioData {
+  audioUrl?: string;
+}
+// Assuming ModelType[] and VoiceType[] are the expected array types for list actions
+// Using any[] for now if specific types are not readily available or too complex for this snippet
+type ModelList = any[]; // Replace with actual type e.g. ElevenLabsModel[]
+type VoiceList = any[]; // Replace with actual type e.g. ElevenLabsVoice[]
 
 export const createElevenLabsActions = (context: ActionContext): FunctionFactory => ({
   generateElevenLabsAudio: {
     function: async ({ text, voiceId, modelId, filename }: { text: string; voiceId: string; modelId?: string; filename?: string }) => {
       const apiKey = await getApiKey(context.companyId, 'labs11_api_key');
       if (!apiKey) {
-        return {
-          success: false,
-          error: 'API key missing',
-          message: 'ElevenLabs API key is not configured.',
-        };
+        throw new ActionExecutionError('ElevenLabs API key is not configured for this company.', {
+          actionName: 'generateElevenLabsAudio',
+          statusCode: 400,
+        });
       }
 
-      const result = await generateAudio(apiKey, text, voiceId, modelId, filename);
-      if (result.success) {
-        return {
-          success: true,
-          data: { audioUrl: result.data?.audioUrl },
-        };
-      } else {
-        return {
-          success: false,
-          error: result.error || 'Audio generation failed',
-          message: result.error || 'Unknown error occurred while generating audio.',
-        };
-      }
+      return executeAction<GenerateAudioData, { success: boolean; data?: { audioUrl?: string }; error?: string }>(
+        'generateElevenLabsAudio',
+        async () => {
+          const serviceResult = await generateAudio(apiKey, text, voiceId, modelId, filename);
+          if (serviceResult.success) {
+            return { success: true, data: { audioUrl: serviceResult.data?.audioUrl } };
+          } else {
+            return { success: false, description: serviceResult.error || 'Audio generation failed by service' };
+          }
+        },
+        {
+          serviceName: 'ElevenLabsService',
+        }
+      );
     },
     description: 'Generate audio using ElevenLabs text-to-speech service',
     parameters: {
@@ -56,25 +67,19 @@ export const createElevenLabsActions = (context: ActionContext): FunctionFactory
     function: async () => {
       const apiKey = await getApiKey(context.companyId, 'labs11_api_key');
       if (!apiKey) {
-        return {
-          success: false,
-          error: 'API key missing',
-          message: 'ElevenLabs API key is not configured.',
-        };
+        throw new ActionExecutionError('ElevenLabs API key is not configured for this company.', {
+          actionName: 'listElevenLabsModels',
+          statusCode: 400,
+        });
       }
-      try {
-        const models = await listModels(apiKey);
-        return {
-          success: true,
-          data: models,
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to list models',
-          message: error instanceof Error ? error.message : 'Unknown error occurred while listing models.',
-        };
-      }
+      return executeAction<ModelList>(
+        'listElevenLabsModels',
+        async () => {
+          const modelsData = await listModels(apiKey);
+          return { success: true, data: modelsData };
+        },
+        { serviceName: 'ElevenLabsService' }
+      );
     },
     description: 'List available ElevenLabs models',
     parameters: {
@@ -87,25 +92,19 @@ export const createElevenLabsActions = (context: ActionContext): FunctionFactory
     function: async () => {
       const apiKey = await getApiKey(context.companyId, 'labs11_api_key');
       if (!apiKey) {
-        return {
-          success: false,
-          error: 'API key missing',
-          message: 'ElevenLabs API key is not configured.',
-        };
+        throw new ActionExecutionError('ElevenLabs API key is not configured for this company.', {
+          actionName: 'listElevenLabsVoices',
+          statusCode: 400,
+        });
       }
-      try {
-        const voices = await listVoices(apiKey);
-        return {
-          success: true,
-          data: voices,
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to list voices',
-          message: error instanceof Error ? error.message : 'Unknown error occurred while listing voices.',
-        };
-      }
+      return executeAction<VoiceList>(
+        'listElevenLabsVoices',
+        async () => {
+          const voicesData = await listVoices(apiKey);
+          return { success: true, data: voicesData };
+        },
+        { serviceName: 'ElevenLabsService' }
+      );
     },
     description: 'List available ElevenLabs voices',
     parameters: {

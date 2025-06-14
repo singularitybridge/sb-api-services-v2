@@ -1,6 +1,8 @@
 import axios, { AxiosError } from 'axios';
 import { ActionContext, FunctionFactory } from '../actions/types';
 import { getApiKey } from '../../services/api.key.service';
+import { executeAction } from '../actions/executor';
+import { ActionExecutionError } from '../../utils/actionErrors';
 
 // Response interfaces to match the API structure
 interface ExecuteResponse {
@@ -28,13 +30,34 @@ interface FileOperationResponse {
   error?: string;
 }
 
-interface AIAgentExecutorResponse {
-  success: boolean;
-  data?: any;
-  error?: string;
+// AIAgentExecutorResponse is no longer needed as actions will return StandardActionResult
+// interface AIAgentExecutorResponse {
+//   success: boolean;
+//   data?: any;
+//   error?: string;
+// }
+
+// Define data shapes for StandardActionResult
+interface ExecuteCommandResultData extends ExecuteResponse {
+  isLongRunning?: boolean; // Added for clarity if taskId is present
+}
+interface PerformFileOperationResultData {
+  // This would be the type of 'response.data.result'
+  [key: string]: any; // Or a more specific type
+}
+interface TaskStatusResultData extends TaskResponse {}
+interface EndTaskResultData {
+  message?: string;
+  taskId?: string;
+}
+interface ChangeDirectoryResultData {
+  // Define based on actual response from /change-directory
+  currentPath?: string; // Example
+  message?: string;
 }
 
-type FileOperation = 
+
+type FileOperation =
   | 'list'
   | 'read'
   | 'write'
@@ -45,20 +68,8 @@ type FileOperation =
   | 'deleteDirectory'
   | 'checkExistence';
 
-// Enhanced error handling with detailed logging
-const handleError = (error: unknown): string => {
-  if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError<{ error?: string }>;
-    console.error(`API Error: ${axiosError.response?.status} - ${JSON.stringify(axiosError.response?.data)}`);
-    return (
-      axiosError.response?.data?.error ||
-      axiosError.message ||
-      'An error occurred with the API request'
-    );
-  }
-  console.error(`Unexpected error: ${error}`);
-  return error instanceof Error ? error.message : 'An unknown error occurred';
-};
+// handleError is no longer needed as executeAction will handle errors.
+// const handleError = (error: unknown): string => { ... };
 
 export const createAIAgentExecutorActions = (context: ActionContext): FunctionFactory => {
   // Get headers with encrypted keys
@@ -95,40 +106,41 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
         },
         required: ['command'],
       },
-      function: async ({ command }: { command: string }): Promise<AIAgentExecutorResponse> => {
-        try {
-          const baseUrl = await getBaseUrl();
-          const headers = await getHeaders();
-          
-          const response = await axios.post<ExecuteResponse>(
-            `${baseUrl}/execute`,
-            { command },
-            { headers }
-          );
+      function: async ({ command }: { command: string }) => {
+        const actionName = 'executeCommand';
+        return executeAction<ExecuteCommandResultData>(
+          actionName,
+          async () => {
+            const baseUrl = await getBaseUrl();
+            const headers = await getHeaders();
+            const response = await axios.post<ExecuteResponse>(
+              `${baseUrl}/execute`,
+              { command },
+              { headers }
+            );
 
-          // Handle both immediate and long-running task responses
-          if (response.data.taskId) {
+            // Shape the data for StandardActionResult
+            if (response.data.taskId) {
+              return {
+                success: true,
+                data: {
+                  taskId: response.data.taskId,
+                  initialOutput: response.data.initialOutput,
+                  isLongRunning: true,
+                },
+              };
+            }
             return {
               success: true,
               data: {
-                taskId: response.data.taskId,
-                initialOutput: response.data.initialOutput,
-                isLongRunning: true
-              }
+                output: response.data.output,
+                exitCode: response.data.exitCode,
+                completed: response.data.completed,
+              },
             };
-          }
-
-          return {
-            success: true,
-            data: {
-              output: response.data.output,
-              exitCode: response.data.exitCode,
-              completed: response.data.completed
-            }
-          };
-        } catch (error: unknown) {
-          return { success: false, error: handleError(error) };
-        }
+          },
+          { serviceName: 'AIAgentExecutorService' }
+        );
       },
     },
 
@@ -179,25 +191,26 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
         path: string;
         content?: string;
         recursive?: boolean;
-      }): Promise<AIAgentExecutorResponse> => {
-        try {
-          const baseUrl = await getBaseUrl();
-          const headers = await getHeaders();
-          
-          const response = await axios.post<FileOperationResponse>(
-            `${baseUrl}/file-operation`,
-            { operation, path, content, recursive },
-            { headers }
-          );
-
-          return {
-            success: response.data.success,
-            data: response.data.result,
-            error: response.data.error
-          };
-        } catch (error: unknown) {
-          return { success: false, error: handleError(error) };
-        }
+      }) => {
+        const actionName = 'performFileOperation';
+        return executeAction<PerformFileOperationResultData>(
+          actionName,
+          async () => {
+            const baseUrl = await getBaseUrl();
+            const headers = await getHeaders();
+            const response = await axios.post<FileOperationResponse>(
+              `${baseUrl}/file-operation`,
+              { operation, path, content, recursive },
+              { headers }
+            );
+            // Adapt the response for executeAction
+            if (!response.data.success) {
+              return { success: false, description: response.data.error, data: response.data.result };
+            }
+            return { success: true, data: response.data.result };
+          },
+          { serviceName: 'AIAgentExecutorService' }
+        );
       },
     },
 
@@ -213,20 +226,21 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
         },
         required: ['taskId'],
       },
-      function: async ({ taskId }: { taskId: string }): Promise<AIAgentExecutorResponse> => {
-        try {
-          const baseUrl = await getBaseUrl();
-          const headers = await getHeaders();
-          
-          const response = await axios.get<TaskResponse>(
-            `${baseUrl}/tasks/${taskId}`,
-            { headers }
-          );
-
-          return { success: true, data: response.data };
-        } catch (error: unknown) {
-          return { success: false, error: handleError(error) };
-        }
+      function: async ({ taskId }: { taskId: string }) => {
+        const actionName = 'getTaskStatus';
+        return executeAction<TaskStatusResultData>(
+          actionName,
+          async () => {
+            const baseUrl = await getBaseUrl();
+            const headers = await getHeaders();
+            const response = await axios.get<TaskResponse>(
+              `${baseUrl}/tasks/${taskId}`,
+              { headers }
+            );
+            return { success: true, data: response.data };
+          },
+          { serviceName: 'AIAgentExecutorService' }
+        );
       },
     },
 
@@ -242,27 +256,23 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
         },
         required: ['taskId'],
       },
-      function: async ({ taskId }: { taskId: string }): Promise<AIAgentExecutorResponse> => {
-        try {
-          const baseUrl = await getBaseUrl();
-          const headers = await getHeaders();
-          
-          const response = await axios.post(
-            `${baseUrl}/tasks/${taskId}/end`,
-            {},
-            { headers }
-          );
-
-          return {
-            success: true,
-            data: {
-              message: response.data.message,
-              taskId: response.data.taskId
-            }
-          };
-        } catch (error: unknown) {
-          return { success: false, error: handleError(error) };
-        }
+      function: async ({ taskId }: { taskId: string }) => {
+        const actionName = 'endTask';
+        return executeAction<EndTaskResultData>(
+          actionName,
+          async () => {
+            const baseUrl = await getBaseUrl();
+            const headers = await getHeaders();
+            // Assuming response.data is { message: string, taskId: string } or similar
+            const response = await axios.post<{ message?: string; taskId?: string }>(
+              `${baseUrl}/tasks/${taskId}/end`,
+              {},
+              { headers }
+            );
+            return { success: true, data: response.data };
+          },
+          { serviceName: 'AIAgentExecutorService' }
+        );
       },
     },
 
@@ -278,21 +288,23 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
         },
         required: ['newPath'],
       },
-      function: async ({ newPath }: { newPath: string }): Promise<AIAgentExecutorResponse> => {
-        try {
-          const baseUrl = await getBaseUrl();
-          const headers = await getHeaders();
-          
-          const response = await axios.post(
-            `${baseUrl}/change-directory`,
-            { newPath },
-            { headers }
-          );
-
-          return { success: true, data: response.data };
-        } catch (error: unknown) {
-          return { success: false, error: handleError(error) };
-        }
+      function: async ({ newPath }: { newPath: string }) => {
+        const actionName = 'changeDirectory';
+        return executeAction<ChangeDirectoryResultData>(
+          actionName,
+          async () => {
+            const baseUrl = await getBaseUrl();
+            const headers = await getHeaders();
+            // Assuming response.data is { currentPath: string, message: string } or similar
+            const response = await axios.post<{ currentPath?: string; message?: string }>(
+              `${baseUrl}/change-directory`,
+              { newPath },
+              { headers }
+            );
+            return { success: true, data: response.data };
+          },
+          { serviceName: 'AIAgentExecutorService' }
+        );
       },
     },
   };

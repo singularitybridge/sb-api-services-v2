@@ -1,5 +1,10 @@
-import { ActionContext, FunctionFactory } from '../actions/types';
+import { ActionContext, FunctionFactory, StandardActionResult } from '../actions/types';
 import { readContentFiles, writeContentFile, removeContentFile, getContentFileById } from './content_file.service';
+import { executeAction, ExecuteActionOptions } from '../actions/executor';
+import { ActionValidationError } from '../../utils/actionErrors'; // ActionServiceError might not be needed here if executeAction handles it
+import { IContentFile } from '../../models/ContentFile';
+
+const SERVICE_NAME = 'contentFileService';
 
 export const createContentFileActions = (context: ActionContext): FunctionFactory => ({
   readFiles: {
@@ -10,8 +15,17 @@ export const createContentFileActions = (context: ActionContext): FunctionFactor
       required: [],
       additionalProperties: false,
     },
-    function: async () => {
-      return await readContentFiles(context.sessionId, context.companyId);
+    function: async (): Promise<StandardActionResult<IContentFile[]>> => {
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+      // Type for service call result S
+      type ServiceResultType = { success: boolean; data: IContentFile[] };
+      return executeAction<IContentFile[], ServiceResultType>(
+        'readFiles',
+        async () => readContentFiles(context.sessionId, context.companyId!),
+        { serviceName: SERVICE_NAME } // Default dataExtractor (res.data) should work
+      );
     },
   },
 
@@ -28,8 +42,20 @@ export const createContentFileActions = (context: ActionContext): FunctionFactor
       required: ['fileId'],
       additionalProperties: false,
     },
-    function: async (params: { fileId: string }) => {
-      return await getContentFileById(context.sessionId, context.companyId, params.fileId);
+    function: async (params: { fileId: string }): Promise<StandardActionResult<IContentFile | null>> => {
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+      if (!params.fileId) {
+        throw new ActionValidationError('File ID parameter is missing.');
+      }
+      // Type for service call result S
+      type ServiceResultType = { success: boolean; data: IContentFile | null };
+      return executeAction<IContentFile | null, ServiceResultType>(
+        'getFile',
+        async () => getContentFileById(context.sessionId, context.companyId!, params.fileId),
+        { serviceName: SERVICE_NAME } // Default dataExtractor (res.data) should work
+      );
     },
   },
 
@@ -63,13 +89,20 @@ export const createContentFileActions = (context: ActionContext): FunctionFactor
       title: string;
       content: string;
       description?: string;
-    }) => {
-      try {
-        return await writeContentFile(context.sessionId, context.companyId, params);
-      } catch (error) {
-        console.error('Error in writeFile action:', error);
-        return { success: false, error: error instanceof Error ? error.message : 'Unknown error occurred' };
+    }): Promise<StandardActionResult<Partial<IContentFile>>> => {
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
       }
+      if (!params.title || !params.content) {
+        throw new ActionValidationError('Title and content parameters are required.');
+      }
+      // Type for service call result S
+      type ServiceResultType = { success: boolean; data: Partial<IContentFile> };
+      return executeAction<Partial<IContentFile>, ServiceResultType>(
+        'writeFile',
+        async () => writeContentFile(context.sessionId, context.companyId!, params),
+        { serviceName: SERVICE_NAME } // Default dataExtractor (res.data) should work
+      );
     },
   },
 
@@ -86,8 +119,29 @@ export const createContentFileActions = (context: ActionContext): FunctionFactor
       required: ['fileId'],
       additionalProperties: false,
     },
-    function: async (params: { fileId: string }) => {
-      return await removeContentFile(context.sessionId, context.companyId, params.fileId);
+    function: async (params: { fileId: string }): Promise<StandardActionResult<{ message: string }>> => {
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+      if (!params.fileId) {
+        throw new ActionValidationError('File ID parameter is missing.');
+      }
+      // Type for service call result S for removeContentFile is { success: boolean }
+      // We want R to be { message: string }
+      // The serviceCall lambda needs to return a structure that executeAction can use.
+      // Specifically, its 'data' property should be what we want for R.
+      type ServiceLambdaReturnType = { success: boolean; data: { message: string } };
+
+      return executeAction<{ message: string }, ServiceLambdaReturnType>(
+        'deleteFile',
+        async (): Promise<ServiceLambdaReturnType> => {
+          await removeContentFile(context.sessionId, context.companyId!, params.fileId);
+          // If removeContentFile throws, executeAction handles it.
+          // If it succeeds, it returns { success: true }. We shape the response for executeAction here.
+          return { success: true, data: { message: 'File deleted successfully.' } };
+        },
+        { serviceName: SERVICE_NAME } // Default dataExtractor (res.data) will pick up data: { message: ... }
+      );
     },
   },
 });

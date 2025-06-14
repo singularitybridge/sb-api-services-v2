@@ -1,5 +1,5 @@
 import { ActionContext, FunctionFactory } from '../../actions/types';
-import { createCurlActions, CurlActionResponse } from '../curl.actions';
+import { createCurlActions, CurlActionResponseData } from '../curl.actions';
 import { SupportedLanguage } from '../../../services/discovery.service';
 
 // Mock the context
@@ -40,7 +40,7 @@ describe('curl.actions', () => {
 
     const result = await performCurlAction({
       curlCommand: 'curl https://api.example.com/data'
-    }) as CurlActionResponse & { success?: boolean };
+    }) as CurlActionResponseData & { success?: boolean };
 
     expect(mockPerformCurlRequestFromService).toHaveBeenCalledWith(mockContext, 'curl https://api.example.com/data');
     expect(result.status).toBe(200);
@@ -62,7 +62,7 @@ describe('curl.actions', () => {
 
     const result = await performCurlAction({
       curlCommand: 'curl https://api.example.com/nonexistent'
-    }) as CurlActionResponse & { success?: boolean };
+    }) as CurlActionResponseData & { success?: boolean };
 
     expect(result.status).toBe(404);
     expect(result.data).toEqual({ error: 'Not Found' });
@@ -84,7 +84,7 @@ describe('curl.actions', () => {
 
     const result = await performCurlAction({
       curlCommand: 'curl invalid-url-or-command'
-    }) as CurlActionResponse & { success?: boolean };
+    }) as CurlActionResponseData & { success?: boolean };
 
     expect(result.status).toBe(400);
     expect(result.error).toBe('Invalid command or URL in service');
@@ -104,7 +104,7 @@ describe('curl.actions', () => {
     const result = await performCurlAction({
       curlCommand: 'curl https://api.example.com/longdata',
       maxResponseChars: 50
-    }) as CurlActionResponse & { success?: boolean };
+    }) as CurlActionResponseData & { success?: boolean };
 
     expect(result.status).toBe(200);
     expect(result.data).toBe('a'.repeat(50));
@@ -125,7 +125,7 @@ describe('curl.actions', () => {
     const result = await performCurlAction({
       curlCommand: 'curl https://api.example.com/objectdata',
       maxResponseChars: 50
-    }) as CurlActionResponse & { success?: boolean };
+    }) as CurlActionResponseData & { success?: boolean };
     
     expect(result.data).toEqual(objectData);
     expect(result.truncated).toBe(false); // Updated expectation
@@ -138,7 +138,7 @@ describe('curl.actions', () => {
 
     const result = await performCurlAction({
       curlCommand: 'curl https://non-existent-domain-12345.com'
-    }) as CurlActionResponse & { success?: boolean };
+    }) as CurlActionResponseData & { success?: boolean };
 
     // Check the structured error response from curl.actions.ts's catch block
     expect(result.status).toBe(500);

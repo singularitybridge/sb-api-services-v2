@@ -1,26 +1,48 @@
-import { ActionContext, FunctionFactory } from '../actions/types';
+import { ActionContext, FunctionFactory, StandardActionResult } from '../actions/types';
+import { executeAction } from '../actions/executor'; // Import the new executor
 import { 
-  getAssistants, 
-  setAssistant, 
-  createNewAssistant, 
-  getCurrentAssistant,
-  updateAssistantById,
-  askAnotherAssistant,
-  getTeams,
-  getAssistantsByTeam
+  getAssistants as getAssistantsService, 
+  setAssistant as setAssistantService, 
+  createNewAssistant as createNewAssistantService, 
+  getCurrentAssistant as getCurrentAssistantService,
+  updateAssistantById as updateAssistantByIdService,
+  askAnotherAssistant as askAnotherAssistantService,
+  getTeams as getTeamsService,
+  getAssistantsByTeam as getAssistantsByTeamService
 } from './assistant.service';
-import { IIdentifier } from '../../models/Assistant';
+import { IAssistant, IIdentifier } from '../../models/Assistant';
+import { ITeam } from '../../models/Team';
+
+// Define data types for StandardActionResult payloads
+type GetAssistantsData = IAssistant[]; 
+type SetAssistantData = { message: string }; 
+type CreateNewAssistantData = IAssistant;
+type GetCurrentAssistantData = IAssistant | null; 
+type UpdateAssistantData = IAssistant;
+type AskAssistantData = any; 
+type GetTeamsData = ITeam[];
+type GetAssistantsByTeamData = Partial<IAssistant>[] | IAssistant[];
+
+const ASSISTANT_SERVICE_NAME = 'AssistantService';
 
 const createAssistantActions = (context: ActionContext): FunctionFactory => ({
   getAssistants: {
-    description: 'Get a list of all assistants for the current user\'s company',
+    description: "Get a list of all assistants for the current user's company",
     parameters: {
       type: 'object',
       properties: {},
       required: [],
     },
-    function: async () => {
-      return await getAssistants(context.sessionId);
+    function: async (): Promise<StandardActionResult<GetAssistantsData>> => {
+      return executeAction<GetAssistantsData>(
+        'getAssistants',
+        () => getAssistantsService(context.sessionId),
+        { 
+          serviceName: ASSISTANT_SERVICE_NAME,
+          successMessage: 'Assistants retrieved successfully.',
+          dataExtractor: (result) => result.data as GetAssistantsData,
+        }
+      );
     },
   },
 
@@ -36,8 +58,16 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
       },
       required: ['_id'],
     },
-    function: async ({ _id }: { _id: string }) => {
-      return await setAssistant(context.sessionId, _id);
+    function: async ({ _id }: { _id: string }): Promise<StandardActionResult<SetAssistantData>> => {
+      return executeAction<SetAssistantData>(
+        'setAssistant',
+        () => setAssistantService(context.sessionId, _id),
+        {
+          serviceName: ASSISTANT_SERVICE_NAME,
+          successMessage: 'Assistant set successfully.',
+          dataExtractor: (result) => ({ message: result.description || 'Assistant set successfully.' }),
+        }
+      );
     },
   },
 
@@ -46,40 +76,19 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
     parameters: {
       type: 'object',
       properties: {
-        name: {
-          type: 'string',
-          description: 'The name of the new assistant',
-        },
-        description: {
-          type: 'string',
-          description: 'A description of the new assistant',
-        },
-        prompt: {
-          type: 'string',
-          description: 'The initial prompt for the new assistant',
-        },
-        language: {
-          type: 'string',
-          description: 'The language of the assistant, can be he or en',
-        },
-        voice: {
-          type: 'string',
-          description: 'The voice of the assistant',
-        },
+        name: { type: 'string', description: 'The name of the new assistant' },
+        description: { type: 'string', description: 'A description of the new assistant' },
+        prompt: { type: 'string', description: 'The initial prompt for the new assistant' },
+        language: { type: 'string', description: 'The language of the assistant, can be he or en' },
+        voice: { type: 'string', description: 'The voice of the assistant' },
         conversationStarters: {
           type: 'array',
           description: 'Array of conversation starters with title and content',
           items: {
             type: 'object',
             properties: {
-              key: {
-                type: 'string',
-                description: 'The title of the conversation starter',
-              },
-              value: {
-                type: 'string',
-                description: 'The content of the conversation starter',
-              },
+              key: { type: 'string', description: 'The title of the conversation starter' },
+              value: { type: 'string', description: 'The content of the conversation starter' },
             },
             required: ['key', 'value'],
           },
@@ -87,29 +96,30 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
       },
       required: ['name', 'description', 'prompt', 'language', 'voice'],
     },
-    function: async ({ 
-      name, 
-      description, 
-      prompt, 
-      language, 
-      voice, 
-      conversationStarters = []
-    }: { 
+    function: async (args: { 
       name: string; 
       description: string; 
       prompt: string;
       language: string;
       voice: string;
       conversationStarters?: IIdentifier[];
-    }) => {
-      return await createNewAssistant(
-        context.sessionId, 
-        name, 
-        description, 
-        prompt, 
-        language, 
-        voice, 
-        conversationStarters
+    }): Promise<StandardActionResult<CreateNewAssistantData>> => {
+      return executeAction<CreateNewAssistantData>(
+        'createNewAssistant',
+        () => createNewAssistantService(
+          context.sessionId, 
+          args.name, 
+          args.description, 
+          args.prompt, 
+          args.language, 
+          args.voice, 
+          args.conversationStarters || []
+        ),
+        {
+          serviceName: ASSISTANT_SERVICE_NAME,
+          successMessage: 'Assistant created successfully.',
+          dataExtractor: (result) => result.data as CreateNewAssistantData,
+        }
       );
     },
   },
@@ -121,13 +131,21 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
       properties: {},
       required: [],
     },
-    function: async () => {
-      return await getCurrentAssistant(context.sessionId);
+    function: async (): Promise<StandardActionResult<GetCurrentAssistantData>> => {
+      return executeAction<GetCurrentAssistantData>(
+        'getCurrentAssistant',
+        () => getCurrentAssistantService(context.sessionId),
+        {
+          serviceName: ASSISTANT_SERVICE_NAME,
+          successMessage: 'Current assistant retrieved successfully.',
+          dataExtractor: (result) => result.data as GetCurrentAssistantData,
+        }
+      );
     },
   },
 
   updateAssistantById: {
-    description: 'Update a specific assistant by ID with new information. Only provided fields (name, description, llmModel, llmProvider, llmPrompt) will be updated.',
+    description: 'Update a specific assistant by ID with new information. Only provided fields will be updated.',
     parameters: {
       type: 'object',
       properties: {
@@ -138,61 +156,83 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
         llmProvider: { type: 'string', enum: ['openai', 'google', 'anthropic'], description: 'New LLM provider' },
         llmPrompt: { type: 'string', description: 'New LLM prompt for the assistant' },
       },
-      required: ['assistantId'], // assistantId is now required
+      required: ['assistantId'],
       additionalProperties: false,
     },
     function: async (params: {
-      assistantId: string; // Added assistantId
+      assistantId: string;
       name?: string;
       description?: string;
       llmModel?: string;
       llmProvider?: 'openai' | 'google' | 'anthropic';
       llmPrompt?: string;
-    }) => {
+    }): Promise<StandardActionResult<UpdateAssistantData>> => {
       const { assistantId, ...updateData } = params;
-      return await updateAssistantById(context.sessionId, assistantId, updateData);
+      return executeAction<UpdateAssistantData>(
+        'updateAssistantById',
+        () => updateAssistantByIdService(context.sessionId, assistantId, updateData),
+        {
+          serviceName: ASSISTANT_SERVICE_NAME,
+          successMessage: 'Assistant updated successfully.',
+          dataExtractor: (result) => result.data as UpdateAssistantData,
+        }
+      );
     },
   },
 
   askAssistant: {
-    description: 'Ask another assistant to handle a specific task and return the response. Useful for delegating specialized tasks to expert assistants.',
+    description: 'Ask another assistant to handle a specific task and return the response.',
     parameters: {
       type: 'object',
       properties: {
-        assistantId: {
-          type: 'string',
-          description: 'The ID of the target assistant to ask',
-        },
-        task: {
-          type: 'string',
-          description: 'The task or prompt to send to the target assistant',
-        },
+        assistantId: { type: 'string', description: 'The ID of the target assistant to ask' },
+        task: { type: 'string', description: 'The task or prompt to send to the target assistant' },
       },
       required: ['assistantId', 'task'],
       additionalProperties: false,
     },
-    function: async ({ assistantId, task }: { assistantId: string; task: string }) => {
-      if (context.isStateless) {
-        return await askAnotherAssistant(context.sessionId, assistantId, task, context.companyId, context.userId);
-      }
-      return await askAnotherAssistant(context.sessionId, assistantId, task);
+    function: async ({ assistantId, task }: { assistantId: string; task: string }): Promise<StandardActionResult<AskAssistantData>> => {
+      return executeAction<AskAssistantData>(
+        'askAssistant',
+        () => context.isStateless 
+          ? askAnotherAssistantService(context.sessionId, assistantId, task, context.companyId, context.userId)
+          : askAnotherAssistantService(context.sessionId, assistantId, task),
+        {
+          serviceName: ASSISTANT_SERVICE_NAME,
+          successMessage: 'Task delegated successfully.',
+          dataExtractor: (result) => result.data, // Data is 'any' here
+        }
+      );
     },
   },
 
   getTeams: {
-    description: 'Get a list of all teams for the current user\'s company',
+    description: "Get a list of all teams for the current user's company",
     parameters: {
       type: 'object',
       properties: {},
       required: [],
     },
-    function: async () => {
-      try {
-        const teams = await getTeams(context.sessionId);
-        return { success: true, data: teams }; 
-      } catch (error) {
-        throw error; // Re-throw to be caught by the executor
-      }
+    function: async (): Promise<StandardActionResult<GetTeamsData>> => {
+      // Note: getTeamsService might already throw or return a structure that executeAction handles.
+      // If getTeamsService directly throws on error and returns { data: ... } on success,
+      // the executeAction can simplify this further.
+      // For now, assuming it returns { success: boolean, data: ..., description?: string }
+      return executeAction<GetTeamsData>(
+        'getTeams',
+        async () => {
+          // If getTeamsService throws on error and returns data directly on success:
+          // const teamData = await getTeamsService(context.sessionId);
+          // return { success: true, data: teamData, description: 'Teams retrieved successfully.' };
+          // If it returns { success, data, description }
+          return getTeamsService(context.sessionId);
+        },
+        {
+          serviceName: ASSISTANT_SERVICE_NAME,
+          successMessage: 'Teams retrieved successfully.',
+          dataExtractor: (result) => result.data, // Assuming result.data is ITeam[]
+        }
+      );
     },
   },
 
@@ -201,25 +241,21 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
     parameters: {
       type: 'object',
       properties: {
-        teamId: {
-          type: 'string',
-          description: 'The ID of the team',
-        },
-        lean: {
-          type: 'boolean',
-          description: 'If true, returns a lean representation of assistants. Defaults to true.',
-          default: true,
-        }
+        teamId: { type: 'string', description: 'The ID of the team' },
+        lean: { type: 'boolean', description: 'If true, returns a lean representation. Defaults to true.', default: true }
       },
       required: ['teamId'],
     },
-    function: async ({ teamId, lean = true }: { teamId: string, lean?: boolean }) => {
-      try {
-        const assistants = await getAssistantsByTeam(context.sessionId, teamId, lean);
-        return { success: true, data: assistants };
-      } catch (error) {
-        throw error; // Re-throw to be caught by the executor
-      }
+    function: async ({ teamId, lean = true }: { teamId: string, lean?: boolean }): Promise<StandardActionResult<GetAssistantsByTeamData>> => {
+      return executeAction<GetAssistantsByTeamData>(
+        'getAssistantsByTeam',
+        () => getAssistantsByTeamService(context.sessionId, teamId, lean),
+        {
+          serviceName: ASSISTANT_SERVICE_NAME,
+          successMessage: 'Assistants for team retrieved successfully.',
+          dataExtractor: (result) => result.data,
+        }
+      );
     },
   },
 });

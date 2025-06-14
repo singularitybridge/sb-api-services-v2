@@ -1,17 +1,30 @@
-import { ActionContext, FunctionFactory } from '../actions/types';
-import { performCurlRequest } from './curl.service';
+import { ActionContext, FunctionFactory, StandardActionResult } from '../actions/types';
+import { performCurlRequest as performCurlRequestService } from './curl.service'; // Renamed to avoid conflict
+import { executeAction, ExecuteActionOptions } from '../actions/executor';
+import { ActionValidationError } from '../../utils/actionErrors';
 
 interface CurlRequestArgs {
   curlCommand: string;
 }
 
-export interface CurlActionResponse {
+// This will be the R type for StandardActionResult<R>
+export interface CurlActionResponseData {
   status: number;
   data: any;
   headers: { [key: string]: string };
   error?: string;
-  truncated?: boolean;
+  truncated: boolean; // Ensure this is part of the final data payload
 }
+
+// This is the S type, the raw result from our serviceCall lambda for executeAction
+interface ServiceCallLambdaResponse {
+  success: boolean;
+  data: CurlActionResponseData; // This data will be extracted by executeAction
+  description?: string;
+}
+
+
+const SERVICE_NAME = 'curlService';
 
 export const createCurlActions = (context: ActionContext): FunctionFactory => ({
   performCurlRequest: {
@@ -27,35 +40,41 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
       required: ['curlCommand'],
       additionalProperties: false,
     },
-    function: async (args: CurlRequestArgs) => {
-      try {
-        const { curlCommand } = args;
+    function: async (args: CurlRequestArgs): Promise<StandardActionResult<CurlActionResponseData>> => {
+      const { curlCommand } = args;
 
-        // Call the service to perform the request
-        const response = await performCurlRequest(context, curlCommand);
-
-        // Create the result object with original status and data
-        const result: CurlActionResponse & { success: boolean } = {
-          status: response.status,
-          data: response.data,
-          headers: response.headers, // Note: service currently always returns {}
-          error: response.error,   // Propagate error from service response
-          truncated: false,          // Initialize truncated to false
-          success: response.status >= 200 && response.status < 300 && !response.error // Success if 2xx and no explicit error from service
-        };
-
-        return result;
-      } catch (error: any) {
-        console.error('performCurlRequest: Error performing request', error);
-        return {
-          status: 500,
-          data: null,
-          headers: {},
-          error: error.message || 'An unexpected error occurred performing curl request',
-          success: false,
-          truncated: false, // Ensure truncated is always present
-        };
+      if (!curlCommand || typeof curlCommand !== 'string' || !curlCommand.trim()) {
+        throw new ActionValidationError('curlCommand parameter is required and must be a non-empty string.');
       }
+      // The service itself validates if it starts with "curl" and returns an error object if not.
+      // We'll let executeAction handle that based on the success flag from the service call lambda.
+
+      return executeAction<CurlActionResponseData, ServiceCallLambdaResponse>(
+        'performCurlRequest',
+        async (): Promise<ServiceCallLambdaResponse> => {
+          const serviceResponse = await performCurlRequestService(context, curlCommand);
+          
+          const isSuccess = serviceResponse.status >= 200 && serviceResponse.status < 300 && !serviceResponse.error;
+
+          const responseData: CurlActionResponseData = {
+            status: serviceResponse.status,
+            data: serviceResponse.data,
+            headers: serviceResponse.headers,
+            error: serviceResponse.error,
+            truncated: false, // As per original logic
+          };
+          
+          return {
+            success: isSuccess,
+            data: responseData,
+            description: isSuccess ? 'Curl request successful.' : (serviceResponse.error || `Curl request failed with status ${serviceResponse.status}`)
+          };
+        },
+        { 
+          serviceName: SERVICE_NAME,
+          // Default dataExtractor (res => res.data) will work because our lambda returns data shaped as CurlActionResponseData
+        }
+      );
     },
   },
 });
