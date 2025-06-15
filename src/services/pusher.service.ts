@@ -15,7 +15,7 @@ export const publishMessage = async (
 ): Promise<void> => {
   console.log(`[Pusher] Sending message to channel: ${channel}, event: ${eventName}`);
   await pusher.trigger(channel, eventName, message);
-  console.log(`[Pusher] Message sent successfully to channel: ${channel}`);
+  // console.log(`[Pusher] Message sent successfully to channel: ${channel}`);
 };
 
 export const publishSessionMessage = async (

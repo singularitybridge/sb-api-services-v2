@@ -113,7 +113,7 @@ export const publishActionMessage = async (
     try {
       console.log(`[Action Publisher] Publishing action message - sessionId: ${sessionId}, actionId: ${executionDetails.actionId}, status: ${status}, messageType: action_execution`);
       await publishSessionMessage(sessionId, 'chat_message', completeMessage);
-      console.log(`[Action Publisher] Successfully published action message for ${executionDetails.actionId} with status ${status}`);
+      // console.log(`[Action Publisher] Successfully published action message for ${executionDetails.actionId} with status ${status}`);
     } catch (pusherError) {
       console.error('Pusher publishing failed (non-critical):', pusherError);
       // Don't rethrow - Pusher errors shouldn't affect tool execution
