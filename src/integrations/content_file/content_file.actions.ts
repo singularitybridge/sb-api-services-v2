@@ -1,5 +1,5 @@
 import { ActionContext, FunctionFactory, StandardActionResult } from '../actions/types';
-import { readContentFiles, writeContentFile, removeContentFile, getContentFileById } from './content_file.service';
+import { readContentFiles, writeContentFile, removeContentFile, getFileContentText } from './content_file.service';
 import { executeAction, ExecuteActionOptions } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors'; // ActionServiceError might not be needed here if executeAction handles it
 import { IContentFile } from '../../models/ContentFile';
@@ -30,31 +30,31 @@ export const createContentFileActions = (context: ActionContext): FunctionFactor
   },
 
   getFile: {
-    description: 'Retrieves a specific content file by ID',
+    description: "Retrieves a specific content file's text content by ID",
     parameters: {
       type: 'object',
       properties: {
         fileId: {
           type: 'string',
-          description: 'The ID of the file to retrieve (MongoDB ObjectId as a string)',
+          description: 'The ID of the file whose content is to be retrieved (MongoDB ObjectId as a string)',
         },
       },
       required: ['fileId'],
       additionalProperties: false,
     },
-    function: async (params: { fileId: string }): Promise<StandardActionResult<IContentFile | null>> => {
+    function: async (params: { fileId: string }): Promise<StandardActionResult<string | null>> => {
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
       }
       if (!params.fileId) {
         throw new ActionValidationError('File ID parameter is missing.');
       }
-      // Type for service call result S
-      type ServiceResultType = { success: boolean; data: IContentFile | null };
-      return executeAction<IContentFile | null, ServiceResultType>(
+      // Type for service call result S, which is the return type of getFileContentText
+      type ServiceResultType = { success: boolean; data: string | null };
+      return executeAction<string | null, ServiceResultType>(
         'getFile',
-        async () => getContentFileById(context.sessionId, context.companyId!, params.fileId),
-        { serviceName: SERVICE_NAME } // Default dataExtractor (res.data) should work
+        async () => getFileContentText(context.sessionId, context.companyId!, params.fileId),
+        { serviceName: SERVICE_NAME } // Default dataExtractor (res.data) will work
       );
     },
   },

@@ -1,4 +1,4 @@
-import { uploadContentFile, getContentFiles, deleteContentFile } from '../../services/content-file.service';
+import { uploadContentFile, getContentFiles, deleteContentFile, downloadContentFileText } from '../../services/content-file.service';
 import { IContentFile, ContentFile } from '../../models/ContentFile';
 import { Readable } from 'stream';
 import mongoose from 'mongoose';
@@ -30,6 +30,23 @@ export const getContentFileById = async (
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     throw new Error(`Failed to get content file: ${errorMessage}`);
+  }
+};
+
+export const getFileContentText = async (
+  sessionId: string, // sessionId might not be strictly needed here if downloadContentFileText doesn't use it
+  companyId: string,
+  fileId: string
+): Promise<{ success: boolean; data: string | null }> => {
+  try {
+    // Assuming downloadContentFileText is imported from '../../services/content-file.service'
+    // This import will be added in the next step if not already present by the linter/IDE
+    const content = await downloadContentFileText(fileId, companyId);
+    return { success: true, data: content };
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    // To align with other functions, we throw an error which will be caught by executeAction
+    throw new Error(`Failed to get file content text: ${errorMessage}`);
   }
 };
 

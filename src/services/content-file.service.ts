@@ -131,6 +131,43 @@ export const uploadContentFile = async (
   }
 };
 
+export const downloadContentFileText = async (fileId: string, companyId: string): Promise<string | null> => {
+  try {
+    console.log(`Attempting to download content for file ID: ${fileId} for company: ${companyId}`);
+    
+    const fileMetadata = await ContentFile.findOne({ 
+      _id: new mongoose.Types.ObjectId(fileId), 
+      companyId: new mongoose.Types.ObjectId(companyId) 
+    });
+
+    if (!fileMetadata) {
+      console.error(`File metadata not found or not owned by the company. FileId: ${fileId}, CompanyId: ${companyId}`);
+      // Consider throwing an error or returning null based on desired behavior for "not found"
+      return null; 
+    }
+
+    console.log(`File metadata found: ${JSON.stringify(fileMetadata)}`);
+
+    const bucket = storage.bucket(bucketName);
+    // Strip query parameters from gcpStorageUrl to get the blob name
+    const urlWithoutParams = fileMetadata.gcpStorageUrl.split('?')[0];
+    const blobName = path.basename(urlWithoutParams);
+    
+    console.log(`Attempting to download blob: ${blobName} from bucket: ${bucketName}`);
+    
+    const [fileBuffer] = await bucket.file(blobName).download();
+    console.log(`Blob ${blobName} downloaded successfully`);
+    
+    // Assuming text files are UTF-8 encoded. For other types, more complex handling might be needed.
+    return fileBuffer.toString('utf-8');
+
+  } catch (error: any) {
+    console.error('Error in downloadContentFileText:', error);
+    // Rethrow or handle as appropriate for the service layer
+    throw new Error(`Failed to download content file text: ${error.message || 'An unknown error occurred'}`);
+  }
+};
+
 export const getContentFiles = async (companyId: string): Promise<IContentFile[]> => {
   try {
     return await ContentFile.find({ companyId: new mongoose.Types.ObjectId(companyId) });

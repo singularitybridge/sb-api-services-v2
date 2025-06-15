@@ -1,6 +1,6 @@
-import { Assistant, IIdentifier } from '../../models/Assistant';
+import { Assistant, IIdentifier, IAssistant } from '../../models/Assistant';
 import { Session } from '../../models/Session';
-import { Team } from '../../models/Team';
+import { Team, ITeam } from '../../models/Team';
 import { publishMessage } from '../../services/pusher.service';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
@@ -397,24 +397,33 @@ export const askAnotherAssistant = async (
   }
 };
 
-export const getTeams = async (sessionId: string): Promise<any> => {
+export const getTeams = async (sessionId: string): Promise<{ success: boolean; description: string; data: ITeam[] }> => {
   try {
     const session = await Session.findById(sessionId);
     if (!session) {
+      // Throw error to be caught by executeAction or higher level handler
       throw new Error('Invalid session');
     }
     const teams = await Team.find(
       { companyId: session.companyId },
       { _id: 1, name: 1, description: 1, icon: 1 }
     );
-    return teams;
+    // Team.find returns ITeam[] (empty if none). This is correct.
+    // If teams is somehow null/undefined (should not happen with Mongoose find), default to empty array.
+    return { success: true, description: 'Teams retrieved successfully.', data: teams || [] };
   } catch (error: any) {
     console.error('Error getting teams:', error);
-    throw new Error(`Failed to retrieve teams: ${error.message}`);
+    // Re-throw for executeAction to handle and package into StandardActionResult.error
+    // This ensures that the action layer gets a proper error if something goes wrong.
+    throw new Error(`Failed to retrieve teams: ${error.message || 'Unknown error'}`);
   }
 };
 
-export const getAssistantsByTeam = async (sessionId: string, teamId: string, lean: boolean = true): Promise<any> => {
+export const getAssistantsByTeam = async (
+  sessionId: string, 
+  teamId: string, 
+  lean: boolean = true
+): Promise<{ success: boolean; description: string; data: Partial<IAssistant>[] | IAssistant[] }> => {
   try {
     const session = await Session.findById(sessionId);
     if (!session) {
@@ -427,6 +436,11 @@ export const getAssistantsByTeam = async (sessionId: string, teamId: string, lea
 
     const team = await Team.findOne({ _id: teamId, companyId: session.companyId });
     if (!team) {
+      // If team not found, it implies no assistants can be found for it under this company.
+      // Return success with empty data, or throw error if that's preferred for "not found"
+      // For consistency with how Team.find would return [], let's return empty data.
+      // However, the original code threw 'Team not found or access denied'.
+      // Let's stick to throwing an error if the team itself isn't found or accessible.
       throw new Error('Team not found or access denied');
     }
 
@@ -435,9 +449,15 @@ export const getAssistantsByTeam = async (sessionId: string, teamId: string, lea
       { companyId: session.companyId, teams: teamId },
       projection
     );
-    return assistants;
+    // Assistant.find returns IAssistant[] (empty if none). This is correct.
+    return { 
+      success: true, 
+      description: 'Assistants for team retrieved successfully.', 
+      data: assistants || [] // Ensure data is an array
+    };
   } catch (error: any) {
     console.error('Error getting assistants by team:', error);
-    throw new Error(`Failed to retrieve assistants by team: ${error.message}`);
+    // Re-throw for executeAction to handle
+    throw new Error(`Failed to retrieve assistants by team: ${error.message || 'Unknown error'}`);
   }
 };
