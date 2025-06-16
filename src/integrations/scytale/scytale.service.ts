@@ -3,7 +3,7 @@ import { getApiKey } from '../../services/api.key.service';
 
 // Hard-coded for now as per user request
 // const SCYTALE_API_KEY = 'YOUR_HARDCODED_SCYTALE_API_KEY'; // This was not the correct auth
-const SCYTALE_SESSION_COOKIE = 'SCYTALE_COOKIE_REDACTED';
+const SCYTALE_SESSION_COOKIE = process.env.SCYTALE_SESSION_COOKIE;
 const BASE_URL = 'https://api.scytale.ai/control/608e8c9800518e0012068f48/questionnaires/context/questionnaires';
 
 interface ScytaleQuestionnaireListItem {
