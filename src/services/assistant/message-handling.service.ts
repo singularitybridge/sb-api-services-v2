@@ -356,11 +356,7 @@ export const handleSessionMessage = async (
     // console.log(`Cached toolsForSdk for assistant ${assistant._id}`);
   }
   
-  let modelIdentifier = assistant.llmModel || 'gpt-4o-mini'; 
-  if (modelIdentifier === 'gpt-4.1-mini') {
-    console.log(`[handleSessionMessage] Overriding model 'gpt-4.1-mini' to 'gpt-4o-mini' for testing.`);
-    modelIdentifier = 'gpt-4o-mini';
-  }
+  let modelIdentifier = assistant.llmModel || 'gpt-4o-mini';
   console.log(`[handleSessionMessage] About to get API key for provider ${providerKey} and company ${session.companyId.toString()}`);
   const llmApiKey = await getApiKey(session.companyId.toString(), `${providerKey}_api_key`);
   if (!llmApiKey) {
