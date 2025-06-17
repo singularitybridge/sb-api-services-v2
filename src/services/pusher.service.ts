@@ -13,7 +13,7 @@ export const publishMessage = async (
   eventName: string,
   message: Record<string, unknown>
 ): Promise<void> => {
-  console.log(`[Pusher] Sending message to channel: ${channel}, event: ${eventName}`);
+  // console.log(`[Pusher] Sending message to channel: ${channel}, event: ${eventName}`);
   await pusher.trigger(channel, eventName, message);
   // console.log(`[Pusher] Message sent successfully to channel: ${channel}`);
 };
@@ -24,6 +24,6 @@ export const publishSessionMessage = async (
   message: Record<string, unknown>
 ): Promise<void> => {
   const channel = `sb-${sessionId}`;
-  console.log(`[Pusher] Publishing session message for sessionId: ${sessionId}, channel: ${channel}, event: ${eventName}`);
+  // console.log(`[Pusher] Publishing session message for sessionId: ${sessionId}, channel: ${channel}, event: ${eventName}`);
   await publishMessage(channel, eventName, message);  
 };

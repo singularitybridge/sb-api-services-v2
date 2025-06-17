@@ -185,7 +185,7 @@ export const executeFunctionCall = async (
           });
         }
         const successReturn = { result: result.data };
-        console.log(`[executeFunctionCall] Returning success data to AI SDK for ${functionName}:`, JSON.stringify(successReturn, null, 2));
+        // console.log(`[executeFunctionCall] Returning success data to AI SDK for ${functionName}:`, JSON.stringify(successReturn, null, 2));
         return successReturn;
       }
     } catch (error) {
