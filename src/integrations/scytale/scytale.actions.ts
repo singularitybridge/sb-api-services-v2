@@ -1,78 +1,123 @@
 import { ActionContext, FunctionFactory } from '../actions/types';
-import { getQuestionnaires, getQuestionnaireById } from './scytale.service';
+import {
+  getContextTypesPerCompany,
+  getContextItemsByCompanyAndType,
+  contextVectorSearch,
+  ScytaleContextTypeResponse,
+  ScytaleContextItem,
+  ScytaleVectorSearchResponse,
+  ScytaleVectorSearchRequest,
+} from './scytale.service';
 import { executeAction } from '../actions/executor';
-import { ActionValidationError, ActionExecutionError } from '../../utils/actionErrors'; // Added ActionExecutionError just in case, though ActionServiceError is primary from executeAction
-
-// Assuming types for the data payload
-interface ScytaleQuestionnaire {
-  // Define structure based on actual questionnaire object
-  id: string;
-  name: string;
-  // ... other properties
-}
-
-interface GetQuestionnaireByIdArgs {
-  questionnaireId: string;
-}
+import { ActionValidationError } from '../../utils/actionErrors';
 
 export const createScytaleActions = (context: ActionContext): FunctionFactory => ({
-  getQuestionnaires: {
-    description: 'Fetches all questionnaires from Scytale AI for the configured company.',
+  getContextTypesPerCompany: {
+    description: 'Fetches the list of available context types (e.g., audits, controls, policies) for a given company.',
     parameters: {
       type: 'object',
-      properties: {},
-      required: [],
+      properties: {
+        companyId: { type: 'string', description: 'The ID of the company to fetch context types for.' },
+      },
+      required: ['companyId'],
       additionalProperties: false,
     },
-    function: async () => {
-      const actionName = 'getQuestionnaires';
-      // Assuming context.sessionId and context.companyId are validated/guaranteed by the framework
-      // If not, add checks here:
-      // if (!context.sessionId) throw new ActionExecutionError('Session ID is missing', { actionName, statusCode: 400 });
-      // if (!context.companyId) throw new ActionExecutionError('Company ID is missing', { actionName, statusCode: 400 });
+    function: async (params: { companyId: string }) => {
+      const actionName = 'getContextTypesPerCompany';
+      if (!params.companyId) {
+        throw new ActionValidationError('companyId is required.', {
+          fieldErrors: { companyId: 'companyId is required.' },
+        });
+      }
 
-      return executeAction<ScytaleQuestionnaire[]>(
+      return executeAction<ScytaleContextTypeResponse>(
         actionName,
         async () => {
-          const serviceResult = await getQuestionnaires(context.sessionId, context.companyId);
-          // Adapt if serviceResult uses 'error' for message instead of 'description'
+          const serviceResult = await getContextTypesPerCompany(params.companyId);
           if (!serviceResult.success && serviceResult.error) {
             return { success: false, description: serviceResult.error, data: serviceResult.data };
           }
-          return serviceResult; // executeAction expects { success, data, description? }
+          return serviceResult;
         },
         { serviceName: 'ScytaleService' }
       );
     },
   },
-  getQuestionnaire: {
-    description: 'Fetches a single questionnaire by its ID from Scytale AI.',
+  getContextItemsByCompanyAndType: {
+    description: 'Fetches detailed information for a specific context type (e.g., control, policy) for a given company.',
     parameters: {
       type: 'object',
       properties: {
-        questionnaireId: { type: 'string', description: 'The ID of the questionnaire to fetch.' },
+        companyId: { type: 'string', description: 'The ID of the company.' },
+        contextType: { type: 'string', description: 'The type of the context item to fetch (e.g., "control", "policy").' },
       },
-      required: ['questionnaireId'],
+      required: ['companyId', 'contextType'],
       additionalProperties: false,
     },
-    function: async (params: GetQuestionnaireByIdArgs) => {
-      const actionName = 'getQuestionnaire';
-      if (!params.questionnaireId) {
-        throw new ActionValidationError('questionnaireId is required.', {
-          fieldErrors: { questionnaireId: 'questionnaireId is required.' },
+    function: async (params: { companyId: string; contextType: string }) => {
+      const actionName = 'getContextItemsByCompanyAndType';
+      if (!params.companyId) {
+        throw new ActionValidationError('companyId is required.', {
+          fieldErrors: { companyId: 'companyId is required.' },
         });
       }
-      // Assuming context.sessionId and context.companyId are validated/guaranteed
+      if (!params.contextType) {
+        throw new ActionValidationError('contextType is required.', {
+          fieldErrors: { contextType: 'contextType is required.' },
+        });
+      }
 
-      return executeAction<ScytaleQuestionnaire>(
+      return executeAction<ScytaleContextItem[]>(
         actionName,
         async () => {
-          const serviceResult = await getQuestionnaireById(context.sessionId, context.companyId, params.questionnaireId);
-          // Adapt if serviceResult uses 'error' for message instead of 'description'
+          const serviceResult = await getContextItemsByCompanyAndType(params.companyId, params.contextType);
           if (!serviceResult.success && serviceResult.error) {
             return { success: false, description: serviceResult.error, data: serviceResult.data };
           }
-          return serviceResult; // executeAction expects { success, data, description? }
+          return serviceResult;
+        },
+        { serviceName: 'ScytaleService' }
+      );
+    },
+  },
+  contextVectorSearch: {
+    description: 'Performs a vector search for context items based on a query.',
+    parameters: {
+      type: 'object',
+      properties: {
+        companyId: { type: 'string', description: 'The ID of the company.' },
+        query: { type: 'string', description: 'The search query.' },
+        limit: { type: 'number', description: 'Optional: The maximum number of results to return.' },
+      },
+      required: ['companyId', 'query'],
+      additionalProperties: false,
+    },
+    function: async (params: { companyId: string; query: string; limit?: number }) => {
+      const actionName = 'contextVectorSearch';
+      if (!params.companyId) {
+        throw new ActionValidationError('companyId is required.', {
+          fieldErrors: { companyId: 'companyId is required.' },
+        });
+      }
+      if (!params.query) {
+        throw new ActionValidationError('query is required.', {
+          fieldErrors: { query: 'query is required.' },
+        });
+      }
+
+      const searchRequest: ScytaleVectorSearchRequest = {
+        query: params.query,
+        ...(params.limit && { limit: params.limit }),
+      };
+
+      return executeAction<ScytaleVectorSearchResponse>(
+        actionName,
+        async () => {
+          const serviceResult = await contextVectorSearch(params.companyId, searchRequest);
+          if (!serviceResult.success && serviceResult.error) {
+            return { success: false, description: serviceResult.error, data: serviceResult.data };
+          }
+          return serviceResult;
         },
         { serviceName: 'ScytaleService' }
       );
