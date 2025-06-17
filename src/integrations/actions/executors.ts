@@ -155,8 +155,7 @@ export const executeFunctionCall = async (
         });
       }
 
-      const result = await functionFactory[functionName].function(processedArgs) as ActionResult;
-      console.log(`[executeFunctionCall] Raw result from ${functionName}:`, JSON.stringify(result, null, 2));
+      const result = await functionFactory[functionName].function(processedArgs) as ActionResult;     
 
       if (!result.success) {
         // If the result is not successful, publish failed message and return error result (not throw)

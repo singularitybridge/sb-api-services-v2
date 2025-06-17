@@ -152,7 +152,7 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
         assistantId: { type: 'string', description: 'The ID of the assistant to update' },
         name: { type: 'string', description: 'New name (title) for the assistant' },
         description: { type: 'string', description: 'New description for the assistant' },
-        llmModel: { type: 'string', description: 'New LLM model identifier (e.g., gpt-4o-mini)' },
+        llmModel: { type: 'string', description: 'New LLM model identifier (e.g., gpt-4.1-mini)' },
         llmProvider: { type: 'string', enum: ['openai', 'google', 'anthropic'], description: 'New LLM provider' },
         llmPrompt: { type: 'string', description: 'New LLM prompt for the assistant' },
       },

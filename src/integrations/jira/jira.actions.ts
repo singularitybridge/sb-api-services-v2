@@ -162,7 +162,17 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
       if (params.summary !== undefined) fieldsToUpdate.summary = params.summary;
       if (params.description !== undefined) fieldsToUpdate.description = params.description;
       if (params.assigneeAccountId !== undefined) fieldsToUpdate.assignee = params.assigneeAccountId === null ? null : { accountId: params.assigneeAccountId };
-      if (params.labels !== undefined) fieldsToUpdate.labels = params.labels;
+      if (params.labels !== undefined) {
+        if (Array.isArray(params.labels)) {
+          fieldsToUpdate.labels = params.labels;
+        } else if (typeof params.labels === 'object' && params.labels !== null) {
+          // Attempt to convert object values to an array for labels
+          fieldsToUpdate.labels = Object.values(params.labels);
+        } else {
+          // If it's some other unexpected type, assign as is or log a warning
+          fieldsToUpdate.labels = params.labels;
+        }
+      }
       const result = await updateJiraTicket(context.sessionId, context.companyId, { issueIdOrKey: params.issueIdOrKey, fields: fieldsToUpdate });
       if (result.success) return { success: true, data: result.data, message: result.message };
       throw new Error(result.error || 'Failed to update ticket');
