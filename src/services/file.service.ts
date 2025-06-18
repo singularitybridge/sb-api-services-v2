@@ -26,7 +26,7 @@ export async function uploadFile(
 
     // Validate the MIME type
     const supportedMimeTypes = [
-      'c', 'cpp', 'css', 'csv', 'docx', 'gif', 'html', 'java', 'jpeg', 'jpg', 'js', 'json',
+      'c', 'cpp', 'css', 'csv', 'docx', 'gif', 'html', 'java', 'jpeg', 'jpg', 'js', 'json', 'mp3',
       'md', 'pdf', 'php', 'png', 'pptx', 'py', 'rb', 'tar', 'tex', 'ts', 'txt', 'webp', 'xlsx', 'xml', 'zip'
     ];
     const fileExtension = path.extname(file.originalname).substring(1);
