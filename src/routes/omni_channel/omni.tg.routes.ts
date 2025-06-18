@@ -15,15 +15,25 @@ import { file } from 'googleapis/build/src/apis/file';
 import { transcribeAudioWhisper } from '../../services/speech.recognition.service';
 import { handleSessionMessage } from '../../services/assistant.service';
 
-const twilioClient = new Twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN,
-);
-
+let twilioClient: Twilio | undefined;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 const messagingRouter = express.Router();
 const waitingSoundTick =
   'https://red-labradoodle-6369.twil.io/assets/tick1.wav';
+
+if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+  twilioClient = new Twilio(
+    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_AUTH_TOKEN,
+  );
+} else {
+  console.warn("Twilio credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN) not found. Some omni.tg routes may not be available or fully functional.");
+  // messagingRouter.use((req, res) => {
+  //   res.status(503).send("Twilio dependent service is not configured on the server.");
+  // });
+  // We don't add a general 503 middleware here as some routes in this file might not depend on Twilio.
+  // Individual route handlers that use twilioClient should check for its existence.
+}
 
 messagingRouter.get('/webhook', (req, res) => {
   console.log('verify token ...', req.query);
@@ -162,6 +172,14 @@ messagingRouter.post('/whatsapp/reply', async (req, res) => {
     responseText = await response.text;
   }
   const limitedResponse = responseText.substring(0, 1600); // Limit response to 1600 characters
+
+  if (!twilioClient || !twilioPhoneNumber) {
+    console.error('Twilio client or phone number not initialized. Cannot send reply via Twilio.');
+    // Depending on the desired behavior, you might want to send an error response
+    // or simply log and not attempt to send via Twilio.
+    // For now, just logging and not sending.
+    return; 
+  }
 
   twilioClient.messages
     .create({

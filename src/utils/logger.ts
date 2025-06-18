@@ -6,8 +6,30 @@ dotenv.config();
 
 const { combine, timestamp, printf, colorize, json, errors } = winston.format;
 
-const logLevel = process.env.LOG_LEVEL || 'info';
-const logFormat = process.env.LOG_FORMAT || (process.env.NODE_ENV === 'production' ? 'json' : 'simple');
+const nodeEnv = process.env.NODE_ENV || 'development';
+if (!process.env.NODE_ENV) {
+  console.warn("NODE_ENV environment variable not set. Defaulting to 'development'.");
+}
+
+let logLevel = process.env.LOG_LEVEL;
+if (!logLevel) {
+  console.warn("LOG_LEVEL environment variable not set. Defaulting to 'info'.");
+  logLevel = 'info';
+}
+
+let logFormat = process.env.LOG_FORMAT;
+if (!logFormat) {
+  const defaultFormat = nodeEnv === 'production' ? 'json' : 'simple';
+  console.warn(`LOG_FORMAT environment variable not set. Defaulting to '${defaultFormat}'.`);
+  logFormat = defaultFormat;
+}
+
+const enableFileLogging = process.env.ENABLE_FILE_LOGGING === 'true';
+if (process.env.ENABLE_FILE_LOGGING === undefined && nodeEnv === 'production') {
+  // console.warn("ENABLE_FILE_LOGGING environment variable not set. File logging is disabled by default in production. Set to 'true' to enable.");
+  // No warning for this one as it's a common default to not log to files unless specified.
+}
+
 
 // Define colors for different log levels
 const levelColors = {
@@ -52,7 +74,7 @@ const customFormat = printf(({ level, message, timestamp: ts, ...metadata }) => 
   }
   
   // Add stack trace for errors if available
-  if (metadata.stack && process.env.NODE_ENV !== 'production') {
+  if (metadata.stack && nodeEnv !== 'production') {
     msg += `\n  Stack: ${metadata.stack}`;
   }
   
@@ -66,7 +88,7 @@ const simpleFormat = printf(({ level, message, timestamp: ts }) => {
 
 const transports: winston.transport[] = [];
 
-if (process.env.NODE_ENV !== 'production') {
+if (nodeEnv !== 'production') {
   transports.push(
     new winston.transports.Console({
       format: combine(
@@ -88,7 +110,7 @@ if (process.env.NODE_ENV !== 'production') {
     })
   );
   // Optional: File logging for production
-  if (process.env.ENABLE_FILE_LOGGING === 'true') {
+  if (enableFileLogging) {
     transports.push(
       new winston.transports.DailyRotateFile({
         filename: 'logs/application-%DATE%.log',

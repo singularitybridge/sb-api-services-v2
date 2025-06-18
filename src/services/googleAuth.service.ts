@@ -5,14 +5,23 @@ import { ICompany, Company } from '../models/Company';
 import { createCompany } from './company.service';
 
 const JWT_SECRET: string = process.env.JWT_SECRET || '';
-const CLIENT_ID: string = process.env.G_CLIENT_ID || '';
-const client = new OAuth2Client(CLIENT_ID);
+const G_CLIENT_ID_ENV: string | undefined = process.env.G_CLIENT_ID;
+let client: OAuth2Client | undefined;
+
+if (G_CLIENT_ID_ENV) {
+    client = new OAuth2Client(G_CLIENT_ID_ENV);
+} else {
+    console.warn("G_CLIENT_ID not found in environment variables. Google login will not be available.");
+}
 
 export const googleLogin = async (token: string): Promise<{ user: IUser; company: ICompany; sessionToken: string }> => {
+    if (!client || !G_CLIENT_ID_ENV) {
+        throw new Error('Google client not initialized. Google login is unavailable.');
+    }
     try {
         const ticket = await client.verifyIdToken({
             idToken: token,
-            audience: CLIENT_ID,
+            audience: G_CLIENT_ID_ENV, // Use the env variable directly here
         });
 
         const payload = ticket.getPayload();

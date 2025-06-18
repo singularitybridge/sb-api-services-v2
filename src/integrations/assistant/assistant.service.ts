@@ -315,7 +315,10 @@ export const askAnotherAssistant = async (
       };
       authToken = jwt.sign(tokenPayload, process.env.JWT_SECRET);
     } else {
-      console.warn('[askAnotherAssistant] Unable to generate JWT token, missing JWT_SECRET or user/company information');
+      console.warn('[askAnotherAssistant] Unable to generate JWT token, missing JWT_SECRET or user/company information. Falling back to INTERNAL_API_TOKEN or default.');
+      if (!process.env.INTERNAL_API_TOKEN) {
+        console.warn('[askAnotherAssistant] INTERNAL_API_TOKEN environment variable not set. Using default "internal" token. This may not be secure or intended for production.');
+      }
       authToken = process.env.INTERNAL_API_TOKEN || 'internal';
     }
 

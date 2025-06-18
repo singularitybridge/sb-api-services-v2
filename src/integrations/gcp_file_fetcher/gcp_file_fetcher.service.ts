@@ -4,8 +4,18 @@ import path from 'path';
 import mongoose from 'mongoose';
 import pdf from 'pdf-parse';
 
-const storage = new Storage();
-const bucketName = process.env.GCP_STORAGE_BUCKET || 'sb-ai-experiments-files'; // Ensure this matches your actual bucket name
+let storage: Storage | undefined;
+let bucketName: string | undefined = process.env.GCP_STORAGE_BUCKET;
+
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS) { // Assuming credentials are a prerequisite for storage
+  storage = new Storage();
+  if (!bucketName) {
+    console.warn("GCP_STORAGE_BUCKET environment variable not found. Using default 'sb-ai-experiments-files'. This might not be intended for production.");
+    bucketName = 'sb-ai-experiments-files';
+  }
+} else {
+  console.warn("GOOGLE_APPLICATION_CREDENTIALS not found. GCP file fetcher service will not be available.");
+}
 
 interface FetchFileParams {
   fileId: string;
@@ -17,6 +27,12 @@ export const fetchGcpFileContent = async (
   companyId: string,
   params: FetchFileParams
 ): Promise<{ success: boolean; data?: string | Buffer; error?: string }> => { // Updated return type
+  if (!storage || !bucketName) {
+    const errorMsg = "Google Cloud Storage not configured. Cannot fetch file.";
+    console.error(errorMsg);
+    // Return a structured error response instead of throwing, to align with expected return type
+    return { success: false, error: errorMsg }; 
+  }
   if (!params.fileId) {
     throw new Error('The fileId parameter is missing.');
   }
