@@ -11,21 +11,28 @@ import { file } from "googleapis/build/src/apis/file";
 import { transcribeAudioWhisper } from "../../services/speech.recognition.service";
 import { handleSessionMessage } from "../../services/assistant.service";
 
-const twilioClient = new Twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
-
+let twilioClient: Twilio | undefined;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 const twilioMessagingRouter = express.Router();
 const waitingSoundTick = "https://red-labradoodle-6369.twil.io/assets/tick1.wav";
 
+if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+  twilioClient = new Twilio(
+    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_AUTH_TOKEN
+  );
 
-twilioMessagingRouter.get("/whatsapp", (req, res) => {
-  twilioClient.messages.list().then((messages) => res.send(messages));
-});
+  twilioMessagingRouter.get("/whatsapp", (req, res) => {
+    if (!twilioClient) {
+      return res.status(503).send("Twilio client not initialized");
+    }
+    twilioClient.messages.list().then((messages) => res.send(messages));
+  });
 
-twilioMessagingRouter.post("/whatsapp/reply", async (req, res) => {
+  twilioMessagingRouter.post("/whatsapp/reply", async (req, res) => {
+    if (!twilioClient) {
+      return res.status(503).send("Twilio client not initialized");
+    }
   const {
     CallSid,
     CallStatus, // ringing/in-progress/completed
@@ -76,6 +83,11 @@ twilioMessagingRouter.post("/whatsapp/reply", async (req, res) => {
   if (typeof response === 'string') {
     const limitedResponse = response.substring(0, 1600); // Limit response to 1600 characters
 
+    if (!twilioClient || !twilioPhoneNumber) {
+      console.error('Twilio client or phone number not initialized. Cannot send WhatsApp reply.');
+      return res.status(503).send("Twilio client or phone number not initialized");
+    }
+
     twilioClient.messages
       .create({
         body: limitedResponse,
@@ -101,5 +113,12 @@ twilioMessagingRouter.post("/whatsapp/reply", async (req, res) => {
     res.status(200).send(); 
   }
 });
+} else {
+  console.warn("Twilio credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN) not found. Twilio messaging routes will not be available.");
+  // Optionally, define placeholder routes or a message indicating the service is unavailable
+  twilioMessagingRouter.use((req, res) => {
+    res.status(503).send("Twilio messaging service is not configured on the server.");
+  });
+}
 
 export { twilioMessagingRouter };

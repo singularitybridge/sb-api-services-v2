@@ -5,12 +5,12 @@ import { getApiKey } from './api.key.service';
 let pineconeClient: Pinecone | null = null;
 const INDEX_NAME = process.env.PINECONE_INDEX || 'journal';
 
-const initPinecone = () => {
+const initPinecone = (): Pinecone | null => {
+  if (!process.env.PINECONE_API_KEY) {
+    // console.warn('PINECONE_API_KEY environment variable not found. Pinecone client not initialized.');
+    return null;
+  }
   if (!pineconeClient) {
-    if (!process.env.PINECONE_API_KEY) {
-      throw new Error('PINECONE_API_KEY environment variable is required');
-    }
-    
     pineconeClient = new Pinecone({
       apiKey: process.env.PINECONE_API_KEY,
     });
@@ -26,6 +26,11 @@ export const upsertVector = async (
 ) => {
   try {
     const client = initPinecone();
+    if (!client) {
+      console.warn('Pinecone client not initialized. Skipping upsertVector.');
+      // Optionally, throw an error or return a specific status
+      return; 
+    }
     const index = client.index(INDEX_NAME);
     
     const openaiApiKey = await getApiKey(companyId, 'openai_api_key');
@@ -54,6 +59,11 @@ export const upsertVector = async (
 export const deleteVector = async (id: string) => {
   try {
     const client = initPinecone();
+    if (!client) {
+      console.warn('Pinecone client not initialized. Skipping deleteVector.');
+      // Optionally, throw an error or return a specific status
+      return;
+    }
     const index = client.index(INDEX_NAME);
     
     await index.deleteOne(id);
@@ -78,6 +88,11 @@ export const runVectorSearch = async ({
 }) => {
   try {
     const client = initPinecone();
+    if (!client) {
+      console.warn('Pinecone client not initialized. Skipping runVectorSearch.');
+      // Optionally, throw an error or return a specific status like an empty array
+      return []; 
+    }
     const index = client.index(INDEX_NAME);
     
     const openaiApiKey = await getApiKey(companyId, 'openai_api_key');

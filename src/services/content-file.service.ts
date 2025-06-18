@@ -3,8 +3,19 @@ import { Storage } from '@google-cloud/storage';
 import path from 'path';
 import mongoose from 'mongoose';
 
-const storage = new Storage();
-const bucketName = process.env.GCP_STORAGE_BUCKET || 'your-default-bucket-name';
+let storage: Storage | undefined;
+let bucketName: string | undefined = process.env.GCP_STORAGE_BUCKET;
+
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS) { // Assuming credentials are a prerequisite for storage
+  storage = new Storage();
+  if (!bucketName) {
+    console.warn("GCP_STORAGE_BUCKET environment variable not found. Using default 'your-default-bucket-name'. This might not be intended for production.");
+    bucketName = 'your-default-bucket-name';
+  }
+} else {
+  console.warn("GOOGLE_APPLICATION_CREDENTIALS not found. Google Cloud Storage service will not be available.");
+}
+
 
 export const uploadContentFile = async (
   file: Express.Multer.File,
@@ -14,6 +25,11 @@ export const uploadContentFile = async (
   sessionId?: string,
   fileId?: string
 ): Promise<{ success: boolean; data?: Partial<IContentFile>; error?: string }> => {
+  if (!storage || !bucketName) {
+    const errorMsg = "Google Cloud Storage not configured. Cannot upload file.";
+    console.error(errorMsg);
+    return { success: false, error: errorMsg };
+  }
   try {
     let contentFile;
     
@@ -132,6 +148,11 @@ export const uploadContentFile = async (
 };
 
 export const downloadContentFileText = async (fileId: string, companyId: string): Promise<string | null> => {
+  if (!storage || !bucketName) {
+    const errorMsg = "Google Cloud Storage not configured. Cannot download file text.";
+    console.error(errorMsg);
+    throw new Error(errorMsg); // Or return null depending on desired error handling
+  }
   try {
     console.log(`Attempting to download content for file ID: ${fileId} for company: ${companyId}`);
     
@@ -178,6 +199,11 @@ export const getContentFiles = async (companyId: string): Promise<IContentFile[]
 };
 
 export const deleteContentFile = async (fileId: string, companyId: string): Promise<{ success: boolean; error?: string }> => {
+  if (!storage || !bucketName) {
+    const errorMsg = "Google Cloud Storage not configured. Cannot delete file.";
+    console.error(errorMsg);
+    return { success: false, error: errorMsg };
+  }
   try {
     console.log(`Attempting to delete file with ID: ${fileId} for company: ${companyId}`);
     
