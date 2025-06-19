@@ -3,18 +3,52 @@ import { Storage } from '@google-cloud/storage';
 import path from 'path';
 import mongoose from 'mongoose';
 import pdf from 'pdf-parse';
+import { logger } from '../../utils/logger'; // Ensure logger is correctly imported
 
 let storage: Storage | undefined;
-let bucketName: string | undefined = process.env.GCP_STORAGE_BUCKET;
+let effectiveBucketName: string | undefined;
+let isGcpStorageConfigured = false;
 
-if (process.env.GOOGLE_APPLICATION_CREDENTIALS) { // Assuming credentials are a prerequisite for storage
-  storage = new Storage();
-  if (!bucketName) {
-    console.warn("GCP_STORAGE_BUCKET environment variable not found. Using default 'sb-ai-experiments-files'. This might not be intended for production.");
-    bucketName = 'sb-ai-experiments-files';
+const placeholderBucketName = 'sb-ai-experiments-files'; // Define placeholder based on original log
+
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  const envBucketName = process.env.GCP_STORAGE_BUCKET;
+  if (envBucketName && envBucketName.trim() !== '' && envBucketName !== placeholderBucketName) {
+    try {
+      storage = new Storage(); // Initialize storage client
+      effectiveBucketName = envBucketName;
+      isGcpStorageConfigured = true;
+      logger.info(`GcpFileFetcherService: GCP Storage configured with bucket: ${effectiveBucketName}`);
+    } catch (error) {
+      logger.error(`GcpFileFetcherService: Failed to initialize GCP Storage client for bucket ${envBucketName}. GCP Storage will be disabled. Error: ${(error as Error).message}`);
+      storage = undefined;
+      effectiveBucketName = undefined;
+      isGcpStorageConfigured = false;
+    }
+  } else {
+    if (!envBucketName || envBucketName.trim() === '') {
+      logger.warn(`GcpFileFetcherService: GCP_STORAGE_BUCKET environment variable not set or empty. GCP Storage functionality will be disabled.`);
+    } else if (envBucketName === placeholderBucketName) {
+      // This case means the .env has the placeholder, which is fine if it's intentional for a default bucket
+      // However, we still treat it as "configured" if it's explicitly set, even to the placeholder.
+      // The original logic used this placeholder as a default if env var was missing.
+      // For robust optionality, we might want to reconsider if placeholder means "not truly configured for unique use".
+      // For now, aligning with previous change: if it's the placeholder, treat as not configured for specific operations.
+      logger.warn(`GcpFileFetcherService: GCP_STORAGE_BUCKET is set to placeholder '${placeholderBucketName}'. Assuming not specifically configured; functionality may be limited or use a shared default.`);
+      // To strictly disable if it's the placeholder:
+      // isGcpStorageConfigured = false;
+      // However, the original code *would* use this placeholder if GCP_STORAGE_BUCKET was missing.
+      // Let's assume if it's explicitly set to the placeholder, it's intended (though odd).
+      // For safety, let's be stricter: if it's the placeholder, it's not "user-configured".
+      // This makes it consistent with content-file.service.ts
+       isGcpStorageConfigured = false; // Treat placeholder as not configured for unique operations
+       logger.warn(`GcpFileFetcherService: GCP_STORAGE_BUCKET is set to placeholder '${placeholderBucketName}'. GCP Storage functionality requiring a specific bucket will be disabled.`);
+    }
+     // isGcpStorageConfigured remains false unless explicitly set to a non-placeholder
   }
 } else {
-  console.warn("GOOGLE_APPLICATION_CREDENTIALS not found. GCP file fetcher service will not be available.");
+  logger.warn("GcpFileFetcherService: GOOGLE_APPLICATION_CREDENTIALS not found. GCP file fetcher service will not be available.");
+  // isGcpStorageConfigured remains false
 }
 
 interface FetchFileParams {
@@ -27,10 +61,9 @@ export const fetchGcpFileContent = async (
   companyId: string,
   params: FetchFileParams
 ): Promise<{ success: boolean; data?: string | Buffer; error?: string }> => { // Updated return type
-  if (!storage || !bucketName) {
-    const errorMsg = "Google Cloud Storage not configured. Cannot fetch file.";
-    console.error(errorMsg);
-    // Return a structured error response instead of throwing, to align with expected return type
+  if (!isGcpStorageConfigured || !storage || !effectiveBucketName) {
+    const errorMsg = "Google Cloud Storage not configured or not properly initialized. Cannot fetch file.";
+    logger.error(`fetchGcpFileContent: ${errorMsg}`);
     return { success: false, error: errorMsg }; 
   }
   if (!params.fileId) {
@@ -75,12 +108,12 @@ export const fetchGcpFileContent = async (
       throw new Error(`Could not extract blob name from URL: ${fileDocument.gcpStorageUrl}`);
     }
 
-    const bucket = storage.bucket(bucketName);
+    const bucket = storage.bucket(effectiveBucketName); // Changed bucketName to effectiveBucketName
     const blob = bucket.file(blobName);
 
     const [exists] = await blob.exists();
     if (!exists) {
-      throw new Error(`File not found in GCP bucket. Bucket: ${bucketName}, Blob: ${blobName}`);
+      throw new Error(`File not found in GCP bucket. Bucket: ${effectiveBucketName}, Blob: ${blobName}`); // Changed bucketName to effectiveBucketName
     }
 
     const [contents] = await blob.download(); // contents is a Buffer
