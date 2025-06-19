@@ -2,18 +2,39 @@ import { ContentFile, IContentFile } from '../models/ContentFile';
 import { Storage } from '@google-cloud/storage';
 import path from 'path';
 import mongoose from 'mongoose';
+import { logger } from '../utils/logger'; // Ensure logger is correctly imported
 
 let storage: Storage | undefined;
-let bucketName: string | undefined = process.env.GCP_STORAGE_BUCKET;
+let effectiveBucketName: string | undefined;
+let isGcpStorageConfigured = false;
 
-if (process.env.GOOGLE_APPLICATION_CREDENTIALS) { // Assuming credentials are a prerequisite for storage
-  storage = new Storage();
-  if (!bucketName) {
-    console.warn("GCP_STORAGE_BUCKET environment variable not found. Using default 'your-default-bucket-name'. This might not be intended for production.");
-    bucketName = 'your-default-bucket-name';
+const placeholderBucketName = 'your-default-bucket-name'; // Define placeholder
+
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  const envBucketName = process.env.GCP_STORAGE_BUCKET;
+  if (envBucketName && envBucketName.trim() !== '' && envBucketName !== placeholderBucketName) {
+    try {
+      storage = new Storage(); // Initialize storage client
+      effectiveBucketName = envBucketName;
+      isGcpStorageConfigured = true;
+      logger.info(`ContentFileService: GCP Storage configured with bucket: ${effectiveBucketName}`);
+    } catch (error) {
+      logger.error(`ContentFileService: Failed to initialize GCP Storage client for bucket ${envBucketName}. GCP Storage will be disabled. Error: ${(error as Error).message}`);
+      storage = undefined;
+      effectiveBucketName = undefined;
+      isGcpStorageConfigured = false;
+    }
+  } else {
+    if (!envBucketName || envBucketName.trim() === '') {
+      logger.warn(`ContentFileService: GCP_STORAGE_BUCKET environment variable not set or empty. GCP Storage functionality will be disabled.`);
+    } else if (envBucketName === placeholderBucketName) {
+      logger.warn(`ContentFileService: GCP_STORAGE_BUCKET is set to placeholder '${placeholderBucketName}'. GCP Storage functionality will be disabled.`);
+    }
+    // isGcpStorageConfigured remains false
   }
 } else {
-  console.warn("GOOGLE_APPLICATION_CREDENTIALS not found. Google Cloud Storage service will not be available.");
+  logger.warn("ContentFileService: GOOGLE_APPLICATION_CREDENTIALS not found. Google Cloud Storage service will not be available.");
+  // isGcpStorageConfigured remains false
 }
 
 
@@ -25,9 +46,9 @@ export const uploadContentFile = async (
   sessionId?: string,
   fileId?: string
 ): Promise<{ success: boolean; data?: Partial<IContentFile>; error?: string }> => {
-  if (!storage || !bucketName) {
-    const errorMsg = "Google Cloud Storage not configured. Cannot upload file.";
-    console.error(errorMsg);
+  if (!isGcpStorageConfigured || !storage || !effectiveBucketName) {
+    const errorMsg = "Google Cloud Storage not configured or not properly initialized. Cannot upload file.";
+    logger.error(`uploadContentFile: ${errorMsg}`);
     return { success: false, error: errorMsg };
   }
   try {
@@ -63,7 +84,7 @@ export const uploadContentFile = async (
         }
 
         // Delete existing file from GCP
-        const bucket = storage.bucket(bucketName);
+        const bucket = storage.bucket(effectiveBucketName); // Changed bucketName to effectiveBucketName
         // Strip query parameters before getting basename
         const urlWithoutParams = contentFile.gcpStorageUrl.split('?')[0];
         const existingBlobName = path.basename(urlWithoutParams);
@@ -102,7 +123,7 @@ export const uploadContentFile = async (
     // Use the file ID for GCP storage filename
     const fileExtension = path.extname(file.originalname);
     const uniqueFilename = `${contentFile._id}${fileExtension}`;
-    const bucket = storage.bucket(bucketName);
+    const bucket = storage.bucket(effectiveBucketName); // Changed bucketName to effectiveBucketName
     const blob = bucket.file(uniqueFilename);
 
     // Add timestamp to metadata to ensure uniqueness
@@ -148,10 +169,10 @@ export const uploadContentFile = async (
 };
 
 export const downloadContentFileText = async (fileId: string, companyId: string): Promise<string | null> => {
-  if (!storage || !bucketName) {
-    const errorMsg = "Google Cloud Storage not configured. Cannot download file text.";
-    console.error(errorMsg);
-    throw new Error(errorMsg); // Or return null depending on desired error handling
+  if (!isGcpStorageConfigured || !storage || !effectiveBucketName) { // Updated guard clause
+    const errorMsg = "Google Cloud Storage not configured or not properly initialized. Cannot download file text.";
+    logger.error(`downloadContentFileText: ${errorMsg}`); // Using logger
+    throw new Error(errorMsg);
   }
   try {
     console.log(`Attempting to download content for file ID: ${fileId} for company: ${companyId}`);
@@ -169,12 +190,12 @@ export const downloadContentFileText = async (fileId: string, companyId: string)
 
     console.log(`File metadata found: ${JSON.stringify(fileMetadata)}`);
 
-    const bucket = storage.bucket(bucketName);
+    const bucket = storage.bucket(effectiveBucketName); // Changed bucketName to effectiveBucketName
     // Strip query parameters from gcpStorageUrl to get the blob name
     const urlWithoutParams = fileMetadata.gcpStorageUrl.split('?')[0];
     const blobName = path.basename(urlWithoutParams);
     
-    console.log(`Attempting to download blob: ${blobName} from bucket: ${bucketName}`);
+    console.log(`Attempting to download blob: ${blobName} from bucket: ${effectiveBucketName}`); // Changed bucketName to effectiveBucketName
     
     const [fileBuffer] = await bucket.file(blobName).download();
     console.log(`Blob ${blobName} downloaded successfully`);
@@ -199,9 +220,9 @@ export const getContentFiles = async (companyId: string): Promise<IContentFile[]
 };
 
 export const deleteContentFile = async (fileId: string, companyId: string): Promise<{ success: boolean; error?: string }> => {
-  if (!storage || !bucketName) {
-    const errorMsg = "Google Cloud Storage not configured. Cannot delete file.";
-    console.error(errorMsg);
+  if (!isGcpStorageConfigured || !storage || !effectiveBucketName) { // Updated guard clause
+    const errorMsg = "Google Cloud Storage not configured or not properly initialized. Cannot delete file.";
+    logger.error(`deleteContentFile: ${errorMsg}`); // Using logger
     return { success: false, error: errorMsg };
   }
   try {
@@ -219,11 +240,11 @@ export const deleteContentFile = async (fileId: string, companyId: string): Prom
 
     console.log(`File found in database: ${JSON.stringify(file)}`);
 
-    const bucket = storage.bucket(bucketName);
+    const bucket = storage.bucket(effectiveBucketName); // Changed bucketName to effectiveBucketName
     // Strip query parameters before getting basename
     const urlWithoutParams = file.gcpStorageUrl.split('?')[0];
     const blobName = path.basename(urlWithoutParams);
-    console.log(`Attempting to delete blob: ${blobName} from bucket: ${bucketName}`);
+    console.log(`Attempting to delete blob: ${blobName} from bucket: ${effectiveBucketName}`); // Changed bucketName to effectiveBucketName
     
     const blob = bucket.file(blobName);
 

@@ -7,7 +7,7 @@ let agendaClient: Agenda | null = null;
 
 if (process.env.MONGODB_URI) {
   agendaClient = new Agenda({
-    db: { address: `${process.env.MONGODB_URI}/agenda` },
+    db: { address: process.env.MONGODB_URI, collection: 'agendaJobs' }, // Connect to the DB specified in MONGODB_URI and use 'agendaJobs' collection
   });
 }
 
