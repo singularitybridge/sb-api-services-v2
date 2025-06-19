@@ -10,24 +10,74 @@ const generateMessageId = (): string => {
 
 // Helper function to truncate large output for Pusher
 const truncateForPusher = (data: any, maxSize: number = 8000): any => {
+  // First, handle the case where data itself is an array (e.g. direct array output)
+  if (Array.isArray(data)) {
+    const jsonString = JSON.stringify(data);
+    if (jsonString.length <= maxSize) {
+      return data;
+    }
+    return {
+      summary: `Large dataset with ${data.length} items (truncated for display)`,
+      sample: data.slice(0, 2),
+      totalCount: data.length,
+      _isTruncatedList: true // Flag to help UI
+    };
+  }
+
+  // Handle objects, especially those that might contain a 'data' property that is an array
+  if (typeof data === 'object' && data !== null) {
+    const originalJsonString = JSON.stringify(data);
+    if (originalJsonString.length <= maxSize) {
+      return data;
+    }
+
+    // Check if the object has a 'data' property that is an array and is the main cause of largeness
+    // This specifically targets the structure { success: boolean, data: array, ... }
+    if (data.hasOwnProperty('data') && Array.isArray(data.data)) {
+      // Create a shell object without the large array to estimate its size
+      const tempData = { ...data };
+      delete tempData.data; // Remove the large array temporarily
+      const shellSize = JSON.stringify(tempData).length;
+      
+      // Calculate remaining size budget for the array's representation (summary/sample)
+      // Subtract a bit more for safety margin (e.g., for keys of the summary object itself)
+      const remainingSizeForArrayRepresentation = maxSize - shellSize - 150; 
+
+      if (remainingSizeForArrayRepresentation > 0) {
+        // Recursively call truncateForPusher for the inner array with the calculated budget
+        const truncatedInnerArraySummary = truncateForPusher(data.data, remainingSizeForArrayRepresentation);
+        
+        // Reconstruct the object with the truncated array part
+        const reconstructedData = {
+          ...data, // Keep other properties of the original object (like 'success')
+          data: truncatedInnerArraySummary, // Replace original array with its summary/truncated version
+          _isTruncatedOutput: true // Flag to help UI understand this object's 'data' field is modified
+        };
+        
+        // Final check if the reconstructed object is within limits
+        if (JSON.stringify(reconstructedData).length <= maxSize) {
+          return reconstructedData;
+        }
+      }
+    }
+    
+    // If not an array itself, and doesn't have a primary 'data' array that could be separately truncated,
+    // or if the above specific truncation didn't fit.
+    // Fallback to generic object truncation based on its stringified form.
+    return {
+      summary: "Large data response (object truncated for display)",
+      preview: originalJsonString.substring(0, maxSize - 200) + "... [truncated]", // Adjusted substring length
+      _isTruncatedObject: true // Flag to help UI
+    };
+  }
+
+  // For primitive types or anything else, just stringify and check length
   const jsonString = JSON.stringify(data);
   if (jsonString.length <= maxSize) {
     return data;
   }
-  
-  // If too large, provide summary instead of full data
-  if (Array.isArray(data)) {
-    return {
-      summary: `Large dataset with ${data.length} items (truncated for display)`,
-      sample: data.slice(0, 2), // Show first 2 items as sample
-      totalCount: data.length
-    };
-  }
-  
-  return {
-    summary: "Large data response (truncated for display)",
-    preview: jsonString.substring(0, maxSize - 100) + "... [truncated]"
-  };
+  // Generic truncation for other types (e.g. long strings)
+  return jsonString.substring(0, maxSize - 50) + "...[truncated]"; 
 };
 
 export const publishActionMessage = async (
