@@ -43,6 +43,13 @@ twilioVoiceRouter.post('/status', async (req, res) => {
 twilioVoiceRouter.post('/wait', async (req, res) => {
   const jobId = req.query.job as string;
   console.log(`wait, jobId: ${jobId}`);
+
+  if (!agendaClient) {
+    console.error('Agenda client is not initialized. Cannot retrieve job.');
+    res.status(503).send('Agenda service unavailable.');
+    return;
+  }
+
   const jobs = await agendaClient.jobs({ _id: new ObjectId(jobId) });
 
   if (jobs && jobs.length > 0) {
@@ -59,7 +66,7 @@ twilioVoiceRouter.post('/wait', async (req, res) => {
       const twiml = new VoiceResponse();
       twiml.play(waitingSoundTick);
       twiml.redirect(`/twilio/voice/wait?job=${jobId}`);
-      res.type('text/xml'); 
+      res.type('text/xml');
       res.send(twiml.toString());
     }
   } else {
@@ -68,10 +75,18 @@ twilioVoiceRouter.post('/wait', async (req, res) => {
 });
 
 twilioVoiceRouter.post('/recording', async (req, res) => {
-  const { CallSid, CallStatus, From, To, RecordingUrl } = req.body; 
+  const { CallSid, CallStatus, From, To, RecordingUrl } = req.body;
   const job = await scheduleJob('processVoiceRecording', { CallSid, CallStatus, From, To, RecordingUrl }, 'now');
   const twiml = new VoiceResponse();
-  
+
+  if (!job) {
+    console.error('Failed to schedule job. Agenda client might not be initialized.');
+    twiml.say('We are experiencing technical difficulties. Please try again later.');
+    res.type('text/xml');
+    res.send(twiml.toString());
+    return;
+  }
+
   twiml.redirect(`/twilio/voice/wait?job=${job.attrs._id}`);
   console.log(`record, redirect to /twilio/voice/wait?job=${job.attrs._id}`);
   res.type('text/xml');
