@@ -20,6 +20,49 @@ import { trimToWindow } from '../../utils/tokenWindow';
 import { getProvider } from './provider.service'; 
 // import util from 'node:util'; // No longer needed after debug log removal
 
+// Helper function to determine if a file format is unsupported
+const isUnsupportedFileFormat = (mimeType: string, fileName: string): boolean => {
+  // Список неподдерживаемых MIME типов
+  const unsupportedMimeTypes = [
+    'audio/',      // Все аудио форматы
+    'video/',      // Все видео форматы
+    'application/octet-stream', // Бинарные файлы, если не определен более конкретный тип
+  ];
+  
+  // Список неподдерживаемых расширений
+  const unsupportedExtensions = [
+    '.mp3', '.mp4', '.avi', '.mov', '.wav', '.flac', '.mkv',
+    '.webm', '.ogg', '.m4a', '.aac', '.wma', '.opus',
+    '.exe', '.dll', '.so', '.dylib', '.bin', '.zip', '.gz', '.tar', '.rar' // Добавлены архивы и исполняемые файлы
+  ];
+  
+  // Проверка MIME типа
+  const isUnsupportedMime = unsupportedMimeTypes.some(type => 
+    mimeType.startsWith(type)
+  );
+  
+  // Проверка расширения файла
+  const fileExtension = fileName.toLowerCase().match(/\.[^.]+$/)?.[0] || '';
+  const isUnsupportedExt = unsupportedExtensions.includes(fileExtension);
+  
+  // Если MIME тип известен и поддерживается (например, application/pdf, text/csv), не считаем его неподдерживаемым,
+  // даже если расширение попало в общий список (например, если кто-то назовет файл data.bin, но MIME text/csv)
+  const knownSupportedMimeTypes = [
+    'image/', 'application/pdf', 'text/csv', 'text/plain', 'application/json', 'text/html', 'text/xml', 
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // xlsx
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation' // pptx
+  ];
+
+  const isKnownSupportedMime = knownSupportedMimeTypes.some(type => mimeType.startsWith(type));
+
+  if (isKnownSupportedMime) {
+    return false; // Если MIME тип явно поддерживается, то формат поддерживается
+  }
+  
+  return isUnsupportedMime || isUnsupportedExt;
+};
+
 // Simple in-memory cache for toolsForSdk
 const toolsCache = new Map<string, Record<string, Tool<any, any>>>();
 
@@ -144,10 +187,25 @@ export const handleSessionMessage = async (
   // This will hold the parts for the user's message, including text, image, and file parts
   // Using a flexible type for modern PDF handling
   const userMessageContentParts: (TextPart | ImagePart | any)[] = [{ type: 'text', text: processedUserInput }];
+  let hasUnsupportedAttachment = false;
+  let firstUnsupportedAttachmentInfo: Attachment | null = null;
 
   if (attachments && attachments.length > 0) {
     // console.log(`Processing ${attachments.length} attachments for session ${sessionId} with provider ${providerKey}`);
     for (const attachment of attachments) {
+      // Check if the file format is unsupported first
+      if (isUnsupportedFileFormat(attachment.mimeType, attachment.fileName)) {
+        hasUnsupportedAttachment = true;
+        if (!firstUnsupportedAttachmentInfo) {
+          firstUnsupportedAttachmentInfo = attachment;
+        }
+        console.log(`[handleSessionMessage] Unsupported file detected: ${attachment.fileName} (MIME: ${attachment.mimeType}). Will be acknowledged directly.`);
+        // Do not append to userMessageContentParts[0].text for the direct response strategy.
+        // The attachment info will be in userMessage.data.attachments.
+        continue; // Skip specific content processing for this unsupported attachment, move to next attachment.
+      }
+
+      // Existing logic for supported attachments
       if (attachment.mimeType.startsWith('image/')) {
         try {
           // console.log(`Fetching image: ${attachment.fileName} from ${attachment.url}`);
@@ -237,33 +295,66 @@ export const handleSessionMessage = async (
     // If files were attached by appending text, their content IS in userMessageContentParts[0].text.
     // For simplicity in this change, we'll keep processedUserInput reflecting the primary text part.
     // The original user input is already stored in metadata.
+    // processedUserInput is updated based on text from *supported* files, if any.
     processedUserInput = (userMessageContentParts.find(part => part.type === 'text') as TextPart)?.text || userInput;
   }
 
   const userMessage = new Message({
     sessionId: new mongoose.Types.ObjectId(session._id),
     sender: 'user',
-    // Store the user's original typed text, or the text part if it was modified by errors/fallbacks.
-    // Avoid storing large extracted PDF text here if the PDF is sent as a blob.
-    content: (userMessageContentParts.find(part => part.type === 'text') as TextPart)?.text || userInput,
+    content: processedUserInput, // Contains original user text + text from supported files
     assistantId: new mongoose.Types.ObjectId(assistant._id),
     userId: new mongoose.Types.ObjectId(session.userId),
     timestamp: new Date(),
-    messageType: attachments && attachments.length > 0 ? 'file_upload_text' : 'text', 
+    messageType: attachments && attachments.length > 0 ? 'file_upload_text' : 'text',
     data: {
       ...(metadata || {}),
-      originalUserInput: userInput, 
-      attachments: attachments?.map(att => ({ 
+      originalUserInput: userInput,
+      attachments: attachments?.map(att => ({
         fileName: att.fileName,
         mimeType: att.mimeType,
         fileId: att.fileId,
-        url: att.url, 
+        url: att.url,
       }))
     },
   });
   console.log(`[handleSessionMessage] About to save user message for session ${sessionId}`);
   await userMessage.save();
   console.log(`[handleSessionMessage] User message saved for session ${sessionId}`);
+
+  // If an unsupported file was attached, send the specific assistant response and return, bypassing LLM for this turn.
+  if (hasUnsupportedAttachment && firstUnsupportedAttachmentInfo) {
+    console.log(`[handleSessionMessage] Condition for direct response MET: hasUnsupportedAttachment=true, fileName=${firstUnsupportedAttachmentInfo.fileName}, userInput="${userInput}"`);
+    let fileTypeDescription = "файл";
+    let followUpSuggestion = "Если нужно что-то еще, дайте знать!";
+
+    if (firstUnsupportedAttachmentInfo.mimeType.startsWith('audio/')) {
+        fileTypeDescription = "аудиофайл";
+        followUpSuggestion = "Хотите, я попробую сделать транскрипцию этого файла? Или вам нужна другая помощь?";
+    } else if (firstUnsupportedAttachmentInfo.mimeType.startsWith('video/')) {
+        fileTypeDescription = "видеофайл";
+        // Для видео пока нет предложения о транскрипции, можно добавить позже если появится функционал
+        followUpSuggestion = "Вы можете использовать эту ссылку для просмотра или скачивания. Если нужно что-то еще, дайте знать!";
+    }
+    
+    const formattedAssistantResponseText = `Вот ссылка на ${fileTypeDescription} "${firstUnsupportedAttachmentInfo.fileName}", который вы загрузили:\n${firstUnsupportedAttachmentInfo.url}\nВы можете использовать эту ссылку для прослушивания или скачивания. ${followUpSuggestion}`;
+
+    const assistantMessage = new Message({
+      sessionId: new mongoose.Types.ObjectId(session._id),
+      sender: 'assistant',
+      content: formattedAssistantResponseText,
+      assistantId: new mongoose.Types.ObjectId(assistant._id),
+      userId: new mongoose.Types.ObjectId(session.userId),
+      timestamp: new Date(),
+      messageType: 'text',
+    });
+    await assistantMessage.save();
+    console.log(`[handleSessionMessage] Saved direct assistant message for ${firstUnsupportedAttachmentInfo.fileName}. Content: "${formattedAssistantResponseText}"`);
+    console.log(`[handleSessionMessage] Returning direct response. Bypassing LLM.`);
+    return formattedAssistantResponseText; // Return non-streamed text directly
+  } else {
+    console.log(`[handleSessionMessage] Condition for direct response NOT MET: hasUnsupportedAttachment=${hasUnsupportedAttachment}, firstUnsupportedAttachmentInfo is ${firstUnsupportedAttachmentInfo ? 'set' : 'null'}, userInput="${userInput}". Proceeding to LLM call or further processing.`);
+  }
 
   console.log(`[handleSessionMessage] About to fetch DB messages for session ${sessionId}`);
   const dbMessages = await getMessagesBySessionId(sessionId.toString());
