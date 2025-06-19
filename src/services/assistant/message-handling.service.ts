@@ -22,31 +22,32 @@ import { getProvider } from './provider.service';
 
 // Helper function to determine if a file format is unsupported
 const isUnsupportedFileFormat = (mimeType: string, fileName: string): boolean => {
-  // Список неподдерживаемых MIME типов
+  // List of unsupported MIME types
   const unsupportedMimeTypes = [
-    'audio/',      // Все аудио форматы
-    'video/',      // Все видео форматы
-    'application/octet-stream', // Бинарные файлы, если не определен более конкретный тип
+    'audio/',      // All audio formats
+    'video/',      // All video formats
+    'application/octet-stream', // Binary files, if a more specific type is not defined
   ];
   
-  // Список неподдерживаемых расширений
+  // List of unsupported extensions
   const unsupportedExtensions = [
     '.mp3', '.mp4', '.avi', '.mov', '.wav', '.flac', '.mkv',
     '.webm', '.ogg', '.m4a', '.aac', '.wma', '.opus',
-    '.exe', '.dll', '.so', '.dylib', '.bin', '.zip', '.gz', '.tar', '.rar' // Добавлены архивы и исполняемые файлы
+    '.exe', '.dll', '.so', '.dylib', '.bin', '.zip', '.gz', '.tar', '.rar' // Archives and executables added
   ];
   
-  // Проверка MIME типа
+  // Check MIME type
   const isUnsupportedMime = unsupportedMimeTypes.some(type => 
     mimeType.startsWith(type)
   );
   
-  // Проверка расширения файла
+  // Check file extension
   const fileExtension = fileName.toLowerCase().match(/\.[^.]+$/)?.[0] || '';
   const isUnsupportedExt = unsupportedExtensions.includes(fileExtension);
   
-  // Если MIME тип известен и поддерживается (например, application/pdf, text/csv), не считаем его неподдерживаемым,
-  // даже если расширение попало в общий список (например, если кто-то назовет файл data.bin, но MIME text/csv)
+  // If the MIME type is known and supported (e.g., application/pdf, text/csv),
+  // do not consider it unsupported, even if the extension is in the general list
+  // (e.g., if someone names a file data.bin, but the MIME is text/csv)
   const knownSupportedMimeTypes = [
     'image/', 'application/pdf', 'text/csv', 'text/plain', 'application/json', 'text/html', 'text/xml', 
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
@@ -57,7 +58,7 @@ const isUnsupportedFileFormat = (mimeType: string, fileName: string): boolean =>
   const isKnownSupportedMime = knownSupportedMimeTypes.some(type => mimeType.startsWith(type));
 
   if (isKnownSupportedMime) {
-    return false; // Если MIME тип явно поддерживается, то формат поддерживается
+    return false; // If the MIME type is explicitly supported, then the format is supported
   }
   
   return isUnsupportedMime || isUnsupportedExt;
