@@ -325,19 +325,18 @@ export const handleSessionMessage = async (
   // If an unsupported file was attached, send the specific assistant response and return, bypassing LLM for this turn.
   if (hasUnsupportedAttachment && firstUnsupportedAttachmentInfo) {
     console.log(`[handleSessionMessage] Condition for direct response MET: hasUnsupportedAttachment=true, fileName=${firstUnsupportedAttachmentInfo.fileName}, userInput="${userInput}"`);
-    let fileTypeDescription = "файл";
-    let followUpSuggestion = "Если нужно что-то еще, дайте знать!";
+    let fileTypeDescription = "file";
+    let followUpSuggestion = "If you need anything else, let me know!";
 
     if (firstUnsupportedAttachmentInfo.mimeType.startsWith('audio/')) {
-        fileTypeDescription = "аудиофайл";
-        followUpSuggestion = "Хотите, я попробую сделать транскрипцию этого файла? Или вам нужна другая помощь?";
+        fileTypeDescription = "audio file";
+        followUpSuggestion = "Would you like me to try to transcribe this file? Or do you need other help?";
     } else if (firstUnsupportedAttachmentInfo.mimeType.startsWith('video/')) {
-        fileTypeDescription = "видеофайл";
-        // Для видео пока нет предложения о транскрипции, можно добавить позже если появится функционал
-        followUpSuggestion = "Вы можете использовать эту ссылку для просмотра или скачивания. Если нужно что-то еще, дайте знать!";
+        fileTypeDescription = "video file";
+        followUpSuggestion = "You can use this link to view or download. If you need anything else, let me know!";
     }
     
-    const formattedAssistantResponseText = `Вот ссылка на ${fileTypeDescription} "${firstUnsupportedAttachmentInfo.fileName}", который вы загрузили:\n${firstUnsupportedAttachmentInfo.url}\nВы можете использовать эту ссылку для прослушивания или скачивания. ${followUpSuggestion}`;
+    const formattedAssistantResponseText = `Here is the link to the ${fileTypeDescription} "${firstUnsupportedAttachmentInfo.fileName}" that you uploaded:\n${firstUnsupportedAttachmentInfo.url}\nYou can use this link to listen/view or download. ${followUpSuggestion}`;
 
     const assistantMessage = new Message({
       sessionId: new mongoose.Types.ObjectId(session._id),
