@@ -13,27 +13,27 @@ import { ActionValidationError } from '../../utils/actionErrors';
 
 export const createScytaleActions = (context: ActionContext): FunctionFactory => ({
   getContextTypesPerCompany: {
-    description: 'Fetches the list of available context types (e.g., audits, controls, policies) for a given company.',
+    description: 'Fetches the list of available context types (e.g., audits, controls, policies) for a given context.',
     parameters: {
       type: 'object',
       properties: {
-        companyId: { type: 'string', description: 'The ID of the company to fetch context types for.' },
+        contextId: { type: 'string', description: 'The ID of the context to fetch context types for.' },
       },
-      required: ['companyId'],
+      required: ['contextId'],
       additionalProperties: false,
     },
-    function: async (params: { companyId: string }) => {
+    function: async (params: { contextId: string }) => {
       const actionName = 'getContextTypesPerCompany';
-      if (!params.companyId) {
-        throw new ActionValidationError('companyId is required.', {
-          fieldErrors: { companyId: 'companyId is required.' },
+      if (!params.contextId) {
+        throw new ActionValidationError('contextId is required.', {
+          fieldErrors: { contextId: 'contextId is required.' },
         });
       }
 
       return executeAction<ScytaleContextTypeResponse>(
         actionName,
         async () => {
-          const serviceResult = await getContextTypesPerCompany(params.companyId);
+          const serviceResult = await getContextTypesPerCompany(params.contextId);
           if (!serviceResult.success && serviceResult.error) {
             return { success: false, description: serviceResult.error, data: serviceResult.data };
           }
@@ -44,21 +44,21 @@ export const createScytaleActions = (context: ActionContext): FunctionFactory =>
     },
   },
   getContextItemsByCompanyAndType: {
-    description: 'Fetches detailed information for a specific context type (e.g., control, policy) for a given company.',
+    description: 'Fetches detailed information for a specific context type (e.g., control, policy) for a given context.',
     parameters: {
       type: 'object',
       properties: {
-        companyId: { type: 'string', description: 'The ID of the company.' },
+        contextId: { type: 'string', description: 'The ID of the context.' },
         contextType: { type: 'string', description: 'The type of the context item to fetch (e.g., "control", "policy").' },
       },
-      required: ['companyId', 'contextType'],
+      required: ['contextId', 'contextType'],
       additionalProperties: false,
     },
-    function: async (params: { companyId: string; contextType: string }) => {
+    function: async (params: { contextId: string; contextType: string }) => {
       const actionName = 'getContextItemsByCompanyAndType';
-      if (!params.companyId) {
-        throw new ActionValidationError('companyId is required.', {
-          fieldErrors: { companyId: 'companyId is required.' },
+      if (!params.contextId) {
+        throw new ActionValidationError('contextId is required.', {
+          fieldErrors: { contextId: 'contextId is required.' },
         });
       }
       if (!params.contextType) {
@@ -70,7 +70,7 @@ export const createScytaleActions = (context: ActionContext): FunctionFactory =>
       return executeAction<ScytaleContextItem[]>(
         actionName,
         async () => {
-          const serviceResult = await getContextItemsByCompanyAndType(params.companyId, params.contextType);
+          const serviceResult = await getContextItemsByCompanyAndType(params.contextId, params.contextType);
           if (!serviceResult.success && serviceResult.error) {
             return { success: false, description: serviceResult.error, data: serviceResult.data };
           }
@@ -85,18 +85,18 @@ export const createScytaleActions = (context: ActionContext): FunctionFactory =>
     parameters: {
       type: 'object',
       properties: {
-        companyId: { type: 'string', description: 'The ID of the company.' },
+        contextId: { type: 'string', description: 'The ID of the context.' },
         query: { type: 'string', description: 'The search query.' },
         limit: { type: 'number', description: 'Optional: The maximum number of results to return.' },
       },
-      required: ['companyId', 'query'],
+      required: ['contextId', 'query'],
       additionalProperties: false,
     },
-    function: async (params: { companyId: string; query: string; limit?: number }) => {
+    function: async (params: { contextId: string; query: string; limit?: number }) => {
       const actionName = 'contextVectorSearch';
-      if (!params.companyId) {
-        throw new ActionValidationError('companyId is required.', {
-          fieldErrors: { companyId: 'companyId is required.' },
+      if (!params.contextId) {
+        throw new ActionValidationError('contextId is required.', {
+          fieldErrors: { contextId: 'contextId is required.' },
         });
       }
       if (!params.query) {
@@ -113,7 +113,7 @@ export const createScytaleActions = (context: ActionContext): FunctionFactory =>
       return executeAction<ScytaleVectorSearchResponse>(
         actionName,
         async () => {
-          const serviceResult = await contextVectorSearch(params.companyId, searchRequest);
+          const serviceResult = await contextVectorSearch(params.contextId, searchRequest);
           if (!serviceResult.success && serviceResult.error) {
             return { success: false, description: serviceResult.error, data: serviceResult.data };
           }
