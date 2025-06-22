@@ -354,7 +354,6 @@ export const fetchJiraTickets = async (
   sessionId: string,
   companyId: string,
   params: {
-    projectKey?: string; // Make projectKey optional if JQL is provided
     jql?: string; // Add jql as an optional parameter
     maxResults?: number;
     fieldsToFetch?: string[]; 
@@ -378,8 +377,21 @@ export const fetchJiraTickets = async (
     
     const defaultFieldsToFetch = ['summary', 'status', 'description', sprintFieldIdentifier];
     let fieldsToRequest = (params.fieldsToFetch && params.fieldsToFetch.length > 0)
-      ? params.fieldsToFetch
-      : defaultFieldsToFetch;
+      ? [...params.fieldsToFetch] // Create a mutable copy
+      : [...defaultFieldsToFetch];
+
+    // Dynamically replace 'storyPoints' with its actual field ID if present
+    const storyPointsIndex = fieldsToRequest.findIndex(f => f.toLowerCase() === 'storypoints');
+    if (storyPointsIndex !== -1) {
+      const storyPointsFieldId = await findStoryPointsFieldId(companyId);
+      if (storyPointsFieldId) {
+        fieldsToRequest.splice(storyPointsIndex, 1, storyPointsFieldId);
+      } else {
+        // If not found, remove it to prevent an API error, or log a warning
+        console.warn("Could not resolve 'storyPoints' to a field ID. It will be excluded from the request.");
+        fieldsToRequest.splice(storyPointsIndex, 1);
+      }
+    }
 
     if (params.fieldsToFetch && params.fieldsToFetch.length > 0) {
         if (!fieldsToRequest.includes('description')) fieldsToRequest.push('description');
@@ -394,13 +406,12 @@ export const fetchJiraTickets = async (
     let allSimplifiedTickets: any[] = []; 
     
     while (true) {
-      const jqlQuery = params.jql || `project = "${params.projectKey}"`; // Use provided JQL or default to projectKey
-      if (!params.jql && !params.projectKey) {
-        return { success: false, error: 'Either projectKey or JQL must be provided to fetch tickets.' };
+      if (!params.jql) {
+        return { success: false, error: 'JQL must be provided to fetch tickets.' };
       }
 
       const response = await jiraClient.issueSearch.searchForIssuesUsingJql({
-        jql: jqlQuery,
+        jql: params.jql,
         fields: fieldsToRequest, 
         startAt,
         maxResults,
@@ -891,10 +902,11 @@ export const getIssuesForSprint = async (
   companyId: string,
   params: {
     sprintId: string;
-    projectKey?: string; 
+    projectKey?: string;
     maxResults?: number;
     startAt?: number;
     fieldsToFetch?: string[];
+    assigneeAccountId?: string; // <-- Add the new parameter here
   }
 ): Promise<Result<{ issues: any[], total?: number, maxResults?: number, startAt?: number, message?: string }>> => {
   try {
@@ -927,11 +939,14 @@ export const getIssuesForSprint = async (
         {
           method: 'GET',
           url: `/rest/agile/1.0/sprint/${sprintIdNumber}/issue`,
-          params: { 
+          params: {
             startAt: startAt,
             maxResults: maxResults,
             fields: fieldsToRequest.join(','),
-            jql: params.projectKey ? `project = ${params.projectKey}` : undefined // Optional JQL filter by projectKey
+            jql: [
+              params.projectKey ? `project = ${params.projectKey}` : '',
+              params.assigneeAccountId ? `assignee = "${params.assigneeAccountId}"` : ''
+            ].filter(Boolean).join(' AND ') || undefined
           },
         },
         (error: any, data: any) => {
