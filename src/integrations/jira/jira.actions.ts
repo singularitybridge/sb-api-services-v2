@@ -41,7 +41,7 @@ interface AddTicketToCurrentSprintArgs { boardId: string; issueKey: string; }
 interface SearchUsersArgs { query?: string; startAt?: number; maxResults?: number; accountId?: string; }
 interface AssignTicketArgs { issueIdOrKey: string; accountId: string | null; }
 interface GetActiveSprintForBoardArgs { boardId: string; }
-interface GetIssuesForSprintArgs { sprintId: string; projectKey?: string; maxResults?: number; startAt?: number; fields?: string[]; }
+interface GetIssuesForSprintArgs { sprintId: string; projectKey?: string; maxResults?: number; startAt?: number; fields?: string[]; assigneeAccountId?: string; }
 interface MoveIssueToSprintArgs { issueKey: string; targetSprintId: string; }
 interface MoveIssueToBacklogArgs { issueKey: string; }
 interface GetAvailableTransitionsArgs { issueIdOrKey: string; }
@@ -103,17 +103,15 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
     },
   },
   fetchTickets: {
-    description: 'Fetches JIRA tickets. Can filter by project, assignee, or a custom JQL query. If JQL is provided, it takes precedence. Otherwise, projectKey is required. If assigneeAccountId is also provided, tickets are filtered by assignee within the project.',
+    description: 'Fetches JIRA tickets using a JQL query.',
     parameters: {
       type: 'object',
       properties: {
-        projectKey: { ...projectKeyParamDefinition, description: 'JIRA project key (e.g., "PROJ"). Required if not using a JQL query that specifies the project.' },
-        assigneeAccountId: { type: 'string', description: 'Optional: JIRA user account ID to filter tickets by assignee. Used in conjunction with projectKey if JQL is not provided.' },
-        jql: { type: 'string', description: 'Optional: Custom JQL query (e.g., "project = SB AND assignee = currentUser() ORDER BY created DESC"). If provided, this query is used directly.' },
+        jql: { type: 'string', description: 'Custom JQL query (e.g., "project = SB AND assignee = currentUser() ORDER BY created DESC").' },
         maxResults: { type: 'number', description: 'Optional: Maximum number of tickets to return. Defaults to 50.' },
         fields: { type: 'array', items: { type: 'string' }, description: "Optional: Specific fields to retrieve for each ticket (e.g., ['summary', 'status', 'assignee']). If omitted, a default set of fields is returned." }
       },
-      required: [] // Logical requirement: (projectKey OR jql with project context)
+      required: ['jql']
     },
     function: async (params: FetchTicketsArgs): Promise<StandardActionResult<any[]>> => {
       interface S_FetchTicketsServiceResponse {
@@ -122,26 +120,11 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
         description?: string;
       }
 
-      let jqlQuery = params.jql;
-
-      if (!jqlQuery) {
-        if (!params.projectKey) {
-          throw new Error('Project key is required if not providing a custom JQL query.');
-        }
-        jqlQuery = `project = "${params.projectKey}"`;
-        if (params.assigneeAccountId) {
-          jqlQuery += ` AND assignee = "${params.assigneeAccountId}"`;
-        }
-      }
-      // If params.jql is provided, it's used.
-      // If not, jqlQuery is constructed from projectKey and optionally assigneeAccountId.
-
       return executeAction<any[], S_FetchTicketsServiceResponse>(
         'jira.fetchTickets',
         async (): Promise<S_FetchTicketsServiceResponse> => {
           const serviceResult = await fetchJiraTickets(context.sessionId, context.companyId, {
-            projectKey: params.projectKey, // Pass projectKey for context, service might use it if JQL doesn't specify project
-            jql: jqlQuery,
+            jql: params.jql,
             maxResults: params.maxResults,
             fieldsToFetch: params.fields
           });
@@ -260,7 +243,13 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
     },
     function: async (params: SearchUsersArgs): Promise<StandardActionResult<any>> => {
       const result = await searchJiraUsers(context.sessionId, context.companyId, params);
-      if (result.success) return { success: true, data: result.data, message: result.message };
+      if (result.success) {
+        // If the search is successful but returns an empty array, inform the user.
+        if (Array.isArray(result.data) && result.data.length === 0) {
+          return { success: true, data: [], message: "No users found matching the query." };
+        }
+        return { success: true, data: result.data, message: result.message };
+      }
       throw new Error(result.error || 'Failed to search users');
     },
   },
@@ -291,26 +280,45 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
     },
     function: async (params: GetActiveSprintForBoardArgs): Promise<StandardActionResult<any>> => {
       const result = await getActiveSprintForBoardService(context.sessionId, context.companyId, params);
-      if (result.success) return { success: true, data: result.data, message: result.message };
+      if (result.success) {
+        // If successful but no active sprint is found (e.g., empty data or specific property missing)
+        if (!result.data || (Array.isArray(result.data) && result.data.length === 0)) {
+          return { success: true, data: null, message: "No active sprint found for the specified board." };
+        }
+        return { success: true, data: result.data, message: result.message };
+      }
       throw new Error(result.error || 'Failed to get active sprint');
     },
   },
-  getIssuesForSprint: { /* ... existing definition ... */ 
-    description: 'Gets issues assigned to a specific JIRA sprint. Can optionally filter by project key within that sprint.',
-    parameters: { 
-      type: 'object', 
-      properties: { 
-        sprintId: { type: 'string', description: "The numeric ID of the JIRA sprint." }, 
-        projectKey: { type: 'string', description: "Optional: JIRA project key to filter issues within the sprint." }, 
-        maxResults: { type: 'number', description: "Optional: Maximum number of issues to return. Defaults to 50." }, 
-        startAt: { type: 'number', description: "Optional: The index of the first issue to return (for pagination). Defaults to 0." }, 
-        fields: { type: 'array', items: { type: 'string' }, description: "Optional: Specific fields to retrieve for each issue. If omitted, a default set is returned." } 
-      }, 
-      required: ['sprintId'] 
+  getIssuesForSprint: {
+    description: 'Gets issues for a specific sprint. This is the primary action to get tickets for a sprint. It can be filtered by project and, most importantly, by assignee.',
+    parameters: {
+      type: 'object',
+      properties: {
+        sprintId: { type: 'string', description: "The numeric ID of the JIRA sprint." },
+        assigneeAccountId: { type: 'string', description: "Optional: The account ID of the user to filter the sprint's issues by." },
+        projectKey: { type: 'string', description: "Optional: JIRA project key to further filter issues within the sprint." },
+        maxResults: { type: 'number', description: "Optional: Maximum number of issues to return. Defaults to 50." },
+        startAt: { type: 'number', description: "Optional: The index of the first issue to return (for pagination). Defaults to 0." },
+        fields: { type: 'array', items: { type: 'string' }, description: "Optional: Specific fields to retrieve for each issue. If omitted, a default set is returned." }
+      },
+      required: ['sprintId']
     },
     function: async (params: GetIssuesForSprintArgs): Promise<StandardActionResult<any>> => {
-      const result = await getIssuesForSprintService(context.sessionId, context.companyId, { sprintId: params.sprintId, projectKey: params.projectKey, maxResults: params.maxResults, startAt: params.startAt, fieldsToFetch: params.fields });
-      if (result.success) return { success: true, data: result.data, message: result.message };
+      const result = await getIssuesForSprintService(context.sessionId, context.companyId, { 
+        sprintId: params.sprintId, 
+        projectKey: params.projectKey, 
+        maxResults: params.maxResults, 
+        startAt: params.startAt, 
+        fieldsToFetch: params.fields,
+        assigneeAccountId: params.assigneeAccountId 
+      });
+      if (result.success) {
+        if (Array.isArray(result.data) && result.data.length === 0) {
+          return { success: true, data: [], message: "No issues found for the specified user in this sprint." };
+        }
+        return { success: true, data: result.data, message: result.message };
+      }
       throw new Error(result.error || 'Failed to get issues for sprint');
     },
   },
@@ -604,7 +612,7 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
           if (!projectForJQL && !params.jqlQueryForIssues.toLowerCase().includes('project =')) {
               throw new Error('Project key is required for JQL unless JQL specifies the project.');
           }
-          const jqlResult = await fetchJiraTickets(context.sessionId, context.companyId, { projectKey: projectForJQL, jql: params.jqlQueryForIssues, fieldsToFetch: ['key'] });
+          const jqlResult = await fetchJiraTickets(context.sessionId, context.companyId, { jql: params.jqlQueryForIssues, fieldsToFetch: ['key'] });
           if (!jqlResult.success || !jqlResult.data) {
               throw new Error(`Failed to fetch issues with JQL: ${params.jqlQueryForIssues}. ${jqlResult.error || ''}`);
           }
