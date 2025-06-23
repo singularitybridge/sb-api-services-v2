@@ -160,15 +160,25 @@ threadRouter.post(
             'handleSessionMessage did not return a valid textStream for SSE. Result:',
             result,
           );
-          if (!res.writableEnded) {
-            const errorMessage = typeof result === 'string' 
-              ? `Expected a stream but received a string response: ${result.substring(0, 100)}...`
-              : "Failed to establish stream or received an unexpected response type.";
-            // Step 6: Structured error frame
-            res.write(
-              `event:error\ndata:${JSON.stringify({type:'error', errorDetails:{message: errorMessage}})}\n\n`
-            );
+          // MODIFICATION START: Handle direct string response in SSE mode
+          if (typeof result === 'string') {
+            // This is a direct string response (e.g., for unsupported files)
+            // Send it as a single 'token' event, similar to how stream chunks are sent.
+            console.log('[SSE] handleSessionMessage returned a direct string. Sending as a single message event.');
+            if (!res.writableEnded) {
+              res.write(`data:${JSON.stringify({ type: 'token', value: result })}\n\n`);
+            }
+          } else {
+            // This is an actual unexpected response type if it's not a stream and not a string.
+            console.error('[SSE] handleSessionMessage returned an unexpected response type (not a stream, not a string). Result:', result);
+            if (!res.writableEnded) {
+              const errorMessage = "Failed to establish stream or received an unexpected response type from message handler.";
+              res.write(
+                `event:error\ndata:${JSON.stringify({type:'error', errorDetails:{message: errorMessage}})}\n\n`
+              );
+            }
           }
+          // MODIFICATION END
         }
         if (!res.writableEnded) {
           res.write(`data:${JSON.stringify({ type:'done' })}\n\n`);

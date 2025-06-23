@@ -326,18 +326,22 @@ export const handleSessionMessage = async (
   // If an unsupported file was attached, send the specific assistant response and return, bypassing LLM for this turn.
   if (hasUnsupportedAttachment && firstUnsupportedAttachmentInfo) {
     console.log(`[handleSessionMessage] Condition for direct response MET: hasUnsupportedAttachment=true, fileName=${firstUnsupportedAttachmentInfo.fileName}, userInput="${userInput}"`);
-    let fileTypeDescription = "file";
-    let followUpSuggestion = "If you need anything else, let me know!";
-
+    let fileTypeForMessage = "file"; // Default for general unsupported files
     if (firstUnsupportedAttachmentInfo.mimeType.startsWith('audio/')) {
-        fileTypeDescription = "audio file";
-        followUpSuggestion = "Would you like me to try to transcribe this file? Or do you need other help?";
+        fileTypeForMessage = "audio file";
     } else if (firstUnsupportedAttachmentInfo.mimeType.startsWith('video/')) {
-        fileTypeDescription = "video file";
-        followUpSuggestion = "You can use this link to view or download. If you need anything else, let me know!";
+        fileTypeForMessage = "video file";
+    }
+    // For other unsupported types (e.g., archives, binaries identified by isUnsupportedFileFormat), 
+    // it will use "file". This can be expanded if more specific descriptions are needed.
+
+    let followUpMessage = `You can use this link to access or download the ${fileTypeForMessage}. If you need anything else, let me know!`;
+    if (fileTypeForMessage === "audio file") {
+        // Keep the specific offer for audio transcription
+        followUpMessage = `You can use this link to listen to the audio file or download it. Would you like me to try to transcribe this file, or do you need other help?`;
     }
     
-    const formattedAssistantResponseText = `Here is the link to the ${fileTypeDescription} "${firstUnsupportedAttachmentInfo.fileName}" that you uploaded:\n${firstUnsupportedAttachmentInfo.url}\nYou can use this link to listen/view or download. ${followUpSuggestion}`;
+    const formattedAssistantResponseText = `I've received the ${fileTypeForMessage} "${firstUnsupportedAttachmentInfo.fileName}".\nHere is the link: ${firstUnsupportedAttachmentInfo.url}\n${followUpMessage}`;
 
     const assistantMessage = new Message({
       sessionId: new mongoose.Types.ObjectId(session._id),
