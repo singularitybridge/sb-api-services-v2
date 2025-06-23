@@ -33,7 +33,7 @@ export const createScytaleActions = (context: ActionContext): FunctionFactory =>
       return executeAction<ScytaleContextTypeResponse>(
         actionName,
         async () => {
-          const serviceResult = await getContextTypesPerCompany(params.contextId);
+          const serviceResult = await getContextTypesPerCompany(context.companyId, params.contextId);
           if (!serviceResult.success && serviceResult.error) {
             return { success: false, description: serviceResult.error, data: serviceResult.data };
           }
@@ -70,7 +70,7 @@ export const createScytaleActions = (context: ActionContext): FunctionFactory =>
       return executeAction<ScytaleContextItem[]>(
         actionName,
         async () => {
-          const serviceResult = await getContextItemsByCompanyAndType(params.contextId, params.contextType);
+          const serviceResult = await getContextItemsByCompanyAndType(context.companyId, params.contextId, params.contextType);
           if (!serviceResult.success && serviceResult.error) {
             return { success: false, description: serviceResult.error, data: serviceResult.data };
           }
@@ -113,7 +113,7 @@ export const createScytaleActions = (context: ActionContext): FunctionFactory =>
       return executeAction<ScytaleVectorSearchResponse>(
         actionName,
         async () => {
-          const serviceResult = await contextVectorSearch(params.contextId, searchRequest);
+          const serviceResult = await contextVectorSearch(context.companyId, params.contextId, searchRequest);
           if (!serviceResult.success && serviceResult.error) {
             return { success: false, description: serviceResult.error, data: serviceResult.data };
           }

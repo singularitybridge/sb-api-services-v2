@@ -23,7 +23,8 @@ export type ApiKeyType =
   | 'jira_api_token'
   | 'jira_domain'
   | 'jira_email'
-  | 'scytale_api_key';
+  | 'scytale_base_url'
+  | 'scytale_auth_token';
 
 // Initialize cache with a 15-minute TTL (time to live)
 const apiKeyCache = new NodeCache({ stdTTL: 900 });
