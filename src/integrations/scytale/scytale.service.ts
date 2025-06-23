@@ -1,6 +1,5 @@
 import fetch from 'node-fetch';
-
-const BASE_URL = 'http://localhost:3002/context';
+import { getApiKey } from '../../services/api.key.service';
 
 export interface ScytaleContextTypeResponse {
     contextId: string;
@@ -38,11 +37,28 @@ export interface ScytaleVectorSearchResponse {
  * @returns A promise that resolves to an object indicating success or failure, with data if successful.
  */
 export const getContextTypesPerCompany = async (
+  companyId: string,
   contextId: string,
 ): Promise<{ success: boolean; data?: ScytaleContextTypeResponse; error?: string }> => {
   try {
-    const url = `${BASE_URL}/${contextId}/types`;
-    const response = await fetch(url);
+    let scytaleBaseUrl = await getApiKey(companyId, 'scytale_base_url');
+    const scytaleAuthToken = await getApiKey(companyId, 'scytale_auth_token');
+
+    if (!scytaleBaseUrl) {
+      throw new Error('Scytale Base URL not configured.');
+    }
+
+    // Temporary fix: Ensure the base URL ends with /context if it's missing
+    if (!scytaleBaseUrl.endsWith('/context')) {
+      scytaleBaseUrl = `${scytaleBaseUrl}/context`;
+    }
+
+    const url = `${scytaleBaseUrl}/${contextId}/types`;
+    const headers: Record<string, string> = {};
+    if (scytaleAuthToken) {
+      headers['Authorization'] = `Bearer ${scytaleAuthToken}`;
+    }
+    const response = await fetch(url, { headers });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -64,6 +80,7 @@ export const getContextTypesPerCompany = async (
  * @returns A promise that resolves to an object indicating success or failure, with data if successful.
  */
 export const getContextItemsByCompanyAndType = async (
+  companyId: string,
   contextId: string,
   contextType: string,
 ): Promise<{ success: boolean; data?: ScytaleContextItem[]; error?: string }> => {
@@ -71,8 +88,24 @@ export const getContextItemsByCompanyAndType = async (
     throw new Error('Both contextId and contextType parameters are required.');
   }
   try {
-    const url = `${BASE_URL}/${contextId}/${contextType}/items`;
-    const response = await fetch(url);
+    let scytaleBaseUrl = await getApiKey(companyId, 'scytale_base_url');
+    const scytaleAuthToken = await getApiKey(companyId, 'scytale_auth_token');
+
+    if (!scytaleBaseUrl) {
+      throw new Error('Scytale Base URL not configured.');
+    }
+
+    // Temporary fix: Ensure the base URL ends with /context if it's missing
+    if (!scytaleBaseUrl.endsWith('/context')) {
+      scytaleBaseUrl = `${scytaleBaseUrl}/context`;
+    }
+
+    const url = `${scytaleBaseUrl}/${contextId}/${contextType}/items`;
+    const headers: Record<string, string> = {};
+    if (scytaleAuthToken) {
+      headers['Authorization'] = `Bearer ${scytaleAuthToken}`;
+    }
+    const response = await fetch(url, { headers });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -94,6 +127,7 @@ export const getContextItemsByCompanyAndType = async (
  * @returns A promise that resolves to an object indicating success or failure, with data if successful.
  */
 export const contextVectorSearch = async (
+  companyId: string,
   contextId: string,
   searchRequest: ScytaleVectorSearchRequest,
 ): Promise<{ success: boolean; data?: ScytaleVectorSearchResponse; error?: string }> => {
@@ -101,12 +135,28 @@ export const contextVectorSearch = async (
     throw new Error('contextId and a search query are required for vector search.');
   }
   try {
-    const url = `${BASE_URL}/${contextId}/search`;
+    let scytaleBaseUrl = await getApiKey(companyId, 'scytale_base_url');
+    const scytaleAuthToken = await getApiKey(companyId, 'scytale_auth_token');
+
+    if (!scytaleBaseUrl) {
+      throw new Error('Scytale Base URL not configured.');
+    }
+
+    // Temporary fix: Ensure the base URL ends with /context if it's missing
+    if (!scytaleBaseUrl.endsWith('/context')) {
+      scytaleBaseUrl = `${scytaleBaseUrl}/context`;
+    }
+
+    const url = `${scytaleBaseUrl}/${contextId}/search`;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (scytaleAuthToken) {
+      headers['Authorization'] = `Bearer ${scytaleAuthToken}`;
+    }
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(searchRequest),
     });
 
