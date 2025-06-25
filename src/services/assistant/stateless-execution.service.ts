@@ -5,7 +5,7 @@ import { createFunctionFactory } from '../../integrations/actions/loaders';
 import { executeFunctionCall } from '../../integrations/actions/executors';
 import { FunctionCall } from '../../integrations/actions/types';
 import { getApiKey } from '../api.key.service';
-import { fetchGcpFileContent } from '../../integrations/gcp_file_fetcher/gcp_file_fetcher.service';
+import { downloadFile } from '../file-downloader.service';
 import axios from 'axios';
 import { generateText, tool, streamText, CoreMessage, StreamTextResult, Tool, ImagePart, TextPart, generateObject } from 'ai';
 import { z, ZodTypeAny } from 'zod';
@@ -90,40 +90,20 @@ export const executeAssistantStateless = async (
           console.error(`Error fetching image ${attachment.fileName}:`, error);
           (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load image: ${attachment.fileName}]`;
         }
-      } else if (attachment.fileId && attachment.mimeType === 'application/pdf') {
-        try {
-          const pdfBufferResult = await fetchGcpFileContent("stateless_execution", companyId, { fileId: attachment.fileId, returnAs: 'buffer' });
-          if (pdfBufferResult.success && pdfBufferResult.data instanceof Buffer) {
-            const fileContentResult = await fetchGcpFileContent("stateless_execution", companyId, { fileId: attachment.fileId, returnAs: 'string' });
-            if (fileContentResult.success && typeof fileContentResult.data === 'string') {
-              let pdfTextToAppend = fileContentResult.data;
-              const MAX_PDF_TEXT_CHARS = 7000;
-              if (pdfTextToAppend.length > MAX_PDF_TEXT_CHARS) {
-                pdfTextToAppend = pdfTextToAppend.substring(0, MAX_PDF_TEXT_CHARS) + "\n\n[...PDF text truncated...]\n";
-              }
-              (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached PDF: ${attachment.fileName} ---\n${pdfTextToAppend}\n--- End of File ---`;
-            } else {
-               (userMessageContentParts[0] as TextPart).text += `\n\n[Could not extract text from PDF: ${attachment.fileName}]`;
-            }
-          } else {
-             (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load PDF: ${attachment.fileName}]`;
-          }
-        } catch (error) {
-          console.error(`Error processing PDF ${attachment.fileName}:`, error);
-          (userMessageContentParts[0] as TextPart).text += `\n\n[Error loading PDF: ${attachment.fileName}]`;
-        }
       } else if (attachment.fileId) {
         try {
-          const fileContentResult = await fetchGcpFileContent("stateless_execution", companyId, { fileId: attachment.fileId, returnAs: 'string' });
-            if (fileContentResult.success && typeof fileContentResult.data === 'string') {
-              let fileTextToAppend = fileContentResult.data;
-              const MAX_FILE_TEXT_CHARS = 10000; // Max characters for appended file content
-              if (fileTextToAppend.length > MAX_FILE_TEXT_CHARS) {
-                fileTextToAppend = fileTextToAppend.substring(0, MAX_FILE_TEXT_CHARS) + `\n\n[...File text truncated: ${attachment.fileName}...]\n`;
-              }
-              (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached File: ${attachment.fileName} ---\n${fileTextToAppend}\n--- End of File ---`;
-            } else {
-              (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load file: ${attachment.fileName}]`;
+          const fileBuffer = await downloadFile(attachment.url);
+          const fileContent = fileBuffer.toString('utf-8');
+
+          if (fileContent) {
+            let fileTextToAppend = fileContent;
+            const MAX_FILE_TEXT_CHARS = 10000; // Max characters for appended file content
+            if (fileTextToAppend.length > MAX_FILE_TEXT_CHARS) {
+              fileTextToAppend = fileTextToAppend.substring(0, MAX_FILE_TEXT_CHARS) + `\n\n[...File text truncated: ${attachment.fileName}...]\n`;
+            }
+            (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached File: ${attachment.fileName} ---\n${fileTextToAppend}\n--- End of File ---`;
+          } else {
+            (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load file: ${attachment.fileName}]`;
           }
         } catch (error) {
           console.error(`Error processing file ${attachment.fileName}:`, error);

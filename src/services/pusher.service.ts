@@ -1,11 +1,11 @@
 import Pusher from 'pusher';
 
 const pusher = new Pusher({
-  appId: '1624583',
-  key: '7e8897731876adb4652f',
-  secret: 'f4becb3e048e4652c519',
-  cluster: 'eu',
-  useTLS: true,
+  appId: process.env.PUSHER_APP_ID!,
+  key: process.env.PUSHER_KEY!,
+  secret: process.env.PUSHER_SECRET!,
+  cluster: process.env.PUSHER_CLUSTER!,
+  useTLS: process.env.PUSHER_USE_TLS === 'true',
 });
 
 export const publishMessage = async (
