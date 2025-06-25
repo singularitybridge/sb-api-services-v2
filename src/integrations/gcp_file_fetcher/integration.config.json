@@ -1,7 +1,0 @@
-{
-  "name": "gcp_file_fetcher",
-  "icon": "cloud-download", 
-  "apiKeyName": null,
-  "actionCreator": "createGcpFileFetcherActions",
-  "actionsFile": "gcp_file_fetcher.actions.ts"
-}

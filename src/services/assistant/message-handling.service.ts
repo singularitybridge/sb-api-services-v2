@@ -10,7 +10,7 @@ import { createFunctionFactory } from '../../integrations/actions/loaders';
 import { executeFunctionCall } from '../../integrations/actions/executors';
 import { FunctionCall } from '../../integrations/actions/types';
 import { getApiKey } from '../api.key.service'; 
-import { fetchGcpFileContent } from '../../integrations/gcp_file_fetcher/gcp_file_fetcher.service';
+import { downloadFile } from '../file-downloader.service';
 import axios from 'axios'; // Added axios for fetching image data
 
 // Vercel AI SDK imports
@@ -166,62 +166,17 @@ export const handleSessionMessage = async (
           // Append error info to the text part of the user message
           (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load image: ${attachment.fileName}]`;
         }
-      } else if (attachment.fileId && attachment.mimeType === 'application/pdf') { // Modern PDF handling
-        try {
-          // console.log(`Fetching PDF content AS BUFFER: ${attachment.fileName} (ID: ${attachment.fileId}) for ${providerKey}`);
-          const pdfBufferResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'buffer' });
-
-          if (pdfBufferResult.success && pdfBufferResult.data instanceof Buffer) {
-            // For now, use text extraction approach for all providers until file parts are fully stable
-            const fileContentResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'string' });
-            if (fileContentResult.success && typeof fileContentResult.data === 'string') {
-              let pdfTextToAppend = fileContentResult.data;
-              const MAX_PDF_TEXT_CHARS = 7000;
-              if (pdfTextToAppend.length > MAX_PDF_TEXT_CHARS) {
-                pdfTextToAppend = pdfTextToAppend.substring(0, MAX_PDF_TEXT_CHARS) + "\n\n[...PDF text truncated due to length...]\n";
-                // console.log(`Truncated extracted PDF text for ${attachment.fileName} to ${MAX_PDF_TEXT_CHARS} characters.`);
-              }
-              (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached PDF: ${attachment.fileName} ---\n${pdfTextToAppend}\n--- End of File ---`;
-              // console.log(`${providerKey} PDF attachment processed as text extraction: ${attachment.fileName}`);
-            } else {
-              // Fallback for unknown providers: text extraction
-              const fileContentResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'string' });
-              if (fileContentResult.success && typeof fileContentResult.data === 'string') {
-                (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached PDF (text fallback): ${attachment.fileName} ---\n${fileContentResult.data.slice(0, 7000)}\n--- End of File ---`;
-              } else {
-                (userMessageContentParts[0] as TextPart).text += `\n\n[PDF omitted: provider ${providerKey} does not support files]`;
-              }
-              // console.log(`PDF processed as text fallback for ${providerKey}: ${attachment.fileName}`);
-            }
-          } else {
-            // console.warn(`Could not fetch PDF as buffer: ${attachment.fileName}. Error: ${pdfBufferResult.error || 'Unknown error'}. Falling back to text extraction.`);
-            const fileContentResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'string' });
-            if (fileContentResult.success && typeof fileContentResult.data === 'string') {
-              let pdfTextToAppend = fileContentResult.data;
-              const MAX_PDF_TEXT_CHARS = 7000;
-              if (pdfTextToAppend.length > MAX_PDF_TEXT_CHARS) {
-                pdfTextToAppend = pdfTextToAppend.substring(0, MAX_PDF_TEXT_CHARS) + "\n\n[...PDF text truncated due to length...]\n";
-                // console.log(`Truncated extracted PDF text for ${attachment.fileName} to ${MAX_PDF_TEXT_CHARS} characters.`);
-              }
-              (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached PDF (text fallback): ${attachment.fileName} ---\n${pdfTextToAppend}\n--- End of File ---`;
-            } else {
-              (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load PDF content: ${attachment.fileName}]`;
-            }
-          }
-        } catch (error) {
-          // console.error(`Error fetching/processing PDF ${attachment.fileName}:`, error);
-          (userMessageContentParts[0] as TextPart).text += `\n\n[Error loading PDF: ${attachment.fileName}]`;
-        }
       } else if (attachment.fileId) { // Other non-image files (TXT, CSV, etc.)
         try {
           // console.log(`Fetching non-image file content AS TEXT: ${attachment.fileName} (ID: ${attachment.fileId}) for provider ${providerKey}`);
-          const fileContentResult = await fetchGcpFileContent(sessionId, session.companyId.toString(), { fileId: attachment.fileId, returnAs: 'string' });
+          const fileBuffer = await downloadFile(attachment.url);
+          const fileContent = fileBuffer.toString('utf-8');
           
-          if (fileContentResult.success && typeof fileContentResult.data === 'string') {
-            (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached File: ${attachment.fileName} ---\n${fileContentResult.data}\n--- End of File: ${attachment.fileName} ---`;
+          if (fileContent) {
+            (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached File: ${attachment.fileName} ---\n${fileContent}\n--- End of File: ${attachment.fileName} ---`;
             // console.log(`Non-image file content (text) appended for ${providerKey}: ${attachment.fileName}`);
           } else {
-            // console.warn(`Could not fetch content for file: ${attachment.fileName} (ID: ${attachment.fileId}). Result: ${JSON.stringify(fileContentResult)}`);
+            // console.warn(`Could not fetch content for file: ${attachment.fileName} (ID: ${attachment.fileId}).`);
             (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load content for attached file: ${attachment.fileName}]`;
           }
         } catch (error) {
