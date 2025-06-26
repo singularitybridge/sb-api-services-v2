@@ -40,19 +40,6 @@ let sprintFieldIdCache: string | null = null;
 // --- END NEW CACHE VARIABLES ---
 
 const initializeClient = async (companyId: string): Promise<Version3Client> => {
-  // Removed 'if (client) return client;' to ensure fresh client if companyId changes context,
-  // or ensure client is re-initialized if previous init failed for a different company.
-  // If client management needs to be per-company, a Map could be used.
-  // For now, assume one client instance is okay, but re-init if called with different companyId logic.
-  // Or, more simply, always re-init for safety in a stateless function call context.
-  // Let's stick to the original simple caching for now, assuming companyId context is managed by caller.
-  if (client) { // Simple cache, assuming same company context for subsequent calls within a short timeframe
-      // A more robust solution might involve a map of clients per companyId or invalidating on companyId change.
-      // For now, this matches the original behavior.
-      return client;
-  }
-
-
   const apiToken = await getApiKey(companyId, 'jira_api_token');
   const domain = await getApiKey(companyId, 'jira_domain');
   const email = await getApiKey(companyId, 'jira_email');
@@ -63,7 +50,7 @@ const initializeClient = async (companyId: string): Promise<Version3Client> => {
 
   const host = domain.endsWith('.atlassian.net') ? `https://${domain}/` : `https://${domain}.atlassian.net/`;
 
-  client = new Version3Client({
+  const newClient = new Version3Client({
     host,
     authentication: {
       basic: {
@@ -73,7 +60,7 @@ const initializeClient = async (companyId: string): Promise<Version3Client> => {
     }
   });
 
-  return client;
+  return newClient;
 };
 
 // --- BEGIN NEW SERVICE FUNCTIONS ---
