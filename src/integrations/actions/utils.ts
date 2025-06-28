@@ -6,11 +6,13 @@ export const sanitizeFunctionName = (name: string): string =>
   name.replace(/\./g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
 
 export const getIntegrationFolders = (integrationsPath: string): string[] =>
-  readdirSync(integrationsPath).filter(folder =>
-    existsSync(join(integrationsPath, folder, 'integration.config.json'))
+  readdirSync(integrationsPath).filter((folder) =>
+    existsSync(join(integrationsPath, folder, 'integration.config.json')),
   );
 
-export const loadConfig = (configPath: string): Record<string, unknown> | null => {
+export const loadConfig = (
+  configPath: string,
+): Record<string, unknown> | null => {
   try {
     return require(configPath);
   } catch (error) {
@@ -21,28 +23,31 @@ export const loadConfig = (configPath: string): Record<string, unknown> | null =
 
 export const createPrefixedActions = (
   actionObj: FunctionFactory,
-  integrationName: string
+  integrationName: string,
 ): FunctionFactory =>
   Object.fromEntries(
     Object.entries(actionObj).map(([actionName, funcDef]) => {
       const fullActionName = `${integrationName}.${actionName}`;
       const sanitizedName = sanitizeFunctionName(fullActionName);
-      return [sanitizedName, {
-        ...(funcDef as FunctionDefinition<any>),
-        originalName: fullActionName
-      }];
-    })
+      return [
+        sanitizedName,
+        {
+          ...(funcDef as FunctionDefinition<any>),
+          originalName: fullActionName,
+        },
+      ];
+    }),
   );
 
 export const filterAllowedActions = (
   allActions: FunctionFactory,
-  allowedActions: string[]
+  allowedActions: string[],
 ): FunctionFactory => {
   const sanitizedAllowedActions = allowedActions.map(sanitizeFunctionName);
   return Object.fromEntries(
     Object.entries(allActions).filter(([actionName]) =>
-      sanitizedAllowedActions.includes(actionName)
-    )
+      sanitizedAllowedActions.includes(actionName),
+    ),
   ) as FunctionFactory;
 };
 
@@ -65,8 +70,6 @@ export const convertOpenAIFunctionName = (name: string): string => {
   return `${integrationName}.${formattedActionName}`;
 };
 
-
-
 export interface DetailedError {
   message: string;
   name?: string;
@@ -84,10 +87,16 @@ export interface DetailedError {
   details?: Record<string, unknown>;
 }
 
-import { ActionExecutionError, ActionValidationError, ActionServiceError, BaseActionError } from '../../utils/actionErrors'; // Import custom errors
+import {
+  ActionExecutionError,
+  ActionValidationError,
+  ActionServiceError,
+  BaseActionError,
+} from '../../utils/actionErrors'; // Import custom errors
 
 export const extractErrorDetails = (error: unknown): DetailedError => {
-  if (error instanceof BaseActionError) { // Handle our custom errors first for specific properties
+  if (error instanceof BaseActionError) {
+    // Handle our custom errors first for specific properties
     const baseDetails: DetailedError = {
       message: error.message,
       name: error.name,
@@ -102,14 +111,37 @@ export const extractErrorDetails = (error: unknown): DetailedError => {
         originalError: error.originalError, // This might still be complex, consider further processing if needed
         statusCode: error.statusCode,
         // Capture any other enumerable properties not explicitly handled, if any
-        details: Object.fromEntries(Object.entries(error).filter(([key]) => !['name', 'message', 'stack', 'actionName', 'originalError', 'statusCode'].includes(key)))
+        details: Object.fromEntries(
+          Object.entries(error).filter(
+            ([key]) =>
+              ![
+                'name',
+                'message',
+                'stack',
+                'actionName',
+                'originalError',
+                'statusCode',
+              ].includes(key),
+          ),
+        ),
       };
     } else if (error instanceof ActionValidationError) {
       return {
         ...baseDetails,
         fieldErrors: error.fieldErrors,
         statusCode: error.statusCode,
-        details: Object.fromEntries(Object.entries(error).filter(([key]) => !['name', 'message', 'stack', 'fieldErrors', 'statusCode'].includes(key)))
+        details: Object.fromEntries(
+          Object.entries(error).filter(
+            ([key]) =>
+              ![
+                'name',
+                'message',
+                'stack',
+                'fieldErrors',
+                'statusCode',
+              ].includes(key),
+          ),
+        ),
       };
     } else if (error instanceof ActionServiceError) {
       return {
@@ -117,28 +149,53 @@ export const extractErrorDetails = (error: unknown): DetailedError => {
         serviceName: error.serviceName,
         serviceResponse: error.serviceResponse, // This might still be complex
         statusCode: error.statusCode,
-        details: Object.fromEntries(Object.entries(error).filter(([key]) => !['name', 'message', 'stack', 'serviceName', 'serviceResponse', 'statusCode'].includes(key)))
+        details: Object.fromEntries(
+          Object.entries(error).filter(
+            ([key]) =>
+              ![
+                'name',
+                'message',
+                'stack',
+                'serviceName',
+                'serviceResponse',
+                'statusCode',
+              ].includes(key),
+          ),
+        ),
       };
     }
     // Fallback for BaseActionError or other derived types not specifically handled above
     return {
       ...baseDetails,
-      details: Object.fromEntries(Object.entries(error).filter(([key]) => !['name', 'message', 'stack'].includes(key)))
+      details: Object.fromEntries(
+        Object.entries(error).filter(
+          ([key]) => !['name', 'message', 'stack'].includes(key),
+        ),
+      ),
     };
-  } else if (error instanceof Error) { // Standard Error
+  } else if (error instanceof Error) {
+    // Standard Error
     return {
       message: error.message,
       name: error.name,
       stack: error.stack,
       // For generic errors, keep other properties in 'details'
-      details: Object.fromEntries(Object.entries(error).filter(([key]) => !['name', 'message', 'stack'].includes(key)))
+      details: Object.fromEntries(
+        Object.entries(error).filter(
+          ([key]) => !['name', 'message', 'stack'].includes(key),
+        ),
+      ),
     };
-  } else if (typeof error === 'object' && error !== null) { // Plain object error
+  } else if (typeof error === 'object' && error !== null) {
+    // Plain object error
     return {
-      message: String((error as Record<string, unknown>).message || 'Unknown error'),
-      details: error as Record<string, unknown> // The whole object becomes details
+      message: String(
+        (error as Record<string, unknown>).message || 'Unknown error',
+      ),
+      details: error as Record<string, unknown>, // The whole object becomes details
     };
-  } else { // Other types
+  } else {
+    // Other types
     return { message: String(error) };
   }
 };

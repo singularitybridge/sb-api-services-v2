@@ -4,7 +4,10 @@ import { AuthenticatedSocket } from './types';
 import { websocketConfig } from './config';
 import { setupSocketAuth } from './handlers/authHandler';
 import { handleMessage } from './handlers/messageHandler';
-import { registerSocket, unregisterSocket } from '../../integrations/agent_ui/agent_ui.service';
+import {
+  registerSocket,
+  unregisterSocket,
+} from '../../integrations/agent_ui/agent_ui.service';
 
 // Import RPC methods
 import './rpc/methods';
@@ -23,14 +26,17 @@ const setupEventHandlers = (io: SocketServer): void => {
         const message = JSON.parse(rawMessage);
         await handleMessage(socket, message);
       } catch (error) {
-        socket.emit('message', JSON.stringify({
-          requestId: 'system',
-          type: 'ERROR',
-          error: {
-            code: 'INVALID_MESSAGE',
-            message: 'Invalid message format'
-          }
-        }));
+        socket.emit(
+          'message',
+          JSON.stringify({
+            requestId: 'system',
+            type: 'ERROR',
+            error: {
+              code: 'INVALID_MESSAGE',
+              message: 'Invalid message format',
+            },
+          }),
+        );
       }
     });
 

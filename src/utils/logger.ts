@@ -8,7 +8,9 @@ const { combine, timestamp, printf, colorize, json, errors } = winston.format;
 
 const nodeEnv = process.env.NODE_ENV || 'development';
 if (!process.env.NODE_ENV) {
-  console.warn("NODE_ENV environment variable not set. Defaulting to 'development'.");
+  console.warn(
+    "NODE_ENV environment variable not set. Defaulting to 'development'.",
+  );
 }
 
 let logLevel = process.env.LOG_LEVEL;
@@ -20,7 +22,9 @@ if (!logLevel) {
 let logFormat = process.env.LOG_FORMAT;
 if (!logFormat) {
   const defaultFormat = nodeEnv === 'production' ? 'json' : 'simple';
-  console.warn(`LOG_FORMAT environment variable not set. Defaulting to '${defaultFormat}'.`);
+  console.warn(
+    `LOG_FORMAT environment variable not set. Defaulting to '${defaultFormat}'.`,
+  );
   logFormat = defaultFormat;
 }
 
@@ -30,56 +34,73 @@ if (process.env.ENABLE_FILE_LOGGING === undefined && nodeEnv === 'production') {
   // No warning for this one as it's a common default to not log to files unless specified.
 }
 
-
 // Define colors for different log levels
 const levelColors = {
   error: '\x1b[31m', // red
-  warn: '\x1b[33m',  // yellow
-  info: '\x1b[36m',  // cyan
+  warn: '\x1b[33m', // yellow
+  info: '\x1b[36m', // cyan
   debug: '\x1b[35m', // magenta
 };
 
 const resetColor = '\x1b[0m';
 
-const customFormat = printf(({ level, message, timestamp: ts, ...metadata }) => {
-  // Simplify the format - no service name
-  let msg = `${ts} ${level}: ${message}`;
-  
-  // Handle metadata more cleanly
-  if (metadata && Object.keys(metadata).length > 0) {
-    // Filter out internal Winston properties
-    const filteredMetadata = Object.entries(metadata).reduce((acc, [key, value]) => {
-      if (key !== 'level' && key !== 'message' && key !== 'timestamp' && key !== 'service' && key !== 'splat' && key !== 'stack') {
-        acc[key] = value;
-      }
-      return acc;
-    }, {} as Record<string, any>);
+const customFormat = printf(
+  ({ level, message, timestamp: ts, ...metadata }) => {
+    // Simplify the format - no service name
+    let msg = `${ts} ${level}: ${message}`;
 
-    if (Object.keys(filteredMetadata).length > 0) {
-      // Format metadata more readably
-      if (Object.keys(filteredMetadata).length === 1 && filteredMetadata.error) {
-        // Special handling for error messages
-        msg += ` | ${filteredMetadata.error}`;
-      } else if (Object.keys(filteredMetadata).length <= 3) {
-        // For small metadata, show inline
-        const metaParts = Object.entries(filteredMetadata).map(([k, v]) => 
-          `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`
-        );
-        msg += ` | ${metaParts.join(', ')}`;
-      } else {
-        // For larger metadata, show on new line
-        msg += '\n  ' + JSON.stringify(filteredMetadata, null, 2).split('\n').join('\n  ');
+    // Handle metadata more cleanly
+    if (metadata && Object.keys(metadata).length > 0) {
+      // Filter out internal Winston properties
+      const filteredMetadata = Object.entries(metadata).reduce(
+        (acc, [key, value]) => {
+          if (
+            key !== 'level' &&
+            key !== 'message' &&
+            key !== 'timestamp' &&
+            key !== 'service' &&
+            key !== 'splat' &&
+            key !== 'stack'
+          ) {
+            acc[key] = value;
+          }
+          return acc;
+        },
+        {} as Record<string, any>,
+      );
+
+      if (Object.keys(filteredMetadata).length > 0) {
+        // Format metadata more readably
+        if (
+          Object.keys(filteredMetadata).length === 1 &&
+          filteredMetadata.error
+        ) {
+          // Special handling for error messages
+          msg += ` | ${filteredMetadata.error}`;
+        } else if (Object.keys(filteredMetadata).length <= 3) {
+          // For small metadata, show inline
+          const metaParts = Object.entries(filteredMetadata).map(
+            ([k, v]) =>
+              `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`,
+          );
+          msg += ` | ${metaParts.join(', ')}`;
+        } else {
+          // For larger metadata, show on new line
+          msg +=
+            '\n  ' +
+            JSON.stringify(filteredMetadata, null, 2).split('\n').join('\n  ');
+        }
       }
     }
-  }
-  
-  // Add stack trace for errors if available
-  if (metadata.stack && nodeEnv !== 'production') {
-    msg += `\n  Stack: ${metadata.stack}`;
-  }
-  
-  return msg;
-});
+
+    // Add stack trace for errors if available
+    if (metadata.stack && nodeEnv !== 'production') {
+      msg += `\n  Stack: ${metadata.stack}`;
+    }
+
+    return msg;
+  },
+);
 
 // Simpler format for production
 const simpleFormat = printf(({ level, message, timestamp: ts }) => {
@@ -92,12 +113,20 @@ if (nodeEnv !== 'production') {
   transports.push(
     new winston.transports.Console({
       format: combine(
-        colorize({ all: true, colors: { info: 'cyan', warn: 'yellow', error: 'red', debug: 'magenta' } }),
+        colorize({
+          all: true,
+          colors: {
+            info: 'cyan',
+            warn: 'yellow',
+            error: 'red',
+            debug: 'magenta',
+          },
+        }),
         timestamp({ format: 'HH:mm:ss' }), // Shorter timestamp for dev
         errors({ stack: true }),
-        customFormat
+        customFormat,
       ),
-    })
+    }),
   );
 } else {
   transports.push(
@@ -105,9 +134,9 @@ if (nodeEnv !== 'production') {
       format: combine(
         timestamp(),
         errors({ stack: true }),
-        json() // JSON format for production
+        json(), // JSON format for production
       ),
-    })
+    }),
   );
   // Optional: File logging for production
   if (enableFileLogging) {
@@ -118,12 +147,8 @@ if (nodeEnv !== 'production') {
         zippedArchive: true,
         maxSize: '20m',
         maxFiles: '14d',
-        format: combine(
-          timestamp(),
-          errors({ stack: true }),
-          json()
-        ),
-      })
+        format: combine(timestamp(), errors({ stack: true }), json()),
+      }),
     );
   }
 }
@@ -132,7 +157,7 @@ const winstonLogger = winston.createLogger({
   level: logLevel,
   format: combine(
     timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    errors({ stack: true })
+    errors({ stack: true }),
   ),
   transports: transports,
 });
@@ -140,38 +165,38 @@ const winstonLogger = winston.createLogger({
 // Extend Winston logger with backward compatibility methods
 class ExtendedLogger {
   private logs: string[] = [];
-  
+
   // Winston logger methods
   log = (level: string, message: string, meta?: any) => {
     this.logs.push(`${level}: ${message}`);
     return winstonLogger.log(level, message, meta);
   };
-  
+
   info = (message: string, meta?: any) => {
     this.logs.push(`info: ${message}`);
     return winstonLogger.info(message, meta);
   };
-  
+
   warn = (message: string, meta?: any) => {
     this.logs.push(`warn: ${message}`);
     return winstonLogger.warn(message, meta);
   };
-  
+
   error = (message: string, meta?: any) => {
     this.logs.push(`error: ${message}`);
     return winstonLogger.error(message, meta);
   };
-  
+
   debug = (message: string, meta?: any) => {
     this.logs.push(`debug: ${message}`);
     return winstonLogger.debug(message, meta);
   };
-  
+
   // Backward compatibility methods
   getLogs() {
     return this.logs.join('\n');
   }
-  
+
   clearLogs() {
     this.logs = [];
   }

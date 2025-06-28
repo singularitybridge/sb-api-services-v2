@@ -37,7 +37,9 @@ assistantRouter.delete(
       res.send({ message: 'Assistant deleted successfully' });
     } catch (error) {
       console.error('Error deleting assistant:', error);
-      res.status(500).send({ message: `Failed to delete assistant: ${(error as Error).message}` });
+      res.status(500).send({
+        message: `Failed to delete assistant: ${(error as Error).message}`,
+      });
     }
   },
 );
@@ -51,7 +53,9 @@ assistantRouter.patch(
       const { allowedActions } = req.body;
 
       if (!Array.isArray(allowedActions)) {
-        return res.status(400).send({ message: 'allowedActions must be an array of strings' });
+        return res
+          .status(400)
+          .send({ message: 'allowedActions must be an array of strings' });
       }
 
       const updatedAssistant = await updateAllowedActions(id, allowedActions);
@@ -63,12 +67,21 @@ assistantRouter.patch(
       res.send(updatedAssistant);
     } catch (error) {
       console.error('Error updating allowed actions:', error);
-      if (error instanceof Error && error.message.startsWith('Failed to add actions:')) {
-        return res.status(400).send({ message: 'Error updating allowed actions', failedActions: error.message.split(':')[1].trim().split(', ') });
+      if (
+        error instanceof Error &&
+        error.message.startsWith('Failed to add actions:')
+      ) {
+        return res.status(400).send({
+          message: 'Error updating allowed actions',
+          failedActions: error.message.split(':')[1].trim().split(', '),
+        });
       }
-      res.status(500).send({ message: 'Error updating allowed actions', error: (error as Error).message });
+      res.status(500).send({
+        message: 'Error updating allowed actions',
+        error: (error as Error).message,
+      });
     }
-  }
+  },
 );
 
 export { assistantRouter };

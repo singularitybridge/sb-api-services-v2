@@ -1,6 +1,9 @@
 import { User, IUser } from '../models/User';
 
-export const findUserByIdentifier = async (key: string, value: string): Promise<IUser | null> => {
+export const findUserByIdentifier = async (
+  key: string,
+  value: string,
+): Promise<IUser | null> => {
   try {
     return await User.findOne({ identifiers: { $elemMatch: { key, value } } });
   } catch (error) {
@@ -9,14 +12,21 @@ export const findUserByIdentifier = async (key: string, value: string): Promise<
   }
 };
 
-export const findUserByIdentifierAndCompany = async (key: string, value: string, companyId: string): Promise<IUser | null> => {
+export const findUserByIdentifierAndCompany = async (
+  key: string,
+  value: string,
+  companyId: string,
+): Promise<IUser | null> => {
   try {
     return await User.findOne({
       identifiers: { $elemMatch: { key, value } },
-      companyId: companyId
+      companyId: companyId,
     });
   } catch (error) {
-    console.error(`Error finding user by identifier (${key}) and company:`, error);
+    console.error(
+      `Error finding user by identifier (${key}) and company:`,
+      error,
+    );
     return null;
   }
 };
@@ -40,7 +50,10 @@ export const getUserById = async (userId: string): Promise<IUser | null> => {
   }
 };
 
-export const updateUser = async (userId: string, updateData: Partial<IUser>): Promise<IUser | null> => {
+export const updateUser = async (
+  userId: string,
+  updateData: Partial<IUser>,
+): Promise<IUser | null> => {
   try {
     return await User.findByIdAndUpdate(userId, updateData, { new: true });
   } catch (error) {

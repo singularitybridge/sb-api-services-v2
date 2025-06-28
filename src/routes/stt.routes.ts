@@ -12,14 +12,14 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware';
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.post('/transcribe/oai', 
+router.post(
+  '/transcribe/oai',
   validateApiKeys(['openai_api_key']),
-  upload.single('audio'), 
+  upload.single('audio'),
   async (req: AuthenticatedRequest, res) => {
     const language = req.body.language || 'en'; // Default to English if not specified
 
     try {
-
       const openaiApiKey = await getApiKey(req.company._id, 'openai_api_key');
 
       if (!openaiApiKey) {
@@ -28,10 +28,18 @@ router.post('/transcribe/oai',
       }
 
       if (req.file) {
-        const oaiWhisperResult = await transcribeAudioWhisper(openaiApiKey, req.file.buffer, language);
+        const oaiWhisperResult = await transcribeAudioWhisper(
+          openaiApiKey,
+          req.file.buffer,
+          language,
+        );
         res.send({ text: oaiWhisperResult });
       } else if (req.body.audioURL) {
-        const oaiWhisperResult = await transcribeAudioWhisperFromURL(openaiApiKey, req.body.audioURL, language);
+        const oaiWhisperResult = await transcribeAudioWhisperFromURL(
+          openaiApiKey,
+          req.body.audioURL,
+          language,
+        );
         res.send({ text: oaiWhisperResult });
       } else {
         res.status(400).send('No audio file uploaded or URL provided');
@@ -40,9 +48,8 @@ router.post('/transcribe/oai',
       console.error('Error in /transcribe/oai:', error);
       res.status(500).send('Error transcribing audio');
     }
-});
-
-
+  },
+);
 
 router.post('/transcribe/gcp', async (req, res) => {
   const { audioURL, language = 'en-US' } = req.body; // Default to English (US) if not specified

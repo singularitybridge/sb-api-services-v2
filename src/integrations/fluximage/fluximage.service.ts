@@ -10,7 +10,10 @@ interface FluxImageGenerationOptions {
   filename?: string;
 }
 
-export const generateFluxImage = async (companyId: string, options: FluxImageGenerationOptions): Promise<string> => {
+export const generateFluxImage = async (
+  companyId: string,
+  options: FluxImageGenerationOptions,
+): Promise<string> => {
   const apiKey = await getApiKey(companyId, 'getimg_api_key');
   if (!apiKey) {
     throw new Error('GetImg API key not found');
@@ -25,19 +28,21 @@ export const generateFluxImage = async (companyId: string, options: FluxImageGen
         prompt,
         width,
         height,
-        response_format: 'b64'
+        response_format: 'b64',
       },
       {
         headers: {
-          'accept': 'application/json',
-          'authorization': `Bearer ${apiKey}`,
-          'content-type': 'application/json'
-        }
-      }
+          accept: 'application/json',
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+        },
+      },
     );
 
     const imageBuffer = Buffer.from(response.data.image, 'base64');
-    const fileName = filename ? `${filename}.png` : `flux_image_${Date.now()}.png`;
+    const fileName = filename
+      ? `${filename}.png`
+      : `flux_image_${Date.now()}.png`;
 
     // Create a partial File object that includes only the necessary properties
     const file: Partial<Express.Multer.File> = {

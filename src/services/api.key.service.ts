@@ -47,9 +47,7 @@ export const getApiKey = async (
     throw new Error('Company not found');
   }
 
-  const apiKey = company.api_keys.find(
-    (key) => key.key === keyType,
-  );
+  const apiKey = company.api_keys.find((key) => key.key === keyType);
   if (!apiKey) {
     return null;
   }

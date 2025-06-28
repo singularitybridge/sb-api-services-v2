@@ -7,21 +7,24 @@ import { UIConnection } from '../../models/UIConnection';
 // This is still in-memory but only used after we verify connection state in MongoDB
 const socketMap = new Map<string, AuthenticatedSocket>();
 
-export const registerSocket = async (companyId: string, socket: AuthenticatedSocket): Promise<void> => {
+export const registerSocket = async (
+  companyId: string,
+  socket: AuthenticatedSocket,
+): Promise<void> => {
   // Store socket instance in memory map
   socketMap.set(socket.id, socket);
-  
+
   // Update connection state in MongoDB
   await UIConnection.findOneAndUpdate(
     { companyId },
-    { 
-      $set: { 
-        isUiConnected: true, 
+    {
+      $set: {
+        isUiConnected: true,
         socketId: socket.id,
-        lastConnectedAt: new Date() 
-      } 
+        lastConnectedAt: new Date(),
+      },
     },
-    { upsert: true, new: true }
+    { upsert: true, new: true },
   );
 };
 
@@ -31,16 +34,16 @@ export const unregisterSocket = async (companyId: string): Promise<void> => {
   if (connection?.socketId !== undefined) {
     socketMap.delete(connection.socketId);
   }
-  
+
   // Mark UI as disconnected in MongoDB
   await UIConnection.findOneAndUpdate(
     { companyId },
-    { $set: { isUiConnected: false } }
+    { $set: { isUiConnected: false } },
   );
 };
 
 export const getUiContext = async (
-  companyId: string
+  companyId: string,
 ): Promise<{ success: boolean; data?: any; error?: string }> => {
   // Check connection state in MongoDB
   const connection = await UIConnection.findOne({ companyId });
@@ -48,22 +51,24 @@ export const getUiContext = async (
     return {
       success: false,
       error: 'No active UI connection found for company',
-      data: null
+      data: null,
     };
   }
 
   // Get socket instance from memory
-  const socket = connection.socketId ? socketMap.get(connection.socketId) : undefined;
+  const socket = connection.socketId
+    ? socketMap.get(connection.socketId)
+    : undefined;
   if (!socket) {
     // Socket instance not found - update MongoDB to reflect disconnected state
     await UIConnection.findOneAndUpdate(
       { companyId },
-      { $set: { isUiConnected: false } }
+      { $set: { isUiConnected: false } },
     );
     return {
       success: false,
       error: 'UI connection lost',
-      data: null
+      data: null,
     };
   }
 
@@ -71,14 +76,14 @@ export const getUiContext = async (
     const result = await callRpcMethod(socket, 'getUiContext', {});
     return {
       success: true,
-      data: result
+      data: result,
     };
   } catch (error) {
     console.error('Error getting UI context:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred',
-      data: null
+      data: null,
     };
   }
 };
@@ -97,45 +102,47 @@ interface ExecuteUiMethodResult {
 
 export const executeUiMethod = async (
   companyId: string,
-  params: ExecuteUiMethodParams
+  params: ExecuteUiMethodParams,
 ): Promise<ExecuteUiMethodResult> => {
   // Check connection state in MongoDB
   const connection = await UIConnection.findOne({ companyId });
   if (!connection || !connection.isUiConnected) {
     return {
       success: false,
-      error: 'No active UI connection found for company'
+      error: 'No active UI connection found for company',
     };
   }
 
   // Get socket instance from memory
-  const socket = connection.socketId ? socketMap.get(connection.socketId) : undefined;
+  const socket = connection.socketId
+    ? socketMap.get(connection.socketId)
+    : undefined;
   if (!socket) {
     // Socket instance not found - update MongoDB to reflect disconnected state
     await UIConnection.findOneAndUpdate(
       { companyId },
-      { $set: { isUiConnected: false } }
+      { $set: { isUiConnected: false } },
     );
     return {
       success: false,
-      error: 'UI connection lost'
+      error: 'UI connection lost',
     };
   }
 
   try {
     const result = await callRpcMethod(socket, params.method, {
       pageId: params.pageId,
-      params: params.params
+      params: params.params,
     });
     return {
       success: true,
-      data: result
+      data: result,
     };
   } catch (error) {
     console.error('Error executing UI method:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
     };
   }
 };

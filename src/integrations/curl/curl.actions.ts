@@ -1,4 +1,8 @@
-import { ActionContext, FunctionFactory, StandardActionResult } from '../actions/types';
+import {
+  ActionContext,
+  FunctionFactory,
+  StandardActionResult,
+} from '../actions/types';
 import { performCurlRequest as performCurlRequestService } from './curl.service'; // Renamed to avoid conflict
 import { executeAction, ExecuteActionOptions } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
@@ -23,7 +27,6 @@ interface ServiceCallLambdaResponse {
   description?: string;
 }
 
-
 const SERVICE_NAME = 'curlService';
 
 export const createCurlActions = (context: ActionContext): FunctionFactory => ({
@@ -40,11 +43,19 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
       required: ['curlCommand'],
       additionalProperties: false,
     },
-    function: async (args: CurlRequestArgs): Promise<StandardActionResult<CurlActionResponseData>> => {
+    function: async (
+      args: CurlRequestArgs,
+    ): Promise<StandardActionResult<CurlActionResponseData>> => {
       const { curlCommand } = args;
 
-      if (!curlCommand || typeof curlCommand !== 'string' || !curlCommand.trim()) {
-        throw new ActionValidationError('curlCommand parameter is required and must be a non-empty string.');
+      if (
+        !curlCommand ||
+        typeof curlCommand !== 'string' ||
+        !curlCommand.trim()
+      ) {
+        throw new ActionValidationError(
+          'curlCommand parameter is required and must be a non-empty string.',
+        );
       }
       // The service itself validates if it starts with "curl" and returns an error object if not.
       // We'll let executeAction handle that based on the success flag from the service call lambda.
@@ -52,9 +63,15 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
       return executeAction<CurlActionResponseData, ServiceCallLambdaResponse>(
         'performCurlRequest',
         async (): Promise<ServiceCallLambdaResponse> => {
-          const serviceResponse = await performCurlRequestService(context, curlCommand);
-          
-          const isSuccess = serviceResponse.status >= 200 && serviceResponse.status < 300 && !serviceResponse.error;
+          const serviceResponse = await performCurlRequestService(
+            context,
+            curlCommand,
+          );
+
+          const isSuccess =
+            serviceResponse.status >= 200 &&
+            serviceResponse.status < 300 &&
+            !serviceResponse.error;
 
           const responseData: CurlActionResponseData = {
             status: serviceResponse.status,
@@ -63,17 +80,20 @@ export const createCurlActions = (context: ActionContext): FunctionFactory => ({
             error: serviceResponse.error,
             truncated: false, // As per original logic
           };
-          
+
           return {
             success: isSuccess,
             data: responseData,
-            description: isSuccess ? 'Curl request successful.' : (serviceResponse.error || `Curl request failed with status ${serviceResponse.status}`)
+            description: isSuccess
+              ? 'Curl request successful.'
+              : serviceResponse.error ||
+                `Curl request failed with status ${serviceResponse.status}`,
           };
         },
-        { 
+        {
           serviceName: SERVICE_NAME,
           // Default dataExtractor (res => res.data) will work because our lambda returns data shaped as CurlActionResponseData
-        }
+        },
       );
     },
   },

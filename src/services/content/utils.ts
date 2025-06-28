@@ -1,6 +1,9 @@
 import OpenAI from 'openai';
 
-export const generateEmbedding = async (text: string, apiKey: string): Promise<number[]> => {
+export const generateEmbedding = async (
+  text: string,
+  apiKey: string,
+): Promise<number[]> => {
   const openai = new OpenAI({
     apiKey,
   });

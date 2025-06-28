@@ -10,13 +10,14 @@ export interface ActionContext {
 
 // New interface for a standardized successful action result
 export interface StandardActionResult<D = any> {
-  success: true;    // Explicitly true for successful outcomes
+  success: true; // Explicitly true for successful outcomes
   message?: string; // Optional human-readable message for UI or logs
-  data?: D;         // The primary payload/data of the action
+  data?: D; // The primary payload/data of the action
   // uiHints?: Record<string, any>; // Example: Future extension for UI rendering hints
 }
 
-export interface FunctionDefinition<T = any, R = any> { // Added R for the data type of StandardActionResult
+export interface FunctionDefinition<T = any, R = any> {
+  // Added R for the data type of StandardActionResult
   description: string;
   strict?: boolean;
   actionType?: ActionType;

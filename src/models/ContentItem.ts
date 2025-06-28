@@ -13,12 +13,16 @@ export interface IContentItem extends Document {
 const ContentItemSchema: Schema = new Schema(
   {
     companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true },
-    contentTypeId: { type: Schema.Types.ObjectId, ref: 'ContentType', required: true },
+    contentTypeId: {
+      type: Schema.Types.ObjectId,
+      ref: 'ContentType',
+      required: true,
+    },
     artifactKey: { type: String, required: true },
     data: { type: Schema.Types.Mixed, required: true },
     embedding: { type: [Number], required: false },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 ContentItemSchema.index({ companyId: 1, contentTypeId: 1 });
@@ -27,4 +31,7 @@ ContentItemSchema.index({ 'data.status': 1 });
 ContentItemSchema.index({ 'data.createdAt': -1 });
 ContentItemSchema.index({ embedding: '2dsphere' }); // Index for vector search
 
-export const ContentItem = mongoose.model<IContentItem>('ContentItem', ContentItemSchema);
+export const ContentItem = mongoose.model<IContentItem>(
+  'ContentItem',
+  ContentItemSchema,
+);

@@ -34,7 +34,7 @@ export enum OnboardingStatus {
   READY_FOR_ASSISTANTS = 'ready_for_assistants',
   USING_BASIC_FEATURES = 'using_basic_features',
   ADVANCED_USER = 'advanced_user',
-  EXPERT_USER = 'expert_user'
+  EXPERT_USER = 'expert_user',
 }
 
 export interface ICompany extends Document {
@@ -53,14 +53,18 @@ const CompanySchema = new Schema({
   token: TokenSchema,
   api_keys: [ApiKeySchema],
   identifiers: { type: [IdentifierSchema], required: false }, // Made optional
-  onboardingStatus: { type: String, enum: Object.values(OnboardingStatus), default: OnboardingStatus.CREATED },
+  onboardingStatus: {
+    type: String,
+    enum: Object.values(OnboardingStatus),
+    default: OnboardingStatus.CREATED,
+  },
   onboardedModules: [{ type: String }],
 });
 
 // Update the index to allow null values and make it sparse
 CompanySchema.index(
   { 'identifiers.type': 1, 'identifiers.value': 1 },
-  { unique: true, sparse: true }
+  { unique: true, sparse: true },
 );
 
 export const Company = mongoose.model('Company', CompanySchema);

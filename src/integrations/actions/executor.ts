@@ -1,7 +1,10 @@
 // src/integrations/actions/executor.ts
 
 import { StandardActionResult } from './types';
-import { ActionExecutionError, ActionServiceError } from '../../utils/actionErrors';
+import {
+  ActionExecutionError,
+  ActionServiceError,
+} from '../../utils/actionErrors';
 
 /**
  * Options for the executeAction function.
@@ -33,17 +36,21 @@ export interface ExecuteActionOptions<R, S = any> {
  * @returns {Promise<StandardActionResult<R>>} A Promise resolving to a StandardActionResult.
  * @throws {ActionServiceError | ActionExecutionError | Error} Throws an appropriate error on failure.
  */
-export async function executeAction<R, S extends { success: boolean; description?: string; data?: any } = any>(
+export async function executeAction<
+  R,
+  S extends { success: boolean; description?: string; data?: any } = any,
+>(
   actionName: string,
   serviceCall: () => Promise<S>,
-  options?: ExecuteActionOptions<R, S>
+  options?: ExecuteActionOptions<R, S>,
 ): Promise<StandardActionResult<R>> {
   try {
     const result = await serviceCall();
 
     if (result.success === false) {
       // If the service call itself indicates failure (e.g., returns { success: false, ... })
-      const message = result.description || "Service call for '" + actionName + "' failed.";
+      const message =
+        result.description || "Service call for '" + actionName + "' failed.";
       throw new ActionServiceError(message, {
         serviceName: options?.serviceName,
         serviceResponse: result,
@@ -57,7 +64,10 @@ export async function executeAction<R, S extends { success: boolean; description
 
     return {
       success: true,
-      message: options?.successMessage || result.description || (actionName + " completed successfully."),
+      message:
+        options?.successMessage ||
+        result.description ||
+        actionName + ' completed successfully.',
       data: extractedData,
     };
   } catch (error) {
@@ -65,18 +75,21 @@ export async function executeAction<R, S extends { success: boolean; description
       throw options.errorTransformer(error, actionName);
     }
 
-    if (error instanceof ActionServiceError || error instanceof ActionExecutionError) {
+    if (
+      error instanceof ActionServiceError ||
+      error instanceof ActionExecutionError
+    ) {
       throw error; // Re-throw known action errors
     }
-    
+
     // Wrap other errors in ActionExecutionError for consistent handling
-    const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred in " + actionName + ".";
-    throw new ActionExecutionError(
-      errorMessage,
-      {
-        actionName,
-        originalError: error,
-      }
-    );
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : 'An unexpected error occurred in ' + actionName + '.';
+    throw new ActionExecutionError(errorMessage, {
+      actionName,
+      originalError: error,
+    });
   }
 }

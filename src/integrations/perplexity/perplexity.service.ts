@@ -19,13 +19,20 @@ interface PerplexityResponse {
   }[];
 }
 
-export async function performPerplexitySearch(companyId: string, model: string, query: string): Promise<string> {
+export async function performPerplexitySearch(
+  companyId: string,
+  model: string,
+  query: string,
+): Promise<string> {
   const apiKey = await getApiKey(companyId, 'perplexity_api_key');
   if (!apiKey) {
     throw new Error('Perplexity API key not found');
   }
 
-  const validModels = ['llama-3.1-sonar-small-128k-online', 'llama-3.1-sonar-large-128k-online'];
+  const validModels = [
+    'llama-3.1-sonar-small-128k-online',
+    'llama-3.1-sonar-large-128k-online',
+  ];
   if (!validModels.includes(model)) {
     throw new Error('Invalid model specified');
   }
@@ -48,11 +55,11 @@ export async function performPerplexitySearch(companyId: string, model: string, 
       },
       {
         headers: {
-          'accept': 'application/json',
-          'authorization': `Bearer ${apiKey}`,
+          accept: 'application/json',
+          authorization: `Bearer ${apiKey}`,
           'content-type': 'application/json',
         },
-      }
+      },
     );
 
     // Extract and return only the content from the response

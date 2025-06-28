@@ -6,7 +6,7 @@ export const searchContentItems = async (
   companyId: string,
   queryText: string,
   contentTypeId?: string,
-  limit: number = 10
+  limit: number = 10,
 ): Promise<IContentItem[]> => {
   // Get OpenAI API key
   const openaiApiKey = await getApiKey(companyId, 'openai_api_key');

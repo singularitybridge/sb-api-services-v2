@@ -11,7 +11,7 @@ const pusher = new Pusher({
 export const publishMessage = async (
   channel: string = 'sb',
   eventName: string,
-  message: Record<string, unknown>
+  message: Record<string, unknown>,
 ): Promise<void> => {
   // console.log(`[Pusher] Sending message to channel: ${channel}, event: ${eventName}`);
   await pusher.trigger(channel, eventName, message);
@@ -21,9 +21,9 @@ export const publishMessage = async (
 export const publishSessionMessage = async (
   sessionId: string,
   eventName: string,
-  message: Record<string, unknown>
+  message: Record<string, unknown>,
 ): Promise<void> => {
   const channel = `sb-${sessionId}`;
   // console.log(`[Pusher] Publishing session message for sessionId: ${sessionId}, channel: ${channel}, event: ${eventName}`);
-  await publishMessage(channel, eventName, message);  
+  await publishMessage(channel, eventName, message);
 };

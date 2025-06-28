@@ -33,7 +33,10 @@ export const createTeam = async (teamData: Partial<ITeam>): Promise<ITeam> => {
   }
 };
 
-export const updateTeam = async (id: string, teamData: Partial<ITeam>): Promise<ITeam | null> => {
+export const updateTeam = async (
+  id: string,
+  teamData: Partial<ITeam>,
+): Promise<ITeam | null> => {
   try {
     const team = await Team.findByIdAndUpdate(id, teamData, { new: true });
     return team;
@@ -47,17 +50,17 @@ export const deleteTeam = async (id: string): Promise<void> => {
   const session = await mongoose.startSession();
   try {
     session.startTransaction();
-    
+
     // Remove the team from all assistants that reference it
     await Assistant.updateMany(
       { teams: id },
       { $pull: { teams: id } },
-      { session }
+      { session },
     );
-    
+
     // Delete the team
     await Team.findByIdAndDelete(id).session(session);
-    
+
     await session.commitTransaction();
   } catch (error) {
     await session.abortTransaction();
@@ -68,18 +71,21 @@ export const deleteTeam = async (id: string): Promise<void> => {
   }
 };
 
-export const assignAssistantToTeam = async (assistantId: string, teamId: string): Promise<void> => {
+export const assignAssistantToTeam = async (
+  assistantId: string,
+  teamId: string,
+): Promise<void> => {
   const session = await mongoose.startSession();
   try {
     session.startTransaction();
-    
+
     // Add team to assistant's teams array if not already present
     await Assistant.findByIdAndUpdate(
       assistantId,
       { $addToSet: { teams: teamId } },
-      { session }
+      { session },
     );
-    
+
     await session.commitTransaction();
   } catch (error) {
     await session.abortTransaction();
@@ -90,18 +96,21 @@ export const assignAssistantToTeam = async (assistantId: string, teamId: string)
   }
 };
 
-export const removeAssistantFromTeam = async (assistantId: string, teamId: string): Promise<void> => {
+export const removeAssistantFromTeam = async (
+  assistantId: string,
+  teamId: string,
+): Promise<void> => {
   const session = await mongoose.startSession();
   try {
     session.startTransaction();
-    
+
     // Remove team from assistant's teams array
     await Assistant.findByIdAndUpdate(
       assistantId,
       { $pull: { teams: teamId } },
-      { session }
+      { session },
     );
-    
+
     await session.commitTransaction();
   } catch (error) {
     await session.abortTransaction();

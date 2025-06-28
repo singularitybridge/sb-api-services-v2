@@ -27,14 +27,21 @@ const FieldDefinitionSchema = new Schema({
 
 const ContentTypeSchema: Schema = new Schema(
   {
-    companyId: { type: mongoose.Types.ObjectId, ref: 'Company', required: true },
+    companyId: {
+      type: mongoose.Types.ObjectId,
+      ref: 'Company',
+      required: true,
+    },
     name: { type: String, required: true },
     description: { type: String },
     fields: { type: [FieldDefinitionSchema], required: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 ContentTypeSchema.index({ companyId: 1, name: 1 }, { unique: true });
 
-export const ContentType = mongoose.model<IContentType>('ContentType', ContentTypeSchema);
+export const ContentType = mongoose.model<IContentType>(
+  'ContentType',
+  ContentTypeSchema,
+);

@@ -2,9 +2,19 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { CustomError } from '../utils/errors';
-import { ActionExecutionError, ActionServiceError, ActionValidationError, BaseActionError } from '../utils/actionErrors';
+import {
+  ActionExecutionError,
+  ActionServiceError,
+  ActionValidationError,
+  BaseActionError,
+} from '../utils/actionErrors';
 
-export const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunction) => {
+export const errorHandler = (
+  err: unknown,
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   console.error('Error Details:', err); // Enhanced logging
 
   // Handle specific custom action errors first
@@ -34,10 +44,11 @@ export const errorHandler = (err: unknown, req: Request, res: Response, next: Ne
       // originalError: err.originalError ? { name: err.originalError.name, message: err.originalError.message } : undefined,
     });
   }
-  
+
   // Fallback for any other BaseActionError
   if (err instanceof BaseActionError) {
-    return res.status((err as any).statusCode || 500).json({ // Cast to any if statusCode is not on BaseActionError directly
+    return res.status((err as any).statusCode || 500).json({
+      // Cast to any if statusCode is not on BaseActionError directly
       message: err.message,
       error: err.name,
     });
@@ -48,7 +59,13 @@ export const errorHandler = (err: unknown, req: Request, res: Response, next: Ne
   // Based on the log, err.statusCode and err.responseBody are good indicators.
   // Also, the error name might be 'APICallError' or 'AI_APICallError'.
   // Let's assume it has a 'statusCode' and 'responseBody' if it's an APICallError.
-  if (typeof err === 'object' && err !== null && 'statusCode' in err && 'responseBody' in err && 'message' in err) {
+  if (
+    typeof err === 'object' &&
+    err !== null &&
+    'statusCode' in err &&
+    'responseBody' in err &&
+    'message' in err
+  ) {
     // Attempt to parse responseBody if it's a JSON string
     let errorDetails = err.responseBody;
     try {
@@ -58,18 +75,18 @@ export const errorHandler = (err: unknown, req: Request, res: Response, next: Ne
     } catch (parseError) {
       // If parsing fails, use the raw responseBody
     }
-    
+
     return res.status(err.statusCode as number).json({
       message: (err as { message: string }).message, // Main error message
       error: (err as { name?: string }).name || 'APICallError', // Error name
-      details: errorDetails // Detailed response from the API call
+      details: errorDetails, // Detailed response from the API call
     });
   }
 
   if (err instanceof CustomError) {
     return res.status(err.statusCode).json({
       message: err.message,
-      error: err.name
+      error: err.name,
     });
   }
 
@@ -77,12 +94,12 @@ export const errorHandler = (err: unknown, req: Request, res: Response, next: Ne
     // General error handling
     return res.status(500).json({
       message: 'An error occurred',
-      error: err.message // Provide the actual error message
+      error: err.message, // Provide the actual error message
     });
   }
 
   // Fallback for unknown errors
   res.status(500).json({
-    message: 'An unknown error occurred'
+    message: 'An unknown error occurred',
   });
 };

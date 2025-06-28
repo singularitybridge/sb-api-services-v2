@@ -10,7 +10,10 @@ interface RemoveBackgroundOptions {
   crop?: boolean;
 }
 
-export const removeBackgroundFromImage = async (companyId: string, options: RemoveBackgroundOptions): Promise<string> => {
+export const removeBackgroundFromImage = async (
+  companyId: string,
+  options: RemoveBackgroundOptions,
+): Promise<string> => {
   const apiKey = await getApiKey(companyId, 'photoroom_api_key');
   if (!apiKey) {
     throw new Error('PhotoRoom API key not found');
@@ -19,9 +22,17 @@ export const removeBackgroundFromImage = async (companyId: string, options: Remo
   const { imageUrl, filename, crop = false } = options;
 
   try {
-    const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+    const imageResponse = await axios.get(imageUrl, {
+      responseType: 'arraybuffer',
+    });
     const formData = new FormData();
-    formData.append('image_file', new Blob([imageResponse.data], { type: imageResponse.headers['content-type'] }), 'image.jpg');
+    formData.append(
+      'image_file',
+      new Blob([imageResponse.data], {
+        type: imageResponse.headers['content-type'],
+      }),
+      'image.jpg',
+    );
     formData.append('format', 'png');
     formData.append('crop', crop.toString());
 
@@ -29,13 +40,15 @@ export const removeBackgroundFromImage = async (companyId: string, options: Remo
       headers: {
         'Content-Type': 'multipart/form-data',
         'x-api-key': apiKey,
-        'Accept': 'image/png, application/json'
+        Accept: 'image/png, application/json',
       },
-      responseType: 'arraybuffer'
+      responseType: 'arraybuffer',
     });
 
     const processedImage = Buffer.from(response.data);
-    const fileName = filename ? `${filename}.png` : `photoroom_image_${Date.now()}.png`;
+    const fileName = filename
+      ? `${filename}.png`
+      : `photoroom_image_${Date.now()}.png`;
 
     // Create a partial File object that includes only the necessary properties
     const file: Partial<Express.Multer.File> = {

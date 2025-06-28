@@ -13,11 +13,23 @@ export interface IMessage extends Document {
 }
 
 const MessageSchema: Schema = new Schema({
-  sessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Session', required: true },
-  sender: { type: String, enum: ['user', 'assistant', 'system', 'agent'], required: true },
+  sessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Session',
+    required: true,
+  },
+  sender: {
+    type: String,
+    enum: ['user', 'assistant', 'system', 'agent'],
+    required: true,
+  },
   content: { type: String }, // Now optional
   timestamp: { type: Date, default: Date.now },
-  assistantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Assistant', required: true },
+  assistantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Assistant',
+    required: true,
+  },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   messageType: { type: String, required: true },
   data: { type: Schema.Types.Mixed }, // Can store any type of data

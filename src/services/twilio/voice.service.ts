@@ -52,7 +52,6 @@ export const handleVoiceRequest = async (
   from: string,
   to: string,
 ): Promise<{ callActive: boolean; response: string }> => {
-
   const twiml = new VoiceResponse();
   const assistant = await Assistant.findOne({ 'identifiers.value': to });
   const user = await User.findOne({ 'identifiers.value': from });
@@ -83,10 +82,16 @@ export const handleVoiceRequest = async (
   }
 
   if (firstTime !== false) {
-    const userInput = `this is a conversation with ${user.name}, start with greeting the user. ${getCurrentTimeAndDay()}`;
+    const userInput = `this is a conversation with ${
+      user.name
+    }, start with greeting the user. ${getCurrentTimeAndDay()}`;
     // Assuming Twilio voice sessions might use ChannelType.WEB or a generic channel if not specifically defined
     // TODO: Consider adding a ChannelType.VOICE or ChannelType.TWILIO if distinct channel logic is needed.
-    const response = await handleSessionMessage(userInput, session.id, ChannelType.WEB);
+    const response = await handleSessionMessage(
+      userInput,
+      session.id,
+      ChannelType.WEB,
+    );
 
     if (typeof response === 'string') {
       const limitedResponse = response.substring(0, 1200); // Limit response to 1200 characters
@@ -96,11 +101,15 @@ export const handleVoiceRequest = async (
         twiml.play(audioResponse.data.audioUrl);
       } else {
         console.error('Failed to generate audio:', audioResponse.error);
-        twiml.say('I apologize, but I am unable to generate audio at the moment.');
+        twiml.say(
+          'I apologize, but I am unable to generate audio at the moment.',
+        );
       }
     } else {
       // Handle cases where response is not a string (should not happen with non-streaming call)
-      console.error('handleSessionMessage did not return a string for voice intro.');
+      console.error(
+        'handleSessionMessage did not return a string for voice intro.',
+      );
       twiml.say('I encountered an issue processing the initial message.');
     }
   }
@@ -126,7 +135,6 @@ export const handleVoiceRecordingRequest = async (
   to: string,
   recordingUrl: string,
 ) => {
-
   // const SpeechResult = await transcribeAudioWhisper(recordingUrl);
 
   const twiml = new VoiceResponse();
@@ -165,11 +173,15 @@ export const handleVoiceRecordingRequest = async (
       twiml.play(audioResponse.data.audioUrl);
     } else {
       console.error('Failed to generate audio:', audioResponse.error);
-      twiml.say('I apologize, but I am unable to generate audio at the moment.');
+      twiml.say(
+        'I apologize, but I am unable to generate audio at the moment.',
+      );
     }
   } else {
     // Handle cases where response is not a string
-    console.error('handleSessionMessage did not return a string for voice recording response.');
+    console.error(
+      'handleSessionMessage did not return a string for voice recording response.',
+    );
     twiml.say('I encountered an issue processing your recording.');
   }
 

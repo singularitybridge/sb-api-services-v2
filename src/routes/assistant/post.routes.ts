@@ -1,6 +1,10 @@
 import { Router } from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
-import { validateApiKeys, getApiKey, refreshApiKeyCache } from '../../services/api.key.service';
+import {
+  validateApiKeys,
+  getApiKey,
+  refreshApiKeyCache,
+} from '../../services/api.key.service';
 import { Assistant } from '../../models/Assistant';
 // OpenAI Assistant API calls removed as it's deprecated in favor of Vercel AI
 import { createDefaultAssistant } from '../../services/assistant.service';
@@ -27,7 +31,9 @@ router.post(
       await newAssistant.save();
 
       // OpenAI assistant creation removed as it's deprecated in favor of Vercel AI
-      console.log(`Created assistant ${newAssistant._id} in local database only`);
+      console.log(
+        `Created assistant ${newAssistant._id} in local database only`,
+      );
 
       res.send(newAssistant);
     } catch (err) {
@@ -52,19 +58,25 @@ router.post(
   async (req: AuthenticatedRequest, res) => {
     try {
       const companyId = req.company._id;
-      const apiKey = await getApiKey(companyId, 'openai_api_key') as string;
+      const apiKey = (await getApiKey(companyId, 'openai_api_key')) as string;
 
       if (!apiKey) {
         return res.status(400).json({ message: 'OpenAI API key not found' });
       }
 
-      const defaultAssistant = await createDefaultAssistant(companyId.toString(), apiKey);
+      const defaultAssistant = await createDefaultAssistant(
+        companyId.toString(),
+        apiKey,
+      );
       res.status(201).json(defaultAssistant);
     } catch (error) {
       console.error('Error creating default assistant:', error);
-      res.status(500).json({ message: 'Failed to create default assistant', error: (error as Error).message });
+      res.status(500).json({
+        message: 'Failed to create default assistant',
+        error: (error as Error).message,
+      });
     }
-  }
+  },
 );
 
 export default router;

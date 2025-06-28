@@ -9,7 +9,8 @@ export async function synthesizeText(
   text: string,
   voiceLanguageCode: string = 'he-IL',
   voiceName: string = 'he-IL-Wavenet-C',
-): Promise<string> { // Return string instead of SaveToFileResponse
+): Promise<string> {
+  // Return string instead of SaveToFileResponse
   const request = {
     input: { text },
     voice: {
@@ -21,7 +22,7 @@ export async function synthesizeText(
 
   try {
     const [response] = await textToSpeechClient.synthesizeSpeech(request);
-    
+
     // Create a mock Express.Multer.File object
     const file: Express.Multer.File = {
       fieldname: 'file',

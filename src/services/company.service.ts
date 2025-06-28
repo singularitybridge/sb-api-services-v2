@@ -1,6 +1,11 @@
 // File: src/services/company.service.ts
 import { Types } from 'mongoose';
-import { Company, ICompany, IApiKey, OnboardingStatus } from '../models/Company';
+import {
+  Company,
+  ICompany,
+  IApiKey,
+  OnboardingStatus,
+} from '../models/Company';
 import { encryptData, decryptData } from './encryption.service';
 import jwt from 'jsonwebtoken';
 import { updateOnboardingStatus } from './onboarding.service';
@@ -48,7 +53,9 @@ const decryptCompanyData = (companyData: any) => {
   }
 };
 
-export const createCompany = async (companyData: Partial<ICompany>): Promise<ICompany> => {
+export const createCompany = async (
+  companyData: Partial<ICompany>,
+): Promise<ICompany> => {
   try {
     const token = generateToken();
     companyData.token = { value: token };
@@ -72,8 +79,8 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
       { key: 'executor_agent_token', value: 'default_executor_agent_token' },
     ];
 
-    defaultKeys.forEach(defaultKey => {
-      if (!companyData.api_keys!.some(key => key.key === defaultKey.key)) {
+    defaultKeys.forEach((defaultKey) => {
+      if (!companyData.api_keys!.some((key) => key.key === defaultKey.key)) {
         companyData.api_keys!.push(defaultKey);
       }
     });
@@ -84,7 +91,7 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
     encryptCompanyData(companyData as ICompany);
 
     const company = new Company(companyData);
-    
+
     await company.save();
 
     const createdCompany = company.toObject();
@@ -92,7 +99,9 @@ export const createCompany = async (companyData: Partial<ICompany>): Promise<ICo
 
     // Refresh API key cache for the new company
     await refreshApiKeyCache(createdCompany._id.toString());
-    console.log(`API key cache refreshed for new company: ${createdCompany._id}`);
+    console.log(
+      `API key cache refreshed for new company: ${createdCompany._id}`,
+    );
 
     return createdCompany as unknown as ICompany;
   } catch (error) {
@@ -116,7 +125,9 @@ export const getCompany = async (id: string) => {
   }
 };
 
-export const getCompanies = async (companyId: Types.ObjectId | null): Promise<any[]> => {
+export const getCompanies = async (
+  companyId: Types.ObjectId | null,
+): Promise<any[]> => {
   try {
     if (companyId === null) {
       const companies = await Company.find();
@@ -146,7 +157,7 @@ export const updateCompany = async (id: string, data: Partial<ICompany>) => {
     const updatedCompany = await Company.findOneAndUpdate(
       { _id: id },
       { $set: data },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!updatedCompany) {
@@ -182,7 +193,10 @@ export const deleteCompany = async (id: string) => {
   }
 };
 
-export const updateCompanyOnboarding = async (id: string, data: { companyName: string; companyDescription: string; userName: string }) => {
+export const updateCompanyOnboarding = async (
+  id: string,
+  data: { companyName: string; companyDescription: string; userName: string },
+) => {
   try {
     const company = await Company.findById(id);
     if (!company) {
@@ -210,7 +224,9 @@ export const updateCompanyOnboarding = async (id: string, data: { companyName: s
 
     // Refresh API key cache for the updated company
     await refreshApiKeyCache(id);
-    console.log(`API key cache refreshed for company after onboarding update: ${id}`);
+    console.log(
+      `API key cache refreshed for company after onboarding update: ${id}`,
+    );
 
     return updatedCompanyData as unknown as ICompany;
   } catch (error) {
@@ -237,7 +253,9 @@ export const refreshCompanyToken = async (id: string, data: ICompany) => {
       data,
     )) as unknown as ICompany;
 
-    console.log(`New token generated and API key cache refreshed for company: ${id}`);
+    console.log(
+      `New token generated and API key cache refreshed for company: ${id}`,
+    );
     return updatedCompanyData;
   } catch (error) {
     console.error('Error refreshing company token:', error);

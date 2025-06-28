@@ -12,31 +12,46 @@ const placeholderBucketName = 'your-default-bucket-name'; // Define placeholder
 
 if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
   const envBucketName = process.env.GCP_STORAGE_BUCKET;
-  if (envBucketName && envBucketName.trim() !== '' && envBucketName !== placeholderBucketName) {
+  if (
+    envBucketName &&
+    envBucketName.trim() !== '' &&
+    envBucketName !== placeholderBucketName
+  ) {
     try {
       storage = new Storage(); // Initialize storage client
       effectiveBucketName = envBucketName;
       isGcpStorageConfigured = true;
-      logger.info(`ContentFileService: GCP Storage configured with bucket: ${effectiveBucketName}`);
+      logger.info(
+        `ContentFileService: GCP Storage configured with bucket: ${effectiveBucketName}`,
+      );
     } catch (error) {
-      logger.error(`ContentFileService: Failed to initialize GCP Storage client for bucket ${envBucketName}. GCP Storage will be disabled. Error: ${(error as Error).message}`);
+      logger.error(
+        `ContentFileService: Failed to initialize GCP Storage client for bucket ${envBucketName}. GCP Storage will be disabled. Error: ${
+          (error as Error).message
+        }`,
+      );
       storage = undefined;
       effectiveBucketName = undefined;
       isGcpStorageConfigured = false;
     }
   } else {
     if (!envBucketName || envBucketName.trim() === '') {
-      logger.warn(`ContentFileService: GCP_STORAGE_BUCKET environment variable not set or empty. GCP Storage functionality will be disabled.`);
+      logger.warn(
+        `ContentFileService: GCP_STORAGE_BUCKET environment variable not set or empty. GCP Storage functionality will be disabled.`,
+      );
     } else if (envBucketName === placeholderBucketName) {
-      logger.warn(`ContentFileService: GCP_STORAGE_BUCKET is set to placeholder '${placeholderBucketName}'. GCP Storage functionality will be disabled.`);
+      logger.warn(
+        `ContentFileService: GCP_STORAGE_BUCKET is set to placeholder '${placeholderBucketName}'. GCP Storage functionality will be disabled.`,
+      );
     }
     // isGcpStorageConfigured remains false
   }
 } else {
-  logger.warn("ContentFileService: GOOGLE_APPLICATION_CREDENTIALS not found. Google Cloud Storage service will not be available.");
+  logger.warn(
+    'ContentFileService: GOOGLE_APPLICATION_CREDENTIALS not found. Google Cloud Storage service will not be available.',
+  );
   // isGcpStorageConfigured remains false
 }
-
 
 export const uploadContentFile = async (
   file: Express.Multer.File,
@@ -44,16 +59,21 @@ export const uploadContentFile = async (
   title: string,
   description?: string,
   sessionId?: string,
-  fileId?: string
-): Promise<{ success: boolean; data?: Partial<IContentFile>; error?: string }> => {
+  fileId?: string,
+): Promise<{
+  success: boolean;
+  data?: Partial<IContentFile>;
+  error?: string;
+}> => {
   if (!isGcpStorageConfigured || !storage || !effectiveBucketName) {
-    const errorMsg = "Google Cloud Storage not configured or not properly initialized. Cannot upload file.";
+    const errorMsg =
+      'Google Cloud Storage not configured or not properly initialized. Cannot upload file.';
     logger.error(`uploadContentFile: ${errorMsg}`);
     return { success: false, error: errorMsg };
   }
   try {
     let contentFile;
-    
+
     // If fileId is provided, check if file exists
     if (fileId) {
       try {
@@ -63,12 +83,12 @@ export const uploadContentFile = async (
         // Log the search parameters for debugging
         console.log('Searching for file with:', {
           fileId: mongoFileId,
-          companyId: mongoCompanyId
+          companyId: mongoCompanyId,
         });
 
         contentFile = await ContentFile.findOne({
           _id: mongoFileId,
-          companyId: mongoCompanyId
+          companyId: mongoCompanyId,
         });
 
         console.log('Found file:', contentFile);
@@ -77,7 +97,9 @@ export const uploadContentFile = async (
           // Improved error message
           const existingFile = await ContentFile.findById(mongoFileId);
           if (existingFile) {
-            throw new Error(`File found but not owned by the company. File ID: ${fileId}, Company ID: ${companyId}`);
+            throw new Error(
+              `File found but not owned by the company. File ID: ${fileId}, Company ID: ${companyId}`,
+            );
           } else {
             throw new Error(`File not found. File ID: ${fileId}`);
           }
@@ -102,10 +124,15 @@ export const uploadContentFile = async (
         contentFile.mimeType = file.mimetype;
         contentFile.size = file.size;
         if (description !== undefined) contentFile.description = description;
-        if (sessionId) contentFile.sessionId = new mongoose.Types.ObjectId(sessionId);
+        if (sessionId)
+          contentFile.sessionId = new mongoose.Types.ObjectId(sessionId);
       } catch (error: any) {
         console.error('Error processing existing file:', error);
-        throw new Error(`Error processing existing file: ${error?.message || 'Unknown error'}`);
+        throw new Error(
+          `Error processing existing file: ${
+            error?.message || 'Unknown error'
+          }`,
+        );
       }
     } else {
       // Create new ContentFile instance without saving
@@ -135,8 +162,8 @@ export const uploadContentFile = async (
         cacheControl: 'no-cache, no-store, must-revalidate',
         lastModified: timestamp,
         metadata: {
-          updateTimestamp: timestamp
-        }
+          updateTimestamp: timestamp,
+        },
       },
     });
     console.log('Successfully uploaded new file to GCP:', uniqueFilename);
@@ -153,7 +180,7 @@ export const uploadContentFile = async (
 
     // Set the GCP URL
     contentFile.gcpStorageUrl = baseUrl;
-    
+
     await contentFile.save();
     console.log('Successfully saved content file to database');
 
@@ -164,28 +191,40 @@ export const uploadContentFile = async (
     return { success: true, data: responseContentFile };
   } catch (error: any) {
     console.error('Error in uploadContentFile:', error);
-    return { success: false, error: error.message || 'An unknown error occurred' };
+    return {
+      success: false,
+      error: error.message || 'An unknown error occurred',
+    };
   }
 };
 
-export const downloadContentFileText = async (fileId: string, companyId: string): Promise<string | null> => {
-  if (!isGcpStorageConfigured || !storage || !effectiveBucketName) { // Updated guard clause
-    const errorMsg = "Google Cloud Storage not configured or not properly initialized. Cannot download file text.";
+export const downloadContentFileText = async (
+  fileId: string,
+  companyId: string,
+): Promise<string | null> => {
+  if (!isGcpStorageConfigured || !storage || !effectiveBucketName) {
+    // Updated guard clause
+    const errorMsg =
+      'Google Cloud Storage not configured or not properly initialized. Cannot download file text.';
     logger.error(`downloadContentFileText: ${errorMsg}`); // Using logger
     throw new Error(errorMsg);
   }
   try {
-    console.log(`Attempting to download content for file ID: ${fileId} for company: ${companyId}`);
-    
-    const fileMetadata = await ContentFile.findOne({ 
-      _id: new mongoose.Types.ObjectId(fileId), 
-      companyId: new mongoose.Types.ObjectId(companyId) 
+    console.log(
+      `Attempting to download content for file ID: ${fileId} for company: ${companyId}`,
+    );
+
+    const fileMetadata = await ContentFile.findOne({
+      _id: new mongoose.Types.ObjectId(fileId),
+      companyId: new mongoose.Types.ObjectId(companyId),
     });
 
     if (!fileMetadata) {
-      console.error(`File metadata not found or not owned by the company. FileId: ${fileId}, CompanyId: ${companyId}`);
+      console.error(
+        `File metadata not found or not owned by the company. FileId: ${fileId}, CompanyId: ${companyId}`,
+      );
       // Consider throwing an error or returning null based on desired behavior for "not found"
-      return null; 
+      return null;
     }
 
     console.log(`File metadata found: ${JSON.stringify(fileMetadata)}`);
@@ -194,48 +233,69 @@ export const downloadContentFileText = async (fileId: string, companyId: string)
     // Strip query parameters from gcpStorageUrl to get the blob name
     const urlWithoutParams = fileMetadata.gcpStorageUrl.split('?')[0];
     const blobName = path.basename(urlWithoutParams);
-    
-    console.log(`Attempting to download blob: ${blobName} from bucket: ${effectiveBucketName}`); // Changed bucketName to effectiveBucketName
-    
+
+    console.log(
+      `Attempting to download blob: ${blobName} from bucket: ${effectiveBucketName}`,
+    ); // Changed bucketName to effectiveBucketName
+
     const [fileBuffer] = await bucket.file(blobName).download();
     console.log(`Blob ${blobName} downloaded successfully`);
-    
+
     // Assuming text files are UTF-8 encoded. For other types, more complex handling might be needed.
     return fileBuffer.toString('utf-8');
-
   } catch (error: any) {
     console.error('Error in downloadContentFileText:', error);
     // Rethrow or handle as appropriate for the service layer
-    throw new Error(`Failed to download content file text: ${error.message || 'An unknown error occurred'}`);
+    throw new Error(
+      `Failed to download content file text: ${
+        error.message || 'An unknown error occurred'
+      }`,
+    );
   }
 };
 
-export const getContentFiles = async (companyId: string): Promise<IContentFile[]> => {
+export const getContentFiles = async (
+  companyId: string,
+): Promise<IContentFile[]> => {
   try {
-    return await ContentFile.find({ companyId: new mongoose.Types.ObjectId(companyId) });
+    return await ContentFile.find({
+      companyId: new mongoose.Types.ObjectId(companyId),
+    });
   } catch (error) {
     console.error('Error fetching content files:', error);
     throw error;
   }
 };
 
-export const deleteContentFile = async (fileId: string, companyId: string): Promise<{ success: boolean; error?: string }> => {
-  if (!isGcpStorageConfigured || !storage || !effectiveBucketName) { // Updated guard clause
-    const errorMsg = "Google Cloud Storage not configured or not properly initialized. Cannot delete file.";
+export const deleteContentFile = async (
+  fileId: string,
+  companyId: string,
+): Promise<{ success: boolean; error?: string }> => {
+  if (!isGcpStorageConfigured || !storage || !effectiveBucketName) {
+    // Updated guard clause
+    const errorMsg =
+      'Google Cloud Storage not configured or not properly initialized. Cannot delete file.';
     logger.error(`deleteContentFile: ${errorMsg}`); // Using logger
     return { success: false, error: errorMsg };
   }
   try {
-    console.log(`Attempting to delete file with ID: ${fileId} for company: ${companyId}`);
-    
-    const file = await ContentFile.findOne({ 
-      _id: new mongoose.Types.ObjectId(fileId), 
-      companyId: new mongoose.Types.ObjectId(companyId) 
+    console.log(
+      `Attempting to delete file with ID: ${fileId} for company: ${companyId}`,
+    );
+
+    const file = await ContentFile.findOne({
+      _id: new mongoose.Types.ObjectId(fileId),
+      companyId: new mongoose.Types.ObjectId(companyId),
     });
 
     if (!file) {
-      console.error(`File not found or not owned by the company. FileId: ${fileId}, CompanyId: ${companyId}`);
-      return { success: false, error: 'File not found or not owned by the company' };
+      console.error(
+        `File not found or not owned by the company. FileId: ${fileId}, CompanyId: ${companyId}`,
+      );
+      return {
+        success: false,
+        error: 'File not found or not owned by the company',
+      };
     }
 
     console.log(`File found in database: ${JSON.stringify(file)}`);
@@ -244,8 +304,10 @@ export const deleteContentFile = async (fileId: string, companyId: string): Prom
     // Strip query parameters before getting basename
     const urlWithoutParams = file.gcpStorageUrl.split('?')[0];
     const blobName = path.basename(urlWithoutParams);
-    console.log(`Attempting to delete blob: ${blobName} from bucket: ${effectiveBucketName}`); // Changed bucketName to effectiveBucketName
-    
+    console.log(
+      `Attempting to delete blob: ${blobName} from bucket: ${effectiveBucketName}`,
+    ); // Changed bucketName to effectiveBucketName
+
     const blob = bucket.file(blobName);
 
     await blob.delete();
@@ -257,6 +319,9 @@ export const deleteContentFile = async (fileId: string, companyId: string): Prom
     return { success: true };
   } catch (error: any) {
     console.error('Error in deleteContentFile:', error);
-    return { success: false, error: error.message || 'An unknown error occurred' };
+    return {
+      success: false,
+      error: error.message || 'An unknown error occurred',
+    };
   }
 };

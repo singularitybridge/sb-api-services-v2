@@ -24,7 +24,10 @@ const initializeApp = async () => {
     await initializeTelegramBots();
     logger.info('Telegram bots initialized for all companies');
   } catch (error: any) {
-    logger.error('Error during initialization:', { error: error.message, stack: error.stack });
+    logger.error('Error during initialization:', {
+      error: error.message,
+      stack: error.stack,
+    });
     process.exit(1);
   }
 };
@@ -48,6 +51,7 @@ import {
   verifyAccess,
   verifyTokenMiddleware,
 } from './middleware/auth.middleware';
+import { apiKeyRateLimit } from './middleware/apiKeyRateLimit.middleware';
 import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
 import { onboardingRouter } from './routes/onboarding.routes';
 import { authRouter } from './routes/auth.routes';
@@ -60,6 +64,7 @@ import { contentTypeRouter } from './routes/content-type.routes';
 import integrationRouter from './routes/integration.routes';
 import { teamRouter } from './routes/team.routes';
 import memoryRouter from './routes/memory.routes'; // Added import for memory router
+import apiKeyRouter from './routes/apiKey.routes';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -73,6 +78,15 @@ const io = initializeWebSocket(server);
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.json({ limit: '50mb' }));
 app.use(cors());
+
+// Apply rate limiting globally for API key requests
+app.use(
+  apiKeyRateLimit({
+    windowMs: 60000, // 1 minute
+    maxRequests: 100, // 100 requests per minute for API keys
+    skipJWT: true, // Don't rate limit JWT auth
+  }),
+);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -91,7 +105,9 @@ app.use('/policy', policyRouter);
 app.use('/assistant/user-input', (req, res, next) => {
   const acceptHeader = req.get('accept');
   // Check if acceptHeader is not undefined and includes 'text/event-stream'
-  const wantsSSE = typeof acceptHeader === 'string' && acceptHeader.includes('text/event-stream');
+  const wantsSSE =
+    typeof acceptHeader === 'string' &&
+    acceptHeader.includes('text/event-stream');
   if (wantsSSE) {
     return next(); // no gzip for SSE
   }
@@ -133,10 +149,11 @@ app.use(
   '/integrations',
   verifyTokenMiddleware,
   verifyAccess(),
-  integrationRouter
+  integrationRouter,
 );
 app.use('/teams', verifyTokenMiddleware, verifyAccess(), teamRouter);
 app.use('/memory', verifyTokenMiddleware, verifyAccess(), memoryRouter); // Added memory router
+app.use('/api/keys', verifyTokenMiddleware, verifyAccess(), apiKeyRouter); // API key management
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);
@@ -150,6 +167,8 @@ if (process.env.NODE_ENV !== 'test') {
   // Use the HTTP server instead of the Express app to listen
   server.listen(port, () => {
     logger.info(`Server is running on port ${port}`);
-    logger.info(`WebSocket server is available at ws://localhost:${port}/realtime`);
+    logger.info(
+      `WebSocket server is available at ws://localhost:${port}/realtime`,
+    );
   });
 }

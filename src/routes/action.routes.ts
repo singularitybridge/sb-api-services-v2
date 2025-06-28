@@ -1,6 +1,11 @@
 import express from 'express';
-import { createAction, deleteAction, getAction, getActions, updateAction } from '../services/action.service';
-
+import {
+  createAction,
+  deleteAction,
+  getAction,
+  getActions,
+  updateAction,
+} from '../services/action.service';
 
 const actionRouter = express.Router();
 

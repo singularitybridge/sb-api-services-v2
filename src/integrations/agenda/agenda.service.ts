@@ -2,6 +2,7 @@ import Agenda, { Job } from 'agenda';
 import { ObjectId } from 'mongodb';
 import { toZonedTime, format } from 'date-fns-tz';
 import { sendMessageToAgent } from '../../services/assistant.service';
+import { ApiKeyService } from '../../services/apiKey.service';
 
 let agendaClient: Agenda | null = null;
 
@@ -16,6 +17,10 @@ export const startAgenda = async () => {
     try {
       await agendaClient.start();
       console.log('Agenda started');
+
+      // Schedule API key cleanup job to run daily at 2 AM
+      await agendaClient.every('0 2 * * *', 'cleanupExpiredApiKeys');
+      console.log('Scheduled daily API key cleanup job');
     } catch (error) {
       console.error('Failed to start Agenda:', error);
       agendaClient = null; // Set to null if it fails to start
@@ -53,13 +58,20 @@ export const getJobs = async () => {
     return [];
   }
   try {
-    const jobs = await agendaClient.jobs({ nextRunAt: { $ne: null }, lastRunAt: null });
+    const jobs = await agendaClient.jobs({
+      nextRunAt: { $ne: null },
+      lastRunAt: null,
+    });
     const israelTimeZone = 'Asia/Jerusalem';
-    
-    return jobs.map(job => ({
+
+    return jobs.map((job) => ({
       ...job.attrs,
-      nextRunAt: job.attrs.nextRunAt 
-        ? format(toZonedTime(job.attrs.nextRunAt, israelTimeZone), 'yyyy-MM-dd HH:mm:ss zzz', { timeZone: israelTimeZone }) 
+      nextRunAt: job.attrs.nextRunAt
+        ? format(
+            toZonedTime(job.attrs.nextRunAt, israelTimeZone),
+            'yyyy-MM-dd HH:mm:ss zzz',
+            { timeZone: israelTimeZone },
+          )
         : null,
     }));
   } catch (error) {
@@ -85,7 +97,11 @@ export const getJob = async (jobId: string) => {
 if (agendaClient) {
   agendaClient.define('genericScheduledJob', async (job: Job) => {
     try {
-      console.log('Generic scheduled job started', job.attrs._id, job.attrs.data);
+      console.log(
+        'Generic scheduled job started',
+        job.attrs._id,
+        job.attrs.data,
+      );
       // Perform the scheduled task here
       // This could be calling an API, running a function, etc.
       console.log('Generic scheduled job completed');
@@ -97,7 +113,11 @@ if (agendaClient) {
 
   agendaClient.define('sendScheduledMessage', async (job: Job) => {
     try {
-      console.log('Scheduled message job started', job.attrs._id, job.attrs.data);
+      console.log(
+        'Scheduled message job started',
+        job.attrs._id,
+        job.attrs.data,
+      );
       const { sessionId, message } = job.attrs.data;
       await sendMessageToAgent(sessionId, message);
       console.log('Scheduled message sent successfully');
@@ -106,13 +126,25 @@ if (agendaClient) {
       throw error;
     }
   });
-}
 
+  agendaClient.define('cleanupExpiredApiKeys', async (job: Job) => {
+    try {
+      console.log('API key cleanup job started');
+      const deletedCount = await ApiKeyService.cleanupExpiredKeys();
+      console.log(
+        `API key cleanup completed. Deleted ${deletedCount} expired keys`,
+      );
+    } catch (error) {
+      console.error('Error cleaning up expired API keys:', error);
+      throw error;
+    }
+  });
+}
 
 export const scheduleJob = async (
   jobName: string,
   data: any,
-  scheduledTime: string
+  scheduledTime: string,
 ): Promise<Job | null> => {
   if (!agendaClient) {
     console.log('Agenda client not initialized. Cannot schedule job.');
@@ -132,9 +164,13 @@ export const scheduleJob = async (
 export const scheduleMessage = async (
   sessionId: string,
   message: string,
-  scheduledTime: string
+  scheduledTime: string,
 ): Promise<Job | null> => {
-  return scheduleJob('sendScheduledMessage', { sessionId, message }, scheduledTime);
+  return scheduleJob(
+    'sendScheduledMessage',
+    { sessionId, message },
+    scheduledTime,
+  );
 };
 
 export { agendaClient };

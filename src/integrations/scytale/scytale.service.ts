@@ -2,39 +2,39 @@ import fetch from 'node-fetch';
 import { getApiKey } from '../../services/api.key.service';
 
 export interface ContextTypeResponse {
-    contextId: string;
-    contextTypes: string[];
+  contextId: string;
+  contextTypes: string[];
 }
 
 export interface ContextItem {
-    id: string;
-    createdAt: string;
-    updatedAt: string;
-    contextId: string;
-    contextType: string;
-    internalId: string;
-    name: string;
-    description: string;
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  contextId: string;
+  contextType: string;
+  internalId: string;
+  name: string;
+  description: string;
 }
 
 export interface VectorSearchRequest {
-    query: string;
-    limit?: number;
+  query: string;
+  limit?: number;
 }
 
 export interface VectorSearchResultItem {
-    item: ContextItem;
-    score: number;
+  item: ContextItem;
+  score: number;
 }
 
 export interface VectorSearchResponse {
-    results: VectorSearchResultItem[];
+  results: VectorSearchResultItem[];
 }
 
 export interface IndexingStatusResponse {
-    queueSize: number;
-    pending: number;
-    isPaused: boolean;
+  queueSize: number;
+  pending: number;
+  isPaused: boolean;
 }
 
 /**
@@ -45,7 +45,11 @@ export interface IndexingStatusResponse {
 export const getContextTypes = async (
   companyId: string,
   contextId: string,
-): Promise<{ success: boolean; data?: ContextTypeResponse; error?: string }> => {
+): Promise<{
+  success: boolean;
+  data?: ContextTypeResponse;
+  error?: string;
+}> => {
   try {
     let scytaleBaseUrl = await getApiKey(companyId, 'scytale_base_url');
     const scytaleAuthToken = await getApiKey(companyId, 'scytale_auth_token');
@@ -68,14 +72,24 @@ export const getContextTypes = async (
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to fetch context types for ${contextId}: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(
+        `Failed to fetch context types for ${contextId}: ${response.status} ${response.statusText} - ${errorText}`,
+      );
     }
 
     const data = (await response.json()) as ContextTypeResponse;
     return { success: true, data };
   } catch (error: any) {
-    console.error(`Error in getContextTypes for contextId ${contextId}:`, error);
-    return { success: false, error: error.message || 'An unknown error occurred while fetching context types.' };
+    console.error(
+      `Error in getContextTypes for contextId ${contextId}:`,
+      error,
+    );
+    return {
+      success: false,
+      error:
+        error.message ||
+        'An unknown error occurred while fetching context types.',
+    };
   }
 };
 
@@ -86,7 +100,11 @@ export const getContextTypes = async (
  */
 export const getIndexingStatus = async (
   companyId: string,
-): Promise<{ success: boolean; data?: IndexingStatusResponse; error?: string }> => {
+): Promise<{
+  success: boolean;
+  data?: IndexingStatusResponse;
+  error?: string;
+}> => {
   try {
     let scytaleBaseUrl = await getApiKey(companyId, 'scytale_base_url');
     const scytaleAuthToken = await getApiKey(companyId, 'scytale_auth_token');
@@ -109,14 +127,21 @@ export const getIndexingStatus = async (
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to fetch indexing status: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(
+        `Failed to fetch indexing status: ${response.status} ${response.statusText} - ${errorText}`,
+      );
     }
 
     const data = (await response.json()) as IndexingStatusResponse;
     return { success: true, data };
   } catch (error: any) {
     console.error(`Error in getIndexingStatus:`, error);
-    return { success: false, error: error.message || 'An unknown error occurred while fetching indexing status.' };
+    return {
+      success: false,
+      error:
+        error.message ||
+        'An unknown error occurred while fetching indexing status.',
+    };
   }
 };
 
@@ -170,14 +195,24 @@ export const getContextItems = async (
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to fetch context items for context ${contextId} and type ${contextType}: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(
+        `Failed to fetch context items for context ${contextId} and type ${contextType}: ${response.status} ${response.statusText} - ${errorText}`,
+      );
     }
 
     const data = (await response.json()) as ContextItem[];
     return { success: true, data };
   } catch (error: any) {
-    console.error(`Error in getContextItems (contextId: ${contextId}, contextType: ${contextType}):`, error);
-    return { success: false, error: error.message || `An unknown error occurred while fetching context items for type ${contextType}.` };
+    console.error(
+      `Error in getContextItems (contextId: ${contextId}, contextType: ${contextType}):`,
+      error,
+    );
+    return {
+      success: false,
+      error:
+        error.message ||
+        `An unknown error occurred while fetching context items for type ${contextType}.`,
+    };
   }
 };
 
@@ -191,9 +226,15 @@ export const vectorSearch = async (
   companyId: string,
   contextId: string,
   searchRequest: VectorSearchRequest,
-): Promise<{ success: boolean; data?: VectorSearchResponse; error?: string }> => {
+): Promise<{
+  success: boolean;
+  data?: VectorSearchResponse;
+  error?: string;
+}> => {
   if (!contextId || !searchRequest || !searchRequest.query) {
-    throw new Error('contextId and a search query are required for vector search.');
+    throw new Error(
+      'contextId and a search query are required for vector search.',
+    );
   }
   try {
     let scytaleBaseUrl = await getApiKey(companyId, 'scytale_base_url');
@@ -223,13 +264,21 @@ export const vectorSearch = async (
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to perform vector search for ${contextId}: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(
+        `Failed to perform vector search for ${contextId}: ${response.status} ${response.statusText} - ${errorText}`,
+      );
     }
 
     const data = (await response.json()) as VectorSearchResponse;
     return { success: true, data };
   } catch (error: any) {
-    console.error(`Error in vectorSearch (contextId: ${contextId}, query: ${searchRequest.query}):`, error);
-    return { success: false, error: error.message || 'An unknown error occurred during vector search.' };
+    console.error(
+      `Error in vectorSearch (contextId: ${contextId}, query: ${searchRequest.query}):`,
+      error,
+    );
+    return {
+      success: false,
+      error: error.message || 'An unknown error occurred during vector search.',
+    };
   }
 };

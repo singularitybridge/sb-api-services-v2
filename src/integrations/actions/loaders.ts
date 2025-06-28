@@ -4,10 +4,14 @@ import {
   getIntegrationFolders,
   loadConfig,
   createPrefixedActions,
-  filterAllowedActions
+  filterAllowedActions,
 } from './utils';
 
-const loadActionModule = async (actionFilePath: string, config: Record<string, unknown>, context: ActionContext): Promise<FunctionFactory> => {
+const loadActionModule = async (
+  actionFilePath: string,
+  config: Record<string, unknown>,
+  context: ActionContext,
+): Promise<FunctionFactory> => {
   try {
     const module = await import(actionFilePath);
     const actionCreator = module[config.actionCreator as string];
@@ -24,27 +28,42 @@ const loadActionModule = async (actionFilePath: string, config: Record<string, u
   }
 };
 
-const processIntegrationFolder = async (folder: string, integrationsPath: string, context: ActionContext): Promise<FunctionFactory> => {
+const processIntegrationFolder = async (
+  folder: string,
+  integrationsPath: string,
+  context: ActionContext,
+): Promise<FunctionFactory> => {
   const integrationPath = join(integrationsPath, folder);
   const configFilePath = join(integrationPath, 'integration.config.json');
   const config = loadConfig(configFilePath);
 
   if (!config) return {};
 
-  const actionFilePath = join(integrationPath, config.actionsFile as string || `${folder}.actions.ts`);
+  const actionFilePath = join(
+    integrationPath,
+    (config.actionsFile as string) || `${folder}.actions.ts`,
+  );
   const actionObj = await loadActionModule(actionFilePath, config, context);
-  const integrationName = config.name as string || folder;
+  const integrationName = (config.name as string) || folder;
 
   return createPrefixedActions(actionObj, integrationName);
 };
 
-export const createFunctionFactory = async (context: ActionContext, allowedActions: string[]): Promise<FunctionFactory> => {
+export const createFunctionFactory = async (
+  context: ActionContext,
+  allowedActions: string[],
+): Promise<FunctionFactory> => {
   const integrationsPath = join(__dirname, '..');
   const integrationFolders = getIntegrationFolders(integrationsPath);
 
-  const allActionPromises = integrationFolders.map(folder => processIntegrationFolder(folder, integrationsPath, context));
+  const allActionPromises = integrationFolders.map((folder) =>
+    processIntegrationFolder(folder, integrationsPath, context),
+  );
   const allActionResults = await Promise.all(allActionPromises);
 
-  const allActions = allActionResults.reduce((acc, actions) => ({ ...acc, ...actions }), {});
+  const allActions = allActionResults.reduce(
+    (acc, actions) => ({ ...acc, ...actions }),
+    {},
+  );
   return filterAllowedActions(allActions, allowedActions);
 };

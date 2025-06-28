@@ -21,7 +21,7 @@ describe('curl.service', () => {
   const mockContext: ActionContext = {
     sessionId: 'test-session',
     companyId: 'test-company',
-    language: 'en' as SupportedLanguage
+    language: 'en' as SupportedLanguage,
   };
 
   const mockCurlCommand = `curl --location 'https://api.example.com/test' \
@@ -36,17 +36,20 @@ describe('curl.service', () => {
     });
     const result = await performCurlRequest(mockContext, mockCurlCommand);
     expect(result.status).toBe(200);
-    expect(result.data).toEqual({ message: "Success data from mock" });
+    expect(result.data).toEqual({ message: 'Success data from mock' });
     expect(result.headers).toEqual({}); // Service currently always returns empty headers
     expect(result.error).toBeUndefined();
   });
 
   it('should handle request errors gracefully when exec fails', async () => {
     const invalidCurlCommand = `curl --location 'https://failing-url.example.com'`; // Command doesn't matter as much as mock behavior
-    
+
     mockExec.mockImplementationOnce((commandStr, callback) => {
       // Simulate an error from exec itself (e.g., command not found, network issue caught by exec)
-      callback(new Error('Simulated exec failure'), { stdout: '', stderr: 'Error output from exec' });
+      callback(new Error('Simulated exec failure'), {
+        stdout: '',
+        stderr: 'Error output from exec',
+      });
     });
 
     const result = await performCurlRequest(mockContext, invalidCurlCommand);
@@ -65,13 +68,16 @@ describe('curl.service', () => {
       if (commandStr.includes('https://api.example.com/xml')) {
         const stdout = `<note><to>User</to><from>Test</from><heading>Reminder</heading><body>XML Content</body></note>\nSTATUS_CODE:200`;
         // promisify(exec) expects callback(null, { stdout, stderr }) for success
-        callback(null, { stdout, stderr: '' }); 
+        callback(null, { stdout, stderr: '' });
       } else {
         // Fallback for other commands or if the command matching is too simple
-        callback(new Error('exec_mock_error: command_not_handled_for_xml_test'), { stdout: '', stderr: 'exec_mock_error' });
+        callback(
+          new Error('exec_mock_error: command_not_handled_for_xml_test'),
+          { stdout: '', stderr: 'exec_mock_error' },
+        );
       }
     });
-    
+
     const result = await performCurlRequest(mockContext, xmlCurlCommand);
     expect(result.status).toBe(200);
     expect(typeof result.data).toBe('string');
@@ -83,7 +89,7 @@ describe('curl.service', () => {
       --header 'Content-Type: application/x-www-form-urlencoded' \
       --data-urlencode 'key1=value1' \
       --data-urlencode 'key2=value2'`;
-    
+
     mockExec.mockImplementationOnce((commandStr, callback) => {
       // Simulate a successful response for a form post
       const stdout = `Form data processed successfully\nSTATUS_CODE:201`;

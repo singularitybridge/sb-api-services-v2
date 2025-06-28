@@ -13,7 +13,10 @@ import { IJournal } from '../../models/Journal';
 import { getApiKey } from '../../services/api.key.service';
 import { Types } from 'mongoose';
 import { executeAction } from '../actions/executor';
-import { ActionExecutionError, ActionValidationError } from '../../utils/actionErrors';
+import {
+  ActionExecutionError,
+  ActionValidationError,
+} from '../../utils/actionErrors';
 
 interface JournalEntryArgs {
   content: string;
@@ -52,13 +55,24 @@ export const createJournalActions = (
     parameters: {
       type: 'object',
       properties: {
-        content: { type: 'string', description: 'The content of the journal entry' },
-        entryType: { 
-          type: 'string', 
-          description: 'The type of the journal entry'
+        content: {
+          type: 'string',
+          description: 'The content of the journal entry',
         },
-        tags: { type: 'array', items: { type: 'string' }, description: 'Tags for the journal entry' },
-        metadata: { type: 'object', description: 'Additional metadata for the journal entry', additionalProperties: true },
+        entryType: {
+          type: 'string',
+          description: 'The type of the journal entry',
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags for the journal entry',
+        },
+        metadata: {
+          type: 'object',
+          description: 'Additional metadata for the journal entry',
+          additionalProperties: true,
+        },
       },
       required: ['content', 'entryType'], // entryType is now required
       additionalProperties: false,
@@ -69,7 +83,10 @@ export const createJournalActions = (
       const actionName = 'createJournalEntry';
 
       if (!sessionId) {
-        throw new ActionExecutionError('Session ID is required.', { actionName, statusCode: 400 });
+        throw new ActionExecutionError('Session ID is required.', {
+          actionName,
+          statusCode: 400,
+        });
       }
       // Assuming companyId is guaranteed by ActionContext typing & population
       // if (!companyId) {
@@ -78,10 +95,16 @@ export const createJournalActions = (
 
       const session = await getSessionById(sessionId);
       if (!session) {
-        throw new ActionExecutionError('Invalid session.', { actionName, statusCode: 401 });
+        throw new ActionExecutionError('Invalid session.', {
+          actionName,
+          statusCode: 401,
+        });
       }
       if (!session.userId) {
-        throw new ActionExecutionError('User ID not found in session.', { actionName, statusCode: 400 });
+        throw new ActionExecutionError('User ID not found in session.', {
+          actionName,
+          statusCode: 400,
+        });
       }
 
       const apiKey = (await getApiKey(companyId, 'openai_api_key')) || '';
@@ -103,7 +126,7 @@ export const createJournalActions = (
           );
           return { success: true, data: result };
         },
-        { serviceName: 'JournalService' }
+        { serviceName: 'JournalService' },
       );
     },
   },
@@ -115,38 +138,48 @@ export const createJournalActions = (
     parameters: {
       type: 'object',
       properties: {
-        query: { 
-          type: 'string', 
-          description: 'The search query text' 
+        query: {
+          type: 'string',
+          description: 'The search query text',
         },
-        limit: { 
-          type: 'number', 
-          description: 'Maximum number of entries to return'
+        limit: {
+          type: 'number',
+          description: 'Maximum number of entries to return',
         },
         scope: {
           type: 'string',
           enum: ['user', 'company'],
-          description: 'Search entries for current user only or all company entries'
+          description:
+            'Search entries for current user only or all company entries',
         },
         entryType: {
           type: 'string',
-          description: 'Filter by entry type'
+          description: 'Filter by entry type',
         },
         tags: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Filter by tags'
+          description: 'Filter by tags',
         },
       },
       required: ['query'],
       additionalProperties: false,
     },
-    function: async ({ query, limit = 10, scope = 'user', entryType, tags }: SearchJournalEntriesArgs) => {
+    function: async ({
+      query,
+      limit = 10,
+      scope = 'user',
+      entryType,
+      tags,
+    }: SearchJournalEntriesArgs) => {
       const { companyId, sessionId } = context;
       const actionName = 'searchJournalEntries';
 
       if (!sessionId) {
-        throw new ActionExecutionError('Session ID is required.', { actionName, statusCode: 400 });
+        throw new ActionExecutionError('Session ID is required.', {
+          actionName,
+          statusCode: 400,
+        });
       }
       // if (!companyId) {
       //   throw new ActionExecutionError('Company ID is required.', { actionName, statusCode: 400 });
@@ -154,7 +187,10 @@ export const createJournalActions = (
 
       const session = await getSessionById(sessionId);
       if (!session) {
-        throw new ActionExecutionError('Invalid session.', { actionName, statusCode: 401 });
+        throw new ActionExecutionError('Invalid session.', {
+          actionName,
+          statusCode: 401,
+        });
       }
       // session.userId is optional for company scope search, so no explicit check here if scope is 'company'
 
@@ -167,11 +203,11 @@ export const createJournalActions = (
             scope === 'user' ? session.userId : undefined,
             entryType,
             tags,
-            limit
+            limit,
           );
           return { success: true, data: entries };
         },
-        { serviceName: 'JournalService' }
+        { serviceName: 'JournalService' },
       );
     },
   },
@@ -184,34 +220,57 @@ export const createJournalActions = (
       type: 'object',
       properties: {
         entryType: { type: 'string', description: 'Filter by entry type' },
-        tags: { type: 'array', items: { type: 'string' }, description: 'Filter by tags' },
-        limit: { type: 'number', description: 'Maximum number of entries to return' },
-        scope: { 
-          type: 'string', 
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Filter by tags',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of entries to return',
+        },
+        scope: {
+          type: 'string',
           enum: ['user', 'company'],
-          description: 'Get entries for current user only or all company entries' 
+          description:
+            'Get entries for current user only or all company entries',
         },
       },
       required: [],
       additionalProperties: false,
     },
-    function: async ({ entryType, tags, limit = 25, scope = 'user' }: GetJournalEntriesArgs) => {
+    function: async ({
+      entryType,
+      tags,
+      limit = 25,
+      scope = 'user',
+    }: GetJournalEntriesArgs) => {
       const { companyId, sessionId } = context;
       const actionName = 'getJournalEntries';
 
       if (!sessionId) {
-        throw new ActionExecutionError('Session ID is required.', { actionName, statusCode: 400 });
+        throw new ActionExecutionError('Session ID is required.', {
+          actionName,
+          statusCode: 400,
+        });
       }
       // if (!companyId) {
       //   throw new ActionExecutionError('Company ID is required.', { actionName, statusCode: 400 });
       // }
-      
+
       const session = await getSessionById(sessionId);
       if (!session) {
-        throw new ActionExecutionError('Invalid session.', { actionName, statusCode: 401 });
+        throw new ActionExecutionError('Invalid session.', {
+          actionName,
+          statusCode: 401,
+        });
       }
-      if (!session.userId && scope === 'user') { // userId is required for user scope
-        throw new ActionExecutionError('User ID not found in session for user-scoped query.', { actionName, statusCode: 400 });
+      if (!session.userId && scope === 'user') {
+        // userId is required for user scope
+        throw new ActionExecutionError(
+          'User ID not found in session for user-scoped query.',
+          { actionName, statusCode: 400 },
+        );
       }
 
       return executeAction<IJournal[]>( // Assuming get returns an array of IJournal
@@ -224,40 +283,57 @@ export const createJournalActions = (
             entryType,
             tags,
             limit,
-            scope
+            scope,
           );
           return { success: true, data: entries };
         },
-        { serviceName: 'JournalService' }
+        { serviceName: 'JournalService' },
       );
     },
   },
 
   getFriendlyJournalEntries: {
-    description: 'Get journal entries in a friendly format with user and agent names',
+    description:
+      'Get journal entries in a friendly format with user and agent names',
     strict: true,
     actionType: ActionType.JOURNAL_OPERATION,
     parameters: {
       type: 'object',
       properties: {
         entryType: { type: 'string', description: 'Filter by entry type' },
-        tags: { type: 'array', items: { type: 'string' }, description: 'Filter by tags' },
-        limit: { type: 'number', description: 'Maximum number of entries to return' },
-        scope: { 
-          type: 'string', 
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Filter by tags',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of entries to return',
+        },
+        scope: {
+          type: 'string',
           enum: ['user', 'company'],
-          description: 'Get entries for current user only or all company entries' 
+          description:
+            'Get entries for current user only or all company entries',
         },
       },
       required: [],
       additionalProperties: false,
     },
-    function: async ({ entryType, tags, limit = 25, scope = 'user' }: GetJournalEntriesArgs) => {
+    function: async ({
+      entryType,
+      tags,
+      limit = 25,
+      scope = 'user',
+    }: GetJournalEntriesArgs) => {
       const { companyId, sessionId } = context;
       const actionName = 'getFriendlyJournalEntries';
 
       if (!sessionId) {
-        throw new ActionExecutionError('Session ID is required.', { actionName, statusCode: 400 });
+        throw new ActionExecutionError('Session ID is required.', {
+          actionName,
+          statusCode: 400,
+        });
       }
       // if (!companyId) {
       //   throw new ActionExecutionError('Company ID is required.', { actionName, statusCode: 400 });
@@ -265,12 +341,19 @@ export const createJournalActions = (
 
       const session = await getSessionById(sessionId);
       if (!session) {
-        throw new ActionExecutionError('Invalid session.', { actionName, statusCode: 401 });
+        throw new ActionExecutionError('Invalid session.', {
+          actionName,
+          statusCode: 401,
+        });
       }
-      if (!session.userId && scope === 'user') { // userId is required for user scope
-        throw new ActionExecutionError('User ID not found in session for user-scoped query.', { actionName, statusCode: 400 });
+      if (!session.userId && scope === 'user') {
+        // userId is required for user scope
+        throw new ActionExecutionError(
+          'User ID not found in session for user-scoped query.',
+          { actionName, statusCode: 400 },
+        );
       }
-      
+
       // Assuming FriendlyJournalEntry[] is the return type, using any[] for now
       return executeAction<any[]>(
         actionName,
@@ -282,11 +365,11 @@ export const createJournalActions = (
             entryType,
             tags,
             limit,
-            scope
+            scope,
           );
           return { success: true, data: entries };
         },
-        { serviceName: 'JournalService' }
+        { serviceName: 'JournalService' },
       );
     },
   },
@@ -309,10 +392,14 @@ export const createJournalActions = (
       const actionName = 'updateJournalEntry';
 
       if (!journalId) {
-        throw new ActionValidationError('journalId is required.', { fieldErrors: { journalId: 'journalId is required.'} });
+        throw new ActionValidationError('journalId is required.', {
+          fieldErrors: { journalId: 'journalId is required.' },
+        });
       }
       if (!updateData || Object.keys(updateData).length === 0) {
-        throw new ActionValidationError('updateData cannot be empty.', { fieldErrors: { updateData: 'updateData cannot be empty.'} });
+        throw new ActionValidationError('updateData cannot be empty.', {
+          fieldErrors: { updateData: 'updateData cannot be empty.' },
+        });
       }
 
       return executeAction<IJournal | null>( // updateJournalEntry might return null if not found, or the updated IJournal
@@ -321,7 +408,7 @@ export const createJournalActions = (
           const result = await updateJournalEntry(journalId, updateData);
           return { success: true, data: result };
         },
-        { serviceName: 'JournalService' }
+        { serviceName: 'JournalService' },
       );
     },
   },
@@ -342,7 +429,9 @@ export const createJournalActions = (
       const actionName = 'deleteJournalEntry';
 
       if (!journalId) {
-        throw new ActionValidationError('journalId is required.', { fieldErrors: { journalId: 'journalId is required.'} });
+        throw new ActionValidationError('journalId is required.', {
+          fieldErrors: { journalId: 'journalId is required.' },
+        });
       }
 
       return executeAction<any>( // Define specific return type if known (e.g., { deletedCount: number } or IJournal | null)
@@ -351,7 +440,7 @@ export const createJournalActions = (
           const result = await deleteJournalEntry(journalId);
           return { success: true, data: result };
         },
-        { serviceName: 'JournalService' }
+        { serviceName: 'JournalService' },
       );
     },
   },

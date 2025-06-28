@@ -1,9 +1,9 @@
-import moment from "moment-timezone";
-import { IEvent, IFreeSlot } from "../Interfaces/event.interface";
+import moment from 'moment-timezone';
+import { IEvent, IFreeSlot } from '../Interfaces/event.interface';
 
 export enum SlotStatus {
-  Free = "free",
-  Occupied = "occupied",
+  Free = 'free',
+  Occupied = 'occupied',
 }
 
 interface TimeSlot {
@@ -17,25 +17,25 @@ export const generateTimeSlots = (
   endDate: Date,
   startHour: number,
   endHour: number,
-  duration: number // duration in minutes
+  duration: number, // duration in minutes
 ): TimeSlot[] => {
-  let slots: TimeSlot[] = [];
-  let current = moment
-    .tz(startDate, "Asia/Jerusalem")
-    .startOf("day")
+  const slots: TimeSlot[] = [];
+  const current = moment
+    .tz(startDate, 'Asia/Jerusalem')
+    .startOf('day')
     .hour(startHour);
 
-  let end = moment.tz(endDate, "Asia/Jerusalem").endOf("day").hour(endHour);
+  const end = moment.tz(endDate, 'Asia/Jerusalem').endOf('day').hour(endHour);
 
   while (current.isBefore(end)) {
-    let slotStart = current.toDate();
-    let slotEnd = current.clone().add(duration, "minutes").toDate();
+    const slotStart = current.toDate();
+    const slotEnd = current.clone().add(duration, 'minutes').toDate();
 
     // Ensure the slot does not exceed the working hours
     if (current.hour() >= startHour && current.hour() < endHour) {
       slots.push({ start: slotStart, end: slotEnd, status: SlotStatus.Free });
     }
-    current.add(duration, "minutes");
+    current.add(duration, 'minutes');
   }
 
   return slots;
@@ -43,15 +43,15 @@ export const generateTimeSlots = (
 
 export const markOccupiedSlots = (
   slots: TimeSlot[],
-  events: IEvent[]
+  events: IEvent[],
 ): TimeSlot[] => {
   events.forEach((event) => {
-    let eventStart = moment(event.startDate);
-    let eventEnd = moment(event.endDate);
+    const eventStart = moment(event.startDate);
+    const eventEnd = moment(event.endDate);
 
     slots.forEach((slot) => {
-      let slotStart = moment(slot.start);
-      let slotEnd = moment(slot.end);
+      const slotStart = moment(slot.start);
+      const slotEnd = moment(slot.end);
 
       if (slotStart.isBefore(eventEnd) && slotEnd.isAfter(eventStart)) {
         slot.status = SlotStatus.Occupied;
@@ -65,19 +65,19 @@ export const markOccupiedSlots = (
 export const isSlotAvailable = (
   slot: TimeSlot,
   meetingDuration: number,
-  allSlots: TimeSlot[]
+  allSlots: TimeSlot[],
 ): boolean => {
-  let endOfDesiredSlot = moment(slot.start).add(meetingDuration, "minutes");
-  let relevantSlots = allSlots.filter(
+  const endOfDesiredSlot = moment(slot.start).add(meetingDuration, 'minutes');
+  const relevantSlots = allSlots.filter(
     (s) =>
       moment(s.start).isSameOrAfter(slot.start) &&
-      moment(s.end).isSameOrBefore(endOfDesiredSlot)
+      moment(s.end).isSameOrBefore(endOfDesiredSlot),
   );
 
   // Calculate the total free duration within the relevant slots
-  let totalFreeDuration = relevantSlots.reduce((acc, s) => {
+  const totalFreeDuration = relevantSlots.reduce((acc, s) => {
     if (s.status === SlotStatus.Free) {
-      return acc + moment(s.end).diff(moment(s.start), "minutes");
+      return acc + moment(s.end).diff(moment(s.start), 'minutes');
     }
     return acc;
   }, 0);
@@ -90,24 +90,24 @@ export const findFreeSlots = (
   endDate: Date,
   events: IEvent[],
   slotDuration: number,
-  meetingDuration: number
+  meetingDuration: number,
 ): IFreeSlot[] => {
-  let allSlots = generateTimeSlots(startDate, endDate, 9, 17, slotDuration);
-  let markedSlots = markOccupiedSlots(allSlots, events);
+  const allSlots = generateTimeSlots(startDate, endDate, 9, 17, slotDuration);
+  const markedSlots = markOccupiedSlots(allSlots, events);
 
-  let freeSlots: IFreeSlot[] = [];
+  const freeSlots: IFreeSlot[] = [];
   let lastAddedSlotEnd = null;
 
-  for (let slot of markedSlots) {
+  for (const slot of markedSlots) {
     if (
       slot.status === SlotStatus.Free &&
       isSlotAvailable(slot, meetingDuration, allSlots)
     ) {
-      let slotStartMoment = moment(slot.start);
-      let slotEndMoment = moment(slot.start).add(meetingDuration, "minutes");
+      const slotStartMoment = moment(slot.start);
+      const slotEndMoment = moment(slot.start).add(meetingDuration, 'minutes');
 
       // Get the day name
-      let dayName = slotStartMoment.format("dddd"); // 'dddd' formats the date to full day name
+      const dayName = slotStartMoment.format('dddd'); // 'dddd' formats the date to full day name
 
       // Only add the slot if it's not overlapping with the previously added slot
       if (
@@ -115,8 +115,8 @@ export const findFreeSlots = (
         slotStartMoment.isSameOrAfter(lastAddedSlotEnd)
       ) {
         freeSlots.push({
-          start: slotStartMoment.format("DD/MM/YYYY, HH:mm"),
-          end: slotEndMoment.format("DD/MM/YYYY, HH:mm"),
+          start: slotStartMoment.format('DD/MM/YYYY, HH:mm'),
+          end: slotEndMoment.format('DD/MM/YYYY, HH:mm'),
           day: dayName, // Add the day name here
         });
         lastAddedSlotEnd = slotEndMoment;

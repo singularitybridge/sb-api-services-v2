@@ -4,13 +4,13 @@ export const createContentType = async (
   companyId: string,
   name: string,
   description: string,
-  fields: Array<{ name: string; type: string; required: boolean }>
+  fields: Array<{ name: string; type: string; required: boolean }>,
 ): Promise<IContentType> => {
   const contentType = new ContentType({
     companyId,
     name,
     description,
-    fields
+    fields,
   });
   return await contentType.save();
 };

@@ -9,11 +9,21 @@ export interface IVectorStore extends Document {
   updatedAt: Date;
 }
 
-const VectorStoreSchema: Schema = new Schema({
-  openaiId: { type: String, required: true },
-  assistantId: { type: Schema.Types.ObjectId, ref: 'Assistant', required: true },
-  companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true },
-  name: { type: String, required: true },
-}, { timestamps: true });
+const VectorStoreSchema: Schema = new Schema(
+  {
+    openaiId: { type: String, required: true },
+    assistantId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Assistant',
+      required: true,
+    },
+    companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true },
+    name: { type: String, required: true },
+  },
+  { timestamps: true },
+);
 
-export const VectorStore = mongoose.model<IVectorStore>('VectorStore', VectorStoreSchema);
+export const VectorStore = mongoose.model<IVectorStore>(
+  'VectorStore',
+  VectorStoreSchema,
+);

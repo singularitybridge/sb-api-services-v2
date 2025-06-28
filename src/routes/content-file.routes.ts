@@ -1,7 +1,14 @@
 import express from 'express';
 import multer from 'multer';
-import { uploadContentFile, getContentFiles, deleteContentFile } from '../services/content-file.service';
-import { AuthenticatedRequest, verifyAccess } from '../middleware/auth.middleware';
+import {
+  uploadContentFile,
+  getContentFiles,
+  deleteContentFile,
+} from '../services/content-file.service';
+import {
+  AuthenticatedRequest,
+  verifyAccess,
+} from '../middleware/auth.middleware';
 import { validateApiKeys } from '../services/api.key.service';
 
 const contentFileRouter = express.Router();
@@ -26,14 +33,16 @@ contentFileRouter.post(
         title,
         description,
         sessionId,
-        fileId
+        fileId,
       );
       res.status(201).json(contentFile);
     } catch (error) {
       console.error('Error uploading file:', error);
-      res.status(500).json({ error: 'An error occurred while uploading the file' });
+      res
+        .status(500)
+        .json({ error: 'An error occurred while uploading the file' });
     }
-  }
+  },
 );
 
 contentFileRouter.get(
@@ -48,12 +57,12 @@ contentFileRouter.get(
       console.error('Error listing files:', error);
       res.status(500).json({ error: 'An error occurred while listing files' });
     }
-  }
+  },
 );
 
 contentFileRouter.delete(
   '/:fileId',
-  verifyAccess(),  
+  verifyAccess(),
   async (req: AuthenticatedRequest, res) => {
     try {
       const companyId = req.company._id;
@@ -62,9 +71,11 @@ contentFileRouter.delete(
       res.json(result);
     } catch (error) {
       console.error('Error deleting file:', error);
-      res.status(500).json({ error: 'An error occurred while deleting the file' });
+      res
+        .status(500)
+        .json({ error: 'An error occurred while deleting the file' });
     }
-  }
+  },
 );
 
 export default contentFileRouter;

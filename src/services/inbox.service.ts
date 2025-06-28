@@ -34,15 +34,15 @@ export const addMessageToInbox = async (inboxInput: IInboxInput) => {
 export const getInboxMessages = async (companyId: string) => {
   const aggregationPipeline: any[] = [
     {
-      $match: { companyId: new mongoose.Types.ObjectId(companyId) }
+      $match: { companyId: new mongoose.Types.ObjectId(companyId) },
     },
     {
       $lookup: {
         from: 'sessions',
         localField: 'sessionId',
         foreignField: '_id',
-        as: 'sessionInfo'
-      }
+        as: 'sessionInfo',
+      },
     },
     { $unwind: '$sessionInfo' },
     {
@@ -50,8 +50,8 @@ export const getInboxMessages = async (companyId: string) => {
         from: 'assistants',
         localField: 'senderId',
         foreignField: '_id',
-        as: 'assistantInfo'
-      }
+        as: 'assistantInfo',
+      },
     },
     { $unwind: '$assistantInfo' },
     {
@@ -59,8 +59,8 @@ export const getInboxMessages = async (companyId: string) => {
         from: 'users',
         localField: 'sessionInfo.userId',
         foreignField: '_id',
-        as: 'userInfo'
-      }
+        as: 'userInfo',
+      },
     },
     { $unwind: '$userInfo' },
     {
@@ -77,13 +77,13 @@ export const getInboxMessages = async (companyId: string) => {
             sessionActive: { $literal: true }, // Assuming all sessions are active
             assistantName: '$assistantInfo.name',
             senderId: '$senderId',
-            type: '$type'
-          }
-        }
-      }
+            type: '$type',
+          },
+        },
+      },
     },
     {
-      $sort: { lastMessageAt: -1 }
+      $sort: { lastMessageAt: -1 },
     },
     {
       $project: {
@@ -91,16 +91,18 @@ export const getInboxMessages = async (companyId: string) => {
         sessionId: 1,
         userName: 1,
         lastMessageAt: 1,
-        messages: 1
-      }
-    }
+        messages: 1,
+      },
+    },
   ];
 
   return await Inbox.aggregate(aggregationPipeline);
 };
 
-
-export const updateInboxMessageStatus = async (messageId: string, status: 'open' | 'in_progress' | 'closed') => {
+export const updateInboxMessageStatus = async (
+  messageId: string,
+  status: 'open' | 'in_progress' | 'closed',
+) => {
   return await Inbox.findByIdAndUpdate(messageId, { status }, { new: true });
 };
 

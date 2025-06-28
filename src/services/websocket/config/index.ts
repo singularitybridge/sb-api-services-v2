@@ -6,10 +6,12 @@ export const websocketConfig = {
       if (allowedOrigins) {
         return allowedOrigins.split(',');
       }
-      console.warn("ALLOWED_ORIGINS environment variable not set. Defaulting to '*' for CORS, which might be insecure for production.");
+      console.warn(
+        "ALLOWED_ORIGINS environment variable not set. Defaulting to '*' for CORS, which might be insecure for production.",
+      );
       return '*';
     })(),
     methods: ['GET', 'POST'],
-    credentials: true
-  }
+    credentials: true,
+  },
 };

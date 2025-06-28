@@ -15,12 +15,12 @@ export type JsonRpcSuccessResponse = {
   id: string;
 };
 
-export type JsonRpcErrorCode = 
-  | -32700  // Parse error
-  | -32600  // Invalid request
-  | -32601  // Method not found
-  | -32602  // Invalid params
-  | -32603  // Internal error
+export type JsonRpcErrorCode =
+  | -32700 // Parse error
+  | -32600 // Invalid request
+  | -32601 // Method not found
+  | -32602 // Invalid params
+  | -32603 // Internal error
   | -32000; // Server error
 
 export type JsonRpcError = {
@@ -58,6 +58,9 @@ export type RpcOptions = {
   timeout?: number;
 };
 
-export type RpcHandler = (socket: AuthenticatedSocket, params: any) => Promise<any>;
+export type RpcHandler = (
+  socket: AuthenticatedSocket,
+  params: any,
+) => Promise<any>;
 
 export type RpcMethodRegistry = Map<string, RpcHandler>;

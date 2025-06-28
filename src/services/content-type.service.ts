@@ -10,16 +10,27 @@ export const ContentTypeService = {
     return ContentType.findById(id).exec();
   },
 
-  async createContentType(contentTypeData: Partial<IContentType>): Promise<IContentType> {
+  async createContentType(
+    contentTypeData: Partial<IContentType>,
+  ): Promise<IContentType> {
     const contentType = new ContentType(contentTypeData);
     return contentType.save();
   },
 
-  async updateContentType(id: string, contentTypeData: Partial<IContentType>): Promise<IContentType | null> {
-    return ContentType.findByIdAndUpdate(id, contentTypeData, { new: true }).exec();
+  async updateContentType(
+    id: string,
+    contentTypeData: Partial<IContentType>,
+  ): Promise<IContentType | null> {
+    return ContentType.findByIdAndUpdate(id, contentTypeData, {
+      new: true,
+    }).exec();
   },
 
-  async deleteContentType(id: string): Promise<ModifyResult<Document<unknown, {}, IContentType> & IContentType> | null> {
+  async deleteContentType(
+    id: string,
+  ): Promise<ModifyResult<
+    Document<unknown, {}, IContentType> & IContentType
+  > | null> {
     return ContentType.findByIdAndDelete(id).exec();
   },
 };

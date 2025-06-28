@@ -29,16 +29,20 @@ interface ActionDefinition {
 export type SupportedLanguage = 'en' | 'he';
 
 function toSnakeCase(str: string): string {
-  return str.toLowerCase().replace(/[^a-zA-Z0-9]+(.)/g, (_, chr) => '_' + chr.toLowerCase());
+  return str
+    .toLowerCase()
+    .replace(/[^a-zA-Z0-9]+(.)/g, (_, chr) => '_' + chr.toLowerCase());
 }
 
 export const discoveryService = {
-  discoverIntegrations: async (language: SupportedLanguage = 'en'): Promise<Integration[]> => {
+  discoverIntegrations: async (
+    language: SupportedLanguage = 'en',
+  ): Promise<Integration[]> => {
     const integrationsPath = join(__dirname, '..', 'integrations');
-    const integrationFolders = readdirSync(integrationsPath).filter(folder =>
-      existsSync(join(integrationsPath, folder, 'integration.config.json'))
+    const integrationFolders = readdirSync(integrationsPath).filter((folder) =>
+      existsSync(join(integrationsPath, folder, 'integration.config.json')),
     );
-    let integrations: Integration[] = [];
+    const integrations: Integration[] = [];
 
     for (const folder of integrationFolders) {
       const integrationPath = join(integrationsPath, folder);
@@ -52,7 +56,10 @@ export const discoveryService = {
         continue;
       }
 
-      const actionFilePath = join(integrationPath, config.actionsFile || `${folder}.actions.ts`);
+      const actionFilePath = join(
+        integrationPath,
+        config.actionsFile || `${folder}.actions.ts`,
+      );
 
       if (!existsSync(actionFilePath)) {
         console.log(`Action file not found for ${folder}. Skipping.`);
@@ -87,7 +94,8 @@ export const discoveryService = {
             id: `${integrationId}.${key}`,
             serviceName: translations?.serviceName || config.name || folder,
             actionTitle: key,
-            description: translations?.[key]?.description || actionDef.description,
+            description:
+              translations?.[key]?.description || actionDef.description,
             icon: config.icon || 'help-circle',
             service: integrationId,
             parameters: actionDef.parameters,
@@ -101,7 +109,8 @@ export const discoveryService = {
       const integration: Integration = {
         id: integrationId,
         name: translations?.serviceName || config.name || folder,
-        description: translations?.serviceDescription || config.description || '',
+        description:
+          translations?.serviceDescription || config.description || '',
         icon: config.icon || 'help-circle',
         actions: actions,
       };
@@ -112,36 +121,62 @@ export const discoveryService = {
     return integrations;
   },
 
-  discoverActions: async (language: SupportedLanguage = 'en'): Promise<ActionInfo[]> => {
+  discoverActions: async (
+    language: SupportedLanguage = 'en',
+  ): Promise<ActionInfo[]> => {
     const integrations = await discoveryService.discoverIntegrations(language);
-    const actions = flattenIntegrationsToActions(integrations);    
+    const actions = flattenIntegrationsToActions(integrations);
     return actions;
   },
 
-  getIntegrationById: async (id: string, language: SupportedLanguage = 'en'): Promise<Integration | null> => {
+  getIntegrationById: async (
+    id: string,
+    language: SupportedLanguage = 'en',
+  ): Promise<Integration | null> => {
     const integrations = await discoveryService.discoverIntegrations(language);
-    return integrations.find(integration => integration.id === toSnakeCase(id)) || null;
+    return (
+      integrations.find((integration) => integration.id === toSnakeCase(id)) ||
+      null
+    );
   },
 
-  getIntegrationsLean: async (language: SupportedLanguage = 'en', fields?: (keyof Integration)[]): Promise<Partial<Integration>[]> => {
+  getIntegrationsLean: async (
+    language: SupportedLanguage = 'en',
+    fields?: (keyof Integration)[],
+  ): Promise<Partial<Integration>[]> => {
     const integrations = await discoveryService.discoverIntegrations(language);
-    return getLeanResponse(integrations, fields || ['id', 'name', 'description', 'icon', 'actions']) as Partial<Integration>[];
+    return getLeanResponse(
+      integrations,
+      fields || ['id', 'name', 'description', 'icon', 'actions'],
+    ) as Partial<Integration>[];
   },
 };
 
-function loadTranslations(integrationPath: string, language: SupportedLanguage): any {
-  const translationsPath = join(integrationPath, 'translations', `${language}.json`);
+function loadTranslations(
+  integrationPath: string,
+  language: SupportedLanguage,
+): any {
+  const translationsPath = join(
+    integrationPath,
+    'translations',
+    `${language}.json`,
+  );
   if (existsSync(translationsPath)) {
     try {
       return require(translationsPath);
     } catch (error) {
-      console.error(`Failed to load translations from ${translationsPath}:`, error);
+      console.error(
+        `Failed to load translations from ${translationsPath}:`,
+        error,
+      );
     }
   }
   return null;
 }
 
-function flattenIntegrationsToActions(integrations: Integration[]): ActionInfo[] {
+function flattenIntegrationsToActions(
+  integrations: Integration[],
+): ActionInfo[] {
   return integrations.reduce((acc, integration) => {
     return acc.concat(integration.actions);
   }, [] as ActionInfo[]);

@@ -27,7 +27,9 @@ if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
     process.env.TWILIO_AUTH_TOKEN,
   );
 } else {
-  console.warn("Twilio credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN) not found. Some omni.wa routes may not be available or fully functional.");
+  console.warn(
+    'Twilio credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN) not found. Some omni.wa routes may not be available or fully functional.',
+  );
   // messagingRouter.use((req, res) => {
   //   res.status(503).send("Twilio dependent service is not configured on the server.");
   // });
@@ -35,15 +37,14 @@ if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
   // Individual route handlers that use twilioClient should check for its existence.
 }
 
-
 messagingRouter.get('/webhook', (req, res) => {
   console.log('verify token ...', req.query);
 
   const VERIFY_TOKEN = 'sb';
 
-  let mode = req.query['hub.mode'];
-  let token = req.query['hub.verify_token'];
-  let challenge = req.query['hub.challenge'];
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
 
   if (mode && token) {
     if (mode === 'subscribe' && token === VERIFY_TOKEN) {
@@ -55,7 +56,8 @@ messagingRouter.get('/webhook', (req, res) => {
   }
 });
 
-const ACCESS_TOKEN = 'EAAHfZCZCi8Pj8BOyI7wYQMlhScoOfcxIUcOZCjdmtLzQxit3GMNTk6GJSLF31BRPIRrypjpJSbruXmHGBtvsV4O5aKoDXdZAhkk2xbTQXrZA2kU0VYZCFZCtyi7qY4rweyAVDL16ERvADE56c5vig18gIuaKos415CbSkx5Ew2IXQ38A5D1aC4SjFgHlixnUWZA4';
+const ACCESS_TOKEN =
+  'EAAHfZCZCi8Pj8BOyI7wYQMlhScoOfcxIUcOZCjdmtLzQxit3GMNTk6GJSLF31BRPIRrypjpJSbruXmHGBtvsV4O5aKoDXdZAhkk2xbTQXrZA2kU0VYZCFZCtyi7qY4rweyAVDL16ERvADE56c5vig18gIuaKos415CbSkx5Ew2IXQ38A5D1aC4SjFgHlixnUWZA4';
 
 function getTextMessageInput(recipient: any, text: any) {
   return JSON.stringify({
@@ -71,7 +73,7 @@ function getTextMessageInput(recipient: any, text: any) {
 }
 
 function sendMessage(data: any, phoneNumberId: string) {
-  var config = {
+  const config = {
     method: 'post',
     url: `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
     headers: {
@@ -86,7 +88,6 @@ function sendMessage(data: any, phoneNumberId: string) {
 
 // used for whatsapp
 messagingRouter.post('/webhook', async (req, res) => {
-
   console.log('handle incoming message ...');
   console.log(JSON.stringify(req.body, null, 2)); // Indent with 2 spaces
 
@@ -96,25 +97,21 @@ messagingRouter.post('/webhook', async (req, res) => {
     return;
   }
 
-
   const message = messages[0]?.text?.body;
   const senderId = messages[0]?.from;
-  const phoneNumberId = req.body.entry[0]?.changes[0]?.value?.metadata?.phone_number_id;
+  const phoneNumberId =
+    req.body.entry[0]?.changes[0]?.value?.metadata?.phone_number_id;
 
   console.log(message); // Here's the incoming message text!
 
   // Your response
-  var data = getTextMessageInput(
-    senderId,
-    `You said: ${message}`,
-  );
+  const data = getTextMessageInput(senderId, `You said: ${message}`);
   await sendMessage(data, phoneNumberId);
 
   res.sendStatus(200);
 });
 
 /// old stuff
-
 
 messagingRouter.post('/whatsapp/reply', async (req, res) => {
   const {
@@ -175,11 +172,13 @@ messagingRouter.post('/whatsapp/reply', async (req, res) => {
   const limitedResponse = responseText.substring(0, 1600); // Limit response to 1600 characters
 
   if (!twilioClient || !twilioPhoneNumber) {
-    console.error('Twilio client or phone number not initialized. Cannot send WhatsApp reply via Twilio.');
+    console.error(
+      'Twilio client or phone number not initialized. Cannot send WhatsApp reply via Twilio.',
+    );
     // Depending on the desired behavior, you might want to send an error response
     // or simply log and not attempt to send via Twilio.
     // For now, just logging and not sending.
-    return; 
+    return;
   }
 
   twilioClient.messages

@@ -4,7 +4,9 @@ import mongoose from 'mongoose';
 import { getApiKey } from '../api.key.service';
 // OpenAI Assistant API calls removed as it's deprecated in favor of Vercel AI
 
-export const getAssistants = async (companyId: string): Promise<IAssistant[]> => {
+export const getAssistants = async (
+  companyId: string,
+): Promise<IAssistant[]> => {
   try {
     const assistants = await Assistant.find({ companyId });
 
@@ -38,7 +40,9 @@ export const getAssistants = async (companyId: string): Promise<IAssistant[]> =>
   }
 };
 
-export const getAssistantById = async (id: string): Promise<IAssistant | null> => {
+export const getAssistantById = async (
+  id: string,
+): Promise<IAssistant | null> => {
   try {
     const assistant = await Assistant.findById(id);
     return assistant;
@@ -48,7 +52,10 @@ export const getAssistantById = async (id: string): Promise<IAssistant | null> =
   }
 };
 
-export const updateAllowedActions = async (assistantId: string, allowedActions: string[]): Promise<IAssistant | null> => {
+export const updateAllowedActions = async (
+  assistantId: string,
+  allowedActions: string[],
+): Promise<IAssistant | null> => {
   let session = null;
   try {
     session = await mongoose.startSession();
@@ -60,13 +67,17 @@ export const updateAllowedActions = async (assistantId: string, allowedActions: 
     }
 
     // OpenAI synchronization removed as it's deprecated in favor of Vercel AI
-    console.log(`Updating allowed actions for assistant ${assistantId} in local database only`);
+    console.log(
+      `Updating allowed actions for assistant ${assistantId} in local database only`,
+    );
 
     assistant.allowedActions = allowedActions;
     const updatedAssistant = await assistant.save({ session });
 
     await session.commitTransaction();
-    console.log(`Successfully updated allowed actions for assistant ${assistantId}`);
+    console.log(
+      `Successfully updated allowed actions for assistant ${assistantId}`,
+    );
 
     return updatedAssistant;
   } catch (error) {
@@ -82,7 +93,10 @@ export const updateAllowedActions = async (assistantId: string, allowedActions: 
   }
 };
 
-export async function deleteAssistant(id: string, assistantId: string): Promise<void> {
+export async function deleteAssistant(
+  id: string,
+  assistantId: string,
+): Promise<void> {
   try {
     const assistant = await Assistant.findById(id);
     if (!assistant) {
@@ -99,31 +113,44 @@ export async function deleteAssistant(id: string, assistantId: string): Promise<
   }
 }
 
-export const createDefaultAssistant = async (companyId: string, apiKey: string): Promise<IAssistant> => {
+export const createDefaultAssistant = async (
+  companyId: string,
+  apiKey: string,
+): Promise<IAssistant> => {
   const defaultAssistantData = {
     name: 'Default Assistant',
-    description: 'Your company\'s default AI assistant',
+    description: "Your company's default AI assistant",
     conversationStarters: [
       {
         key: 'Welcome',
-        value: 'Hello {{user.name}}! I\'m your default AI assistant for {{company.name}}. How can I help you today?'
-      }
+        value:
+          "Hello {{user.name}}! I'm your default AI assistant for {{company.name}}. How can I help you today?",
+      },
     ],
     voice: 'en-US-Standard-C',
     language: 'en',
     llmModel: 'gpt-4o',
-    llmPrompt: 'You are a helpful AI assistant for {{company.name}}. Your name is {{assistant.name}}. Provide friendly and professional assistance to {{user.name}}. When referring to the user, use their name {{user.name}} or their email {{user.email}}. Always include placeholders like {{user.name}} or {{company.name}} in your responses, as they will be automatically replaced with the actual values.',
+    llmPrompt:
+      'You are a helpful AI assistant for {{company.name}}. Your name is {{assistant.name}}. Provide friendly and professional assistance to {{user.name}}. When referring to the user, use their name {{user.name}} or their email {{user.email}}. Always include placeholders like {{user.name}} or {{company.name}} in your responses, as they will be automatically replaced with the actual values.',
     companyId: companyId,
-    allowedActions: ['readJournal', 'writeJournal', 'searchInbox', 'sendEmail', 'scheduleEvent'],
+    allowedActions: [
+      'readJournal',
+      'writeJournal',
+      'searchInbox',
+      'sendEmail',
+      'scheduleEvent',
+    ],
     // Generate a unique ID for assistantId instead of getting it from OpenAI
-    assistantId: new mongoose.Types.ObjectId().toString()
+    assistantId: new mongoose.Types.ObjectId().toString(),
   };
 
   const assistant = new Assistant(defaultAssistantData);
   await assistant.save();
 
   // OpenAI assistant creation removed as it's deprecated in favor of Vercel AI
-  console.log(`Created default assistant in local database only with ID: ${assistant._id}`);
+  console.log(
+    `Created default assistant in local database only with ID: ${assistant._id}`,
+  );
 
   return assistant;
 };

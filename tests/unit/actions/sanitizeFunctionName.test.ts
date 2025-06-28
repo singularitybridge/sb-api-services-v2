@@ -24,7 +24,6 @@ describe('sanitizeFunctionName', () => {
     const result = sanitizeFunctionName(input);
     expect(result).toBe('');
   });
- 
 
   it('should not alter leading and trailing underscores or hyphens', () => {
     const input = '_function-name_';

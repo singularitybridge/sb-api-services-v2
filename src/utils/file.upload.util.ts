@@ -10,7 +10,9 @@ export interface SaveToFileResponse {
   path: string;
 }
 
-export async function saveToFile(data: Buffer | stream.Readable): Promise<SaveToFileResponse> {
+export async function saveToFile(
+  data: Buffer | stream.Readable,
+): Promise<SaveToFileResponse> {
   const uniqueFileName = `file_${uuidv4()}.mp3`;
   const dir = './files';
   const filePath = `${dir}/${uniqueFileName}`;

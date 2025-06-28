@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
-import { getAssistants, getAssistantById } from '../../services/assistant/assistant-management.service';
+import {
+  getAssistants,
+  getAssistantById,
+} from '../../services/assistant/assistant-management.service';
 import { getAssistantsByTeam, getTeamById } from '../../services/team.service';
 import { Assistant } from '../../models/Assistant';
 
@@ -22,12 +25,15 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
     if (!assistant) {
       return res.status(404).send({ message: 'Assistant not found' });
     }
-    
+
     // Check if the assistant belongs to the user's company or if the user is an Admin
-    if (req.user?.role !== 'Admin' && assistant.companyId.toString() !== req.user?.companyId.toString()) {
+    if (
+      req.user?.role !== 'Admin' &&
+      assistant.companyId.toString() !== req.user?.companyId.toString()
+    ) {
       return res.status(403).send({ message: 'Access denied' });
     }
-    
+
     res.send(assistant);
   } catch (error) {
     console.error('Error retrieving assistant:', error);
@@ -39,17 +45,20 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
 router.get('/by-team/:teamId', async (req: AuthenticatedRequest, res) => {
   try {
     const { teamId } = req.params;
-    
+
     // Verify the team belongs to the user's company
     const team = await getTeamById(teamId);
     if (!team) {
       return res.status(404).send({ message: 'Team not found' });
     }
-    
-    if (req.user?.role !== 'Admin' && team.companyId.toString() !== req.user?.companyId.toString()) {
+
+    if (
+      req.user?.role !== 'Admin' &&
+      team.companyId.toString() !== req.user?.companyId.toString()
+    ) {
       return res.status(403).send({ message: 'Access denied' });
     }
-    
+
     const assistants = await getAssistantsByTeam(teamId);
     res.send(assistants);
   } catch (error) {

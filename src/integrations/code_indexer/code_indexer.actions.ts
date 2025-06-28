@@ -29,14 +29,19 @@ interface ListIndexedFilesData {
 // handleError is no longer needed as executeAction will handle errors.
 // const handleError = (error: unknown, errorMessage: string) => ({ ... });
 
-export const createCodeIndexerActions = (context: ActionContext): FunctionFactory => ({
+export const createCodeIndexerActions = (
+  context: ActionContext,
+): FunctionFactory => ({
   scanCodeProject: {
     description: 'Scan a code project directory and index file summaries',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
-        directoryPath: { type: 'string', description: 'Path to the code project directory' },
+        directoryPath: {
+          type: 'string',
+          description: 'Path to the code project directory',
+        },
         includePatterns: {
           type: 'array',
           items: { type: 'string' },
@@ -66,18 +71,22 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
           await scanCodeProject({ ...params, companyId: context.companyId });
           return { success: true };
         },
-        { serviceName: 'CodeIndexerService' }
+        { serviceName: 'CodeIndexerService' },
       );
     },
   },
 
   dryRunScanCodeProject: {
-    description: 'Perform a dry run scan of a code project directory and return the list of files that would be scanned',
+    description:
+      'Perform a dry run scan of a code project directory and return the list of files that would be scanned',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
-        directoryPath: { type: 'string', description: 'Path to the code project directory' },
+        directoryPath: {
+          type: 'string',
+          description: 'Path to the code project directory',
+        },
         includePatterns: {
           type: 'array',
           items: { type: 'string' },
@@ -108,7 +117,7 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
           // Original action returned { success: true, scannedFiles }, so data should be { scannedFiles }
           return { success: true, data: { scannedFiles } };
         },
-        { serviceName: 'CodeIndexerService' }
+        { serviceName: 'CodeIndexerService' },
       );
     },
   },
@@ -119,8 +128,15 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
     parameters: {
       type: 'object',
       properties: {
-        taskDescription: { type: 'string', description: 'Description of the task' },
-        limit: { type: 'number', description: 'Maximum number of files to return', optional: true },
+        taskDescription: {
+          type: 'string',
+          description: 'Description of the task',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of files to return',
+          optional: true,
+        },
       },
       required: ['taskDescription'],
       additionalProperties: false,
@@ -130,11 +146,15 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
       return executeAction<QueryRelevantFilesData>(
         actionName,
         async () => {
-          const files = await queryRelevantFiles(params.taskDescription, context.companyId, params.limit);
+          const files = await queryRelevantFiles(
+            params.taskDescription,
+            context.companyId,
+            params.limit,
+          );
           // Original action returned { success: true, files }, so data should be { files }
           return { success: true, data: { files } };
         },
-        { serviceName: 'CodeIndexerService' }
+        { serviceName: 'CodeIndexerService' },
       );
     },
   },
@@ -159,7 +179,7 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
           // Original action returned { success: true, content }, so data should be { content }
           return { success: true, data: { content } };
         },
-        { serviceName: 'CodeIndexerService' }
+        { serviceName: 'CodeIndexerService' },
       );
     },
   },
@@ -184,7 +204,7 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
           await editAndSaveFile(params.filePath, params.newContent);
           return { success: true };
         },
-        { serviceName: 'CodeIndexerService' }
+        { serviceName: 'CodeIndexerService' },
       );
     },
   },
@@ -195,7 +215,11 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
     parameters: {
       type: 'object',
       properties: {
-        limit: { type: 'number', description: 'Maximum number of files to return', optional: true },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of files to return',
+          optional: true,
+        },
       },
       required: [],
       additionalProperties: false,
@@ -209,7 +233,7 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
           // Original action returned { success: true, files }, so data should be { files }
           return { success: true, data: { files } };
         },
-        { serviceName: 'CodeIndexerService' }
+        { serviceName: 'CodeIndexerService' },
       );
     },
   },
@@ -231,10 +255,10 @@ export const createCodeIndexerActions = (context: ActionContext): FunctionFactor
           await clearIndexedFiles(context.companyId);
           return { success: true };
         },
-        { 
+        {
           serviceName: 'CodeIndexerService',
-          successMessage: 'Indexed files cleared successfully' 
-        }
+          successMessage: 'Indexed files cleared successfully',
+        },
       );
     },
   },

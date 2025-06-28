@@ -3,22 +3,30 @@ import { getOpenAIClient } from './assistant.service';
 import { ApiKey } from './verification.service';
 import { cleanupAssistantFiles } from './file.service';
 import { VectorStore } from '../models/VectorStore';
-import { createFunctionFactory, ActionContext, FunctionFactory, FunctionDefinition, sanitizeFunctionName } from '../integrations/actions/factory';
+import {
+  createFunctionFactory,
+  ActionContext,
+  FunctionFactory,
+  FunctionDefinition,
+  sanitizeFunctionName,
+} from '../integrations/actions/factory';
 import { SupportedLanguage } from './discovery.service';
 
 // Helper function to extract o3-mini model info for API calls
 // This preserves the original model name in the database while transforming it for API calls
-const extractO3MiniModelInfo = (model: string): { baseModel: string; reasoningEffort?: 'low' | 'medium' | 'high' } => {
+const extractO3MiniModelInfo = (
+  model: string,
+): { baseModel: string; reasoningEffort?: 'low' | 'medium' | 'high' } => {
   // Check if the model follows the pattern o3-mini-{level}
   const o3MiniMatch = model.match(/^o3-mini-(low|medium|high)$/);
-  
+
   if (o3MiniMatch) {
     return {
       baseModel: 'o3-mini',
-      reasoningEffort: o3MiniMatch[1] as 'low' | 'medium' | 'high'
+      reasoningEffort: o3MiniMatch[1] as 'low' | 'medium' | 'high',
     };
   }
-  
+
   // Return the original model if it doesn't match the pattern
   return { baseModel: model };
 };
@@ -41,25 +49,29 @@ export const getAssistantById = async (apiKey: string, assistantId: string) => {
 
 const createFunctionDefinitions = async (allowedActions: string[]) => {
   // Create a dummy context to generate function definitions
-  const dummyContext: ActionContext = { 
-    sessionId: 'dummy-session-id', 
+  const dummyContext: ActionContext = {
+    sessionId: 'dummy-session-id',
     companyId: 'dummy-company-id',
-    language: 'en' as SupportedLanguage
+    language: 'en' as SupportedLanguage,
   };
 
   // Use original allowedActions without sanitization
-  const functionFactory = await createFunctionFactory(dummyContext, allowedActions);
+  const functionFactory = await createFunctionFactory(
+    dummyContext,
+    allowedActions,
+  );
 
   // Create function definitions with sanitized names
-  return Object.entries(functionFactory as FunctionFactory)
-    .map(([funcName, funcDef]: [string, FunctionDefinition]) => ({
-      type: "function" as const,
+  return Object.entries(functionFactory as FunctionFactory).map(
+    ([funcName, funcDef]: [string, FunctionDefinition]) => ({
+      type: 'function' as const,
       function: {
         name: funcName, // This is already sanitized
         description: funcDef.description,
-        parameters: funcDef.parameters
-      }
-    }));
+        parameters: funcDef.parameters,
+      },
+    }),
+  );
 };
 
 export const updateAssistantById = async (
@@ -69,7 +81,7 @@ export const updateAssistantById = async (
   description: string,
   model: string,
   instructions: string,
-  allowedActions: string[]
+  allowedActions: string[],
 ) => {
   const openaiClient = getOpenAIClient(apiKey);
 
@@ -86,10 +98,7 @@ export const updateAssistantById = async (
       name,
       description,
       model: baseModel, // Use the transformed model name for the API call
-      tools: [
-        { type: 'file_search' },
-        ...functionTools
-      ],
+      tools: [{ type: 'file_search' }, ...functionTools],
     };
 
     // Add reasoning_effort parameter if applicable
@@ -99,20 +108,24 @@ export const updateAssistantById = async (
 
     const updatedAssistant = await openaiClient.beta.assistants.update(
       assistantId,
-      updateParams
+      updateParams,
     );
 
     // Validate that all allowed actions are present in the updated assistant
     const updatedTools = updatedAssistant.tools
-      .filter(tool => tool.type === 'function')
-      .map(tool => (tool as any).function.name);
-  
-    const missingActions = allowedActions.filter(action => 
-      !updatedTools.includes(sanitizeFunctionName(action))
+      .filter((tool) => tool.type === 'function')
+      .map((tool) => (tool as any).function.name);
+
+    const missingActions = allowedActions.filter(
+      (action) => !updatedTools.includes(sanitizeFunctionName(action)),
     );
 
     if (missingActions.length > 0) {
-      console.warn(`Warning: The following actions were not successfully added to the OpenAI assistant: ${missingActions.join(', ')}`);
+      console.warn(
+        `Warning: The following actions were not successfully added to the OpenAI assistant: ${missingActions.join(
+          ', ',
+        )}`,
+      );
     }
 
     return updatedAssistant;
@@ -130,7 +143,7 @@ export const createAssistant = async (
   description: string,
   model: string,
   instructions: string,
-  allowedActions: string[]
+  allowedActions: string[],
 ) => {
   console.log('Creating assistant');
 
@@ -149,10 +162,7 @@ export const createAssistant = async (
       description,
       instructions,
       model: baseModel, // Use the transformed model name for the API call
-      tools: [
-        { type: 'file_search' },
-        ...functionTools
-      ],
+      tools: [{ type: 'file_search' }, ...functionTools],
     };
 
     // Add reasoning_effort parameter if applicable

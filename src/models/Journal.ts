@@ -16,22 +16,25 @@ export interface IJournal extends Document {
   embeddingModel?: string;
 }
 
-const JournalSchema: Schema = new Schema({
-  userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true },
-  sessionId: { type: Schema.Types.ObjectId, ref: 'Session', required: true },
-  timestamp: { type: Date, default: Date.now },
-  entryType: { 
-    type: String, 
-    required: true 
+const JournalSchema: Schema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true },
+    sessionId: { type: Schema.Types.ObjectId, ref: 'Session', required: true },
+    timestamp: { type: Date, default: Date.now },
+    entryType: {
+      type: String,
+      required: true,
+    },
+    content: { type: String, required: true },
+    metadata: { type: Schema.Types.Mixed }, // Mongoose stores objects as Mixed by default if not strictly typed
+    tags: [{ type: String }],
+    isIndexed: { type: Boolean, default: false },
+    embeddingId: { type: String },
+    embeddingModel: { type: String },
   },
-  content: { type: String, required: true },
-  metadata: { type: Schema.Types.Mixed }, // Mongoose stores objects as Mixed by default if not strictly typed
-  tags: [{ type: String }],
-  isIndexed: { type: Boolean, default: false },
-  embeddingId: { type: String },
-  embeddingModel: { type: String },
-}, { timestamps: true });
+  { timestamps: true },
+);
 
 JournalSchema.index({ companyId: 1, userId: 1, timestamp: -1 });
 JournalSchema.index({ isIndexed: 1 }, { sparse: true });

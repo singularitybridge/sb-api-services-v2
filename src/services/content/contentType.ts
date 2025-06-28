@@ -5,7 +5,9 @@ import { ContentType, IContentType } from '../../models/ContentType';
  * @param companyId The ID of the company
  * @returns A promise that resolves to an array of IContentType
  */
-export const getContentTypes = async (companyId: string): Promise<IContentType[]> => {
+export const getContentTypes = async (
+  companyId: string,
+): Promise<IContentType[]> => {
   return await ContentType.find({ companyId });
 };
 
@@ -17,7 +19,7 @@ export const getContentTypes = async (companyId: string): Promise<IContentType[]
  */
 export const getContentType = async (
   id: string,
-  companyId: string
+  companyId: string,
 ): Promise<IContentType | null> => {
   return await ContentType.findOne({ _id: id, companyId });
 };
@@ -34,7 +36,7 @@ export const createContentType = async (
   companyId: string,
   name: string,
   description: string,
-  fields: any[]
+  fields: any[],
 ): Promise<IContentType> => {
   const contentType = new ContentType({
     companyId,
@@ -56,13 +58,11 @@ export const createContentType = async (
 export const updateContentType = async (
   id: string,
   companyId: string,
-  updates: Partial<IContentType>
+  updates: Partial<IContentType>,
 ): Promise<IContentType | null> => {
-  return await ContentType.findOneAndUpdate(
-    { _id: id, companyId },
-    updates,
-    { new: true }
-  );
+  return await ContentType.findOneAndUpdate({ _id: id, companyId }, updates, {
+    new: true,
+  });
 };
 
 /**
@@ -73,7 +73,7 @@ export const updateContentType = async (
  */
 export const deleteContentType = async (
   id: string,
-  companyId: string
+  companyId: string,
 ): Promise<boolean> => {
   const result = await ContentType.deleteOne({ _id: id, companyId });
   return result.deletedCount === 1;

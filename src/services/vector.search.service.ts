@@ -22,24 +22,24 @@ export const upsertVector = async (
   id: string,
   content: string,
   metadata: Record<string, any>,
-  companyId: string
+  companyId: string,
 ) => {
   try {
     const client = initPinecone();
     if (!client) {
       console.warn('Pinecone client not initialized. Skipping upsertVector.');
       // Optionally, throw an error or return a specific status
-      return; 
+      return;
     }
     const index = client.index(INDEX_NAME);
-    
+
     const openaiApiKey = await getApiKey(companyId, 'openai_api_key');
     if (!openaiApiKey) {
       throw new Error('OpenAI API key not found for company');
     }
-    
+
     const embedding = await generateEmbedding(content, openaiApiKey);
-    
+
     await index.upsert([
       {
         id,
@@ -65,7 +65,7 @@ export const deleteVector = async (id: string) => {
       return;
     }
     const index = client.index(INDEX_NAME);
-    
+
     await index.deleteOne(id);
   } catch (error) {
     console.error('Error deleting vector:', error);
@@ -89,26 +89,28 @@ export const runVectorSearch = async ({
   try {
     const client = initPinecone();
     if (!client) {
-      console.warn('Pinecone client not initialized. Skipping runVectorSearch.');
+      console.warn(
+        'Pinecone client not initialized. Skipping runVectorSearch.',
+      );
       // Optionally, throw an error or return a specific status like an empty array
-      return []; 
+      return [];
     }
     const index = client.index(INDEX_NAME);
-    
+
     const openaiApiKey = await getApiKey(companyId, 'openai_api_key');
     if (!openaiApiKey) {
       throw new Error('OpenAI API key not found for company');
     }
-    
+
     const queryEmbedding = await generateEmbedding(query, openaiApiKey);
-    
+
     // Combine entity and company filters with any additional filters
     const searchFilter = {
       ...filter,
       companyId: { $eq: companyId },
       ...(entity && entity.length > 0 ? { entity: { $in: entity } } : {}),
     };
-    
+
     const searchResponse = await index.query({
       topK: limit,
       vector: queryEmbedding,
@@ -116,7 +118,7 @@ export const runVectorSearch = async ({
       includeMetadata: true,
       filter: searchFilter,
     });
-    
+
     return searchResponse.matches || [];
   } catch (error) {
     console.error('Error running vector search:', error);

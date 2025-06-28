@@ -17,7 +17,10 @@ completionRouter.post(
       pdfUrl,
     } = req.body;
 
-    const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
+    const apiKey = (await getApiKey(
+      req.company._id,
+      'openai_api_key',
+    )) as string;
 
     try {
       const response = await getCompletionResponse(
@@ -26,15 +29,18 @@ completionRouter.post(
         userInput,
         model,
         temperature,
-        pdfUrl
+        pdfUrl,
       );
       res.json({ content: response });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An error occurred while processing the completion request';
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'An error occurred while processing the completion request';
       const statusCode = errorMessage.includes('PDF') ? 400 : 500;
-      
+
       res.status(statusCode).json({
-        error: errorMessage
+        error: errorMessage,
       });
     }
   },

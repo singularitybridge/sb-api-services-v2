@@ -2,7 +2,11 @@ import mongoose from 'mongoose';
 import * as factoryModule from '../../../src/integrations/actions/loaders';
 import { executeFunctionCall } from '../../../src/integrations/actions/executors';
 import { processTemplate } from '../../../src/services/template.service';
-import { ActionContext, FunctionFactory, FunctionDefinition } from '../../../src/integrations/actions/types';
+import {
+  ActionContext,
+  FunctionFactory,
+  FunctionDefinition,
+} from '../../../src/integrations/actions/types';
 import * as integrationService from '../../../src/services/integration.service';
 import * as publishersModule from '../../../src/integrations/actions/publishers';
 import { SupportedLanguage } from '../../../src/services/discovery.service';
@@ -14,7 +18,7 @@ jest.mock('../../../src/services/template.service', () => ({
 
 // Mock the session service
 jest.mock('../../../src/services/session.service', () => ({
-  getSessionById: jest.fn().mockResolvedValue({ 
+  getSessionById: jest.fn().mockResolvedValue({
     id: 'mockSessionId',
     userId: 'mockUserId',
     companyId: 'mockCompanyId',
@@ -39,13 +43,15 @@ describe('executeFunctionCall', () => {
   const mockContext: ActionContext = {
     sessionId: mockSessionId,
     companyId: mockCompanyId,
-    language: 'en' as SupportedLanguage
+    language: 'en' as SupportedLanguage,
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(console, 'error').mockImplementation(() => {});
-    jest.spyOn(factoryModule, 'createFunctionFactory').mockImplementation(jest.fn());
+    jest
+      .spyOn(factoryModule, 'createFunctionFactory')
+      .mockImplementation(jest.fn());
     (integrationService.discoverActionById as jest.Mock).mockResolvedValue({
       id: 'testAction',
       serviceName: 'Mock Service',
@@ -55,7 +61,9 @@ describe('executeFunctionCall', () => {
       service: 'mock-service',
       parameters: {},
     });
-    (publishersModule.publishActionMessage as jest.Mock).mockResolvedValue(undefined);
+    (publishersModule.publishActionMessage as jest.Mock).mockResolvedValue(
+      undefined,
+    );
   });
 
   afterEach(() => {
@@ -80,22 +88,38 @@ describe('executeFunctionCall', () => {
           },
           required: ['param1'],
         },
-        function: jest.fn().mockResolvedValue({ success: true, data: 'Test result' }),
+        function: jest
+          .fn()
+          .mockResolvedValue({ success: true, data: 'Test result' }),
       } as FunctionDefinition,
     };
 
-    (factoryModule.createFunctionFactory as jest.Mock).mockResolvedValue(mockFunctionFactory);
-    (processTemplate as jest.Mock).mockImplementation((value) => Promise.resolve(value));
+    (factoryModule.createFunctionFactory as jest.Mock).mockResolvedValue(
+      mockFunctionFactory,
+    );
+    (processTemplate as jest.Mock).mockImplementation((value) =>
+      Promise.resolve(value),
+    );
 
-    const result = await executeFunctionCall(mockCall, mockSessionId, mockCompanyId, mockAllowedActions);
+    const result = await executeFunctionCall(
+      mockCall,
+      mockSessionId,
+      mockCompanyId,
+      mockAllowedActions,
+    );
 
     expect(factoryModule.createFunctionFactory).toHaveBeenCalledWith(
       mockContext,
-      mockAllowedActions
+      mockAllowedActions,
     );
     expect(processTemplate).toHaveBeenCalledWith('value1', mockSessionId);
-    expect(mockFunctionFactory.testAction.function).toHaveBeenCalledWith({ param1: 'value1' });
-    expect(integrationService.discoverActionById).toHaveBeenCalledWith('testAction', 'en');
+    expect(mockFunctionFactory.testAction.function).toHaveBeenCalledWith({
+      param1: 'value1',
+    });
+    expect(integrationService.discoverActionById).toHaveBeenCalledWith(
+      'testAction',
+      'en',
+    );
     expect(publishersModule.publishActionMessage).toHaveBeenCalled();
     expect(result).toEqual({ result: 'Test result' });
   }, 10000);
@@ -123,18 +147,32 @@ describe('executeFunctionCall', () => {
       } as FunctionDefinition,
     };
 
-    (factoryModule.createFunctionFactory as jest.Mock).mockResolvedValue(mockFunctionFactory);
-    (processTemplate as jest.Mock).mockImplementation((value) => Promise.resolve(value));
+    (factoryModule.createFunctionFactory as jest.Mock).mockResolvedValue(
+      mockFunctionFactory,
+    );
+    (processTemplate as jest.Mock).mockImplementation((value) =>
+      Promise.resolve(value),
+    );
 
-    const result = await executeFunctionCall(mockCall, mockSessionId, mockCompanyId, mockAllowedActions);
+    const result = await executeFunctionCall(
+      mockCall,
+      mockSessionId,
+      mockCompanyId,
+      mockAllowedActions,
+    );
 
     expect(factoryModule.createFunctionFactory).toHaveBeenCalledWith(
       mockContext,
-      mockAllowedActions
+      mockAllowedActions,
     );
     expect(processTemplate).toHaveBeenCalledWith('value1', mockSessionId);
-    expect(mockFunctionFactory.errorAction.function).toHaveBeenCalledWith({ param1: 'value1' });
-    expect(integrationService.discoverActionById).toHaveBeenCalledWith('errorAction', 'en');
+    expect(mockFunctionFactory.errorAction.function).toHaveBeenCalledWith({
+      param1: 'value1',
+    });
+    expect(integrationService.discoverActionById).toHaveBeenCalledWith(
+      'errorAction',
+      'en',
+    );
     expect(publishersModule.publishActionMessage).toHaveBeenCalled();
     expect(result).toEqual({
       error: expect.objectContaining({
@@ -155,16 +193,25 @@ describe('executeFunctionCall', () => {
 
     const mockFunctionFactory: FunctionFactory = {};
 
-    (factoryModule.createFunctionFactory as jest.Mock).mockResolvedValue(mockFunctionFactory);
+    (factoryModule.createFunctionFactory as jest.Mock).mockResolvedValue(
+      mockFunctionFactory,
+    );
 
-    const result = await executeFunctionCall(mockCall, mockSessionId, mockCompanyId, mockAllowedActions);
+    const result = await executeFunctionCall(
+      mockCall,
+      mockSessionId,
+      mockCompanyId,
+      mockAllowedActions,
+    );
 
     expect(factoryModule.createFunctionFactory).toHaveBeenCalledWith(
       mockContext,
-      mockAllowedActions
+      mockAllowedActions,
     );
     expect(result).toEqual({
-      error: { message: 'Function nonExistentAction not implemented in the factory' },
+      error: {
+        message: 'Function nonExistentAction not implemented in the factory',
+      },
     });
   }, 10000);
 });

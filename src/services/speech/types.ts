@@ -1,4 +1,10 @@
-export type OpenAIVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+export type OpenAIVoice =
+  | 'alloy'
+  | 'echo'
+  | 'fable'
+  | 'onyx'
+  | 'nova'
+  | 'shimmer';
 export type OpenAIModel = 'tts-1' | 'tts-1-hd';
 
 export interface SpeechGenerationOptions {
@@ -10,11 +16,15 @@ export interface SpeechGenerationOptions {
   provider?: 'openai' | 'elevenlabs';
 }
 
-export interface OpenAISpeechOptions extends Omit<SpeechGenerationOptions, 'voice' | 'model'> {
+export interface OpenAISpeechOptions
+  extends Omit<SpeechGenerationOptions, 'voice' | 'model'> {
   voice?: OpenAIVoice;
   model?: OpenAIModel;
 }
 
 export interface SpeechProvider {
-  generateSpeech(text: string, options?: Partial<SpeechGenerationOptions>): Promise<string>;
+  generateSpeech(
+    text: string,
+    options?: Partial<SpeechGenerationOptions>,
+  ): Promise<string>;
 }

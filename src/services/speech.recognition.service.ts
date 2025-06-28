@@ -1,21 +1,25 @@
 //file_path:src/services/speech.recognition.service.ts
-import axios from "axios";
-import FormData from "form-data";
-import speech from "@google-cloud/speech";
+import axios from 'axios';
+import FormData from 'form-data';
+import speech from '@google-cloud/speech';
 
-export const transcribeAudioWhisper = async (apiKey: string, audioBuffer: Buffer, language: string = 'en') => {
+export const transcribeAudioWhisper = async (
+  apiKey: string,
+  audioBuffer: Buffer,
+  language: string = 'en',
+) => {
   try {
     const formData = new FormData();
-    formData.append("file", audioBuffer, {
-      filename: "audio.webm",
-      contentType: "audio/webm",
+    formData.append('file', audioBuffer, {
+      filename: 'audio.webm',
+      contentType: 'audio/webm',
     });
-    formData.append("model", "whisper-1");
-    formData.append("language", language);
+    formData.append('model', 'whisper-1');
+    formData.append('language', language);
 
     const result = await axios({
-      method: "post",
-      url: "https://api.openai.com/v1/audio/transcriptions",
+      method: 'post',
+      url: 'https://api.openai.com/v1/audio/transcriptions',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         ...formData.getHeaders(),
@@ -25,38 +29,45 @@ export const transcribeAudioWhisper = async (apiKey: string, audioBuffer: Buffer
 
     return result.data.text;
   } catch (error) {
-    console.error("Error transcribing audio:", error);
+    console.error('Error transcribing audio:', error);
     throw error;
   }
 };
 
-export const transcribeAudioWhisperFromURL = async (apiKey: string, audioURL: string, language: string = 'en') => {
+export const transcribeAudioWhisperFromURL = async (
+  apiKey: string,
+  audioURL: string,
+  language: string = 'en',
+) => {
   try {
     const audioResponse = await axios({
-      method: "get",
+      method: 'get',
       url: audioURL,
-      responseType: "arraybuffer",
+      responseType: 'arraybuffer',
     });
 
     const audioBuffer = Buffer.from(audioResponse.data);
     return await transcribeAudioWhisper(apiKey, audioBuffer, language);
   } catch (error) {
-    console.error("Error transcribing audio from URL:", error);
+    console.error('Error transcribing audio from URL:', error);
     throw error;
   }
 };
 
-export const transcribeAudioGoogle = async (audioURL: string, language: string = 'en-US') => {
+export const transcribeAudioGoogle = async (
+  audioURL: string,
+  language: string = 'en-US',
+) => {
   try {
     const client = new speech.SpeechClient();
 
     const audioResponse = await axios({
-      method: "get",
+      method: 'get',
       url: audioURL,
-      responseType: "arraybuffer",
+      responseType: 'arraybuffer',
     });
 
-    const audioBytes = audioResponse.data.toString("base64");
+    const audioBytes = audioResponse.data.toString('base64');
 
     const audio = {
       content: audioBytes,
@@ -65,7 +76,7 @@ export const transcribeAudioGoogle = async (audioURL: string, language: string =
     const request = {
       audio: audio,
       config: {
-        encoding: "LINEAR16" as const,
+        encoding: 'LINEAR16' as const,
         sampleRateHertz: 8000,
         languageCode: language,
         useEnhanced: true, // Use enhanced model if available
@@ -78,9 +89,9 @@ export const transcribeAudioGoogle = async (audioURL: string, language: string =
     const transcription =
       response.results
         ?.map(
-          (result) => result.alternatives?.[0]?.transcript ?? "Unknown segment"
+          (result) => result.alternatives?.[0]?.transcript ?? 'Unknown segment',
         )
-        .join("\n") ?? "No transcription available";
+        .join('\n') ?? 'No transcription available';
 
     return transcription;
   } catch (error) {

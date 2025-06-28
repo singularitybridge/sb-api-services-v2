@@ -1,7 +1,10 @@
 import { Assistant, IAssistant } from '../models/Assistant';
 import mongoose from 'mongoose';
 
-export const updateAllowedActions = async (assistantId: string, allowedActions: string[]): Promise<IAssistant | null> => {
+export const updateAllowedActions = async (
+  assistantId: string,
+  allowedActions: string[],
+): Promise<IAssistant | null> => {
   let session = null;
   try {
     session = await mongoose.startSession();
@@ -13,15 +16,19 @@ export const updateAllowedActions = async (assistantId: string, allowedActions: 
     }
 
     // OpenAI synchronization removed as it's deprecated in favor of Vercel AI
-    console.log(`Updating allowed actions for assistant ${assistantId} in local database only`);
+    console.log(
+      `Updating allowed actions for assistant ${assistantId} in local database only`,
+    );
 
     // Update the local database with the allowed actions
     assistant.allowedActions = allowedActions;
     const updatedAssistant = await assistant.save({ session });
 
     await session.commitTransaction();
-    console.log(`Successfully updated allowed actions for assistant ${assistantId}`);
-    
+    console.log(
+      `Successfully updated allowed actions for assistant ${assistantId}`,
+    );
+
     if (allowedActions.length > 0) {
       console.log(`Successfully added actions: ${allowedActions.join(', ')}`);
     }

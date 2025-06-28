@@ -10,7 +10,10 @@ interface EmailParams {
   html: string;
 }
 
-export const sendEmail = async (companyId: string, params: EmailParams): Promise<{ success: boolean; message?: string; error?: string }> => {
+export const sendEmail = async (
+  companyId: string,
+  params: EmailParams,
+): Promise<{ success: boolean; message?: string; error?: string }> => {
   try {
     const apiKey = await getApiKey(companyId, 'sendgrid_api_key');
     if (!apiKey) {
@@ -34,7 +37,9 @@ export const sendEmail = async (companyId: string, params: EmailParams): Promise
     console.error('Error sending email:', error);
     let errorMessage = 'An error occurred while sending the email';
     if (error.response && error.response.body && error.response.body.errors) {
-      errorMessage = error.response.body.errors.map((err: any) => err.message).join(', ');
+      errorMessage = error.response.body.errors
+        .map((err: any) => err.message)
+        .join(', ');
     }
     return { success: false, error: errorMessage };
   }

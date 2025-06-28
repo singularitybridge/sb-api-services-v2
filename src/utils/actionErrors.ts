@@ -27,7 +27,7 @@ export class ActionExecutionError extends BaseActionError {
       actionName?: string;
       originalError?: any;
       statusCode?: number;
-    }
+    },
   ) {
     super(message);
     this.actionName = options?.actionName;
@@ -48,7 +48,7 @@ export class ActionValidationError extends BaseActionError {
     options?: {
       fieldErrors?: Record<string, string>;
       statusCode?: number;
-    }
+    },
   ) {
     super(message);
     this.fieldErrors = options?.fieldErrors;
@@ -71,7 +71,7 @@ export class ActionServiceError extends BaseActionError {
       serviceName?: string;
       serviceResponse?: any;
       statusCode?: number;
-    }
+    },
   ) {
     super(message);
     this.serviceName = options?.serviceName;

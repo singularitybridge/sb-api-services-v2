@@ -8,7 +8,10 @@ import { Message } from '../../models/Message'; // Added for Step 5
 import { handleSessionMessage } from '../../services/assistant.service';
 import { getSessionOrCreate } from '../../services/session.service'; // Added
 import { ChannelType } from '../../types/ChannelType';
-import { getMessagesBySessionId, getMessageById } from '../../services/message.service';
+import {
+  getMessagesBySessionId,
+  getMessageById,
+} from '../../services/message.service';
 
 const threadRouter = express.Router();
 
@@ -41,7 +44,7 @@ threadRouter.get(
       console.error('Error fetching message:', error);
       res.status(500).send('An error occurred while fetching the message.');
     }
-  }
+  },
 );
 
 // Removed POST / route as it was for creating OpenAI specific threads
@@ -56,7 +59,9 @@ threadRouter.post(
 
     // Determine clientWantsSSE before the try block for wider scope
     const acceptHeader = req.get('Accept');
-    const clientWantsSSE = typeof acceptHeader === 'string' && acceptHeader.includes('text/event-stream');
+    const clientWantsSSE =
+      typeof acceptHeader === 'string' &&
+      acceptHeader.includes('text/event-stream');
 
     try {
       // Get or create the active session for the user
@@ -64,9 +69,11 @@ threadRouter.post(
       const userId = req.user?._id?.toString();
 
       if (!companyId || !userId) {
-        return res.status(400).json({ error: 'User or Company ID not found in request.' });
+        return res
+          .status(400)
+          .json({ error: 'User or Company ID not found in request.' });
       }
-      
+
       // Assuming ChannelType.WEB for this endpoint. If other channels use this, it might need adjustment.
       // The getSessionOrCreate function expects an API key, but it's not directly used for session retrieval logic itself,
       // rather it was a prerequisite for OpenAI calls. Since we are moving away from direct OpenAI calls in session.service for thread creation,
@@ -87,14 +94,15 @@ threadRouter.post(
         '', // Placeholder for apiKey, as it's not used for session creation/retrieval itself
         userId,
         companyId,
-        ChannelType.WEB // Defaulting to WEB for this user-input endpoint
+        ChannelType.WEB, // Defaulting to WEB for this user-input endpoint
       );
 
       if (!sessionData || !sessionData._id) {
-        return res.status(404).json({ error: 'Active session could not be found or created.' });
+        return res
+          .status(404)
+          .json({ error: 'Active session could not be found or created.' });
       }
       const activeSessionId = sessionData._id.toString();
-
 
       // Step 3: Streaming is determined by client's Accept header.
       // The 406 error for a global disable flag is removed.
@@ -132,7 +140,7 @@ threadRouter.post(
           activeSessionId, // Use the retrieved/created active session ID
           ChannelType.WEB,
           { 'X-Experimental-Stream': 'true' }, // Inform service that SSE is expected
-          attachments // Pass attachments
+          attachments, // Pass attachments
         );
 
         if (
@@ -142,15 +150,21 @@ threadRouter.post(
           result.textStream &&
           typeof (result as any).textStream[Symbol.asyncIterator] === 'function'
         ) {
-          const { textStream, assistantId: messageAssistantId, threadId: messageThreadId } = result as any; // Assuming these are returned
-          
+          const {
+            textStream,
+            assistantId: messageAssistantId,
+            threadId: messageThreadId,
+          } = result as any; // Assuming these are returned
+
           // Step 5: Persist the assistant reply even in stream mode
           let fullText = '';
           for await (const chunk of textStream) {
             if (res.writableEnded) break;
             fullText += chunk;
             // Step 4: Wrap each model chunk in JSON
-            res.write(`data:${JSON.stringify({ type: 'token', value: chunk })}\n\n`);
+            res.write(
+              `data:${JSON.stringify({ type: 'token', value: chunk })}\n\n`,
+            );
           }
 
           // Removed Message.create from here as it's handled in message-handling.service.ts
@@ -161,17 +175,24 @@ threadRouter.post(
             result,
           );
           if (!res.writableEnded) {
-            const errorMessage = typeof result === 'string' 
-              ? `Expected a stream but received a string response: ${result.substring(0, 100)}...`
-              : "Failed to establish stream or received an unexpected response type.";
+            const errorMessage =
+              typeof result === 'string'
+                ? `Expected a stream but received a string response: ${result.substring(
+                    0,
+                    100,
+                  )}...`
+                : 'Failed to establish stream or received an unexpected response type.';
             // Step 6: Structured error frame
             res.write(
-              `event:error\ndata:${JSON.stringify({type:'error', errorDetails:{message: errorMessage}})}\n\n`
+              `event:error\ndata:${JSON.stringify({
+                type: 'error',
+                errorDetails: { message: errorMessage },
+              })}\n\n`,
             );
           }
         }
         if (!res.writableEnded) {
-          res.write(`data:${JSON.stringify({ type:'done' })}\n\n`);
+          res.write(`data:${JSON.stringify({ type: 'done' })}\n\n`);
           res.end();
         }
       } else {
@@ -181,34 +202,39 @@ threadRouter.post(
           activeSessionId, // Use the retrieved/created active session ID
           ChannelType.WEB, // No streaming metadata, so it returns a string
           undefined, // No streaming metadata
-          attachments // Pass attachments
+          attachments, // Pass attachments
         );
 
         if (typeof result === 'string') {
           // Return standard message format as required by the documentation
           const response = {
             id: generateMessageId(),
-            role: "assistant",
+            role: 'assistant',
             content: [
               {
-                type: "text",
+                type: 'text',
                 text: {
-                  value: result
-                }
-              }
+                  value: result,
+                },
+              },
             ],
             created_at: Math.floor(Date.now() / 1000),
             assistant_id: sessionData.assistantId?.toString(),
             thread_id: activeSessionId,
-            message_type: "text"
+            message_type: 'text',
           };
-          
+
           res.json(response);
         } else {
           // This case should ideally not be hit if handleSessionMessage correctly returns a string
           // when no streaming metadata is passed.
-          console.error('handleSessionMessage returned a stream object when a JSON response was expected.');
-          res.status(500).json({ error: 'Internal server error: Unexpected response format from message handler.' });
+          console.error(
+            'handleSessionMessage returned a stream object when a JSON response was expected.',
+          );
+          res.status(500).json({
+            error:
+              'Internal server error: Unexpected response format from message handler.',
+          });
         }
       }
     } catch (error) {
@@ -216,17 +242,28 @@ threadRouter.post(
       const err = error as Error; // Type assertion
       // Step 6: Structured error frame in catch block
       // Check if SSE was intended for this error path using clientWantsSSE
-      if (clientWantsSSE && !res.writableEnded) { 
-        res.write(`event:error\ndata:${JSON.stringify({type:'error', errorDetails:{message: err.message || 'An unknown error occurred during streaming.'}})}\n\n`);
+      if (clientWantsSSE && !res.writableEnded) {
+        res.write(
+          `event:error\ndata:${JSON.stringify({
+            type: 'error',
+            errorDetails: {
+              message:
+                err.message || 'An unknown error occurred during streaming.',
+            },
+          })}\n\n`,
+        );
         res.end();
       } else if (!res.headersSent) {
-        res.status(500).json({ error: err.message || 'An error occurred while processing your request.' });
+        res.status(500).json({
+          error:
+            err.message || 'An error occurred while processing your request.',
+        });
       } else if (!res.writableEnded) {
         // Fallback if headers sent but not SSE, or if writable but can't determine SSE
-        res.end(); 
+        res.end();
       }
     }
-  }
+  },
 );
 
 export { threadRouter };

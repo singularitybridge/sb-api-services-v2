@@ -3,7 +3,10 @@ import {
   AuthenticatedRequest,
   verifyAccess,
 } from '../middleware/auth.middleware';
-import { getSessionOrCreate, getSessionLanguage } from '../services/session.service';
+import {
+  getSessionOrCreate,
+  getSessionLanguage,
+} from '../services/session.service';
 import { ChannelType } from '../types/ChannelType';
 import { getApiKey, ApiKeyType } from '../services/api.key.service';
 import {
@@ -145,10 +148,7 @@ router.post(
       }
 
       // Get API key
-      const apiKey = await getApiKey(
-        companyId.toString(),
-        'openai_api_key',
-      );
+      const apiKey = await getApiKey(companyId.toString(), 'openai_api_key');
       if (!apiKey) {
         return res
           .status(500)

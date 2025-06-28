@@ -6,7 +6,7 @@ export class ElevenLabsSpeechProvider implements SpeechProvider {
 
   async generateSpeech(
     text: string,
-    options?: Partial<SpeechGenerationOptions>
+    options?: Partial<SpeechGenerationOptions>,
   ): Promise<string> {
     return elevenLabsGenerateSpeech(
       { apiKey: this.apiKey },
@@ -14,8 +14,8 @@ export class ElevenLabsSpeechProvider implements SpeechProvider {
         text,
         voiceId: options?.voice,
         modelId: options?.model,
-        filename: options?.filename
-      }
+        filename: options?.filename,
+      },
     );
   }
 }
