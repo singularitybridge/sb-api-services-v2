@@ -1,33 +1,52 @@
-import { ActionContext, FunctionFactory, StandardActionResult } from '../../integrations/actions/types';
-import { runMongoDbQuery as runMongoDbQueryService, mongoDbService } from './mongodb.service';
+import {
+  ActionContext,
+  FunctionFactory,
+  StandardActionResult,
+} from '../../integrations/actions/types';
+import {
+  runMongoDbQuery as runMongoDbQueryService,
+  mongoDbService,
+} from './mongodb.service';
 import { executeAction, ExecuteActionOptions } from '../actions/executor'; // Corrected path
 import { ActionValidationError } from '../../utils/actionErrors';
 
 const SERVICE_NAME = 'mongoDbService';
 
 // Define R types for StandardActionResult<R>
-interface QueryResultData { 
+interface QueryResultData {
   data?: any;
   logs?: string;
   message?: string;
 }
-interface DbNameData { dbName: string; }
-interface StringListData { list: string[]; } 
-interface CollectionStatsData { stats: any; }
-interface CountData { count: number; }
-interface MessageData { message: string; } 
+interface DbNameData {
+  dbName: string;
+}
+interface StringListData {
+  list: string[];
+}
+interface CollectionStatsData {
+  stats: any;
+}
+interface CountData {
+  count: number;
+}
+interface MessageData {
+  message: string;
+}
 
 // Define S type (service call lambda's response) for executeAction
 interface ServiceLambdaResponse<R_Payload = any> {
   success: boolean;
-  data?: R_Payload; 
+  data?: R_Payload;
   error?: string;
   description?: string;
-  logs?: string; 
-  message?: string; 
+  logs?: string;
+  message?: string;
 }
 
-export const createMongoDbActions = (context: ActionContext): FunctionFactory => ({
+export const createMongoDbActions = (
+  context: ActionContext,
+): FunctionFactory => ({
   runMongoDbQuery: {
     description: 'Run a MongoDB query or command based on user input',
     strict: true,
@@ -42,24 +61,37 @@ export const createMongoDbActions = (context: ActionContext): FunctionFactory =>
       required: ['input'],
       additionalProperties: false,
     },
-    function: async (params: { input: string }): Promise<StandardActionResult<QueryResultData>> => {
-      if (!context.sessionId || !context.companyId) throw new ActionValidationError('SessionID and CompanyID are required.');
-      if (!params.input) throw new ActionValidationError('Input parameter is required.');
-      
-      return executeAction<QueryResultData, ServiceLambdaResponse<QueryResultData>>(
+    function: async (params: {
+      input: string;
+    }): Promise<StandardActionResult<QueryResultData>> => {
+      if (!context.sessionId || !context.companyId)
+        throw new ActionValidationError(
+          'SessionID and CompanyID are required.',
+        );
+      if (!params.input)
+        throw new ActionValidationError('Input parameter is required.');
+
+      return executeAction<
+        QueryResultData,
+        ServiceLambdaResponse<QueryResultData>
+      >(
         'runMongoDbQuery',
         async () => {
-          const res = await runMongoDbQueryService(context.sessionId!, context.companyId!, params.input);
-          return { 
-            success: res.success, 
-            data: { data: res.data, logs: res.logs, message: res.message }, 
-            description: res.error, 
-            error: res.error, 
-            logs: res.logs, 
-            message: res.message 
+          const res = await runMongoDbQueryService(
+            context.sessionId!,
+            context.companyId!,
+            params.input,
+          );
+          return {
+            success: res.success,
+            data: { data: res.data, logs: res.logs, message: res.message },
+            description: res.error,
+            error: res.error,
+            logs: res.logs,
+            message: res.message,
           };
         },
-        { serviceName: SERVICE_NAME }
+        { serviceName: SERVICE_NAME },
       );
     },
   },
@@ -77,10 +109,10 @@ export const createMongoDbActions = (context: ActionContext): FunctionFactory =>
       return executeAction<DbNameData, ServiceLambdaResponse<DbNameData>>(
         'getCurrentDatabase',
         async () => {
-          const dbName = await mongoDbService.getCurrentDatabase(); 
+          const dbName = await mongoDbService.getCurrentDatabase();
           return { success: true, data: { dbName } };
         },
-        { serviceName: SERVICE_NAME }
+        { serviceName: SERVICE_NAME },
       );
     },
   },
@@ -95,13 +127,16 @@ export const createMongoDbActions = (context: ActionContext): FunctionFactory =>
       additionalProperties: false,
     },
     function: async (): Promise<StandardActionResult<StringListData>> => {
-      return executeAction<StringListData, ServiceLambdaResponse<StringListData>>(
+      return executeAction<
+        StringListData,
+        ServiceLambdaResponse<StringListData>
+      >(
         'listDatabases',
         async () => {
-          const databases = await mongoDbService.listDatabases(); 
+          const databases = await mongoDbService.listDatabases();
           return { success: true, data: { list: databases } };
         },
-        { serviceName: SERVICE_NAME }
+        { serviceName: SERVICE_NAME },
       );
     },
   },
@@ -120,15 +155,21 @@ export const createMongoDbActions = (context: ActionContext): FunctionFactory =>
       required: ['dbName'],
       additionalProperties: false,
     },
-    function: async (params: { dbName: string }): Promise<StandardActionResult<MessageData>> => {
-      if (!params.dbName) throw new ActionValidationError('dbName parameter is required.');
+    function: async (params: {
+      dbName: string;
+    }): Promise<StandardActionResult<MessageData>> => {
+      if (!params.dbName)
+        throw new ActionValidationError('dbName parameter is required.');
       return executeAction<MessageData, ServiceLambdaResponse<MessageData>>(
         'useDatabase',
         async () => {
-          await mongoDbService.useDatabase(params.dbName); 
-          return { success: true, data: { message: `Switched to database ${params.dbName}` } };
+          await mongoDbService.useDatabase(params.dbName);
+          return {
+            success: true,
+            data: { message: `Switched to database ${params.dbName}` },
+          };
         },
-        { serviceName: SERVICE_NAME }
+        { serviceName: SERVICE_NAME },
       );
     },
   },
@@ -143,13 +184,16 @@ export const createMongoDbActions = (context: ActionContext): FunctionFactory =>
       additionalProperties: false,
     },
     function: async (): Promise<StandardActionResult<StringListData>> => {
-      return executeAction<StringListData, ServiceLambdaResponse<StringListData>>(
+      return executeAction<
+        StringListData,
+        ServiceLambdaResponse<StringListData>
+      >(
         'listCollections',
         async () => {
-          const collections = await mongoDbService.listCollections(); 
+          const collections = await mongoDbService.listCollections();
           return { success: true, data: { list: collections } };
         },
-        { serviceName: SERVICE_NAME }
+        { serviceName: SERVICE_NAME },
       );
     },
   },
@@ -168,21 +212,32 @@ export const createMongoDbActions = (context: ActionContext): FunctionFactory =>
       required: ['collectionName'],
       additionalProperties: false,
     },
-    function: async (params: { collectionName: string }): Promise<StandardActionResult<CollectionStatsData>> => {
-      if (!params.collectionName) throw new ActionValidationError('collectionName parameter is required.');
-      return executeAction<CollectionStatsData, ServiceLambdaResponse<CollectionStatsData>>(
+    function: async (params: {
+      collectionName: string;
+    }): Promise<StandardActionResult<CollectionStatsData>> => {
+      if (!params.collectionName)
+        throw new ActionValidationError(
+          'collectionName parameter is required.',
+        );
+      return executeAction<
+        CollectionStatsData,
+        ServiceLambdaResponse<CollectionStatsData>
+      >(
         'describeCollection',
         async () => {
-          const collStats = await mongoDbService.describeCollection(params.collectionName); 
+          const collStats = await mongoDbService.describeCollection(
+            params.collectionName,
+          );
           return { success: true, data: { stats: collStats } };
         },
-        { serviceName: SERVICE_NAME }
+        { serviceName: SERVICE_NAME },
       );
     },
   },
 
   countDocuments: {
-    description: 'Count the number of documents in a specific MongoDB collection',
+    description:
+      'Count the number of documents in a specific MongoDB collection',
     strict: true,
     parameters: {
       type: 'object',
@@ -195,15 +250,22 @@ export const createMongoDbActions = (context: ActionContext): FunctionFactory =>
       required: ['collectionName'],
       additionalProperties: false,
     },
-    function: async (params: { collectionName: string }): Promise<StandardActionResult<CountData>> => {
-      if (!params.collectionName) throw new ActionValidationError('collectionName parameter is required.');
+    function: async (params: {
+      collectionName: string;
+    }): Promise<StandardActionResult<CountData>> => {
+      if (!params.collectionName)
+        throw new ActionValidationError(
+          'collectionName parameter is required.',
+        );
       return executeAction<CountData, ServiceLambdaResponse<CountData>>(
         'countDocuments',
         async () => {
-          const count = await mongoDbService.countDocuments(params.collectionName); 
+          const count = await mongoDbService.countDocuments(
+            params.collectionName,
+          );
           return { success: true, data: { count } };
         },
-        { serviceName: SERVICE_NAME }
+        { serviceName: SERVICE_NAME },
       );
     },
   },
@@ -229,22 +291,34 @@ export const createMongoDbActions = (context: ActionContext): FunctionFactory =>
       required: ['collectionName', 'pipeline'],
       additionalProperties: false,
     },
-    function: async (params: { collectionName: string; pipeline: any[] }): Promise<StandardActionResult<QueryResultData>> => {
-      if (!params.collectionName || !params.pipeline) throw new ActionValidationError('collectionName and pipeline are required.');
-      return executeAction<QueryResultData, ServiceLambdaResponse<QueryResultData>>(
+    function: async (params: {
+      collectionName: string;
+      pipeline: any[];
+    }): Promise<StandardActionResult<QueryResultData>> => {
+      if (!params.collectionName || !params.pipeline)
+        throw new ActionValidationError(
+          'collectionName and pipeline are required.',
+        );
+      return executeAction<
+        QueryResultData,
+        ServiceLambdaResponse<QueryResultData>
+      >(
         'runAggregation',
         async () => {
-          const res = await mongoDbService.runAggregation(params.collectionName, params.pipeline);
-          return { 
-            success: res.success, 
-            data: { data: res.data, logs: res.logs, message: res.message }, 
-            description: res.error, 
-            error: res.error, 
-            logs: res.logs, 
-            message: res.message 
+          const res = await mongoDbService.runAggregation(
+            params.collectionName,
+            params.pipeline,
+          );
+          return {
+            success: res.success,
+            data: { data: res.data, logs: res.logs, message: res.message },
+            description: res.error,
+            error: res.error,
+            logs: res.logs,
+            message: res.message,
           };
         },
-        { serviceName: SERVICE_NAME }
+        { serviceName: SERVICE_NAME },
       );
     },
   },

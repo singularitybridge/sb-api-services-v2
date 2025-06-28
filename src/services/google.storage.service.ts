@@ -12,10 +12,12 @@ if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
   storage = new Storage();
 }
 
-export const uploadFile = async (file: Express.Multer.File): Promise<string> => {
+export const uploadFile = async (
+  file: Express.Multer.File,
+): Promise<string> => {
   const bucket = storage.bucket('sb-ai-experiments-files');
   const blob = bucket.file(file.originalname);
-  
+
   // Add timestamp to ensure uniqueness
   const timestamp = new Date().toISOString();
 
@@ -25,12 +27,15 @@ export const uploadFile = async (file: Express.Multer.File): Promise<string> => 
     cacheControl: 'no-cache, no-store, must-revalidate',
     lastModified: timestamp,
     metadata: {
-      updateTimestamp: timestamp
-    }
+      updateTimestamp: timestamp,
+    },
   };
 
   // Set Content-Disposition to inline for common viewable image types
-  if (file.mimetype && (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf')) {
+  if (
+    file.mimetype &&
+    (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf')
+  ) {
     metadata.contentDisposition = 'inline';
   } else {
     // For other types, or if unsure, let it default or explicitly set to attachment
@@ -51,10 +56,15 @@ export const uploadFile = async (file: Express.Multer.File): Promise<string> => 
   return `${signedUrl.split('?')[0]}?t=${Date.now()}`;
 };
 
-export const uploadBuffer = async (companyId: string, filename: string, buffer: Buffer, contentType: string): Promise<string> => {
+export const uploadBuffer = async (
+  companyId: string,
+  filename: string,
+  buffer: Buffer,
+  contentType: string,
+): Promise<string> => {
   const bucket = storage.bucket('sb-ai-experiments-files');
   const blob = bucket.file(`${companyId}/${filename}`);
-  
+
   // Add timestamp to ensure uniqueness
   const timestamp = new Date().toISOString();
 
@@ -64,11 +74,14 @@ export const uploadBuffer = async (companyId: string, filename: string, buffer: 
     cacheControl: 'no-cache, no-store, must-revalidate',
     lastModified: timestamp,
     metadata: {
-      updateTimestamp: timestamp
-    }
+      updateTimestamp: timestamp,
+    },
   };
 
-  if (contentType && (contentType.startsWith('image/') || contentType === 'application/pdf')) {
+  if (
+    contentType &&
+    (contentType.startsWith('image/') || contentType === 'application/pdf')
+  ) {
     metadataBuffer.contentDisposition = 'inline';
   }
 

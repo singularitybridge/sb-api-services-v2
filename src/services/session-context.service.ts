@@ -19,7 +19,9 @@ export interface SessionContextData {
   };
 }
 
-export const getSessionContextData = async (sessionId: string): Promise<SessionContextData> => {
+export const getSessionContextData = async (
+  sessionId: string,
+): Promise<SessionContextData> => {
   const session = await Session.findById(sessionId);
   if (!session) {
     throw new Error('Session not found');

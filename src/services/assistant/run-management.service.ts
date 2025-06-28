@@ -88,12 +88,24 @@ class StatusLogger {
   }
 }
 
-const checkFileToolUsage = async (openaiClient: any, threadId: string, runId: string, logger: StatusLogger): Promise<boolean> => {
-  const runSteps = await openaiClient.beta.threads.runs.steps.list(threadId, runId);
+const checkFileToolUsage = async (
+  openaiClient: any,
+  threadId: string,
+  runId: string,
+  logger: StatusLogger,
+): Promise<boolean> => {
+  const runSteps = await openaiClient.beta.threads.runs.steps.list(
+    threadId,
+    runId,
+  );
   let fileToolUsed = false;
-  
+
   runSteps.data.forEach((step: RunStep) => {
-    if (step.step_details.tool_calls?.some(call => call.type === 'retrieval' || call.type === 'file_search')) {
+    if (
+      step.step_details.tool_calls?.some(
+        (call) => call.type === 'retrieval' || call.type === 'file_search',
+      )
+    ) {
       fileToolUsed = true;
       logger.info('File tool usage detected in step: ' + step.id);
     }
@@ -101,7 +113,11 @@ const checkFileToolUsage = async (openaiClient: any, threadId: string, runId: st
   return fileToolUsed;
 };
 
-const getTranslation = (language: SupportedLanguage, key: string, defaultValue: string): string => {
+const getTranslation = (
+  language: SupportedLanguage,
+  key: string,
+  defaultValue: string,
+): string => {
   if (language === 'he' && key in heKnowledgeRetrieval) {
     return heKnowledgeRetrieval[key as keyof typeof heKnowledgeRetrieval];
   }
@@ -132,26 +148,43 @@ export const pollRunStatus = async (
   while (Date.now() - startTime < timeout) {
     const openaiClient = getOpenAIClient(apiKey);
     const run = await openaiClient.beta.threads.runs.retrieve(threadId, runId);
-    
+
     // Update status
     logger.updateStatus(run.status);
 
-    const fileToolUsed = await checkFileToolUsage(openaiClient, threadId, runId, logger);
+    const fileToolUsed = await checkFileToolUsage(
+      openaiClient,
+      threadId,
+      runId,
+      logger,
+    );
     if (fileToolUsed && !knowledgeRetrievalNotificationSent) {
       logger.info(`File tool usage confirmed for run id: ${runId}`);
       await publishActionMessage(sessionId, 'started', {
         id: knowledgeRetrievalNotificationId,
         actionId: 'knowledge_retrieval_notification',
         serviceName: getTranslation(sessionLanguage, 'knowledge', 'Knowledge'),
-        actionTitle: getTranslation(sessionLanguage, 'knowledge_retrieval_in_progress', 'Knowledge Retrieval In Progress'),
-        actionDescription: getTranslation(sessionLanguage, 'knowledge_retrieval_in_progress_description', 'Knowledge retrieval operation in progress'),
+        actionTitle: getTranslation(
+          sessionLanguage,
+          'knowledge_retrieval_in_progress',
+          'Knowledge Retrieval In Progress',
+        ),
+        actionDescription: getTranslation(
+          sessionLanguage,
+          'knowledge_retrieval_in_progress_description',
+          'Knowledge retrieval operation in progress',
+        ),
         icon: 'book-text',
         args: {},
         originalActionId: 'knowledge_retrieval_notification',
         language: sessionLanguage,
-        input: { 
-          message: getTranslation(sessionLanguage, 'knowledge_retrieval_in_progress_message', 'Knowledge retrieval in progress. Retrieving relevant information...')
-        }
+        input: {
+          message: getTranslation(
+            sessionLanguage,
+            'knowledge_retrieval_in_progress_message',
+            'Knowledge retrieval in progress. Retrieving relevant information...',
+          ),
+        },
       });
       knowledgeRetrievalNotificationSent = true;
     }
@@ -162,16 +195,32 @@ export const pollRunStatus = async (
         await publishActionMessage(sessionId, 'completed', {
           id: knowledgeRetrievalNotificationId,
           actionId: 'knowledge_retrieval_notification',
-          serviceName: getTranslation(sessionLanguage, 'knowledge', 'Knowledge'),
-          actionTitle: getTranslation(sessionLanguage, 'knowledge_retrieval_completed', 'Knowledge Retrieval Completed'),
-          actionDescription: getTranslation(sessionLanguage, 'knowledge_retrieval_completed_description', 'Knowledge retrieval operation completed'),
+          serviceName: getTranslation(
+            sessionLanguage,
+            'knowledge',
+            'Knowledge',
+          ),
+          actionTitle: getTranslation(
+            sessionLanguage,
+            'knowledge_retrieval_completed',
+            'Knowledge Retrieval Completed',
+          ),
+          actionDescription: getTranslation(
+            sessionLanguage,
+            'knowledge_retrieval_completed_description',
+            'Knowledge retrieval operation completed',
+          ),
           icon: 'book-text',
           args: {},
           originalActionId: 'knowledge_retrieval_notification',
           language: sessionLanguage,
-          input: { 
-            message: getTranslation(sessionLanguage, 'knowledge_retrieval_completed_message', 'Knowledge retrieval completed. Results retrieved.')
-          }
+          input: {
+            message: getTranslation(
+              sessionLanguage,
+              'knowledge_retrieval_completed_message',
+              'Knowledge retrieval completed. Results retrieved.',
+            ),
+          },
         });
       }
 

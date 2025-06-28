@@ -8,12 +8,20 @@ import {
   listAllOpenAIFiles,
 } from '../services/file.service';
 import { getApiKey, validateApiKeys } from '../services/api.key.service';
-import { AuthenticatedRequest, verifyAccess } from '../middleware/auth.middleware';
+import {
+  AuthenticatedRequest,
+  verifyAccess,
+} from '../middleware/auth.middleware';
 
 const fileRouter = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-fileRouter.post(  '/:assistantId/files',  verifyAccess(),  validateApiKeys(['openai_api_key']),  upload.single('file'),  async (req: AuthenticatedRequest, res) => {
+fileRouter.post(
+  '/:assistantId/files',
+  verifyAccess(),
+  validateApiKeys(['openai_api_key']),
+  upload.single('file'),
+  async (req: AuthenticatedRequest, res) => {
     const { assistantId } = req.params;
     const { name, description } = req.body;
     const file = req.file;
@@ -22,10 +30,19 @@ fileRouter.post(  '/:assistantId/files',  verifyAccess(),  validateApiKeys(['ope
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
+    const apiKey = (await getApiKey(
+      req.company._id,
+      'openai_api_key',
+    )) as string;
 
     try {
-      const result = await uploadFile(file, assistantId, apiKey, name, description);
+      const result = await uploadFile(
+        file,
+        assistantId,
+        apiKey,
+        name,
+        description,
+      );
       res.status(201).json(result);
     } catch (error) {
       console.error('Error uploading file:', error);
@@ -34,8 +51,15 @@ fileRouter.post(  '/:assistantId/files',  verifyAccess(),  validateApiKeys(['ope
   },
 );
 
-fileRouter.get( '/',  verifyAccess(),  validateApiKeys(['openai_api_key']),  async (req: AuthenticatedRequest, res) => {
-    const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
+fileRouter.get(
+  '/',
+  verifyAccess(),
+  validateApiKeys(['openai_api_key']),
+  async (req: AuthenticatedRequest, res) => {
+    const apiKey = (await getApiKey(
+      req.company._id,
+      'openai_api_key',
+    )) as string;
 
     try {
       const files = await listAllOpenAIFiles(apiKey);
@@ -47,9 +71,16 @@ fileRouter.get( '/',  verifyAccess(),  validateApiKeys(['openai_api_key']),  asy
   },
 );
 
-fileRouter.get(  '/:assistantId/files',  verifyAccess(),  validateApiKeys(['openai_api_key']),  async (req: AuthenticatedRequest, res) => {
+fileRouter.get(
+  '/:assistantId/files',
+  verifyAccess(),
+  validateApiKeys(['openai_api_key']),
+  async (req: AuthenticatedRequest, res) => {
     const { assistantId } = req.params;
-    const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
+    const apiKey = (await getApiKey(
+      req.company._id,
+      'openai_api_key',
+    )) as string;
     try {
       const files = await listFiles(assistantId, apiKey);
       res.json(files);
@@ -60,11 +91,18 @@ fileRouter.get(  '/:assistantId/files',  verifyAccess(),  validateApiKeys(['open
   },
 );
 
-fileRouter.delete( '/:assistantId/files/:fileId',  verifyAccess(),  validateApiKeys(['openai_api_key']),  async (req: AuthenticatedRequest, res) => {
+fileRouter.delete(
+  '/:assistantId/files/:fileId',
+  verifyAccess(),
+  validateApiKeys(['openai_api_key']),
+  async (req: AuthenticatedRequest, res) => {
     const { assistantId, fileId } = req.params;
 
     try {
-      const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
+      const apiKey = (await getApiKey(
+        req.company._id,
+        'openai_api_key',
+      )) as string;
       const result = await deleteFile(assistantId, fileId, apiKey);
       res.json(result);
     } catch (error) {

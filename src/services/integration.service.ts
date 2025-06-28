@@ -1,5 +1,13 @@
-import { executeFunctionCall, sanitizeFunctionName } from '../integrations/actions/factory';
-import { discoveryService, SupportedLanguage, ActionInfo, Integration } from './discovery.service';
+import {
+  executeFunctionCall,
+  sanitizeFunctionName,
+} from '../integrations/actions/factory';
+import {
+  discoveryService,
+  SupportedLanguage,
+  ActionInfo,
+  Integration,
+} from './discovery.service';
 
 export interface IntegrationActionResult {
   success: boolean;
@@ -23,21 +31,28 @@ export async function triggerAction(
   data: any,
   sessionId: string,
   companyId: string,
-  allowedActions: string[]
+  allowedActions: string[],
 ): Promise<IntegrationActionResult> {
-  console.log(`[triggerAction] Entered. Integration: ${integrationName}, Service: ${service}, SessionID: ${sessionId}, CompanyID: ${companyId}`);
+  console.log(
+    `[triggerAction] Entered. Integration: ${integrationName}, Service: ${service}, SessionID: ${sessionId}, CompanyID: ${companyId}`,
+  );
   try {
     const fullServiceId = sanitizeFunctionName(`${integrationName}.${service}`);
-    
+
     const call = {
       function: {
         name: fullServiceId,
-        arguments: JSON.stringify(data)
-      }
+        arguments: JSON.stringify(data),
+      },
     };
 
     const sanitizedAllowedActions = allowedActions.map(sanitizeFunctionName);
-    const result = await executeFunctionCall(call, sessionId, companyId, sanitizedAllowedActions);
+    const result = await executeFunctionCall(
+      call,
+      sessionId,
+      companyId,
+      sanitizedAllowedActions,
+    );
 
     if (result.error) {
       return { success: false, error: result.error.message };
@@ -53,36 +68,50 @@ export async function triggerAction(
   }
 }
 
-export async function getActions(language: SupportedLanguage = 'en'): Promise<ActionInfo[]> {
+export async function getActions(
+  language: SupportedLanguage = 'en',
+): Promise<ActionInfo[]> {
   return discoveryService.discoverActions(language);
 }
 
-export async function getIntegrationById(id: string, language: SupportedLanguage = 'en'): Promise<Integration | null> {
+export async function getIntegrationById(
+  id: string,
+  language: SupportedLanguage = 'en',
+): Promise<Integration | null> {
   return discoveryService.getIntegrationById(id, language);
 }
 
-export async function getLeanIntegrationActions(language: SupportedLanguage = 'en', fields?: (keyof Integration)[]): Promise<LeanIntegration[]> {
-  const leanIntegrations = await discoveryService.getIntegrationsLean(language, fields);
-  
+export async function getLeanIntegrationActions(
+  language: SupportedLanguage = 'en',
+  fields?: (keyof Integration)[],
+): Promise<LeanIntegration[]> {
+  const leanIntegrations = await discoveryService.getIntegrationsLean(
+    language,
+    fields,
+  );
+
   if (fields && fields.includes('actions')) {
     const actions = await getActions(language);
-    
-    return leanIntegrations.map(integration => ({
+
+    return leanIntegrations.map((integration) => ({
       ...integration,
       actions: actions
-        .filter(action => action.service === integration.id)
-        .map(action => ({
+        .filter((action) => action.service === integration.id)
+        .map((action) => ({
           id: action.id,
           title: action.actionTitle,
-          description: action.description
-        }))
+          description: action.description,
+        })),
     })) as LeanIntegration[];
   }
-  
+
   return leanIntegrations as LeanIntegration[];
 }
 
-export async function discoverActionById(actionId: string, language: SupportedLanguage = 'en'): Promise<ActionInfo | null> {
+export async function discoverActionById(
+  actionId: string,
+  language: SupportedLanguage = 'en',
+): Promise<ActionInfo | null> {
   const actions = await getActions(language);
-  return actions.find(action => action.id === actionId) || null;
+  return actions.find((action) => action.id === actionId) || null;
 }

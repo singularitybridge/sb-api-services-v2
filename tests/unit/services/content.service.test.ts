@@ -34,29 +34,33 @@ describe('Content Service', () => {
     await Company.deleteMany({}); // Clear companies too
 
     // Mock getApiKey to return a dummy key, bypassing decryption
-    mockedApiKeyService.getApiKey.mockImplementation(async (companyId, keyType) => {
-      if (companyId === mockCompanyId && keyType === 'openai_api_key') {
-        return 'sk-mockOpenAiApiKey'; // Return a decrypted-like key
-      }
-      return null;
-    });
+    mockedApiKeyService.getApiKey.mockImplementation(
+      async (companyId, keyType) => {
+        if (companyId === mockCompanyId && keyType === 'openai_api_key') {
+          return 'sk-mockOpenAiApiKey'; // Return a decrypted-like key
+        }
+        return null;
+      },
+    );
 
     // Create a mock company (still needed if other parts of the service use it directly, though getApiKey is now mocked)
     // For safety, keep it, but its api_keys content is less critical now for getApiKey.
     const company = new Company({
       _id: mockCompanyId,
       name: 'Test Company',
-      api_keys: [{ // Minimal valid structure if Company model still needs it for save()
-          name: 'openai_api_key', 
-          key: 'openai_api_key', 
-          value: 'dummyValue', 
+      api_keys: [
+        {
+          // Minimal valid structure if Company model still needs it for save()
+          name: 'openai_api_key',
+          key: 'openai_api_key',
+          value: 'dummyValue',
           iv: '64756d6d7949763132333435', // "dummyIv12345" in hex (12 bytes)
           tag: '64756d6d795461673132333435363738', // "dummyTag12345678" in hex (16 bytes)
-          created_at: new Date() 
-      }]
+          created_at: new Date(),
+        },
+      ],
     });
     await company.save();
-
 
     // Create a mock content type
     const contentType = new ContentType({
@@ -83,7 +87,7 @@ describe('Content Service', () => {
       mockCompanyId,
       mockContentTypeId,
       contentData,
-      mockArtifactKey
+      mockArtifactKey,
     )) as IContentItem;
 
     expect(createdContent).toBeDefined();
@@ -96,8 +100,18 @@ describe('Content Service', () => {
     const contentData1 = { title: 'Content 1', body: 'Body 1' };
     const contentData2 = { title: 'Content 2', body: 'Body 2' };
 
-    await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData1, mockArtifactKey);
-    await ContentService.createContentItem(mockCompanyId, mockContentTypeId, contentData2, mockArtifactKey);
+    await ContentService.createContentItem(
+      mockCompanyId,
+      mockContentTypeId,
+      contentData1,
+      mockArtifactKey,
+    );
+    await ContentService.createContentItem(
+      mockCompanyId,
+      mockContentTypeId,
+      contentData2,
+      mockArtifactKey,
+    );
 
     const contentItems = await ContentService.getContentItems(mockCompanyId);
 
@@ -113,7 +127,7 @@ describe('Content Service', () => {
       mockCompanyId,
       mockContentTypeId,
       contentData,
-      mockArtifactKey
+      mockArtifactKey,
     )) as IContentItem;
 
     const updatedData = { title: 'Updated Title', body: 'Updated body' };
@@ -121,7 +135,7 @@ describe('Content Service', () => {
       createdContent._id.toString(),
       mockCompanyId,
       updatedData,
-      mockArtifactKey
+      mockArtifactKey,
     )) as IContentItem;
 
     expect(updatedContent).toBeDefined();
@@ -130,15 +144,21 @@ describe('Content Service', () => {
   });
 
   it('should delete a content item', async () => {
-    const contentData = { title: 'To be deleted', body: 'This will be deleted' };
+    const contentData = {
+      title: 'To be deleted',
+      body: 'This will be deleted',
+    };
     const createdContent = (await ContentService.createContentItem(
       mockCompanyId,
       mockContentTypeId,
       contentData,
-      mockArtifactKey
+      mockArtifactKey,
     )) as IContentItem;
 
-    const result = await ContentService.deleteContentItem(createdContent._id.toString(), mockCompanyId);
+    const result = await ContentService.deleteContentItem(
+      createdContent._id.toString(),
+      mockCompanyId,
+    );
 
     expect(result).toBe(true);
 

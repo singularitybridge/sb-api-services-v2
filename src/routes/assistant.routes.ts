@@ -15,7 +15,11 @@ router.use('/thread', threadRouter);
 router.use('/completion', completionRouter);
 
 // Execute handler with proper parameter handling
-router.post('/:assistantId/execute', validateApiKeys(['openai_api_key']), executeHandler);
+router.post(
+  '/:assistantId/execute',
+  validateApiKeys(['openai_api_key']),
+  executeHandler,
+);
 
 // This should be last to avoid catching other routes
 router.use('/', assistantRouter); // Handles routes like /assistant, /assistant/:id

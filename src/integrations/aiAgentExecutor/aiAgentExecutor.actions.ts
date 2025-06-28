@@ -56,7 +56,6 @@ interface ChangeDirectoryResultData {
   message?: string;
 }
 
-
 type FileOperation =
   | 'list'
   | 'read'
@@ -71,7 +70,9 @@ type FileOperation =
 // handleError is no longer needed as executeAction will handle errors.
 // const handleError = (error: unknown): string => { ... };
 
-export const createAIAgentExecutorActions = (context: ActionContext): FunctionFactory => {
+export const createAIAgentExecutorActions = (
+  context: ActionContext,
+): FunctionFactory => {
   // Get headers with encrypted keys
   const getHeaders = async () => {
     const token = await getApiKey(context.companyId, 'executor_agent_token');
@@ -95,13 +96,15 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
 
   return {
     executeCommand: {
-      description: 'Execute a shell command sequentially using Terminal Turtle.',
+      description:
+        'Execute a shell command sequentially using Terminal Turtle.',
       parameters: {
         type: 'object',
         properties: {
-          command: { 
-            type: 'string', 
-            description: 'The shell command to execute (e.g., npm install, git clone, pm2 logs)' 
+          command: {
+            type: 'string',
+            description:
+              'The shell command to execute (e.g., npm install, git clone, pm2 logs)',
           },
         },
         required: ['command'],
@@ -116,7 +119,7 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
             const response = await axios.post<ExecuteResponse>(
               `${baseUrl}/execute`,
               { command },
-              { headers }
+              { headers },
             );
 
             // Shape the data for StandardActionResult
@@ -139,13 +142,14 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
               },
             };
           },
-          { serviceName: 'AIAgentExecutorService' }
+          { serviceName: 'AIAgentExecutorService' },
         );
       },
     },
 
     performFileOperation: {
-      description: 'Perform file operations like listing, reading, writing, creating, updating, and deleting files or directories.',
+      description:
+        'Perform file operations like listing, reading, writing, creating, updating, and deleting files or directories.',
       parameters: {
         type: 'object',
         properties: {
@@ -160,24 +164,25 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
               'deleteFile',
               'createDir',
               'deleteDirectory',
-              'checkExistence'
+              'checkExistence',
             ],
-            description: 'The file operation to perform'
+            description: 'The file operation to perform',
           },
-          path: { 
-            type: 'string', 
-            description: 'The path to the file or directory' 
+          path: {
+            type: 'string',
+            description: 'The path to the file or directory',
           },
           content: {
             type: 'string',
             description: 'Content for write, createFile, or update operations',
-            optional: true
+            optional: true,
           },
           recursive: {
             type: 'boolean',
-            description: 'Whether to perform the operation recursively (for list operation)',
-            optional: true
-          }
+            description:
+              'Whether to perform the operation recursively (for list operation)',
+            optional: true,
+          },
         },
         required: ['operation', 'path'],
       },
@@ -185,7 +190,7 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
         operation,
         path,
         content,
-        recursive
+        recursive,
       }: {
         operation: FileOperation;
         path: string;
@@ -201,15 +206,19 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
             const response = await axios.post<FileOperationResponse>(
               `${baseUrl}/file-operation`,
               { operation, path, content, recursive },
-              { headers }
+              { headers },
             );
             // Adapt the response for executeAction
             if (!response.data.success) {
-              return { success: false, description: response.data.error, data: response.data.result };
+              return {
+                success: false,
+                description: response.data.error,
+                data: response.data.result,
+              };
             }
             return { success: true, data: response.data.result };
           },
-          { serviceName: 'AIAgentExecutorService' }
+          { serviceName: 'AIAgentExecutorService' },
         );
       },
     },
@@ -219,9 +228,9 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
       parameters: {
         type: 'object',
         properties: {
-          taskId: { 
-            type: 'string', 
-            description: 'The task ID returned when the command was started' 
+          taskId: {
+            type: 'string',
+            description: 'The task ID returned when the command was started',
           },
         },
         required: ['taskId'],
@@ -235,11 +244,11 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
             const headers = await getHeaders();
             const response = await axios.get<TaskResponse>(
               `${baseUrl}/tasks/${taskId}`,
-              { headers }
+              { headers },
             );
             return { success: true, data: response.data };
           },
-          { serviceName: 'AIAgentExecutorService' }
+          { serviceName: 'AIAgentExecutorService' },
         );
       },
     },
@@ -249,9 +258,9 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
       parameters: {
         type: 'object',
         properties: {
-          taskId: { 
-            type: 'string', 
-            description: 'The task ID of the task to terminate' 
+          taskId: {
+            type: 'string',
+            description: 'The task ID of the task to terminate',
           },
         },
         required: ['taskId'],
@@ -264,14 +273,13 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
             const baseUrl = await getBaseUrl();
             const headers = await getHeaders();
             // Assuming response.data is { message: string, taskId: string } or similar
-            const response = await axios.post<{ message?: string; taskId?: string }>(
-              `${baseUrl}/tasks/${taskId}/end`,
-              {},
-              { headers }
-            );
+            const response = await axios.post<{
+              message?: string;
+              taskId?: string;
+            }>(`${baseUrl}/tasks/${taskId}/end`, {}, { headers });
             return { success: true, data: response.data };
           },
-          { serviceName: 'AIAgentExecutorService' }
+          { serviceName: 'AIAgentExecutorService' },
         );
       },
     },
@@ -281,9 +289,9 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
       parameters: {
         type: 'object',
         properties: {
-          newPath: { 
-            type: 'string', 
-            description: 'The new directory path to change to' 
+          newPath: {
+            type: 'string',
+            description: 'The new directory path to change to',
           },
         },
         required: ['newPath'],
@@ -296,14 +304,13 @@ export const createAIAgentExecutorActions = (context: ActionContext): FunctionFa
             const baseUrl = await getBaseUrl();
             const headers = await getHeaders();
             // Assuming response.data is { currentPath: string, message: string } or similar
-            const response = await axios.post<{ currentPath?: string; message?: string }>(
-              `${baseUrl}/change-directory`,
-              { newPath },
-              { headers }
-            );
+            const response = await axios.post<{
+              currentPath?: string;
+              message?: string;
+            }>(`${baseUrl}/change-directory`, { newPath }, { headers });
             return { success: true, data: response.data };
           },
-          { serviceName: 'AIAgentExecutorService' }
+          { serviceName: 'AIAgentExecutorService' },
         );
       },
     },

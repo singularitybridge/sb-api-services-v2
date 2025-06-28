@@ -3,19 +3,40 @@ import express from 'express';
 import { extractTokenFromHeader, verifyToken } from '../services/token.service';
 import { googleLogin, verifyBetaKey } from '../services/googleAuth.service';
 import { refreshApiKeyCache } from '../services/api.key.service';
+import { ApiKeyService } from '../services/apiKey.service';
 
 const authRouter = express.Router();
 
 authRouter.post('/verify-token', async (req, res) => {
   try {
-    
-    const token = extractTokenFromHeader(req.headers.authorization);    
+    const authHeader = req.headers.authorization;
+
+    // Check if it's an API key
+    if (authHeader && authHeader.startsWith('Bearer sk_live_')) {
+      const apiKey = authHeader.substring(7);
+      const result = await ApiKeyService.validateApiKey(apiKey);
+
+      if (!result) {
+        return res.status(401).json({ message: 'Invalid or expired API key' });
+      }
+
+      return res.json({
+        message: 'API key is valid',
+        user: result.user,
+        company: result.company,
+        apiKeyName: result.apiKeyDoc.name,
+        expiresAt: result.apiKeyDoc.expiresAt,
+      });
+    }
+
+    // Otherwise, it's a JWT token
+    const token = extractTokenFromHeader(authHeader);
     const { user, company, decryptedApiKey } = await verifyToken(token);
-    
-    const response: any = { 
+
+    const response: any = {
       message: 'Token is valid',
       user,
-      company
+      company,
     };
 
     if (decryptedApiKey) {
@@ -27,10 +48,11 @@ authRouter.post('/verify-token', async (req, res) => {
     res.json(response);
   } catch (error) {
     console.error('Token verification failed:', error);
-    res.status(401).json({ message: 'Invalid token', error: (error as Error).message });
+    res
+      .status(401)
+      .json({ message: 'Invalid token', error: (error as Error).message });
   }
 });
-
 
 authRouter.post('/google/login', async (req, res) => {
   console.log('called google login route');

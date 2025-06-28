@@ -1,36 +1,44 @@
-import { google } from "googleapis";
-import { OAuth2Client } from "google-auth-library";
-import fs from "fs";
-import path from "path";
-import { IEvent, IEventCreationResponse } from "../Interfaces/event.interface";
-import { ICalendar } from "../Interfaces/calendar.interface";
-import { IEventRequestBody } from "../Interfaces/eventRequest.interface";
+import { google } from 'googleapis';
+import { OAuth2Client } from 'google-auth-library';
+import fs from 'fs';
+import path from 'path';
+import { IEvent, IEventCreationResponse } from '../Interfaces/event.interface';
+import { ICalendar } from '../Interfaces/calendar.interface';
+import { IEventRequestBody } from '../Interfaces/eventRequest.interface';
 
 let oauth2Client: OAuth2Client | undefined;
 let calendar: any; // Using 'any' for google.calendar object, or define a more specific type
 
-const TOKEN_PATH = path.join(__dirname, "tokens.json");
+const TOKEN_PATH = path.join(__dirname, 'tokens.json');
 const calendarId =
-  "0d504cdef77336818a64a4d89b331d90951ae2dcb28444de7dd4ab1de8af35d2@group.calendar.google.com";
+  '0d504cdef77336818a64a4d89b331d90951ae2dcb28444de7dd4ab1de8af35d2@group.calendar.google.com';
 
-if (process.env.CLIENT_ID && process.env.CLIENT_SECRET && process.env.REDIRECT_URL) {
+if (
+  process.env.CLIENT_ID &&
+  process.env.CLIENT_SECRET &&
+  process.env.REDIRECT_URL
+) {
   oauth2Client = new OAuth2Client(
     process.env.CLIENT_ID,
     process.env.CLIENT_SECRET,
-    process.env.REDIRECT_URL
+    process.env.REDIRECT_URL,
   );
-  calendar = google.calendar({ version: "v3", auth: oauth2Client });
+  calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 } else {
-  console.warn("Google Calendar credentials (CLIENT_ID, CLIENT_SECRET, REDIRECT_URL) not found. Google Calendar service will not be available.");
+  console.warn(
+    'Google Calendar credentials (CLIENT_ID, CLIENT_SECRET, REDIRECT_URL) not found. Google Calendar service will not be available.',
+  );
 }
 
 export const initGoogleCalendar = () => {
   if (!oauth2Client) {
-    console.warn("Google Calendar client not initialized. Skipping initGoogleCalendar.");
+    console.warn(
+      'Google Calendar client not initialized. Skipping initGoogleCalendar.',
+    );
     return;
   }
   if (fs.existsSync(TOKEN_PATH)) {
-    const tokens = JSON.parse(fs.readFileSync(TOKEN_PATH, "utf-8"));
+    const tokens = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf-8'));
     oauth2Client.setCredentials(tokens);
     // Automatically refresh the access token
     oauth2Client.on('tokens', (newTokens) => {
@@ -45,10 +53,11 @@ export const initGoogleCalendar = () => {
   }
 };
 
-
 export const handleOAuth2Callback = async (code: string) => {
   if (!oauth2Client) {
-    throw new Error("Google Calendar client not initialized. Cannot handle OAuth2 callback.");
+    throw new Error(
+      'Google Calendar client not initialized. Cannot handle OAuth2 callback.',
+    );
   }
   const { tokens } = await oauth2Client.getToken(code);
   oauth2Client.setCredentials(tokens);
@@ -56,34 +65,37 @@ export const handleOAuth2Callback = async (code: string) => {
   return tokens;
 };
 
-
 export const generateAuthUrl = () => {
   const scopes = [
-    "https://www.googleapis.com/auth/calendar.readonly",
-    "https://www.googleapis.com/auth/calendar.events",
+    'https://www.googleapis.com/auth/calendar.readonly',
+    'https://www.googleapis.com/auth/calendar.events',
   ];
 
   if (!oauth2Client) {
-    console.error("Google Calendar client not initialized. Cannot generate auth URL.");
-    return "Google Calendar client not initialized. Cannot generate auth URL."; // Or throw an error
+    console.error(
+      'Google Calendar client not initialized. Cannot generate auth URL.',
+    );
+    return 'Google Calendar client not initialized. Cannot generate auth URL.'; // Or throw an error
   }
 
   const url = oauth2Client.generateAuthUrl({
-    access_type: "offline",
+    access_type: 'offline',
     scope: scopes,
-    prompt: "consent"
+    prompt: 'consent',
   });
 
-  console.log("Visit this URL to authorize the application:", url);
+  console.log('Visit this URL to authorize the application:', url);
 };
 
 export const getEventsInRange = async (
   startDate: Date,
-  endDate: Date
+  endDate: Date,
 ): Promise<IEvent[]> => {
   try {
     if (!calendar || !oauth2Client) {
-      console.warn("Google Calendar service not initialized. Cannot get events.");
+      console.warn(
+        'Google Calendar service not initialized. Cannot get events.',
+      );
       return [];
     }
     const events = await calendar.events.list({
@@ -91,7 +103,7 @@ export const getEventsInRange = async (
       timeMin: startDate.toISOString(),
       timeMax: endDate.toISOString(),
       singleEvents: true,
-      orderBy: "startTime",
+      orderBy: 'startTime',
     });
 
     if (!events.data.items) {
@@ -99,11 +111,11 @@ export const getEventsInRange = async (
     }
 
     const simplifiedEvents: IEvent[] = events.data.items.map((event: any) => ({
-      id: event.id ?? "",
-      title: event.summary ?? "",
-      description: event.description ?? "",
-      startDate: new Date(event.start?.dateTime ?? ""),
-      endDate: new Date(event.end?.dateTime ?? ""),
+      id: event.id ?? '',
+      title: event.summary ?? '',
+      description: event.description ?? '',
+      startDate: new Date(event.start?.dateTime ?? ''),
+      endDate: new Date(event.end?.dateTime ?? ''),
     }));
 
     return simplifiedEvents;
@@ -115,23 +127,30 @@ export const getEventsInRange = async (
 export const listCalendars = async (): Promise<ICalendar[]> => {
   try {
     if (!calendar || !oauth2Client) {
-      console.warn("Google Calendar service not initialized. Cannot list calendars.");
+      console.warn(
+        'Google Calendar service not initialized. Cannot list calendars.',
+      );
       return [];
     }
     const calendarList = await calendar.calendarList.list();
-    return calendarList.data.items?.map((item: any) => ({
-      id: item.id!,
-      name: item.summary!,
-    })) || [];
+    return (
+      calendarList.data.items?.map((item: any) => ({
+        id: item.id!,
+        name: item.summary!,
+      })) || []
+    );
   } catch (error: any) {
     throw new Error((error as Error).message);
   }
 };
 
-
-export const createEvent = async (eventData: IEventRequestBody): Promise<IEventCreationResponse> => {
+export const createEvent = async (
+  eventData: IEventRequestBody,
+): Promise<IEventCreationResponse> => {
   if (!calendar || !oauth2Client) {
-    throw new Error("Google Calendar service not initialized. Cannot create event.");
+    throw new Error(
+      'Google Calendar service not initialized. Cannot create event.',
+    );
   }
   const event = await calendar.events.insert({
     calendarId: calendarId,
@@ -140,28 +159,33 @@ export const createEvent = async (eventData: IEventRequestBody): Promise<IEventC
   return { id: event.data.id! };
 };
 
-
-export const updateEvent = async (eventId: string, eventData: IEventRequestBody) => {
+export const updateEvent = async (
+  eventId: string,
+  eventData: IEventRequestBody,
+) => {
   try {
     if (!calendar || !oauth2Client) {
-      throw new Error("Google Calendar service not initialized. Cannot update event.");
+      throw new Error(
+        'Google Calendar service not initialized. Cannot update event.',
+      );
     }
     await calendar.events.update({
       calendarId: calendarId,
       eventId: eventId,
       requestBody: eventData,
     });
-    return { message: "Event updated successfully" };
+    return { message: 'Event updated successfully' };
   } catch (error: any) {
     throw new Error((error as Error).message);
   }
 };
 
-
 export const deleteEvent = async (eventId: string) => {
   try {
     if (!calendar || !oauth2Client) {
-      throw new Error("Google Calendar service not initialized. Cannot delete event.");
+      throw new Error(
+        'Google Calendar service not initialized. Cannot delete event.',
+      );
     }
     await calendar.events.delete({
       calendarId: calendarId,

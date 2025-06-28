@@ -1,6 +1,10 @@
 /// file_path: src/routes/inbox.routes.ts
 import express from 'express';
-import { addMessageToInbox, getInboxMessages, updateInboxMessageStatus } from '../services/inbox.service';
+import {
+  addMessageToInbox,
+  getInboxMessages,
+  updateInboxMessageStatus,
+} from '../services/inbox.service';
 import { handleSessionMessage } from '../services/assistant.service';
 import { Session } from '../models/Session';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
@@ -28,45 +32,49 @@ inboxRouter.post('/:sessionId', async (req: AuthenticatedRequest, res) => {
 });
 
 // Human operator replies to an inbox message
-inboxRouter.post('/reply/:sessionId', async (req: AuthenticatedRequest, res) => {
-  const { message, inboxMessageId } = req.body;
-  const { sessionId } = req.params;
+inboxRouter.post(
+  '/reply/:sessionId',
+  async (req: AuthenticatedRequest, res) => {
+    const { message, inboxMessageId } = req.body;
+    const { sessionId } = req.params;
 
-  try {
-    const apiKey = await getApiKey(req.company._id, 'openai_api_key');
+    try {
+      const apiKey = await getApiKey(req.company._id, 'openai_api_key');
 
-    // Add human operator response to inbox
-    await addMessageToInbox({
-      message,
-      sessionId,
-      type: 'human_agent_response',
-      companyId: req.company._id,
-    });
+      // Add human operator response to inbox
+      await addMessageToInbox({
+        message,
+        sessionId,
+        type: 'human_agent_response',
+        companyId: req.company._id,
+      });
 
-    // Update the status of the original message
-    await updateInboxMessageStatus(inboxMessageId, 'closed');
+      // Update the status of the original message
+      await updateInboxMessageStatus(inboxMessageId, 'closed');
 
-    const session = await Session.findById(sessionId);
+      const session = await Session.findById(sessionId);
 
-    if (!session) {
-      return res.status(404).json({ message: 'Session not found' });
-    }
-
-    const responseTemplate = `[human-agent-response]: ${message}. [system]: Incorporate this response into your conversation with the user, maintaining context and tone.`;
-    const llmResponse = await handleSessionMessage(
-      responseTemplate,
-      session.id,
-      ChannelType.WEB,
-      { // This is the metadata argument
-        message_type: 'human-agent-response',
+      if (!session) {
+        return res.status(404).json({ message: 'Session not found' });
       }
-    );
 
-    res.json({ message: 'Response sent successfully', llmResponse });
-  } catch (error) {
-    res.status(500).json({ message: 'Error processing reply', error });
-  }
-});
+      const responseTemplate = `[human-agent-response]: ${message}. [system]: Incorporate this response into your conversation with the user, maintaining context and tone.`;
+      const llmResponse = await handleSessionMessage(
+        responseTemplate,
+        session.id,
+        ChannelType.WEB,
+        {
+          // This is the metadata argument
+          message_type: 'human-agent-response',
+        },
+      );
+
+      res.json({ message: 'Response sent successfully', llmResponse });
+    } catch (error) {
+      res.status(500).json({ message: 'Error processing reply', error });
+    }
+  },
+);
 
 // Get inbox messages for the company
 inboxRouter.get('/', async (req: AuthenticatedRequest, res) => {
@@ -77,7 +85,5 @@ inboxRouter.get('/', async (req: AuthenticatedRequest, res) => {
     res.status(500).json({ message: 'Error retrieving inbox messages', error });
   }
 });
-
-
 
 export { inboxRouter };

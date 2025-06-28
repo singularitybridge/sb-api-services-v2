@@ -7,7 +7,7 @@ export class SpeechFactory {
 
   static getProvider(provider: string, apiKey: string): SpeechProvider {
     const key = `${provider}-${apiKey}`;
-    
+
     if (!this.providers.has(key)) {
       switch (provider) {
         case 'openai':

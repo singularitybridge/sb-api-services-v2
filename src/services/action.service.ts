@@ -30,4 +30,4 @@ export const deleteAction = async (id: string) => {
     throw new Error('Action not found');
   }
   return action;
-}
+};

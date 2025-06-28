@@ -7,7 +7,7 @@ export const getContentItems = async (
   artifactKey?: string,
   orderBy?: string,
   limit?: number,
-  skip?: number
+  skip?: number,
 ): Promise<IContentItem[]> => {
   const query = buildQuery({ companyId, contentTypeId, artifactKey });
   const sort = orderBy ? buildSort(orderBy) : { createdAt: -1 };
@@ -20,7 +20,7 @@ export const getContentItems = async (
 
 export const getContentItem = async (
   id: string,
-  companyId: string
+  companyId: string,
 ): Promise<IContentItem | null> => {
   return await ContentItem.findOne({ _id: id, companyId });
 };
@@ -31,7 +31,7 @@ export const getContentItemsByArtifactKey = async (
   contentTypeId?: string,
   orderBy?: string,
   limit?: number,
-  skip?: number
+  skip?: number,
 ): Promise<IContentItem[]> => {
   const query = buildQuery({ companyId, artifactKey, contentTypeId });
   const sort = orderBy ? buildSort(orderBy) : { createdAt: -1 };
@@ -47,7 +47,7 @@ export const getContentItemsByType = async (
   contentTypeId: string,
   orderBy?: string,
   limit?: number,
-  skip?: number
+  skip?: number,
 ): Promise<IContentItem[]> => {
   const query = buildQuery({ companyId, contentTypeId });
   const sort = orderBy ? buildSort(orderBy) : { createdAt: -1 };

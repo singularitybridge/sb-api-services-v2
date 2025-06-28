@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
+import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import { ApiKey } from '../../services/verification.service';
 import { uploadFile } from '../../services/google.storage.service'; // Added import
 
@@ -28,35 +28,35 @@ export const generateAudio = async (
   text: string,
   voiceId: string = '21m00Tcm4TlvDq8ikWAM',
   modelId?: string, // Added modelId here
-  filename?: string
+  filename?: string,
 ): Promise<GenerateAudioResult> => {
   try {
     const result = await generateSpeech(
       { apiKey },
-      { text, voiceId, modelId, filename } // Pass modelId
+      { text, voiceId, modelId, filename }, // Pass modelId
     );
     return {
       success: true,
       data: {
-        audioUrl: result
-      }
+        audioUrl: result,
+      },
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
     };
   }
 };
 
 export const generateSpeech = async (
   config: ElevenLabsConfig,
-  options: GenerateSpeechOptions
+  options: GenerateSpeechOptions,
 ): Promise<string> => {
   const {
     text,
     voiceId = '21m00Tcm4TlvDq8ikWAM', // Default voice - Rachel
-    modelId = 'eleven_multilingual_v2' // Default model updated
+    modelId = 'eleven_multilingual_v2', // Default model updated
   } = options;
 
   const client = new ElevenLabsClient({ apiKey: config.apiKey });
@@ -67,7 +67,8 @@ export const generateSpeech = async (
     const audioStream = await client.textToSpeech.stream(voiceId, {
       text,
       modelId: modelId, // Corrected from model_id to modelId
-      voiceSettings: { // Corrected from voice_settings to voiceSettings
+      voiceSettings: {
+        // Corrected from voice_settings to voiceSettings
         stability: 0.5,
         similarityBoost: 0.5, // Corrected from similarity_boost to similarityBoost
       },
@@ -75,14 +76,17 @@ export const generateSpeech = async (
 
     // The SDK returns a ReadableStream, we need to convert it to a buffer then base64
     const chunks = [];
-    for await (const chunk of audioStream) { // Corrected typo: audio -> audioStream
+    for await (const chunk of audioStream) {
+      // Corrected typo: audio -> audioStream
       chunks.push(chunk);
     }
     const buffer = Buffer.concat(chunks);
     // const audioBase64 = buffer.toString('base64');
     // const audioUrl = `data:audio/mpeg;base64,${audioBase64}`; // We will upload instead
 
-    const fileName = options.filename ? `${options.filename}.mp3` : `elevenlabs_audio_${Date.now()}.mp3`;
+    const fileName = options.filename
+      ? `${options.filename}.mp3`
+      : `elevenlabs_audio_${Date.now()}.mp3`;
 
     // Create a partial File object for uploadFile
     const file: Partial<Express.Multer.File> = {
@@ -132,7 +136,7 @@ export const listVoices = async (apiKey: string): Promise<any> => {
     // This implies a single object argument.
     const searchResult = await client.voices.search({
       // query: '', // Optional: if an empty query string is needed explicitly
-      includeTotalCount: true // Corrected to camelCase as suggested by previous error hint
+      includeTotalCount: true, // Corrected to camelCase as suggested by previous error hint
     });
     return searchResult;
   } catch (error) {
@@ -142,7 +146,6 @@ export const listVoices = async (apiKey: string): Promise<any> => {
     throw error;
   }
 };
-
 
 export const verifyElevenLabsKey = async (key: ApiKey): Promise<boolean> => {
   if (typeof key !== 'string') {

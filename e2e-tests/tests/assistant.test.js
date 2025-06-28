@@ -11,11 +11,14 @@ async function callAgent(prompt) {
   const res = await fetch(process.env.ENDPOINT_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${process.env.SESSION_TOKEN}`,
+      Authorization: `Bearer ${process.env.SESSION_TOKEN}`,
       'Content-Type': 'application/json',
-      'Accept': 'text/event-stream' // Ensure SSE is requested
+      Accept: 'text/event-stream', // Ensure SSE is requested
     },
-    body: JSON.stringify({ userInput: prompt, sessionId: '682ce6511b783b9533c541cc' })
+    body: JSON.stringify({
+      userInput: prompt,
+      sessionId: '682ce6511b783b9533c541cc',
+    }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const reader = res.body.getReader();
@@ -41,7 +44,9 @@ async function callAgent(prompt) {
             // Optional: handle 'done' message if needed
           } else if (jsonData.type === 'error') {
             console.error('Stream error:', jsonData.errorDetails);
-            throw new Error(jsonData.errorDetails.message || 'Unknown stream error');
+            throw new Error(
+              jsonData.errorDetails.message || 'Unknown stream error',
+            );
           }
         } catch (e) {
           console.error('Error parsing SSE JSON:', e, 'Raw message:', message);
@@ -64,26 +69,34 @@ function judgePrompt(userPrompt, assistantReply, rule) {
 
 describe('AI-assistant happy-path tests', () => {
   for (const tc of cases) {
-    test(tc.name, async () => {
-      const reply = await callAgent(tc.prompt);
+    test(
+      tc.name,
+      async () => {
+        const reply = await callAgent(tc.prompt);
 
-      // simple string checks
-      (tc.mustContain || []).forEach(s =>
-        expect(reply).toEqual(expect.stringContaining(s))
-      );
-      (tc.mustNotContain || []).forEach(s =>
-        expect(reply).not.toEqual(expect.stringContaining(s))
-      );
+        // simple string checks
+        (tc.mustContain || []).forEach((s) =>
+          expect(reply).toEqual(expect.stringContaining(s)),
+        );
+        (tc.mustNotContain || []).forEach((s) =>
+          expect(reply).not.toEqual(expect.stringContaining(s)),
+        );
 
-      // LLM evaluation
-      if (tc.expectedBehavior) {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" }); // Corrected model initialization
-        const result = await model.generateContent(judgePrompt(tc.prompt, reply, tc.expectedBehavior));
-        const response = await result.response; // Get the response object
-        const text = response.text(); // Get the text from the response
-        const verdict = text.trim().toLowerCase().startsWith('yes');
-        expect(verdict).toBe(true);
-      }
-    }, 30_000);            // 30 s timeout per test
+        // LLM evaluation
+        if (tc.expectedBehavior) {
+          const model = genAI.getGenerativeModel({
+            model: 'gemini-1.5-flash-latest',
+          }); // Corrected model initialization
+          const result = await model.generateContent(
+            judgePrompt(tc.prompt, reply, tc.expectedBehavior),
+          );
+          const response = await result.response; // Get the response object
+          const text = response.text(); // Get the text from the response
+          const verdict = text.trim().toLowerCase().startsWith('yes');
+          expect(verdict).toBe(true);
+        }
+      },
+      30_000,
+    ); // 30 s timeout per test
   }
 });

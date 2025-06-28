@@ -1,6 +1,10 @@
 import { Session } from '../models/Session';
 import { ContentTypeService } from '../services/content-type.service';
-import { ActionContext, FunctionFactory, StandardActionResult } from '../integrations/actions/types';
+import {
+  ActionContext,
+  FunctionFactory,
+  StandardActionResult,
+} from '../integrations/actions/types';
 import { IContentType } from '../models/ContentType'; // Correct model import
 import mongoose from 'mongoose';
 
@@ -10,39 +14,47 @@ type GetContentTypesData = IContentType[];
 type UpdateContentTypeData = IContentType;
 type DeleteContentTypeData = { message: string };
 
-export const createContentTypeActions = (context: ActionContext): FunctionFactory => ({
+export const createContentTypeActions = (
+  context: ActionContext,
+): FunctionFactory => ({
   createContentType: {
     description: 'Create a new content type',
     parameters: {
       type: 'object',
       properties: {
         name: { type: 'string', description: 'The name of the content type' },
-        fields: { 
-          type: 'array', 
+        fields: {
+          type: 'array',
           description: 'The fields of the content type',
           items: {
             type: 'object',
             properties: {
               name: { type: 'string', description: 'The name of the field' },
               type: { type: 'string', description: 'The type of the field' },
-              required: { type: 'boolean', description: 'Whether the field is required' },
+              required: {
+                type: 'boolean',
+                description: 'Whether the field is required',
+              },
             },
-            required: ['name', 'type']
-          }
+            required: ['name', 'type'],
+          },
         },
       },
       required: ['name', 'fields'],
     },
-    function: async (args: { name: string; fields: Array<{ name: string; type: string; required?: boolean }> }): Promise<StandardActionResult<CreateContentTypeData>> => {
+    function: async (args: {
+      name: string;
+      fields: Array<{ name: string; type: string; required?: boolean }>;
+    }): Promise<StandardActionResult<CreateContentTypeData>> => {
       const session = await Session.findById(context.sessionId);
       if (!session) {
         throw new Error('Invalid session');
       }
       try {
-        const contentType = await ContentTypeService.createContentType({ 
-          name: args.name, 
+        const contentType = await ContentTypeService.createContentType({
+          name: args.name,
           fields: args.fields,
-          companyId: new mongoose.Types.ObjectId(session.companyId)
+          companyId: new mongoose.Types.ObjectId(session.companyId),
         });
         return {
           success: true,
@@ -51,7 +63,11 @@ export const createContentTypeActions = (context: ActionContext): FunctionFactor
         };
       } catch (error) {
         console.error('Error creating content type:', error);
-        throw new Error(error instanceof Error ? error.message : 'Failed to create content type');
+        throw new Error(
+          error instanceof Error
+            ? error.message
+            : 'Failed to create content type',
+        );
       }
     },
   },
@@ -74,7 +90,7 @@ export const createContentTypeActions = (context: ActionContext): FunctionFactor
         // Let's assume the service handles company context or doesn't need it for this specific call.
         const session = await Session.findById(context.sessionId);
         if (!session) {
-            throw new Error('Invalid session');
+          throw new Error('Invalid session');
         }
         // ContentTypeService.getAllContentTypes() currently takes no arguments.
         // It will fetch all content types. If company-specific filtering is needed,
@@ -88,7 +104,11 @@ export const createContentTypeActions = (context: ActionContext): FunctionFactor
         };
       } catch (error) {
         console.error('Error getting content types:', error);
-        throw new Error(error instanceof Error ? error.message : 'Failed to retrieve content types');
+        throw new Error(
+          error instanceof Error
+            ? error.message
+            : 'Failed to retrieve content types',
+        );
       }
     },
   },
@@ -98,32 +118,48 @@ export const createContentTypeActions = (context: ActionContext): FunctionFactor
     parameters: {
       type: 'object',
       properties: {
-        contentTypeId: { type: 'string', description: 'The ID of the content type to update' },
-        name: { type: 'string', description: 'The new name of the content type (optional)' },
-        fields: { 
-          type: 'array', 
+        contentTypeId: {
+          type: 'string',
+          description: 'The ID of the content type to update',
+        },
+        name: {
+          type: 'string',
+          description: 'The new name of the content type (optional)',
+        },
+        fields: {
+          type: 'array',
           description: 'The updated fields of the content type (optional)',
           items: {
             type: 'object',
             properties: {
               name: { type: 'string', description: 'The name of the field' },
               type: { type: 'string', description: 'The type of the field' },
-              required: { type: 'boolean', description: 'Whether the field is required' },
+              required: {
+                type: 'boolean',
+                description: 'Whether the field is required',
+              },
             },
-            required: ['name', 'type']
-          }
+            required: ['name', 'type'],
+          },
         },
       },
       required: ['contentTypeId'],
     },
-    function: async (args: { contentTypeId: string; name?: string; fields?: Array<{ name: string; type: string; required?: boolean }> }): Promise<StandardActionResult<UpdateContentTypeData>> => {
+    function: async (args: {
+      contentTypeId: string;
+      name?: string;
+      fields?: Array<{ name: string; type: string; required?: boolean }>;
+    }): Promise<StandardActionResult<UpdateContentTypeData>> => {
       try {
         // Session validation might be good here too if company context is needed by service implicitly
-        const updatedContentType = await ContentTypeService.updateContentType(args.contentTypeId, { 
-          name: args.name, 
-          fields: args.fields 
-          // If updateContentType needs companyId for scoping, ensure it's passed or handled by service
-        });
+        const updatedContentType = await ContentTypeService.updateContentType(
+          args.contentTypeId,
+          {
+            name: args.name,
+            fields: args.fields,
+            // If updateContentType needs companyId for scoping, ensure it's passed or handled by service
+          },
+        );
         if (!updatedContentType) {
           throw new Error('Content type not found or failed to update.');
         }
@@ -134,7 +170,11 @@ export const createContentTypeActions = (context: ActionContext): FunctionFactor
         };
       } catch (error) {
         console.error('Error updating content type:', error);
-        throw new Error(error instanceof Error ? error.message : 'Failed to update content type');
+        throw new Error(
+          error instanceof Error
+            ? error.message
+            : 'Failed to update content type',
+        );
       }
     },
   },
@@ -144,26 +184,38 @@ export const createContentTypeActions = (context: ActionContext): FunctionFactor
     parameters: {
       type: 'object',
       properties: {
-        contentTypeId: { type: 'string', description: 'The ID of the content type to delete' },
+        contentTypeId: {
+          type: 'string',
+          description: 'The ID of the content type to delete',
+        },
       },
       required: ['contentTypeId'],
     },
-    function: async (args: { contentTypeId: string }): Promise<StandardActionResult<DeleteContentTypeData>> => {
+    function: async (args: {
+      contentTypeId: string;
+    }): Promise<StandardActionResult<DeleteContentTypeData>> => {
       try {
         // Session validation might be good here too
-        const result = await ContentTypeService.deleteContentType(args.contentTypeId);
-        if (result) { // Assuming service returns true on success, false or throws on failure
+        const result = await ContentTypeService.deleteContentType(
+          args.contentTypeId,
+        );
+        if (result) {
+          // Assuming service returns true on success, false or throws on failure
           return {
             success: true,
             message: 'Content type deleted successfully',
-            data: { message: 'Content type deleted successfully' }
+            data: { message: 'Content type deleted successfully' },
           };
         } else {
           throw new Error('Content type not found or could not be deleted.');
         }
       } catch (error) {
         console.error('Error deleting content type:', error);
-        throw new Error(error instanceof Error ? error.message : 'Failed to delete content type');
+        throw new Error(
+          error instanceof Error
+            ? error.message
+            : 'Failed to delete content type',
+        );
       }
     },
   },

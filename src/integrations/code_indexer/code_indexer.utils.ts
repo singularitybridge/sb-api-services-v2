@@ -3,10 +3,20 @@ import * as path from 'path';
 import glob from 'glob';
 import { Types } from 'mongoose';
 import { CodeFileSummary } from './code_indexer.types';
-import { ContentType, IContentType, IFieldDefinition } from '../../models/ContentType';
+import {
+  ContentType,
+  IContentType,
+  IFieldDefinition,
+} from '../../models/ContentType';
 
-export const getOrCreateContentType = async (companyId: string, name: string): Promise<IContentType> => {
-  const existingContentType = await ContentType.findOne({ companyId, name }).exec();
+export const getOrCreateContentType = async (
+  companyId: string,
+  name: string,
+): Promise<IContentType> => {
+  const existingContentType = await ContentType.findOne({
+    companyId,
+    name,
+  }).exec();
   if (existingContentType) {
     return existingContentType;
   }
@@ -29,7 +39,11 @@ export const getOrCreateContentType = async (companyId: string, name: string): P
   });
 };
 
-export const getFilesFromGlob = (directoryPath: string, includePatterns?: string[], excludePatterns?: string[]): string[] => {
+export const getFilesFromGlob = (
+  directoryPath: string,
+  includePatterns?: string[],
+  excludePatterns?: string[],
+): string[] => {
   const globPattern = includePatterns?.length
     ? path.join(directoryPath, '**', `{${includePatterns.join(',')}}`)
     : path.join(directoryPath, '**', '*');
@@ -40,7 +54,9 @@ export const getFilesFromGlob = (directoryPath: string, includePatterns?: string
   });
 };
 
-export const getFileStats = (filePath: string): { size: number; mtime: Date } => {
+export const getFileStats = (
+  filePath: string,
+): { size: number; mtime: Date } => {
   const { size, mtime } = fs.statSync(filePath);
   return { size, mtime };
 };
@@ -51,7 +67,9 @@ export const readFileContent = (filePath: string): string =>
 export const writeFileContent = (filePath: string, content: string): void =>
   fs.writeFileSync(filePath, content, 'utf-8');
 
-export const validateCodeFileSummary = (summary: CodeFileSummary): string | null => {
+export const validateCodeFileSummary = (
+  summary: CodeFileSummary,
+): string | null => {
   if (!summary.filename || typeof summary.filename !== 'string') {
     return 'Invalid or missing filename';
   }

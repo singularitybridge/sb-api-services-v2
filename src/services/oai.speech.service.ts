@@ -4,12 +4,13 @@ import { getCompletionResponse, summarizeText } from './oai.completion.service';
 
 export const generateSpeech = async (
   apiKey: string,
-  text: string,  
+  text: string,
   voice: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' = 'alloy',
-  model:  'tts-1-hd' | 'tts-1' = 'tts-1-hd',
+  model: 'tts-1-hd' | 'tts-1' = 'tts-1-hd',
   textLimit: number = 256, // Default limit of 4096 characters
-  filename?: string // Optional filename parameter
-): Promise<string> => { // Return string instead of SaveToFileResponse
+  filename?: string, // Optional filename parameter
+): Promise<string> => {
+  // Return string instead of SaveToFileResponse
   // Check if text exceeds the limit
   if (text.length > textLimit) {
     // Summarize the text
@@ -24,11 +25,13 @@ export const generateSpeech = async (
   });
 
   const buffer = Buffer.from(await mp3.arrayBuffer());
-  
+
   // Use provided filename if available, otherwise generate timestamp-based name
-  const finalFilename = filename ? 
-    (filename.endsWith('.mp3') ? filename : `${filename}.mp3`) : 
-    `file_${Date.now()}.mp3`;
+  const finalFilename = filename
+    ? filename.endsWith('.mp3')
+      ? filename
+      : `${filename}.mp3`
+    : `file_${Date.now()}.mp3`;
 
   // Create a mock Express.Multer.File object
   const file: Express.Multer.File = {

@@ -60,12 +60,12 @@ export const sessionFriendlyAggreationQuery = [
 export const updateSessionAssistant = async (
   sessionId: string,
   assistantId: string,
-  companyId: string
+  companyId: string,
 ): Promise<ISession | null> => {
   const session = await Session.findOneAndUpdate(
     { _id: sessionId, companyId: companyId },
     { assistantId },
-    { new: true }
+    { new: true },
   );
 
   if (!session) {
@@ -77,12 +77,12 @@ export const updateSessionAssistant = async (
 
 export const updateSessionLanguage = async (
   sessionId: string,
-  language: string
+  language: string,
 ): Promise<ISession | null> => {
   const session = await Session.findByIdAndUpdate(
     sessionId,
     { language },
-    { new: true }
+    { new: true },
   );
 
   if (!session) {
@@ -103,7 +103,7 @@ export const getSessionById = async (sessionId: string): Promise<ISession> => {
 export const getCurrentSession = async (
   userId: string,
   companyId: string,
-  channel: ChannelType = ChannelType.WEB
+  channel: ChannelType = ChannelType.WEB,
 ): Promise<ISession | null> => {
   return await Session.findOne({ userId, companyId, channel, active: true });
 };
@@ -114,12 +114,16 @@ export const getSessionOrCreate = async (
   companyId: string,
   channel: ChannelType = ChannelType.WEB,
   language: string = 'en',
-  lastAssistantId?: string // Added lastAssistantId parameter
+  lastAssistantId?: string, // Added lastAssistantId parameter
 ) => {
-
   const findSession = async () => {
-    const session = await Session.findOne({ userId, companyId, channel, active: true });
-    if (session) {      
+    const session = await Session.findOne({
+      userId,
+      companyId,
+      channel,
+      active: true,
+    });
+    if (session) {
       return session;
     }
     return null;
@@ -141,18 +145,25 @@ export const getSessionOrCreate = async (
   let assistantToUseId;
   if (lastAssistantId) {
     // Validate if the lastAssistantId is a valid assistant for the company
-    const assistant = await Assistant.findOne({ _id: lastAssistantId, companyId });
+    const assistant = await Assistant.findOne({
+      _id: lastAssistantId,
+      companyId,
+    });
     if (assistant) {
       assistantToUseId = assistant._id;
     } else {
-      console.warn(`Last assistant ID ${lastAssistantId} not found or not valid for company ${companyId}. Falling back to default.`);
+      console.warn(
+        `Last assistant ID ${lastAssistantId} not found or not valid for company ${companyId}. Falling back to default.`,
+      );
     }
   }
 
   if (!assistantToUseId) {
     const defaultAssistant = await Assistant.findOne({ companyId });
     if (!defaultAssistant) {
-      console.error(`No default assistant available for companyId: ${companyId}`);
+      console.error(
+        `No default assistant available for companyId: ${companyId}`,
+      );
       throw new Error('No default assistant available for this company');
     }
     assistantToUseId = defaultAssistant._id;
@@ -171,16 +182,24 @@ export const getSessionOrCreate = async (
       channel,
       language,
     });
-    console.log(`New session created: ${session._id} with assistant ${assistantToUseId}`);
+    console.log(
+      `New session created: ${session._id} with assistant ${assistantToUseId}`,
+    );
   } catch (error: any) {
     if (error.code === 11000) {
-      console.log('Duplicate key error encountered. Attempting to fetch existing session.');
+      console.log(
+        'Duplicate key error encountered. Attempting to fetch existing session.',
+      );
       session = await findSession();
       if (!session) {
         console.error('Failed to retrieve session after duplicate key error');
-        throw new Error('Failed to create or retrieve session after duplicate key error');
+        throw new Error(
+          'Failed to create or retrieve session after duplicate key error',
+        );
       }
-      console.log(`Existing session retrieved after duplicate key error: ${session._id}`);
+      console.log(
+        `Existing session retrieved after duplicate key error: ${session._id}`,
+      );
     } else {
       console.error('Error creating session:', error);
       throw error;
@@ -195,9 +214,12 @@ export const getSessionOrCreate = async (
   };
 };
 
-export const endSession = async (apiKey: string, sessionId: string): Promise<boolean> => {
+export const endSession = async (
+  apiKey: string,
+  sessionId: string,
+): Promise<boolean> => {
   const session = await Session.findOne({ _id: sessionId, active: true });
-  
+
   if (!session) {
     throw new NotFoundError('Active session');
   }
@@ -207,7 +229,9 @@ export const endSession = async (apiKey: string, sessionId: string): Promise<boo
     session.active = false;
     await session.save();
 
-    console.log(`Session ended locally, sessionId: ${sessionId}, userId: ${session.userId}, channel: ${session.channel}`);
+    console.log(
+      `Session ended locally, sessionId: ${sessionId}, userId: ${session.userId}, channel: ${session.channel}`,
+    );
     return true;
   } catch (error: any) {
     console.error('Error ending session:', error);
@@ -221,7 +245,7 @@ export const ensureSessionIndex = async () => {
     await Session.collection.dropIndexes();
     await Session.collection.createIndex(
       { companyId: 1, userId: 1, channel: 1 },
-      { unique: true, partialFilterExpression: { active: true } }
+      { unique: true, partialFilterExpression: { active: true } },
     );
     console.log('Session index updated successfully');
   } catch (error) {
@@ -249,7 +273,7 @@ export async function getSessionLanguage(
       ChannelType.WEB,
       'en', // Default language
     );
-    
+
     return session.language as SupportedLanguage;
   } catch (error) {
     console.error('Error getting session language:', error);

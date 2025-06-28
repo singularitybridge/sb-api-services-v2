@@ -7,7 +7,17 @@ import { FunctionCall } from '../../integrations/actions/types';
 import { getApiKey } from '../api.key.service';
 import { downloadFile } from '../file-downloader.service';
 import axios from 'axios';
-import { generateText, tool, streamText, CoreMessage, StreamTextResult, Tool, ImagePart, TextPart, generateObject } from 'ai';
+import {
+  generateText,
+  tool,
+  streamText,
+  CoreMessage,
+  StreamTextResult,
+  Tool,
+  ImagePart,
+  TextPart,
+  generateObject,
+} from 'ai';
 import { z, ZodTypeAny } from 'zod';
 import { trimToWindow } from '../../utils/tokenWindow';
 import { getProvider } from './provider.service';
@@ -67,19 +77,31 @@ export const executeAssistantStateless = async (
   userId: string, // Added userId for context if needed by tools
   attachments?: Attachment[],
   responseFormat?: ResponseFormat, // Add responseFormat parameter
-  metadata?: Record<string, string>
-): Promise<string | StreamTextResult<Record<string, Tool<any, any>>, unknown> | Record<string, any>> => {
-  console.log(`Executing stateless assistant ${assistant.name} (ID: ${assistant._id}) for company ${companyId}`);
+  metadata?: Record<string, string>,
+): Promise<
+  | string
+  | StreamTextResult<Record<string, Tool<any, any>>, unknown>
+  | Record<string, any>
+> => {
+  console.log(
+    `Executing stateless assistant ${assistant.name} (ID: ${assistant._id}) for company ${companyId}`,
+  );
 
   const providerKey = assistant.llmProvider;
-  const userMessageContentParts: (TextPart | ImagePart)[] = [{ type: 'text', text: userInput }];
+  const userMessageContentParts: (TextPart | ImagePart)[] = [
+    { type: 'text', text: userInput },
+  ];
 
   if (attachments && attachments.length > 0) {
-    console.log(`Processing ${attachments.length} attachments for stateless execution with provider ${providerKey}`);
+    console.log(
+      `Processing ${attachments.length} attachments for stateless execution with provider ${providerKey}`,
+    );
     for (const attachment of attachments) {
       if (attachment.mimeType.startsWith('image/')) {
         try {
-          const response = await axios.get(attachment.url, { responseType: 'arraybuffer' });
+          const response = await axios.get(attachment.url, {
+            responseType: 'arraybuffer',
+          });
           const imageBuffer = Buffer.from(response.data);
           userMessageContentParts.push({
             type: 'image',
@@ -88,7 +110,8 @@ export const executeAssistantStateless = async (
           });
         } catch (error) {
           console.error(`Error fetching image ${attachment.fileName}:`, error);
-          (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load image: ${attachment.fileName}]`;
+          (userMessageContentParts[0] as TextPart).text +=
+            `\n\n[Could not load image: ${attachment.fileName}]`;
         }
       } else if (attachment.fileId) {
         try {
@@ -99,45 +122,62 @@ export const executeAssistantStateless = async (
             let fileTextToAppend = fileContent;
             const MAX_FILE_TEXT_CHARS = 10000; // Max characters for appended file content
             if (fileTextToAppend.length > MAX_FILE_TEXT_CHARS) {
-              fileTextToAppend = fileTextToAppend.substring(0, MAX_FILE_TEXT_CHARS) + `\n\n[...File text truncated: ${attachment.fileName}...]\n`;
+              fileTextToAppend =
+                fileTextToAppend.substring(0, MAX_FILE_TEXT_CHARS) +
+                `\n\n[...File text truncated: ${attachment.fileName}...]\n`;
             }
-            (userMessageContentParts[0] as TextPart).text += `\n\n--- Attached File: ${attachment.fileName} ---\n${fileTextToAppend}\n--- End of File ---`;
+            (userMessageContentParts[0] as TextPart).text +=
+              `\n\n--- Attached File: ${attachment.fileName} ---\n${fileTextToAppend}\n--- End of File ---`;
           } else {
-            (userMessageContentParts[0] as TextPart).text += `\n\n[Could not load file: ${attachment.fileName}]`;
+            (userMessageContentParts[0] as TextPart).text +=
+              `\n\n[Could not load file: ${attachment.fileName}]`;
           }
         } catch (error) {
           console.error(`Error processing file ${attachment.fileName}:`, error);
-          (userMessageContentParts[0] as TextPart).text += `\n\n[Error loading file: ${attachment.fileName}]`;
+          (userMessageContentParts[0] as TextPart).text +=
+            `\n\n[Error loading file: ${attachment.fileName}]`;
         }
       }
     }
   }
 
   const actionContext = {
-    sessionId: "stateless_execution",
+    sessionId: 'stateless_execution',
     companyId,
     language: assistant.language as SupportedLanguage,
     userId, // Pass userId
     assistantId: assistant._id.toString(),
-    isStateless: true
+    isStateless: true,
     // getSession method removed from ActionContext
   };
-  const cacheKey = `${assistant._id.toString()}-${JSON.stringify(assistant.allowedActions.slice().sort())}`;
+  const cacheKey = `${assistant._id.toString()}-${JSON.stringify(
+    assistant.allowedActions.slice().sort(),
+  )}`;
   let toolsForSdk: Record<string, Tool<any, any>>;
 
   if (toolsCache.has(cacheKey)) {
     toolsForSdk = toolsCache.get(cacheKey)!;
   } else {
     toolsForSdk = {};
-    const functionFactory = await createFunctionFactory(actionContext, assistant.allowedActions);
+    const functionFactory = await createFunctionFactory(
+      actionContext,
+      assistant.allowedActions,
+    );
     for (const funcName in functionFactory) {
       const funcDef = functionFactory[funcName];
       const zodShape: Record<string, ZodTypeAny> = {};
       let saneRequiredParams: string[] = [];
 
-      if (funcDef.parameters?.required && Array.isArray(funcDef.parameters.required) && funcDef.parameters.properties) {
-        saneRequiredParams = funcDef.parameters.required.filter(reqParam =>
-          typeof reqParam === 'string' && reqParam.trim() !== '' && funcDef.parameters.properties!.hasOwnProperty(reqParam)
+      if (
+        funcDef.parameters?.required &&
+        Array.isArray(funcDef.parameters.required) &&
+        funcDef.parameters.properties
+      ) {
+        saneRequiredParams = funcDef.parameters.required.filter(
+          (reqParam) =>
+            typeof reqParam === 'string' &&
+            reqParam.trim() !== '' &&
+            funcDef.parameters.properties!.hasOwnProperty(reqParam),
         );
       }
 
@@ -146,36 +186,58 @@ export const executeAssistantStateless = async (
           const paramDef = funcDef.parameters.properties[paramName] as any;
           let zodType: ZodTypeAny;
           switch (paramDef.type) {
-            case 'string': zodType = z.string(); break;
-            case 'number': zodType = z.number(); break;
-            case 'integer': zodType = z.number().int(); break;
-            case 'boolean': zodType = z.boolean(); break;
+            case 'string':
+              zodType = z.string();
+              break;
+            case 'number':
+              zodType = z.number();
+              break;
+            case 'integer':
+              zodType = z.number().int();
+              break;
+            case 'boolean':
+              zodType = z.boolean();
+              break;
             case 'array':
-              if (paramDef.items && paramDef.items.type === 'string') zodType = z.array(z.string());
-              else if (paramDef.items && paramDef.items.type === 'number') zodType = z.array(z.number());
-              else if (paramDef.items && paramDef.items.type === 'boolean') zodType = z.array(z.boolean());
+              if (paramDef.items && paramDef.items.type === 'string')
+                zodType = z.array(z.string());
+              else if (paramDef.items && paramDef.items.type === 'number')
+                zodType = z.array(z.number());
+              else if (paramDef.items && paramDef.items.type === 'boolean')
+                zodType = z.array(z.boolean());
               else zodType = z.array(z.any());
               break;
-            case 'object': zodType = z.record(z.string(), z.any()); break;
-            default: zodType = z.any();
+            case 'object':
+              zodType = z.record(z.string(), z.any());
+              break;
+            default:
+              zodType = z.any();
           }
-          if (paramDef.description) zodType = zodType.describe(paramDef.description);
+          if (paramDef.description)
+            zodType = zodType.describe(paramDef.description);
           if (!saneRequiredParams.includes(paramName)) {
             zodType = zodType.optional();
           }
           zodShape[paramName] = zodType;
         }
       }
-      const zodSchema = Object.keys(zodShape).length > 0 ? z.object(zodShape) : z.object({});
+      const zodSchema =
+        Object.keys(zodShape).length > 0 ? z.object(zodShape) : z.object({});
       const currentFuncName = funcName;
-      
+
       toolsForSdk[currentFuncName] = tool({
         description: funcDef.description,
         parameters: zodSchema,
         execute: async (args: any) => {
-          console.log(`[Stateless Tool Execution] Attempting to execute function: ${currentFuncName} with args:`, args);
+          console.log(
+            `[Stateless Tool Execution] Attempting to execute function: ${currentFuncName} with args:`,
+            args,
+          );
           // Directly use the functionFactory created with the stateless actionContext
-          const factoryForStateless = await createFunctionFactory(actionContext, assistant.allowedActions);
+          const factoryForStateless = await createFunctionFactory(
+            actionContext,
+            assistant.allowedActions,
+          );
           if (factoryForStateless[currentFuncName]) {
             try {
               // The functions in functionFactory expect ActionContext as their first argument if they need it,
@@ -185,12 +247,24 @@ export const executeAssistantStateless = async (
               // We need to ensure functions from createFunctionFactory can run with just 'args'.
               // Most action functions from createFunctionFactory are of type (args: any) => Promise<ActionResult>
               // Let's assume they are structured to receive args directly.
-              const toolResult = await factoryForStateless[currentFuncName].function(args) as ActionResult;
+              const toolResult = (await factoryForStateless[
+                currentFuncName
+              ].function(args)) as ActionResult;
 
-              if (toolResult && typeof toolResult === 'object' && 'success' in toolResult) {
+              if (
+                toolResult &&
+                typeof toolResult === 'object' &&
+                'success' in toolResult
+              ) {
                 if (!toolResult.success) {
-                  const errorMessage = typeof toolResult.error === 'string' ? toolResult.error : JSON.stringify(toolResult.error);
-                  console.error(`Error in stateless tool ${currentFuncName} execution:`, errorMessage);
+                  const errorMessage =
+                    typeof toolResult.error === 'string'
+                      ? toolResult.error
+                      : JSON.stringify(toolResult.error);
+                  console.error(
+                    `Error in stateless tool ${currentFuncName} execution:`,
+                    errorMessage,
+                  );
                   // Return a string representation of the error for the LLM
                   return `Error: ${errorMessage || 'Action failed'}`;
                 }
@@ -199,14 +273,21 @@ export const executeAssistantStateless = async (
               // If the result is not in the expected { success, data/error } format, return it as is.
               return toolResult; // This might happen if a tool returns a primitive or unexpected structure
             } catch (e: any) {
-              console.error(`Exception during stateless tool ${currentFuncName} execution:`, e);
-              return `Exception: ${e.message || 'Tool execution failed with an exception'}`;
+              console.error(
+                `Exception during stateless tool ${currentFuncName} execution:`,
+                e,
+              );
+              return `Exception: ${
+                e.message || 'Tool execution failed with an exception'
+              }`;
             }
           } else {
-            console.error(`Function ${currentFuncName} not found in stateless factory.`);
+            console.error(
+              `Function ${currentFuncName} not found in stateless factory.`,
+            );
             return `Error: Function ${currentFuncName} not implemented.`;
           }
-        }
+        },
       });
     }
     toolsCache.set(cacheKey, toolsForSdk);
@@ -214,20 +295,28 @@ export const executeAssistantStateless = async (
 
   let modelIdentifier = assistant.llmModel || 'gpt-4o-mini';
   const llmApiKey = await getApiKey(companyId, `${providerKey}_api_key`);
-  if (!llmApiKey) throw new Error(`${providerKey} API key not found for company.`);
+  if (!llmApiKey)
+    throw new Error(`${providerKey} API key not found for company.`);
 
-  if (providerKey === 'google' && modelIdentifier && !modelIdentifier.startsWith('models/')) {
+  if (
+    providerKey === 'google' &&
+    modelIdentifier &&
+    !modelIdentifier.startsWith('models/')
+  ) {
     modelIdentifier = `models/${modelIdentifier}`;
   }
 
   const shouldStream = metadata?.['X-Experimental-Stream'] === 'true';
-  
+
   // Check if we should use structured output
-  const useStructuredOutput = responseFormat && (responseFormat.type === 'json_object' || responseFormat.type === 'json_schema');
+  const useStructuredOutput =
+    responseFormat &&
+    (responseFormat.type === 'json_object' ||
+      responseFormat.type === 'json_schema');
 
   // For stateless execution, we'll use the prompt directly without template processing
   // or provide basic context if needed
-  const systemPrompt = assistant.llmPrompt || "You are a helpful assistant.";
+  const systemPrompt = assistant.llmPrompt || 'You are a helpful assistant.';
 
   const userMessageForLlm: CoreMessage = {
     role: 'user',
@@ -236,35 +325,47 @@ export const executeAssistantStateless = async (
 
   // For stateless, history is just the current user message.
   // If you need to allow passing a short history, this would be the place to inject it.
-  const messagesForLlm: CoreMessage[] = [userMessageForLlm]; 
+  const messagesForLlm: CoreMessage[] = [userMessageForLlm];
 
   const TOKEN_LIMITS = {
     google: { 'gemini-1.5': 20000, default: 7000 },
-    openai: { 'gpt-4o': 8000, 'gpt-4': 8000, 'gpt-4-turbo': 8000, default: 7000 },
+    openai: {
+      'gpt-4o': 8000,
+      'gpt-4': 8000,
+      'gpt-4-turbo': 8000,
+      default: 7000,
+    },
     anthropic: {
       'claude-3-opus-20240229': 190000,
       'claude-3-sonnet-20240229': 190000,
       'claude-3-haiku-20240307': 190000,
-      default: 100000
+      default: 100000,
     },
-    default: { default: 7000 }
+    default: { default: 7000 },
   } as const;
 
   let maxPromptTokens: number;
-  const providerConfig = TOKEN_LIMITS[providerKey as keyof typeof TOKEN_LIMITS] || TOKEN_LIMITS.default;
+  const providerConfig =
+    TOKEN_LIMITS[providerKey as keyof typeof TOKEN_LIMITS] ||
+    TOKEN_LIMITS.default;
 
   if (providerKey === 'google') {
     maxPromptTokens = modelIdentifier?.includes('gemini-1.5')
       ? providerConfig['gemini-1.5' as keyof typeof providerConfig]
       : providerConfig.default;
   } else if (providerKey === 'openai') {
-    if (modelIdentifier?.includes('gpt-4o')) maxPromptTokens = providerConfig['gpt-4o' as keyof typeof providerConfig];
-    else if (modelIdentifier?.includes('gpt-4-turbo')) maxPromptTokens = providerConfig['gpt-4-turbo' as keyof typeof providerConfig];
-    else if (modelIdentifier?.includes('gpt-4')) maxPromptTokens = providerConfig['gpt-4' as keyof typeof providerConfig];
+    if (modelIdentifier?.includes('gpt-4o'))
+      maxPromptTokens = providerConfig['gpt-4o' as keyof typeof providerConfig];
+    else if (modelIdentifier?.includes('gpt-4-turbo'))
+      maxPromptTokens =
+        providerConfig['gpt-4-turbo' as keyof typeof providerConfig];
+    else if (modelIdentifier?.includes('gpt-4'))
+      maxPromptTokens = providerConfig['gpt-4' as keyof typeof providerConfig];
     else maxPromptTokens = providerConfig.default;
   } else if (providerKey === 'anthropic') {
     if (modelIdentifier && providerConfig.hasOwnProperty(modelIdentifier)) {
-      maxPromptTokens = providerConfig[modelIdentifier as keyof typeof providerConfig];
+      maxPromptTokens =
+        providerConfig[modelIdentifier as keyof typeof providerConfig];
     } else {
       maxPromptTokens = providerConfig.default;
     }
@@ -276,8 +377,14 @@ export const executeAssistantStateless = async (
 
   // If after trimming, messagesForLlm is empty, it means the initial content was too large.
   // This can happen if userInput + appended files exceed maxPromptTokens significantly.
-  if (trimmedMessages.length === 0 && messagesForLlm.length > 0 && messagesForLlm[0].content) {
-    console.warn('Initial message content too large, attempting aggressive truncation.');
+  if (
+    trimmedMessages.length === 0 &&
+    messagesForLlm.length > 0 &&
+    messagesForLlm[0].content
+  ) {
+    console.warn(
+      'Initial message content too large, attempting aggressive truncation.',
+    );
     const originalMessage = messagesForLlm[0];
     let contentForRetrim: string | TextPart[] | undefined = undefined;
 
@@ -289,12 +396,14 @@ export const executeAssistantStateless = async (
       const contentParts = originalMessage.content as (TextPart | ImagePart)[];
       // Filter out only text parts, concatenate them, and then truncate.
       const textParts = contentParts.filter(
-        (p: TextPart | ImagePart): p is TextPart => p.type === 'text'
+        (p: TextPart | ImagePart): p is TextPart => p.type === 'text',
       );
       if (textParts.length > 0) {
-        let combinedText = textParts.map(p => p.text).join('\n');
+        let combinedText = textParts.map((p) => p.text).join('\n');
         if (combinedText.length > aggressiveCharLimit) {
-          combinedText = combinedText.substring(0, aggressiveCharLimit) + "\n\n[...Content aggressively truncated...]\n";
+          combinedText =
+            combinedText.substring(0, aggressiveCharLimit) +
+            '\n\n[...Content aggressively truncated...]\n';
         }
         contentForRetrim = [{ type: 'text', text: combinedText }];
       }
@@ -302,7 +411,9 @@ export const executeAssistantStateless = async (
       // Handle if original content is a simple string
       let textContent = originalMessage.content;
       if (textContent.length > aggressiveCharLimit) {
-        textContent = textContent.substring(0, aggressiveCharLimit) + "\n\n[...Content aggressively truncated...]\n";
+        textContent =
+          textContent.substring(0, aggressiveCharLimit) +
+          '\n\n[...Content aggressively truncated...]\n';
       }
       contentForRetrim = textContent;
     }
@@ -311,25 +422,44 @@ export const executeAssistantStateless = async (
       let aggressivelyTrimmedMessage: CoreMessage;
       if (typeof contentForRetrim === 'string') {
         // Explicitly set role to 'user' as originalMessage is known to be a user message here
-        aggressivelyTrimmedMessage = { role: 'user', content: contentForRetrim };
-      } else { // contentForRetrim is TextPart[]
+        aggressivelyTrimmedMessage = {
+          role: 'user',
+          content: contentForRetrim,
+        };
+      } else {
+        // contentForRetrim is TextPart[]
         // Explicitly set role to 'user'
-        aggressivelyTrimmedMessage = { role: 'user', content: contentForRetrim };
+        aggressivelyTrimmedMessage = {
+          role: 'user',
+          content: contentForRetrim,
+        };
       }
-      const reTrimResult = trimToWindow([aggressivelyTrimmedMessage], maxPromptTokens);
+      const reTrimResult = trimToWindow(
+        [aggressivelyTrimmedMessage],
+        maxPromptTokens,
+      );
       trimmedMessages = reTrimResult.trimmedMessages;
       if (trimmedMessages.length === 0) {
-        console.error("Failed to trim message even after aggressive truncation. Prompt will likely be empty.");
+        console.error(
+          'Failed to trim message even after aggressive truncation. Prompt will likely be empty.',
+        );
       } else {
-        console.log("Aggressive truncation successful, proceeding with trimmed message.");
+        console.log(
+          'Aggressive truncation successful, proceeding with trimmed message.',
+        );
       }
     } else {
-      console.error("Aggressive truncation: No text content found or suitable for re-trimming in the original message.");
+      console.error(
+        'Aggressive truncation: No text content found or suitable for re-trimming in the original message.',
+      );
     }
   }
 
   if (providerKey === 'anthropic') {
-    trimmedMessages = [{ role: 'system', content: systemPrompt }, ...trimmedMessages.filter(m => m.role !== 'system')];
+    trimmedMessages = [
+      { role: 'system', content: systemPrompt },
+      ...trimmedMessages.filter((m) => m.role !== 'system'),
+    ];
   }
 
   try {
@@ -343,7 +473,8 @@ export const executeAssistantStateless = async (
         tools: relevantTools,
         maxSteps: 3, // Consider making this configurable per assistant or request
       };
-      if (systemPrompt !== undefined && providerKey !== 'anthropic') { // Anthropic handles system prompt in messages
+      if (systemPrompt !== undefined && providerKey !== 'anthropic') {
+        // Anthropic handles system prompt in messages
         streamCallOptions.system = systemPrompt;
       }
       const streamResult = await streamText(streamCallOptions);
@@ -351,7 +482,7 @@ export const executeAssistantStateless = async (
       // We also need to return tool calls and results if any, for the route to save.
       // This requires a slight modification to how streamResult is consumed or what this function returns.
       // For now, let's assume the route handles the full stream object.
-      return streamResult; 
+      return streamResult;
     } else if (useStructuredOutput) {
       // Use generateObject for structured JSON output
       if (responseFormat.type === 'json_schema' && responseFormat.schema) {
@@ -365,12 +496,17 @@ export const executeAssistantStateless = async (
 
         return {
           id: generateMessageId(),
-          role: "assistant",
-          content: [{ type: "text", text: { value: "Structured JSON response. See 'data' field." } }],
+          role: 'assistant',
+          content: [
+            {
+              type: 'text',
+              text: { value: "Structured JSON response. See 'data' field." },
+            },
+          ],
           created_at: Math.floor(Date.now() / 1000),
           assistant_id: assistant._id.toString(),
-          message_type: "json",
-          data: { json: objectResult.object }
+          message_type: 'json',
+          data: { json: objectResult.object },
         };
       } else {
         // Use json mode (less strict, but ensures valid JSON)
@@ -400,20 +536,31 @@ export const executeAssistantStateless = async (
         try {
           jsonContent = JSON.parse(potentialJsonString);
         } catch (e) {
-          console.error('Failed to parse JSON response after attempting to extract from markdown:', e);
+          console.error(
+            'Failed to parse JSON response after attempting to extract from markdown:',
+            e,
+          );
           // Log the string that failed to parse for easier debugging
           console.error('String that failed parsing:', potentialJsonString);
-          jsonContent = { error: 'Failed to parse response as JSON', raw: rawText }; // return original raw text in error
+          jsonContent = {
+            error: 'Failed to parse response as JSON',
+            raw: rawText,
+          }; // return original raw text in error
         }
 
         return {
           id: generateMessageId(),
-          role: "assistant",
-          content: [{ type: "text", text: { value: "JSON response. See 'data' field." } }],
+          role: 'assistant',
+          content: [
+            {
+              type: 'text',
+              text: { value: "JSON response. See 'data' field." },
+            },
+          ],
           created_at: Math.floor(Date.now() / 1000),
           assistant_id: assistant._id.toString(),
-          message_type: "json",
-          data: { json: jsonContent }
+          message_type: 'json',
+          data: { json: jsonContent },
         };
       }
     } else {
@@ -433,12 +580,12 @@ export const executeAssistantStateless = async (
 
       const responsePayload: Record<string, any> = {
         id: generateMessageId(),
-        role: "assistant",
-        content: [{ type: "text", text: { value: processedResponse } }],
+        role: 'assistant',
+        content: [{ type: 'text', text: { value: processedResponse } }],
         created_at: Math.floor(Date.now() / 1000),
         assistant_id: assistant._id.toString(),
-        message_type: "text",
-        data: {}
+        message_type: 'text',
+        data: {},
       };
 
       if (result.toolCalls && result.toolCalls.length > 0) {
@@ -447,14 +594,17 @@ export const executeAssistantStateless = async (
       }
       if (result.toolResults && result.toolResults.length > 0) {
         if (responsePayload.message_type !== 'tool_calls') {
-            responsePayload.message_type = 'tool_results';
+          responsePayload.message_type = 'tool_results';
         }
         responsePayload.data.toolResults = result.toolResults;
       }
       return responsePayload;
     }
   } catch (error: any) {
-    console.error('Error during stateless LLM processing or tool execution:', error);
+    console.error(
+      'Error during stateless LLM processing or tool execution:',
+      error,
+    );
     throw error;
   }
 };

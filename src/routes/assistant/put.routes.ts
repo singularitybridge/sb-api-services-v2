@@ -16,7 +16,10 @@ router.put(
       const assistantData = req.body;
       const { allowedActions, ...otherData } = assistantData;
 
-      const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string;
+      const apiKey = (await getApiKey(
+        req.company._id,
+        'openai_api_key',
+      )) as string;
 
       const assistant = await Assistant.findOneAndUpdate(
         {
@@ -48,7 +51,10 @@ router.put(
       res.send(updatedAssistant);
     } catch (error) {
       console.error('Error updating assistant:', error);
-      res.status(500).send({ message: 'Error updating assistant', error: (error as Error).message });
+      res.status(500).send({
+        message: 'Error updating assistant',
+        error: (error as Error).message,
+      });
     }
   },
 );

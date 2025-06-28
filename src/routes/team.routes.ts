@@ -1,14 +1,14 @@
 import express from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
-import { 
-  getTeams, 
-  getTeamById, 
-  createTeam, 
-  updateTeam, 
+import {
+  getTeams,
+  getTeamById,
+  createTeam,
+  updateTeam,
   deleteTeam,
   assignAssistantToTeam,
   removeAssistantFromTeam,
-  getAssistantsByTeam
+  getAssistantsByTeam,
 } from '../services/team.service';
 import { Team } from '../models/Team';
 
@@ -32,12 +32,15 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
     if (!team) {
       return res.status(404).send({ message: 'Team not found' });
     }
-    
+
     // Check if the team belongs to the user's company or if the user is an Admin
-    if (req.user?.role !== 'Admin' && team.companyId.toString() !== req.user?.companyId.toString()) {
+    if (
+      req.user?.role !== 'Admin' &&
+      team.companyId.toString() !== req.user?.companyId.toString()
+    ) {
       return res.status(403).send({ message: 'Access denied' });
     }
-    
+
     res.send(team);
   } catch (error) {
     console.error('Error retrieving team:', error);
@@ -52,7 +55,7 @@ router.post('/', async (req: AuthenticatedRequest, res) => {
       ...req.body,
       companyId: req.user?.companyId,
     };
-    
+
     const team = await createTeam(teamData);
     res.status(201).send(team);
   } catch (error) {
@@ -66,17 +69,20 @@ router.put('/:id', async (req: AuthenticatedRequest, res) => {
   try {
     const { id } = req.params;
     const teamData = req.body;
-    
+
     // Ensure the team belongs to the user's company
     const team = await getTeamById(id);
     if (!team) {
       return res.status(404).send({ message: 'Team not found' });
     }
-    
-    if (req.user?.role !== 'Admin' && team.companyId.toString() !== req.user?.companyId.toString()) {
+
+    if (
+      req.user?.role !== 'Admin' &&
+      team.companyId.toString() !== req.user?.companyId.toString()
+    ) {
       return res.status(403).send({ message: 'Access denied' });
     }
-    
+
     const updatedTeam = await updateTeam(id, teamData);
     res.send(updatedTeam);
   } catch (error) {
@@ -89,17 +95,20 @@ router.put('/:id', async (req: AuthenticatedRequest, res) => {
 router.delete('/:id', async (req: AuthenticatedRequest, res) => {
   try {
     const { id } = req.params;
-    
+
     // Ensure the team belongs to the user's company
     const team = await getTeamById(id);
     if (!team) {
       return res.status(404).send({ message: 'Team not found' });
     }
-    
-    if (req.user?.role !== 'Admin' && team.companyId.toString() !== req.user?.companyId.toString()) {
+
+    if (
+      req.user?.role !== 'Admin' &&
+      team.companyId.toString() !== req.user?.companyId.toString()
+    ) {
       return res.status(403).send({ message: 'Access denied' });
     }
-    
+
     await deleteTeam(id);
     res.send({ message: 'Team deleted successfully' });
   } catch (error) {
@@ -112,17 +121,20 @@ router.delete('/:id', async (req: AuthenticatedRequest, res) => {
 router.get('/:id/assistants', async (req: AuthenticatedRequest, res) => {
   try {
     const { id } = req.params;
-    
+
     // Ensure the team belongs to the user's company
     const team = await getTeamById(id);
     if (!team) {
       return res.status(404).send({ message: 'Team not found' });
     }
-    
-    if (req.user?.role !== 'Admin' && team.companyId.toString() !== req.user?.companyId.toString()) {
+
+    if (
+      req.user?.role !== 'Admin' &&
+      team.companyId.toString() !== req.user?.companyId.toString()
+    ) {
       return res.status(403).send({ message: 'Access denied' });
     }
-    
+
     const assistants = await getAssistantsByTeam(id);
     res.send(assistants);
   } catch (error) {
@@ -132,49 +144,61 @@ router.get('/:id/assistants', async (req: AuthenticatedRequest, res) => {
 });
 
 // Assign assistant to team
-router.post('/:teamId/assistants/:assistantId', async (req: AuthenticatedRequest, res) => {
-  try {
-    const { teamId, assistantId } = req.params;
-    
-    // Ensure the team belongs to the user's company
-    const team = await getTeamById(teamId);
-    if (!team) {
-      return res.status(404).send({ message: 'Team not found' });
+router.post(
+  '/:teamId/assistants/:assistantId',
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { teamId, assistantId } = req.params;
+
+      // Ensure the team belongs to the user's company
+      const team = await getTeamById(teamId);
+      if (!team) {
+        return res.status(404).send({ message: 'Team not found' });
+      }
+
+      if (
+        req.user?.role !== 'Admin' &&
+        team.companyId.toString() !== req.user?.companyId.toString()
+      ) {
+        return res.status(403).send({ message: 'Access denied' });
+      }
+
+      await assignAssistantToTeam(assistantId, teamId);
+      res.send({ message: 'Assistant assigned to team successfully' });
+    } catch (error) {
+      console.error('Error assigning assistant to team:', error);
+      res.status(500).send({ message: 'Error assigning assistant to team' });
     }
-    
-    if (req.user?.role !== 'Admin' && team.companyId.toString() !== req.user?.companyId.toString()) {
-      return res.status(403).send({ message: 'Access denied' });
-    }
-    
-    await assignAssistantToTeam(assistantId, teamId);
-    res.send({ message: 'Assistant assigned to team successfully' });
-  } catch (error) {
-    console.error('Error assigning assistant to team:', error);
-    res.status(500).send({ message: 'Error assigning assistant to team' });
-  }
-});
+  },
+);
 
 // Remove assistant from team
-router.delete('/:teamId/assistants/:assistantId', async (req: AuthenticatedRequest, res) => {
-  try {
-    const { teamId, assistantId } = req.params;
-    
-    // Ensure the team belongs to the user's company
-    const team = await getTeamById(teamId);
-    if (!team) {
-      return res.status(404).send({ message: 'Team not found' });
+router.delete(
+  '/:teamId/assistants/:assistantId',
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { teamId, assistantId } = req.params;
+
+      // Ensure the team belongs to the user's company
+      const team = await getTeamById(teamId);
+      if (!team) {
+        return res.status(404).send({ message: 'Team not found' });
+      }
+
+      if (
+        req.user?.role !== 'Admin' &&
+        team.companyId.toString() !== req.user?.companyId.toString()
+      ) {
+        return res.status(403).send({ message: 'Access denied' });
+      }
+
+      await removeAssistantFromTeam(assistantId, teamId);
+      res.send({ message: 'Assistant removed from team successfully' });
+    } catch (error) {
+      console.error('Error removing assistant from team:', error);
+      res.status(500).send({ message: 'Error removing assistant from team' });
     }
-    
-    if (req.user?.role !== 'Admin' && team.companyId.toString() !== req.user?.companyId.toString()) {
-      return res.status(403).send({ message: 'Access denied' });
-    }
-    
-    await removeAssistantFromTeam(assistantId, teamId);
-    res.send({ message: 'Assistant removed from team successfully' });
-  } catch (error) {
-    console.error('Error removing assistant from team:', error);
-    res.status(500).send({ message: 'Error removing assistant from team' });
-  }
-});
+  },
+);
 
 export { router as teamRouter };

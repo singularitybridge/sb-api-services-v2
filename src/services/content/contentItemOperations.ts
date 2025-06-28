@@ -12,7 +12,7 @@ const handleContentItemOperation = async (
   data: any,
   artifactKey: string,
   existingItem?: IContentItem,
-  embedding?: number[]
+  embedding?: number[],
 ): Promise<IContentItem | { error: string; details: any }> => {
   const validation = await validateContentData(contentTypeId, data);
 
@@ -22,8 +22,8 @@ const handleContentItemOperation = async (
       details: {
         message: 'Request does not match the content type schema.',
         schema: validation.contentType?.fields,
-        errors: validation.errors
-      }
+        errors: validation.errors,
+      },
     };
   }
 
@@ -40,12 +40,13 @@ const handleContentItemOperation = async (
   if (!openaiApiKey) {
     return {
       error: 'Configuration Error',
-      details: { message: 'OpenAI API key not found for company' }
+      details: { message: 'OpenAI API key not found for company' },
     };
   }
 
   // Use the provided embedding or generate a new one
-  const embeddingToUse = embedding || (await generateEmbedding(textToEmbed, openaiApiKey));
+  const embeddingToUse =
+    embedding || (await generateEmbedding(textToEmbed, openaiApiKey));
 
   if (operation === 'create') {
     const contentItem = new ContentItem({
@@ -58,7 +59,10 @@ const handleContentItemOperation = async (
     return await contentItem.save();
   } else {
     if (!existingItem) {
-      return { error: 'Not Found', details: { message: 'Content item not found' } };
+      return {
+        error: 'Not Found',
+        details: { message: 'Content item not found' },
+      };
     }
     existingItem.data = dataWithoutEmbedding;
     existingItem.artifactKey = artifactKey;
@@ -72,9 +76,17 @@ export const createContentItem = async (
   contentTypeId: string,
   data: any,
   artifactKey: string,
-  embedding?: number[]
+  embedding?: number[],
 ): Promise<IContentItem | { error: string; details: any }> => {
-  return handleContentItemOperation('create', companyId, contentTypeId, data, artifactKey, undefined, embedding);
+  return handleContentItemOperation(
+    'create',
+    companyId,
+    contentTypeId,
+    data,
+    artifactKey,
+    undefined,
+    embedding,
+  );
 };
 
 export const updateContentItem = async (
@@ -82,18 +94,29 @@ export const updateContentItem = async (
   companyId: string,
   data: any,
   artifactKey: string,
-  embedding?: number[]
+  embedding?: number[],
 ): Promise<IContentItem | { error: string; details: any }> => {
   const existingItem = await ContentItem.findOne({ _id: id, companyId });
   if (!existingItem) {
-    return { error: 'Not Found', details: { message: 'Content item not found' } };
+    return {
+      error: 'Not Found',
+      details: { message: 'Content item not found' },
+    };
   }
-  return handleContentItemOperation('update', companyId, existingItem.contentTypeId.toString(), data, artifactKey, existingItem, embedding);
+  return handleContentItemOperation(
+    'update',
+    companyId,
+    existingItem.contentTypeId.toString(),
+    data,
+    artifactKey,
+    existingItem,
+    embedding,
+  );
 };
 
 export const deleteContentItem = async (
   id: string,
-  companyId: string
+  companyId: string,
 ): Promise<boolean> => {
   const result = await ContentItem.deleteOne({ _id: id, companyId });
   return result.deletedCount === 1;
@@ -101,9 +124,11 @@ export const deleteContentItem = async (
 
 export const deleteContentItemsByType = async (
   companyId: string,
-  contentTypeId: string
+  contentTypeId: string,
 ): Promise<number> => {
-  console.log(`Deleting all content items for companyId: ${companyId}, contentTypeId: ${contentTypeId}`);
+  console.log(
+    `Deleting all content items for companyId: ${companyId}, contentTypeId: ${contentTypeId}`,
+  );
   const result = await ContentItem.deleteMany({ companyId, contentTypeId });
   return result.deletedCount;
 };

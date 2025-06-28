@@ -4,9 +4,15 @@ import { Company } from '../models/Company';
 import { User, IUser } from '../models/User';
 import { decryptData } from './encryption.service';
 
-export const verifyToken = async (token: string): Promise<{ user: IUser; company: any; decryptedApiKey: string }> => {
+export const verifyToken = async (
+  token: string,
+): Promise<{ user: IUser; company: any; decryptedApiKey: string }> => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as { userId: string; email: string; companyId: string };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
+      userId: string;
+      email: string;
+      companyId: string;
+    };
 
     const user = await User.findById(decoded.userId);
     if (!user) {
@@ -19,9 +25,13 @@ export const verifyToken = async (token: string): Promise<{ user: IUser; company
     }
 
     let decryptedApiKey = 'not set';
-    const apiKey = company.api_keys.find(key => key.key === 'openai_api_key');
+    const apiKey = company.api_keys.find((key) => key.key === 'openai_api_key');
     if (apiKey) {
-      decryptedApiKey = decryptData({ 'value': apiKey.value, 'iv': apiKey.iv, 'tag': apiKey.tag });
+      decryptedApiKey = decryptData({
+        value: apiKey.value,
+        iv: apiKey.iv,
+        tag: apiKey.tag,
+      });
     }
 
     return { user, company, decryptedApiKey };
@@ -31,7 +41,9 @@ export const verifyToken = async (token: string): Promise<{ user: IUser; company
   }
 };
 
-export const extractTokenFromHeader = (authHeader: string | undefined): string => {
+export const extractTokenFromHeader = (
+  authHeader: string | undefined,
+): string => {
   if (!authHeader) {
     throw new Error('No authorization header provided');
   }
@@ -41,4 +53,3 @@ export const extractTokenFromHeader = (authHeader: string | undefined): string =
   }
   return parts[1];
 };
-

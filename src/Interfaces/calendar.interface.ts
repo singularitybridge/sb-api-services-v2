@@ -1,5 +1,4 @@
 export interface ICalendar {
-    id: string;
-    name: string;
-  }
-  
+  id: string;
+  name: string;
+}

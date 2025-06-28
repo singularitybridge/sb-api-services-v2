@@ -32,7 +32,9 @@ async function verifyTelegramBotToken(token: ApiKey): Promise<boolean> {
     return false;
   }
   try {
-    const response = await axios.get(`https://api.telegram.org/bot${token}/getMe`);
+    const response = await axios.get(
+      `https://api.telegram.org/bot${token}/getMe`,
+    );
     return response.data.ok === true;
   } catch (error) {
     console.error('Error verifying Telegram bot token:', error);

@@ -5,25 +5,31 @@ const pdf = require('pdf-parse');
 export const summarizeText = async (
   apiKey: string,
   text: string,
-  maxLength: number
+  maxLength: number,
 ): Promise<string> => {
   const systemPrompt = `You are a text summarizer. Your task is to summarize the given text to be no longer than ${maxLength} characters while preserving the most important information.`;
   const userInput = `Summarize the following text:\n\n${text}`;
 
-  return getCompletionResponse(apiKey, systemPrompt, userInput, 'gpt-4o-mini', 0.7);
+  return getCompletionResponse(
+    apiKey,
+    systemPrompt,
+    userInput,
+    'gpt-4o-mini',
+    0.7,
+  );
 };
 
 export const getO1CompletionResponse = async (
   apiKey: string,
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
-  model: string,  
+  model: string,
 ): Promise<string> => {
   const openai = new OpenAI({ apiKey });
 
   try {
     const response = await openai.chat.completions.create({
       model,
-      messages,      
+      messages,
     });
 
     return response.choices[0].message.content || '';
@@ -50,10 +56,10 @@ export const getCompletionResponse = async (
   userInput: string,
   model: string = 'gpt-4o-mini',
   temperature: number = 0.7,
-  pdfUrl?: string
+  pdfUrl?: string,
 ): Promise<string> => {
   let enhancedUserInput = userInput;
-  
+
   if (pdfUrl) {
     try {
       const pdfContent = await fetchAndParsePdf(pdfUrl);
@@ -67,9 +73,11 @@ export const getCompletionResponse = async (
   const o1Models = ['o1', 'o1-mini', 'o1-preview'];
 
   if (o1Models.includes(model)) {
-    return getO1CompletionResponse(apiKey, [
-      { role: 'user', content: `${systemPrompt}\n\n${enhancedUserInput}` }
-    ], model);
+    return getO1CompletionResponse(
+      apiKey,
+      [{ role: 'user', content: `${systemPrompt}\n\n${enhancedUserInput}` }],
+      model,
+    );
   }
 
   const openai = new OpenAI({ apiKey });
@@ -82,7 +90,7 @@ export const getCompletionResponse = async (
 
     const params: any = {
       model,
-      messages,      
+      messages,
       temperature,
       top_p: 1,
       frequency_penalty: 0,

@@ -17,7 +17,9 @@ interface UpdateUiElementArgs {
   data: any;
 }
 
-export const createAgentUiFrameworkActions = (context: ActionContext): FunctionFactory => ({
+export const createAgentUiFrameworkActions = (
+  context: ActionContext,
+): FunctionFactory => ({
   getUiContext: {
     description: 'Get the current UI context',
     parameters: {
@@ -36,7 +38,7 @@ export const createAgentUiFrameworkActions = (context: ActionContext): FunctionF
           const uiCtx = await getUiContext(context.sessionId);
           return { success: true, data: { uiContext: uiCtx } };
         },
-        { serviceName: 'AgentUiFrameworkService' }
+        { serviceName: 'AgentUiFrameworkService' },
       );
     },
   },
@@ -71,12 +73,16 @@ export const createAgentUiFrameworkActions = (context: ActionContext): FunctionF
       return executeAction<UpdateUiElementResultData>(
         actionName,
         async () => {
-          const successStatus = await updateUiElement(context.sessionId, { type, id, data });
+          const successStatus = await updateUiElement(context.sessionId, {
+            type,
+            id,
+            data,
+          });
           // The service returns a boolean. We shape the result for executeAction.
           // If successStatus is false, executeAction will throw ActionServiceError.
           return { success: successStatus, data: { updated: successStatus } };
         },
-        { serviceName: 'AgentUiFrameworkService' }
+        { serviceName: 'AgentUiFrameworkService' },
       );
     },
   },

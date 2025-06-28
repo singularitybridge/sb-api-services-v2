@@ -1,19 +1,19 @@
-import { 
-  FunctionFactory, 
-  ActionContext, 
-  FunctionDefinition, 
-  ActionType, 
-  ActionInfo, 
-  ExecutionDetails, 
-  FunctionCall 
+import {
+  FunctionFactory,
+  ActionContext,
+  FunctionDefinition,
+  ActionType,
+  ActionInfo,
+  ExecutionDetails,
+  FunctionCall,
 } from './types';
 import { createFunctionFactory } from './loaders';
 import { executeFunctionCall } from './executors';
-import { 
-  sanitizeFunctionName, 
-  convertOpenAIFunctionName, 
-  extractErrorDetails, 
-  DetailedError 
+import {
+  sanitizeFunctionName,
+  convertOpenAIFunctionName,
+  extractErrorDetails,
+  DetailedError,
 } from './utils';
 import { publishActionMessage } from './publishers';
 
@@ -23,7 +23,7 @@ export {
   sanitizeFunctionName,
   convertOpenAIFunctionName,
   extractErrorDetails,
-  publishActionMessage
+  publishActionMessage,
 };
 
 export type {
@@ -34,5 +34,5 @@ export type {
   ActionInfo,
   ExecutionDetails,
   FunctionCall,
-  DetailedError
+  DetailedError,
 };

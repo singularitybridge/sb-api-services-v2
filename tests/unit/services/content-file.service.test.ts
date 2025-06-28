@@ -1,4 +1,8 @@
-import { uploadContentFile, getContentFiles, deleteContentFile } from '../../../src/services/content-file.service';
+import {
+  uploadContentFile,
+  getContentFiles,
+  deleteContentFile,
+} from '../../../src/services/content-file.service';
 import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -12,7 +16,11 @@ jest.mock('@google-cloud/storage', () => {
       bucket: jest.fn().mockReturnValue({
         file: jest.fn().mockReturnValue({
           save: jest.fn().mockResolvedValue([]),
-          getSignedUrl: jest.fn().mockResolvedValue(['https://storage.googleapis.com/test-bucket/test-file']),
+          getSignedUrl: jest
+            .fn()
+            .mockResolvedValue([
+              'https://storage.googleapis.com/test-bucket/test-file',
+            ]),
           delete: jest.fn().mockResolvedValue([]),
         }),
       }),
@@ -78,13 +86,16 @@ describe('Content File Service', () => {
         { _id: 'file2', title: 'File 2' },
       ];
 
-      const ContentFile = require('../../../src/models/ContentFile').ContentFile;
+      const ContentFile =
+        require('../../../src/models/ContentFile').ContentFile;
       ContentFile.find = jest.fn().mockResolvedValue(mockFiles);
 
       const result = await getContentFiles(mockCompanyId);
 
       expect(result).toEqual(mockFiles);
-      expect(ContentFile.find).toHaveBeenCalledWith({ companyId: expect.any(mongoose.Types.ObjectId) });
+      expect(ContentFile.find).toHaveBeenCalledWith({
+        companyId: expect.any(mongoose.Types.ObjectId),
+      });
       expect(mongoose.Types.ObjectId).toHaveBeenCalledWith(mockCompanyId);
     });
 
@@ -92,11 +103,17 @@ describe('Content File Service', () => {
       const mockCompanyId = 'mockCompanyId';
       const mockError = new Error('Database error');
 
-      const ContentFile = require('../../../src/models/ContentFile').ContentFile;
+      const ContentFile =
+        require('../../../src/models/ContentFile').ContentFile;
       ContentFile.find = jest.fn().mockRejectedValue(mockError);
 
-      await expect(getContentFiles(mockCompanyId)).rejects.toThrow('Database error');
-      expect(console.error).toHaveBeenCalledWith('Error fetching content files:', mockError);
+      await expect(getContentFiles(mockCompanyId)).rejects.toThrow(
+        'Database error',
+      );
+      expect(console.error).toHaveBeenCalledWith(
+        'Error fetching content files:',
+        mockError,
+      );
     });
   });
 

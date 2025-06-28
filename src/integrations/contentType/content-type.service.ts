@@ -6,19 +6,32 @@ export const ContentTypeIntegrationService = {
   async getAllContentTypes(companyId: string): Promise<IContentType[]> {
     // Note: The existing service doesn't filter by companyId, so we'll need to filter the results
     const allContentTypes = await ContentTypeService.getAllContentTypes();
-    return allContentTypes.filter(contentType => contentType.companyId.toString() === companyId);
+    return allContentTypes.filter(
+      (contentType) => contentType.companyId.toString() === companyId,
+    );
   },
 
-  async getContentTypeById(id: string, companyId: string): Promise<IContentType | null> {
+  async getContentTypeById(
+    id: string,
+    companyId: string,
+  ): Promise<IContentType | null> {
     const contentType = await ContentTypeService.getContentTypeById(id);
-    return contentType && contentType.companyId.toString() === companyId ? contentType : null;
+    return contentType && contentType.companyId.toString() === companyId
+      ? contentType
+      : null;
   },
 
-  async createContentType(contentTypeData: Partial<IContentType>): Promise<IContentType> {
+  async createContentType(
+    contentTypeData: Partial<IContentType>,
+  ): Promise<IContentType> {
     return ContentTypeService.createContentType(contentTypeData);
   },
 
-  async updateContentType(id: string, companyId: string, contentTypeData: Partial<IContentType>): Promise<IContentType | null> {
+  async updateContentType(
+    id: string,
+    companyId: string,
+    contentTypeData: Partial<IContentType>,
+  ): Promise<IContentType | null> {
     const existingContentType = await this.getContentTypeById(id, companyId);
     if (!existingContentType) {
       return null;
@@ -26,7 +39,12 @@ export const ContentTypeIntegrationService = {
     return ContentTypeService.updateContentType(id, contentTypeData);
   },
 
-  async deleteContentType(id: string, companyId: string): Promise<ModifyResult<Document<unknown, {}, IContentType> & IContentType> | null> {
+  async deleteContentType(
+    id: string,
+    companyId: string,
+  ): Promise<ModifyResult<
+    Document<unknown, {}, IContentType> & IContentType
+  > | null> {
     const existingContentType = await this.getContentTypeById(id, companyId);
     if (!existingContentType) {
       return null;

@@ -13,6 +13,6 @@ export const setupCodeIndexer = async (companyId: string) => {
       { name: 'fileSize', type: 'number', required: true },
       { name: 'language', type: 'string', required: true },
       { name: 'linesOfCode', type: 'number', required: true },
-    ]
+    ],
   );
 };

@@ -46,7 +46,14 @@ router.post(
         return;
       }
 
-      const fileInfo = await generateSpeech(openaiApiKey, text, voice, 'tts-1', textLimit, filename);
+      const fileInfo = await generateSpeech(
+        openaiApiKey,
+        text,
+        voice,
+        'tts-1',
+        textLimit,
+        filename,
+      );
       res.send(fileInfo);
     } catch (error: unknown) {
       console.error('Error in /generate/oai route:', error);

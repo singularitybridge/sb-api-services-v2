@@ -1,4 +1,7 @@
-import { discoveryService, ActionInfo } from '../../../src/services/discovery.service';
+import {
+  discoveryService,
+  ActionInfo,
+} from '../../../src/services/discovery.service';
 
 // Mock the discoveryService
 jest.mock('../../../src/services/discovery.service', () => ({
@@ -36,12 +39,14 @@ describe('discoveryService', () => {
         },
       ];
 
-      (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
+      (discoveryService.discoverActions as jest.Mock).mockResolvedValue(
+        mockActions,
+      );
 
       const actions = await discoveryService.discoverActions();
-      
+
       expect(Array.isArray(actions)).toBe(true);
-      
+
       actions.forEach((action: ActionInfo) => {
         expect(action).toHaveProperty('id');
         expect(action).toHaveProperty('serviceName');
@@ -50,9 +55,9 @@ describe('discoveryService', () => {
         expect(action).toHaveProperty('icon');
         expect(action).toHaveProperty('service');
         expect(action).toHaveProperty('parameters');
-        
+
         expect(action.id).toMatch(/^[a-zA-Z][a-zA-Z0-9_]*\.[a-zA-Z0-9]+$/);
-        
+
         expect(action.service[0]).toMatch(/[a-zA-Z]/);
       });
     });
@@ -70,11 +75,15 @@ describe('discoveryService', () => {
         },
       ];
 
-      (discoveryService.discoverActions as jest.Mock).mockResolvedValue(mockActions);
+      (discoveryService.discoverActions as jest.Mock).mockResolvedValue(
+        mockActions,
+      );
 
       const actions = await discoveryService.discoverActions();
-      
-      expect(actions[0].id).toMatch(/^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$/);
+
+      expect(actions[0].id).toMatch(
+        /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)+$/,
+      );
     });
   });
 });

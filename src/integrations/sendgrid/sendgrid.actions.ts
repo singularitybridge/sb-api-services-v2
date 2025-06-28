@@ -1,4 +1,8 @@
-import { ActionContext, FunctionFactory, StandardActionResult } from '../actions/types'; // Corrected path for FunctionFactory
+import {
+  ActionContext,
+  FunctionFactory,
+  StandardActionResult,
+} from '../actions/types'; // Corrected path for FunctionFactory
 import { sendEmail as sendEmailService } from './sendgrid.service';
 import { executeAction, ExecuteActionOptions } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
@@ -25,7 +29,9 @@ interface ServiceCallLambdaResponse {
 
 const SERVICE_NAME = 'sendGridService';
 
-export const createSendGridActions = (context: ActionContext): FunctionFactory => ({
+export const createSendGridActions = (
+  context: ActionContext,
+): FunctionFactory => ({
   sendEmail: {
     description: 'Send an email using SendGrid',
     strict: true,
@@ -52,7 +58,9 @@ export const createSendGridActions = (context: ActionContext): FunctionFactory =
       required: ['to', 'subject', 'text', 'html'],
       additionalProperties: false,
     },
-    function: async (args: SendEmailArgs): Promise<StandardActionResult<SendEmailResponseData>> => {
+    function: async (
+      args: SendEmailArgs,
+    ): Promise<StandardActionResult<SendEmailResponseData>> => {
       const { to, subject, text, html } = args;
 
       if (!context.companyId) {
@@ -61,34 +69,49 @@ export const createSendGridActions = (context: ActionContext): FunctionFactory =
 
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(to)) {
-        throw new ActionValidationError('The provided email address is not valid.');
+        throw new ActionValidationError(
+          'The provided email address is not valid.',
+        );
       }
       if (typeof subject !== 'string' || subject.trim().length === 0) {
-        throw new ActionValidationError('The subject must be a non-empty string.');
+        throw new ActionValidationError(
+          'The subject must be a non-empty string.',
+        );
       }
       if (typeof text !== 'string' || text.trim().length === 0) {
-        throw new ActionValidationError('The text content must be a non-empty string.');
+        throw new ActionValidationError(
+          'The text content must be a non-empty string.',
+        );
       }
       if (typeof html !== 'string' || html.trim().length === 0) {
-        throw new ActionValidationError('The HTML content must be a non-empty string.');
+        throw new ActionValidationError(
+          'The HTML content must be a non-empty string.',
+        );
       }
 
       return executeAction<SendEmailResponseData, ServiceCallLambdaResponse>(
         'sendEmail',
         async (): Promise<ServiceCallLambdaResponse> => {
           // sendEmailService returns: { success: boolean; message?: string; error?: string }
-          const serviceResult = await sendEmailService(context.companyId!, { to, subject, text, html });
-          return { 
-            success: serviceResult.success, 
-            data: serviceResult.success ? { message: serviceResult.message } : undefined, 
+          const serviceResult = await sendEmailService(context.companyId!, {
+            to,
+            subject,
+            text,
+            html,
+          });
+          return {
+            success: serviceResult.success,
+            data: serviceResult.success
+              ? { message: serviceResult.message }
+              : undefined,
             description: serviceResult.error,
-            error: serviceResult.error 
+            error: serviceResult.error,
           };
         },
-        { 
+        {
           serviceName: SERVICE_NAME,
           // Default dataExtractor (res => res.data) will work
-        }
+        },
       );
     },
   },

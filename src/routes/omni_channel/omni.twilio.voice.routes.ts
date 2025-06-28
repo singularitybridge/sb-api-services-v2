@@ -5,7 +5,10 @@ import {
   handleVoiceRequest,
 } from '../../services/twilio/voice.service';
 import VoiceResponse from 'twilio/lib/twiml/VoiceResponse';
-import { agendaClient, scheduleJob } from '../../integrations/agenda/agenda.service';
+import {
+  agendaClient,
+  scheduleJob,
+} from '../../integrations/agenda/agenda.service';
 import { ObjectId } from 'mongodb';
 
 const twilioVoiceRouter = express.Router();
@@ -16,7 +19,7 @@ twilioVoiceRouter.post('/', async (req, res) => {
   const { firstTime } = req.query;
   const { CallStatus, From, To } = req.body;
   const apiKey = req.headers['openai-api-key'] as string;
-  
+
   const { response, callActive } = await handleVoiceRequest(
     apiKey,
     firstTime !== 'false',
@@ -36,7 +39,7 @@ twilioVoiceRouter.post('/status', async (req, res) => {
   if (CallStatus === 'completed') {
     await handleVoiceCallEnded(apiKey, From, To);
   }
-  
+
   res.status(200).send('OK');
 });
 
@@ -76,12 +79,20 @@ twilioVoiceRouter.post('/wait', async (req, res) => {
 
 twilioVoiceRouter.post('/recording', async (req, res) => {
   const { CallSid, CallStatus, From, To, RecordingUrl } = req.body;
-  const job = await scheduleJob('processVoiceRecording', { CallSid, CallStatus, From, To, RecordingUrl }, 'now');
+  const job = await scheduleJob(
+    'processVoiceRecording',
+    { CallSid, CallStatus, From, To, RecordingUrl },
+    'now',
+  );
   const twiml = new VoiceResponse();
 
   if (!job) {
-    console.error('Failed to schedule job. Agenda client might not be initialized.');
-    twiml.say('We are experiencing technical difficulties. Please try again later.');
+    console.error(
+      'Failed to schedule job. Agenda client might not be initialized.',
+    );
+    twiml.say(
+      'We are experiencing technical difficulties. Please try again later.',
+    );
     res.type('text/xml');
     res.send(twiml.toString());
     return;

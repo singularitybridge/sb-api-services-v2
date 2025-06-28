@@ -6,7 +6,9 @@ import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 
-export const getCurrentAssistant = async (sessionId: string): Promise<{ success: boolean; description: string; data?: any }> => {
+export const getCurrentAssistant = async (
+  sessionId: string,
+): Promise<{ success: boolean; description: string; data?: any }> => {
   try {
     const session = await Session.findById(sessionId);
     if (!session) {
@@ -67,7 +69,7 @@ export const updateAssistantById = async (
     llmModel?: string;
     llmProvider?: 'openai' | 'google' | 'anthropic';
     llmPrompt?: string;
-  }
+  },
 ): Promise<{ success: boolean; description: string; data?: any }> => {
   try {
     const session = await Session.findById(sessionId);
@@ -86,16 +88,24 @@ export const updateAssistantById = async (
 
     // Verify the assistant belongs to the same company as the session
     if (assistant.companyId.toString() !== session.companyId.toString()) {
-      return { success: false, description: 'Access denied. Assistant does not belong to this company.' };
+      return {
+        success: false,
+        description:
+          'Access denied. Assistant does not belong to this company.',
+      };
     }
 
     // Update only the allowed fields if they are provided in updateData
     if (updateData.name !== undefined) assistant.name = updateData.name;
-    if (updateData.description !== undefined) assistant.description = updateData.description;
-    if (updateData.llmModel !== undefined) assistant.llmModel = updateData.llmModel;
-    if (updateData.llmProvider !== undefined) assistant.llmProvider = updateData.llmProvider;
-    if (updateData.llmPrompt !== undefined) assistant.llmPrompt = updateData.llmPrompt; // Added llmPrompt update
-    
+    if (updateData.description !== undefined)
+      assistant.description = updateData.description;
+    if (updateData.llmModel !== undefined)
+      assistant.llmModel = updateData.llmModel;
+    if (updateData.llmProvider !== undefined)
+      assistant.llmProvider = updateData.llmProvider;
+    if (updateData.llmPrompt !== undefined)
+      assistant.llmPrompt = updateData.llmPrompt; // Added llmPrompt update
+
     // Ensure llmPrompt defaults to empty string if it's somehow null/undefined from DB
     // This was a previous bug fix attempt, keeping it for safety, though model now has default.
     // This line is actually redundant if llmPrompt is updated above and the model has a default.
@@ -104,7 +114,7 @@ export const updateAssistantById = async (
     // The model default handles the case where it's never set.
     // If an explicit update to null/undefined is not desired, add a check:
     // if (updateData.llmPrompt !== undefined) assistant.llmPrompt = updateData.llmPrompt;
-    // else assistant.llmPrompt = assistant.llmPrompt || ""; 
+    // else assistant.llmPrompt = assistant.llmPrompt || "";
     // For now, direct assignment is fine as per request.
 
     await assistant.save();
@@ -142,7 +152,9 @@ export const updateAssistantById = async (
   }
 };
 
-export const getAssistants = async (sessionId: string): Promise<{ success: boolean; description: string; data?: any }> => {
+export const getAssistants = async (
+  sessionId: string,
+): Promise<{ success: boolean; description: string; data?: any }> => {
   try {
     const session = await Session.findById(sessionId);
     if (!session) {
@@ -153,7 +165,7 @@ export const getAssistants = async (sessionId: string): Promise<{ success: boole
     }
     const assistants = await Assistant.find(
       { companyId: session.companyId },
-      { _id: 1, name: 1, description: 1 }
+      { _id: 1, name: 1, description: 1 },
     );
     return {
       success: true,
@@ -169,7 +181,10 @@ export const getAssistants = async (sessionId: string): Promise<{ success: boole
   }
 };
 
-export const setAssistant = async (sessionId: string, assistantId: string): Promise<{ success: boolean; description: string }> => {
+export const setAssistant = async (
+  sessionId: string,
+  assistantId: string,
+): Promise<{ success: boolean; description: string }> => {
   try {
     const assistant = await Assistant.findById(assistantId);
     if (!assistant) {
@@ -199,7 +214,7 @@ export const createNewAssistant = async (
   prompt: string,
   language: string,
   voice: string,
-  conversationStarters: IIdentifier[] = []
+  conversationStarters: IIdentifier[] = [],
 ): Promise<{ success: boolean; description: string; data?: any }> => {
   try {
     const session = await Session.findById(sessionId);
@@ -257,7 +272,7 @@ export const askAnotherAssistant = async (
   targetAssistantId: string,
   task: string,
   companyId?: string,
-  userId?: string
+  userId?: string,
 ): Promise<{ success: boolean; description: string; data?: any }> => {
   try {
     let session;
@@ -315,34 +330,40 @@ export const askAnotherAssistant = async (
       };
       authToken = jwt.sign(tokenPayload, process.env.JWT_SECRET);
     } else {
-      console.warn('[askAnotherAssistant] Unable to generate JWT token, missing JWT_SECRET or user/company information. Falling back to INTERNAL_API_TOKEN or default.');
+      console.warn(
+        '[askAnotherAssistant] Unable to generate JWT token, missing JWT_SECRET or user/company information. Falling back to INTERNAL_API_TOKEN or default.',
+      );
       if (!process.env.INTERNAL_API_TOKEN) {
-        console.warn('[askAnotherAssistant] INTERNAL_API_TOKEN environment variable not set. Using default "internal" token. This may not be secure or intended for production.');
+        console.warn(
+          '[askAnotherAssistant] INTERNAL_API_TOKEN environment variable not set. Using default "internal" token. This may not be secure or intended for production.',
+        );
       }
       authToken = process.env.INTERNAL_API_TOKEN || 'internal';
     }
 
     // Make HTTP request to the assistant execute endpoint
     const executeUrl = `http://localhost:3000/assistant/${targetAssistantId}/execute`;
-    
+
     const requestBody = {
       userInput: task,
-      responseFormat: { type: 'json_object' }
+      responseFormat: { type: 'json_object' },
     };
 
-    console.log(`[askAnotherAssistant] Making request to ${executeUrl} with task: ${task}`);
+    console.log(
+      `[askAnotherAssistant] Making request to ${executeUrl} with task: ${task}`,
+    );
 
     const response = await axios.post(executeUrl, requestBody, {
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`,
+        Authorization: `Bearer ${authToken}`,
       },
       timeout: 30000, // 30 second timeout
     });
 
     // Parse the response based on the expected format
     const responseData = response.data;
-    
+
     if (responseData.message_type === 'json' && responseData.data?.json) {
       return {
         success: true,
@@ -357,8 +378,11 @@ export const askAnotherAssistant = async (
       };
     } else {
       // Handle text responses or other formats
-      const textResponse = responseData.content?.[0]?.text?.value || responseData.content || responseData;
-      
+      const textResponse =
+        responseData.content?.[0]?.text?.value ||
+        responseData.content ||
+        responseData;
+
       return {
         success: true,
         description: `Successfully received response from assistant "${targetAssistant.name}"`,
@@ -371,25 +395,28 @@ export const askAnotherAssistant = async (
         },
       };
     }
-
   } catch (error: any) {
     console.error('Error asking another assistant:', error);
-    
+
     if (error.response) {
       // HTTP error response
       return {
         success: false,
-        description: `HTTP error ${error.response.status}: ${error.response.data?.error || error.response.statusText}`,
+        description: `HTTP error ${error.response.status}: ${
+          error.response.data?.error || error.response.statusText
+        }`,
       };
     } else if (error.code === 'ECONNREFUSED') {
       return {
         success: false,
-        description: 'Could not connect to assistant service. Make sure the service is running.',
+        description:
+          'Could not connect to assistant service. Make sure the service is running.',
       };
     } else if (error.code === 'ETIMEDOUT') {
       return {
         success: false,
-        description: 'Request to assistant timed out. The assistant may be taking too long to respond.',
+        description:
+          'Request to assistant timed out. The assistant may be taking too long to respond.',
       };
     } else {
       return {
@@ -400,7 +427,9 @@ export const askAnotherAssistant = async (
   }
 };
 
-export const getTeams = async (sessionId: string): Promise<{ success: boolean; description: string; data: ITeam[] }> => {
+export const getTeams = async (
+  sessionId: string,
+): Promise<{ success: boolean; description: string; data: ITeam[] }> => {
   try {
     const session = await Session.findById(sessionId);
     if (!session) {
@@ -409,24 +438,34 @@ export const getTeams = async (sessionId: string): Promise<{ success: boolean; d
     }
     const teams = await Team.find(
       { companyId: session.companyId },
-      { _id: 1, name: 1, description: 1, icon: 1 }
+      { _id: 1, name: 1, description: 1, icon: 1 },
     );
     // Team.find returns ITeam[] (empty if none). This is correct.
     // If teams is somehow null/undefined (should not happen with Mongoose find), default to empty array.
-    return { success: true, description: 'Teams retrieved successfully.', data: teams || [] };
+    return {
+      success: true,
+      description: 'Teams retrieved successfully.',
+      data: teams || [],
+    };
   } catch (error: any) {
     console.error('Error getting teams:', error);
     // Re-throw for executeAction to handle and package into StandardActionResult.error
     // This ensures that the action layer gets a proper error if something goes wrong.
-    throw new Error(`Failed to retrieve teams: ${error.message || 'Unknown error'}`);
+    throw new Error(
+      `Failed to retrieve teams: ${error.message || 'Unknown error'}`,
+    );
   }
 };
 
 export const getAssistantsByTeam = async (
-  sessionId: string, 
-  teamId: string, 
-  lean: boolean = true
-): Promise<{ success: boolean; description: string; data: Partial<IAssistant>[] | IAssistant[] }> => {
+  sessionId: string,
+  teamId: string,
+  lean: boolean = true,
+): Promise<{
+  success: boolean;
+  description: string;
+  data: Partial<IAssistant>[] | IAssistant[];
+}> => {
   try {
     const session = await Session.findById(sessionId);
     if (!session) {
@@ -437,7 +476,10 @@ export const getAssistantsByTeam = async (
       throw new Error('Invalid teamId format');
     }
 
-    const team = await Team.findOne({ _id: teamId, companyId: session.companyId });
+    const team = await Team.findOne({
+      _id: teamId,
+      companyId: session.companyId,
+    });
     if (!team) {
       // If team not found, it implies no assistants can be found for it under this company.
       // Return success with empty data, or throw error if that's preferred for "not found"
@@ -447,20 +489,26 @@ export const getAssistantsByTeam = async (
       throw new Error('Team not found or access denied');
     }
 
-    const projection = lean ? { _id: 1, name: 1, description: 1, avatarImage: 1 } : {};
+    const projection = lean
+      ? { _id: 1, name: 1, description: 1, avatarImage: 1 }
+      : {};
     const assistants = await Assistant.find(
       { companyId: session.companyId, teams: teamId },
-      projection
+      projection,
     );
     // Assistant.find returns IAssistant[] (empty if none). This is correct.
-    return { 
-      success: true, 
-      description: 'Assistants for team retrieved successfully.', 
-      data: assistants || [] // Ensure data is an array
+    return {
+      success: true,
+      description: 'Assistants for team retrieved successfully.',
+      data: assistants || [], // Ensure data is an array
     };
   } catch (error: any) {
     console.error('Error getting assistants by team:', error);
     // Re-throw for executeAction to handle
-    throw new Error(`Failed to retrieve assistants by team: ${error.message || 'Unknown error'}`);
+    throw new Error(
+      `Failed to retrieve assistants by team: ${
+        error.message || 'Unknown error'
+      }`,
+    );
   }
 };

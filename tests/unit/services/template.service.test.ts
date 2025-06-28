@@ -15,7 +15,9 @@ describe('Template Service', () => {
 
   it('should render template with valid data', async () => {
     const mockData = { name: 'John', age: 30 };
-    (sessionContextService.getSessionContextData as jest.Mock).mockResolvedValue(mockData);
+    (
+      sessionContextService.getSessionContextData as jest.Mock
+    ).mockResolvedValue(mockData);
 
     const template = 'Hello {{name}}, you are {{age}} years old.';
     const result = await processTemplate(template, 'test-session-id');
@@ -25,7 +27,9 @@ describe('Template Service', () => {
 
   it('should handle missing data fields', async () => {
     const mockData = { name: 'John' };
-    (sessionContextService.getSessionContextData as jest.Mock).mockResolvedValue(mockData);
+    (
+      sessionContextService.getSessionContextData as jest.Mock
+    ).mockResolvedValue(mockData);
 
     const template = 'Hello {{name}}, you are {{age}} years old.';
     const result = await processTemplate(template, 'test-session-id');
@@ -39,26 +43,36 @@ describe('Template Service', () => {
         name: 'John',
         address: {
           city: 'New York',
-          country: 'USA'
-        }
+          country: 'USA',
+        },
       },
-      items: ['apple', 'banana', 'orange']
+      items: ['apple', 'banana', 'orange'],
     };
-    (sessionContextService.getSessionContextData as jest.Mock).mockResolvedValue(mockData);
+    (
+      sessionContextService.getSessionContextData as jest.Mock
+    ).mockResolvedValue(mockData);
 
-    const template = '{{user.name}} lives in {{user.address.city}}, {{user.address.country}}. Favorite fruits: {{#each items}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}';
+    const template =
+      '{{user.name}} lives in {{user.address.city}}, {{user.address.country}}. Favorite fruits: {{#each items}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}';
     const result = await processTemplate(template, 'test-session-id');
 
-    expect(result).toBe('John lives in New York, USA. Favorite fruits: apple, banana, orange');
+    expect(result).toBe(
+      'John lives in New York, USA. Favorite fruits: apple, banana, orange',
+    );
   });
 
   it('should return original template on error', async () => {
-    (sessionContextService.getSessionContextData as jest.Mock).mockRejectedValue(new Error('Test error'));
+    (
+      sessionContextService.getSessionContextData as jest.Mock
+    ).mockRejectedValue(new Error('Test error'));
 
     const template = 'Hello {{name}}';
     const result = await processTemplate(template, 'test-session-id');
 
     expect(result).toBe(template);
-    expect(console.error).toHaveBeenCalledWith('Error processing template:', expect.any(Error));
+    expect(console.error).toHaveBeenCalledWith(
+      'Error processing template:',
+      expect.any(Error),
+    );
   });
 });

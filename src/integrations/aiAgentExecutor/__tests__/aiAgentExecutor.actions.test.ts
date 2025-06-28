@@ -27,64 +27,102 @@ describe('AI Agent Executor Actions', () => {
     mockedApiKeyService.getApiKey.mockReset();
 
     // Setup default mock implementations for getApiKey
-    mockedApiKeyService.getApiKey.mockImplementation(async (companyId, keyName) => {
-      if (keyName === 'executor_agent_token') return 'mock-executor-token';
-      if (keyName === 'executor_agent_url') return 'http://mock-executor-url.com';
-      return null;
-    });
+    mockedApiKeyService.getApiKey.mockImplementation(
+      async (companyId, keyName) => {
+        if (keyName === 'executor_agent_token') return 'mock-executor-token';
+        if (keyName === 'executor_agent_url')
+          return 'http://mock-executor-url.com';
+        return null;
+      },
+    );
 
     const context: ActionContext = {
       sessionId: 'test-session',
       companyId: 'test-company', // This will be used by getApiKey mock
-      language: 'en' as SupportedLanguage
+      language: 'en' as SupportedLanguage,
     };
     actions = createAIAgentExecutorActions(context);
   });
 
   it('should execute a command and handle immediate response', async () => {
-    mockedAxios.post.mockResolvedValue({ 
-      data: { output: 'Command executed', exitCode: 0, completed: true } 
+    mockedAxios.post.mockResolvedValue({
+      data: { output: 'Command executed', exitCode: 0, completed: true },
     });
-    const result = await actions.executeCommand.function({ command: 'echo "Hello, World!"' }) as AIAgentExecutorResponse;
+    const result = (await actions.executeCommand.function({
+      command: 'echo "Hello, World!"',
+    })) as AIAgentExecutorResponse;
     expect(result.success).toBe(true);
-    expect(result.data).toEqual({ output: 'Command executed', exitCode: 0, completed: true });
+    expect(result.data).toEqual({
+      output: 'Command executed',
+      exitCode: 0,
+      completed: true,
+    });
   });
 
   it('should execute a command and handle long-running task response', async () => {
-    mockedAxios.post.mockResolvedValue({ 
-      data: { taskId: 'task-123', initialOutput: 'Task started...', isLongRunning: true }
+    mockedAxios.post.mockResolvedValue({
+      data: {
+        taskId: 'task-123',
+        initialOutput: 'Task started...',
+        isLongRunning: true,
+      },
     });
-    const result = await actions.executeCommand.function({ command: 'npm run dev' }) as AIAgentExecutorResponse;
+    const result = (await actions.executeCommand.function({
+      command: 'npm run dev',
+    })) as AIAgentExecutorResponse;
     expect(result.success).toBe(true);
-    expect(result.data).toEqual({ taskId: 'task-123', initialOutput: 'Task started...', isLongRunning: true });
+    expect(result.data).toEqual({
+      taskId: 'task-123',
+      initialOutput: 'Task started...',
+      isLongRunning: true,
+    });
   });
 
   it('should get task status', async () => {
-    const mockTaskData = { id: '12345', command: 'npm run dev', status: 'running', output: 'logs...', exitCode: null, error: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const mockTaskData = {
+      id: '12345',
+      command: 'npm run dev',
+      status: 'running',
+      output: 'logs...',
+      exitCode: null,
+      error: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
     mockedAxios.get.mockResolvedValue({ data: mockTaskData });
     // Corrected action name
-    const result = await actions.getTaskStatus.function({ taskId: '12345' }) as AIAgentExecutorResponse;
+    const result = (await actions.getTaskStatus.function({
+      taskId: '12345',
+    })) as AIAgentExecutorResponse;
     expect(result.success).toBe(true);
     expect(result.data).toEqual(mockTaskData);
   });
 
   it('should end a task', async () => {
-    const mockEndTaskResponse = { message: 'Task task-123 ended successfully.', taskId: 'task-123'};
+    const mockEndTaskResponse = {
+      message: 'Task task-123 ended successfully.',
+      taskId: 'task-123',
+    };
     mockedAxios.post.mockResolvedValue({ data: mockEndTaskResponse });
     // Corrected action name and parameters
-    const result = await actions.endTask.function({ taskId: 'task-123' }) as AIAgentExecutorResponse;
+    const result = (await actions.endTask.function({
+      taskId: 'task-123',
+    })) as AIAgentExecutorResponse;
     expect(result.success).toBe(true);
     expect(result.data).toEqual(mockEndTaskResponse);
   });
 
   it('should perform file operations', async () => {
-    const mockFileOpResponse = { success: true, result: 'File operation completed' };
+    const mockFileOpResponse = {
+      success: true,
+      result: 'File operation completed',
+    };
     mockedAxios.post.mockResolvedValue({ data: mockFileOpResponse });
     // Corrected action name
-    const result = await actions.performFileOperation.function({
+    const result = (await actions.performFileOperation.function({
       operation: 'read',
-      path: '/path/to/file.txt'
-    }) as AIAgentExecutorResponse;
+      path: '/path/to/file.txt',
+    })) as AIAgentExecutorResponse;
     expect(result.success).toBe(true);
     expect(result.data).toBe('File operation completed');
   });
@@ -99,7 +137,9 @@ describe('AI Agent Executor Actions', () => {
 
   it('should handle errors from executeCommand', async () => {
     mockedAxios.post.mockRejectedValue(new Error('API Error'));
-    const result = await actions.executeCommand.function({ command: 'invalid_command' }) as AIAgentExecutorResponse;
+    const result = (await actions.executeCommand.function({
+      command: 'invalid_command',
+    })) as AIAgentExecutorResponse;
     expect(result.success).toBe(false);
     expect(result.error).toBe('API Error');
   });

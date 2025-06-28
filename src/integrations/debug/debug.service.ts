@@ -1,12 +1,23 @@
 import { Session } from '../../models/Session';
 import { getUserById } from '../../services/user.service';
 import { getCompany } from '../../services/company.service';
-import { triggerAction, getLeanIntegrationActions, getIntegrationById, discoverActionById as discoverActionByIdService } from '../../services/integration.service';
+import {
+  triggerAction,
+  getLeanIntegrationActions,
+  getIntegrationById,
+  discoverActionById as discoverActionByIdService,
+} from '../../services/integration.service';
 import { ActionContext } from '../actions/types';
 import { getSessionContextData } from '../../services/session-context.service';
-import { SupportedLanguage, Integration } from '../../services/discovery.service';
+import {
+  SupportedLanguage,
+  Integration,
+} from '../../services/discovery.service';
 
-export const getSessionInfo = async (sessionId: string, companyId: string): Promise<{ success: boolean; markdown?: string; error?: string }> => {
+export const getSessionInfo = async (
+  sessionId: string,
+  companyId: string,
+): Promise<{ success: boolean; markdown?: string; error?: string }> => {
   try {
     const session = await Session.findById(sessionId);
     if (!session) {
@@ -55,7 +66,7 @@ export const triggerIntegrationAction = async (
   companyId: string,
   integrationName: string,
   service: string,
-  data: any
+  data: any,
 ): Promise<{ success: boolean; data?: any; error?: string }> => {
   try {
     // Use the original function name without sanitization
@@ -64,7 +75,14 @@ export const triggerIntegrationAction = async (
     // Include the full function name in allowedActions
     const allowedActions: string[] = [fullFunctionName];
 
-    const result = await triggerAction(integrationName, service, data, sessionId, companyId, allowedActions);
+    const result = await triggerAction(
+      integrationName,
+      service,
+      data,
+      sessionId,
+      companyId,
+      allowedActions,
+    );
 
     return {
       success: result.success,
@@ -73,21 +91,37 @@ export const triggerIntegrationAction = async (
     };
   } catch (error: any) {
     console.error('Error in triggerIntegrationAction:', error);
-    return { success: false, error: error.message || 'Failed to trigger integration action' };
+    return {
+      success: false,
+      error: error.message || 'Failed to trigger integration action',
+    };
   }
 };
 
-export const discoverLeanActions = async (): Promise<{ success: boolean; data?: any; error?: string }> => {
+export const discoverLeanActions = async (): Promise<{
+  success: boolean;
+  data?: any;
+  error?: string;
+}> => {
   try {
-    const leanActions = await getLeanIntegrationActions('en', ['id', 'name', 'description'])
+    const leanActions = await getLeanIntegrationActions('en', [
+      'id',
+      'name',
+      'description',
+    ]);
     return { success: true, data: leanActions };
   } catch (error: any) {
     console.error('Error in discoverLeanActions:', error);
-    return { success: false, error: error.message || 'Failed to discover lean actions' };
+    return {
+      success: false,
+      error: error.message || 'Failed to discover lean actions',
+    };
   }
 };
 
-export const getIntegration = async (integrationId: string): Promise<{ success: boolean; data?: any; error?: string }> => {
+export const getIntegration = async (
+  integrationId: string,
+): Promise<{ success: boolean; data?: any; error?: string }> => {
   try {
     const integration = await getIntegrationById(integrationId);
     if (integration) {
@@ -97,11 +131,17 @@ export const getIntegration = async (integrationId: string): Promise<{ success: 
     }
   } catch (error: any) {
     console.error('Error in getIntegration:', error);
-    return { success: false, error: error.message || 'Failed to get integration' };
+    return {
+      success: false,
+      error: error.message || 'Failed to get integration',
+    };
   }
 };
 
-export const discoverActionById = async (actionId: string, language: SupportedLanguage): Promise<{ success: boolean; data?: any; error?: string }> => {
+export const discoverActionById = async (
+  actionId: string,
+  language: SupportedLanguage,
+): Promise<{ success: boolean; data?: any; error?: string }> => {
   try {
     const action = await discoverActionByIdService(actionId, language);
     if (action) {
@@ -111,6 +151,9 @@ export const discoverActionById = async (actionId: string, language: SupportedLa
     }
   } catch (error: any) {
     console.error('Error in discoverActionById:', error);
-    return { success: false, error: error.message || 'Failed to discover action by ID' };
+    return {
+      success: false,
+      error: error.message || 'Failed to discover action by ID',
+    };
   }
 };

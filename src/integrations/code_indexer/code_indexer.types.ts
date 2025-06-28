@@ -22,7 +22,10 @@ export interface ContentType {
 }
 
 export interface ContentTypeModel {
-  findOne(query: { companyId: string; name: string }): Promise<ContentType | null>;
+  findOne(query: {
+    companyId: string;
+    name: string;
+  }): Promise<ContentType | null>;
   create(data: Omit<ContentType, '_id'>): Promise<ContentType>;
 }
 

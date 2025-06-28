@@ -31,22 +31,29 @@ const AssistantSchema: Schema = new Schema({
   assistantId: { type: String, required: false },
   name: { type: String, required: true },
   description: { type: String, required: true },
-  conversationStarters: { type: [IdentifierSchema], required: true, default: [] },
+  conversationStarters: {
+    type: [IdentifierSchema],
+    required: true,
+    default: [],
+  },
   voice: { type: String, required: true },
   language: { type: String, required: true },
   llmModel: { type: String, required: false }, // Existing field, will store model name like 'gpt-4.1-mini'
   llmPrompt: { type: String, required: false },
-  llmProvider: { // New field for provider
+  llmProvider: {
+    // New field for provider
     type: String,
     enum: ['openai', 'google', 'anthropic'],
     default: 'openai', // Default provider
-    required: true
+    required: true,
   },
   maxTokens: { type: Number, required: false, default: 25000 }, // Default to 25k tokens
   companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
   allowedActions: [{ type: String, required: false }],
   avatarImage: { type: String, required: false, default: 'default-avatar' },
-  teams: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: false }],
+  teams: [
+    { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: false },
+  ],
 });
 
 export const Assistant = mongoose.model<IAssistant>(

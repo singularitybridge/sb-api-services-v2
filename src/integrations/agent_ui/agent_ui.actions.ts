@@ -1,7 +1,10 @@
 import { ActionContext, FunctionFactory } from '../actions/types';
 import { getUiContext, executeUiMethod } from './agent_ui.service';
 import { executeAction } from '../actions/executor';
-import { ActionValidationError, ActionExecutionError } from '../../utils/actionErrors';
+import {
+  ActionValidationError,
+  ActionExecutionError,
+} from '../../utils/actionErrors';
 
 // Define expected data shapes for StandardActionResult for clarity
 interface UiContextData {
@@ -15,7 +18,9 @@ interface ExecuteUiMethodArgs {
   params: Record<string, any>;
 }
 
-export const createAgentUiActions = (context: ActionContext): FunctionFactory => ({
+export const createAgentUiActions = (
+  context: ActionContext,
+): FunctionFactory => ({
   getUiContext: {
     description: 'Get the current UI context',
     strict: true,
@@ -34,15 +39,19 @@ export const createAgentUiActions = (context: ActionContext): FunctionFactory =>
         async () => {
           const serviceResult = await getUiContext(context.companyId);
           if (!serviceResult.success && serviceResult.error) {
-            return { success: false, description: serviceResult.error, data: serviceResult.data };
+            return {
+              success: false,
+              description: serviceResult.error,
+              data: serviceResult.data,
+            };
           }
           if (serviceResult.success) {
             return { success: true, data: { uiContext: serviceResult.data } };
           }
           // Fallback for unexpected serviceResult structure, though executeAction would likely treat it as error
-          return serviceResult; 
+          return serviceResult;
         },
-        { serviceName: 'AgentUIService' }
+        { serviceName: 'AgentUIService' },
       );
     },
   },
@@ -55,17 +64,17 @@ export const createAgentUiActions = (context: ActionContext): FunctionFactory =>
       properties: {
         method: {
           type: 'string',
-          description: 'Method to execute (e.g., updateGoal, setFilter)'
+          description: 'Method to execute (e.g., updateGoal, setFilter)',
         },
         pageId: {
           type: 'string',
-          description: 'ID of the page where the method should be executed'
+          description: 'ID of the page where the method should be executed',
         },
         params: {
           type: 'object',
           description: 'Parameters for the method',
-          additionalProperties: true
-        }
+          additionalProperties: true,
+        },
       },
       required: ['method', 'pageId', 'params'],
       additionalProperties: false,
@@ -75,24 +84,36 @@ export const createAgentUiActions = (context: ActionContext): FunctionFactory =>
       const actionName = 'executeUiMethod';
 
       if (!method) {
-        throw new ActionValidationError('Method is required.', { fieldErrors: { method: 'Method is required.' } });
+        throw new ActionValidationError('Method is required.', {
+          fieldErrors: { method: 'Method is required.' },
+        });
       }
       if (!pageId) {
-        throw new ActionValidationError('pageId is required.', { fieldErrors: { pageId: 'pageId is required.' } });
+        throw new ActionValidationError('pageId is required.', {
+          fieldErrors: { pageId: 'pageId is required.' },
+        });
       }
       // Assuming context.companyId is validated/guaranteed
 
       return executeAction<UiMethodResult>(
         actionName,
         async () => {
-          const serviceResult = await executeUiMethod(context.companyId, { method, pageId, params });
+          const serviceResult = await executeUiMethod(context.companyId, {
+            method,
+            pageId,
+            params,
+          });
           if (!serviceResult.success && serviceResult.error) {
-            return { success: false, description: serviceResult.error, data: serviceResult.data };
+            return {
+              success: false,
+              description: serviceResult.error,
+              data: serviceResult.data,
+            };
           }
           // On success, serviceResult.data is used directly by executeAction by default.
           return serviceResult;
         },
-        { serviceName: 'AgentUIService' }
+        { serviceName: 'AgentUIService' },
       );
     },
   },

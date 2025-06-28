@@ -11,7 +11,11 @@ const TeamSchema: Schema = new Schema({
   name: { type: String, required: true },
   description: { type: String, required: true },
   icon: { type: String, required: false },
-  companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
+  companyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    required: true,
+  },
 });
 
 export const Team = mongoose.model<ITeam>('Team', TeamSchema);

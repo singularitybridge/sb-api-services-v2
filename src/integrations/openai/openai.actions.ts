@@ -6,7 +6,10 @@ import { getApiKey } from '../../services/api.key.service';
 import { getFileContent } from '../code_indexer/code_indexer.service';
 import OpenAI from 'openai';
 import { executeAction } from '../actions/executor';
-import { ActionExecutionError, ActionValidationError } from '../../utils/actionErrors';
+import {
+  ActionExecutionError,
+  ActionValidationError,
+} from '../../utils/actionErrors';
 
 type OpenAIVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 type OpenAIModel = 'tts-1' | 'tts-1-hd';
@@ -41,7 +44,9 @@ interface AskO1ModelWithFilesArgs {
   filePaths: string[];
 }
 
-export const createOpenAiActions = (context: ActionContext): FunctionFactory => ({
+export const createOpenAiActions = (
+  context: ActionContext,
+): FunctionFactory => ({
   generateOpenAiSpeech: {
     description: 'Generate speech using OpenAI text-to-speech service',
     strict: true,
@@ -55,18 +60,21 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
         voice: {
           type: 'string',
           enum: ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'],
-          description: 'The voice to use for speech generation (default: alloy)',
+          description:
+            'The voice to use for speech generation (default: alloy)',
           default: 'alloy',
         },
         model: {
           type: 'string',
           enum: ['tts-1', 'tts-1-hd'],
-          description: 'The model to use for speech generation (default: tts-1-hd)',
+          description:
+            'The model to use for speech generation (default: tts-1-hd)',
           default: 'tts-1-hd',
         },
         textLimit: {
           type: 'number',
-          description: 'The maximum number of characters allowed in the input text (default: 256)',
+          description:
+            'The maximum number of characters allowed in the input text (default: 256)',
           default: 256,
         },
         filename: {
@@ -77,20 +85,36 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
       required: ['text'],
       additionalProperties: false,
     },
-    function: async ({ text, voice = 'alloy', model = 'tts-1-hd', textLimit = 256, filename }: GenerateSpeechArgs) => {
+    function: async ({
+      text,
+      voice = 'alloy',
+      model = 'tts-1-hd',
+      textLimit = 256,
+      filename,
+    }: GenerateSpeechArgs) => {
       const actionName = 'generateOpenAiSpeech';
       const apiKey = await getApiKey(context.companyId, 'openai_api_key');
       if (!apiKey) {
-        throw new ActionExecutionError('OpenAI API key is missing for this company.', { actionName, statusCode: 400 });
+        throw new ActionExecutionError(
+          'OpenAI API key is missing for this company.',
+          { actionName, statusCode: 400 },
+        );
       }
 
       return executeAction<{ audioUrl: string }>(
         actionName,
         async () => {
-          const audioUrl = await generateSpeech(apiKey, text, voice, model, textLimit, filename);
+          const audioUrl = await generateSpeech(
+            apiKey,
+            text,
+            voice,
+            model,
+            textLimit,
+            filename,
+          );
           return { success: true, data: { audioUrl } };
         },
-        { serviceName: 'OpenAIService' }
+        { serviceName: 'OpenAIService' },
       );
     },
   },
@@ -106,7 +130,8 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
         },
         language: {
           type: 'string',
-          description: 'The language of the audio file (optional), e.g., he, en, es, fr, de, it, nl, pt, ru, zh',
+          description:
+            'The language of the audio file (optional), e.g., he, en, es, fr, de, it, nl, pt, ru, zh',
         },
       },
       required: ['audioUrl'],
@@ -116,21 +141,29 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
       const actionName = 'transcribeAudioWhisperFromURL';
       const apiKey = await getApiKey(context.companyId, 'openai_api_key');
       if (!apiKey) {
-        throw new ActionExecutionError('OpenAI API key is missing for this company.', { actionName, statusCode: 400 });
+        throw new ActionExecutionError(
+          'OpenAI API key is missing for this company.',
+          { actionName, statusCode: 400 },
+        );
       }
 
       return executeAction<{ transcription: string }>(
         actionName,
         async () => {
-          const transcription = await transcribeAudioWhisperFromURL(apiKey, audioUrl, language);
+          const transcription = await transcribeAudioWhisperFromURL(
+            apiKey,
+            audioUrl,
+            language,
+          );
           return { success: true, data: { transcription } };
         },
-        { serviceName: 'OpenAIService' }
+        { serviceName: 'OpenAIService' },
       );
     },
   },
   askO1Model: {
-    description: 'Ask a question to the OpenAI o1 models (o1-preview or o1-mini)',
+    description:
+      'Ask a question to the OpenAI o1 models (o1-preview or o1-mini)',
     strict: true,
     parameters: {
       type: 'object',
@@ -152,29 +185,44 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
       const actionName = 'askO1Model';
       const allowedModels: O1Model[] = ['o1-preview', 'o1-mini'];
       if (!allowedModels.includes(model)) {
-        throw new ActionValidationError(`Invalid model specified. Allowed models are ${allowedModels.join(', ')}`, {
-          fieldErrors: { model: `Invalid model. Allowed: ${allowedModels.join(', ')}` },
-        });
+        throw new ActionValidationError(
+          `Invalid model specified. Allowed models are ${allowedModels.join(
+            ', ',
+          )}`,
+          {
+            fieldErrors: {
+              model: `Invalid model. Allowed: ${allowedModels.join(', ')}`,
+            },
+          },
+        );
       }
 
       const apiKey = await getApiKey(context.companyId, 'openai_api_key');
       if (!apiKey) {
-        throw new ActionExecutionError('OpenAI API key is missing for this company.', { actionName, statusCode: 400 });
+        throw new ActionExecutionError(
+          'OpenAI API key is missing for this company.',
+          { actionName, statusCode: 400 },
+        );
       }
 
       return executeAction<{ response: string }>(
         actionName,
         async () => {
           const messages: O1Message[] = [{ role: 'user', content: question }];
-          const responseText = await getO1CompletionResponse(apiKey, messages, model);
+          const responseText = await getO1CompletionResponse(
+            apiKey,
+            messages,
+            model,
+          );
           return { success: true, data: { response: responseText } };
         },
-        { serviceName: 'OpenAIService' }
+        { serviceName: 'OpenAIService' },
       );
     },
   },
   askO1ModelWithFiles: {
-    description: 'Ask a question to the OpenAI O1 models with additional code files as context',
+    description:
+      'Ask a question to the OpenAI O1 models with additional code files as context',
     strict: true,
     parameters: {
       type: 'object',
@@ -197,30 +245,56 @@ export const createOpenAiActions = (context: ActionContext): FunctionFactory => 
       required: ['question', 'model', 'filePaths'],
       additionalProperties: false,
     },
-    function: async ({ question, model, filePaths }: AskO1ModelWithFilesArgs) => {
+    function: async ({
+      question,
+      model,
+      filePaths,
+    }: AskO1ModelWithFilesArgs) => {
       const actionName = 'askO1ModelWithFiles';
       const allowedModels: O1Model[] = ['o1-preview', 'o1-mini'];
       if (!allowedModels.includes(model)) {
-        throw new ActionValidationError(`Invalid model specified. Allowed models are ${allowedModels.join(', ')}`, {
-          fieldErrors: { model: `Invalid model. Allowed: ${allowedModels.join(', ')}` },
-        });
+        throw new ActionValidationError(
+          `Invalid model specified. Allowed models are ${allowedModels.join(
+            ', ',
+          )}`,
+          {
+            fieldErrors: {
+              model: `Invalid model. Allowed: ${allowedModels.join(', ')}`,
+            },
+          },
+        );
       }
 
       const apiKey = await getApiKey(context.companyId, 'openai_api_key');
       if (!apiKey) {
-        throw new ActionExecutionError('OpenAI API key is missing for this company.', { actionName, statusCode: 400 });
+        throw new ActionExecutionError(
+          'OpenAI API key is missing for this company.',
+          { actionName, statusCode: 400 },
+        );
       }
 
       return executeAction<{ response: string }>(
         actionName,
         async () => {
           let combinedContext = await loadAndProcessFiles(filePaths);
-          combinedContext = truncateContextIfNecessary(combinedContext, question);
-          const messages: O1Message[] = [{ role: 'user', content: `${combinedContext}\n\nQuestion: ${question}` }];
-          const responseText = await getO1CompletionResponse(apiKey, messages, model);
+          combinedContext = truncateContextIfNecessary(
+            combinedContext,
+            question,
+          );
+          const messages: O1Message[] = [
+            {
+              role: 'user',
+              content: `${combinedContext}\n\nQuestion: ${question}`,
+            },
+          ];
+          const responseText = await getO1CompletionResponse(
+            apiKey,
+            messages,
+            model,
+          );
           return { success: true, data: { response: responseText } };
         },
-        { serviceName: 'OpenAIService' }
+        { serviceName: 'OpenAIService' },
       );
     },
   },
@@ -243,7 +317,10 @@ async function loadAndProcessFiles(filePaths: string[]): Promise<string> {
   return combinedContext;
 }
 
-async function processFileContent(content: string, filePath: string): Promise<string> {
+async function processFileContent(
+  content: string,
+  filePath: string,
+): Promise<string> {
   // For now, we'll return the content as is
   // In the future, you might want to implement summarization or preprocessing here
   return content;
@@ -253,10 +330,13 @@ function truncateContextIfNecessary(context: string, question: string): string {
   const MAX_TOKENS = 4096; // Adjust based on the model's max tokens
   const ESTIMATED_TOKENS_PER_CHAR = 0.5; // Rough estimate
 
-  const totalEstimatedTokens = (context.length + question.length) * ESTIMATED_TOKENS_PER_CHAR;
+  const totalEstimatedTokens =
+    (context.length + question.length) * ESTIMATED_TOKENS_PER_CHAR;
 
   if (totalEstimatedTokens > MAX_TOKENS) {
-    const allowedContextLength = (MAX_TOKENS - question.length * ESTIMATED_TOKENS_PER_CHAR) / ESTIMATED_TOKENS_PER_CHAR;
+    const allowedContextLength =
+      (MAX_TOKENS - question.length * ESTIMATED_TOKENS_PER_CHAR) /
+      ESTIMATED_TOKENS_PER_CHAR;
     context = context.slice(-Math.floor(allowedContextLength));
   }
 

@@ -13,7 +13,7 @@ import { LanguageModelV1 } from 'ai'; // For return type hint
 export function getProvider(
   providerKey: string | undefined, // Make providerKey potentially undefined to handle default
   modelName: string,
-  apiKey: string
+  apiKey: string,
 ): LanguageModelV1 {
   switch (providerKey) {
     case 'google':
@@ -24,7 +24,8 @@ export function getProvider(
       // For @ai-sdk/google@1.2.18, apiKey in chat options is likely not supported.
       // It will rely on environment variables (e.g., GOOGLE_API_KEY).
       return google.chat(modelName, {
-        /* apiKey: apiKey */ // Not supported in current google provider version
+        /* apiKey: apiKey */
+        // Not supported in current google provider version
       });
     case 'anthropic':
       // Ensure @ai-sdk/anthropic is installed and supports this structure.
@@ -34,7 +35,8 @@ export function getProvider(
       // For @ai-sdk/anthropic@1.2.11, apiKey in chat options is likely not supported.
       // It will rely on environment variables (e.g., ANTHROPIC_API_KEY).
       return anthropic.chat(modelName, {
-        /* apiKey: apiKey */ // Not supported in current anthropic provider version
+        /* apiKey: apiKey */
+        // Not supported in current anthropic provider version
       });
     case 'openai':
     default:
@@ -48,7 +50,8 @@ export function getProvider(
       // Or directly: openai(modelName, { apiKey }) if openai itself is the factory function.
       // Given the current import, openai.chat is used.
       return openai.chat(modelName, {
-        /* apiKey: apiKey */ // Not supported in current openai version
+        /* apiKey: apiKey */
+        // Not supported in current openai version
       });
   }
 }

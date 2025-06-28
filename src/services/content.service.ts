@@ -2,14 +2,14 @@ import {
   createContentItem,
   updateContentItem,
   deleteContentItem,
-  deleteContentItemsByType
+  deleteContentItemsByType,
 } from './content/contentItemOperations';
 
 import {
   getContentItems,
   getContentItem,
   getContentItemsByArtifactKey,
-  getContentItemsByType
+  getContentItemsByType,
 } from './content/contentItemQueries';
 
 import { searchContentItems } from './content/contentItemSearch';
@@ -26,7 +26,7 @@ export {
   getContentItemsByArtifactKey,
   getContentItemsByType,
   searchContentItems,
-  createContentType
+  createContentType,
 };
 
 // Add any additional content-related services here if needed
