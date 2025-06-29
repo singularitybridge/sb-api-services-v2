@@ -1,11 +1,23 @@
 {
   "serviceName": "Scytale AI",
-  "getQuestionnaires": {
-    "actionTitle": "Get Questionnaires",
-    "description": "Fetches all questionnaires from Scytale AI."
+  "getContextTypes": {
+    "actionTitle": "Get Context Types",
+    "description": "Fetches the list of available context types (e.g., audits, controls, policies) for a given context."
   },
-  "getQuestionnaire": {
-    "actionTitle": "Get Questionnaire by ID",
-    "description": "Fetches a single questionnaire by its ID from Scytale AI."
+  "getContextItems": {
+    "actionTitle": "Get Context Items",
+    "description": "Fetches detailed information for a specific context type (e.g., control, policy) for a given context."
+  },
+  "contextVectorSearch": {
+    "actionTitle": "Context Vector Search",
+    "description": "Performs a vector search for context items based on a query."
+  },
+  "getIndexingStatus": {
+    "actionTitle": "Get Indexing Status",
+    "description": "Fetches the indexing status of the context, including queue size, pending items, and pause status."
+  },
+  "createContextItem": {
+    "actionTitle": "Create Context Item",
+    "description": "Creates a new context item in Scytale with flexible data structure."
   }
 }

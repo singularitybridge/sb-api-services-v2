@@ -1,11 +1,23 @@
 {
   "serviceName": "Scytale AI",
-  "getQuestionnaires": {
-    "actionTitle": "קבל שאלונים",
-    "description": "מאחזר את כל השאלונים מ-Scytale AI."
+  "getContextTypes": {
+    "actionTitle": "קבל סוגי הקשר",
+    "description": "מאחזר את רשימת סוגי ההקשר הזמינים (למשל ביקורות, בקרות, מדיניות) עבור הקשר נתון."
   },
-  "getQuestionnaire": {
-    "actionTitle": "קבל שאלון לפי מזהה",
-    "description": "מאחזר שאלון בודד לפי המזהה שלו מ-Scytale AI."
+  "getContextItems": {
+    "actionTitle": "קבל פריטי הקשר",
+    "description": "מאחזר מידע מפורט עבור סוג הקשר מסוים (למשל בקרה, מדיניות) עבור הקשר נתון."
+  },
+  "contextVectorSearch": {
+    "actionTitle": "חיפוש וקטורי בהקשר",
+    "description": "מבצע חיפוש וקטורי עבור פריטי הקשר על בסיס שאילתה."
+  },
+  "getIndexingStatus": {
+    "actionTitle": "קבל סטטוס אינדקס",
+    "description": "מאחזר את סטטוס האינדקס של ההקשר, כולל גודל התור, פריטים ממתינים וסטטוס השהייה."
+  },
+  "createContextItem": {
+    "actionTitle": "צור פריט הקשר",
+    "description": "יוצר פריט הקשר חדש ב-Scytale עם מבנה נתונים גמיש."
   }
 }

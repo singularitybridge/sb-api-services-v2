@@ -37,6 +37,24 @@ export interface IndexingStatusResponse {
   isPaused: boolean;
 }
 
+export interface CreateContextItemRequest {
+  id?: string;
+  key: string;
+  data: Record<string, any>;
+  metadata?: Record<string, any>;
+  tags?: string[];
+}
+
+export interface CreateContextItemResponse {
+  id: string;
+  key: string;
+  data: Record<string, any>;
+  metadata?: Record<string, any>;
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 /**
  * Fetches the list of available context types for a given context.
  * @param contextId The ID of the context.
@@ -279,6 +297,80 @@ export const vectorSearch = async (
     return {
       success: false,
       error: error.message || 'An unknown error occurred during vector search.',
+    };
+  }
+};
+
+/**
+ * Creates a new context item in Scytale.
+ * @param companyId The ID of the company.
+ * @param contextId The ID of the context.
+ * @param contextType The type of context item (e.g., 'controls', 'policies').
+ * @param item The item data to create.
+ * @returns A promise that resolves to an object indicating success or failure, with data if successful.
+ */
+export const createContextItem = async (
+  companyId: string,
+  contextId: string,
+  contextType: string,
+  item: CreateContextItemRequest,
+): Promise<{
+  success: boolean;
+  data?: CreateContextItemResponse;
+  error?: string;
+}> => {
+  if (!contextId || !contextType || !item || !item.key || !item.data) {
+    throw new Error(
+      'contextId, contextType, item.key, and item.data are required.',
+    );
+  }
+  
+  try {
+    let scytaleBaseUrl = await getApiKey(companyId, 'scytale_base_url');
+    const scytaleAuthToken = await getApiKey(companyId, 'scytale_auth_token');
+
+    if (!scytaleBaseUrl) {
+      throw new Error('Scytale Base URL not configured.');
+    }
+
+    // Ensure the base URL ends with /context if it's missing
+    if (!scytaleBaseUrl.endsWith('/context')) {
+      scytaleBaseUrl = `${scytaleBaseUrl}/context`;
+    }
+
+    const url = `${scytaleBaseUrl}/${contextId}/${contextType}/items`;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (scytaleAuthToken) {
+      headers['Authorization'] = `Bearer ${scytaleAuthToken}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(item),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Failed to create context item for ${contextId}/${contextType}: ${response.status} ${response.statusText} - ${errorText}`,
+      );
+    }
+
+    const data = (await response.json()) as CreateContextItemResponse;
+    return { success: true, data };
+  } catch (error: any) {
+    console.error(
+      `Error in createContextItem (contextId: ${contextId}, contextType: ${contextType}, key: ${item.key}):`,
+      error,
+    );
+    return {
+      success: false,
+      error:
+        error.message ||
+        'An unknown error occurred while creating context item.',
     };
   }
 };
