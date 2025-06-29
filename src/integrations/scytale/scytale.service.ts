@@ -1,6 +1,27 @@
 import fetch from 'node-fetch';
 import { getApiKey } from '../../services/api.key.service';
 
+/**
+ * Helper function to get Scytale API configuration
+ * @param companyId The ID of the company
+ * @returns The base URL and auth token for Scytale API
+ */
+const getScytaleConfig = async (companyId: string) => {
+  let baseUrl = await getApiKey(companyId, 'scytale_base_url');
+  const authToken = await getApiKey(companyId, 'scytale_auth_token');
+
+  if (!baseUrl) {
+    throw new Error('Scytale Base URL not configured.');
+  }
+
+  // Ensure the base URL ends with /context if it's missing
+  if (!baseUrl.endsWith('/context')) {
+    baseUrl = `${baseUrl}/context`;
+  }
+
+  return { baseUrl, authToken };
+};
+
 export interface ContextTypeResponse {
   contextId: string;
   contextTypes: string[];
@@ -69,22 +90,11 @@ export const getContextTypes = async (
   error?: string;
 }> => {
   try {
-    let scytaleBaseUrl = await getApiKey(companyId, 'scytale_base_url');
-    const scytaleAuthToken = await getApiKey(companyId, 'scytale_auth_token');
-
-    if (!scytaleBaseUrl) {
-      throw new Error('Scytale Base URL not configured.');
-    }
-
-    // Temporary fix: Ensure the base URL ends with /context if it's missing
-    if (!scytaleBaseUrl.endsWith('/context')) {
-      scytaleBaseUrl = `${scytaleBaseUrl}/context`;
-    }
-
-    const url = `${scytaleBaseUrl}/${contextId}/types`;
+    const { baseUrl, authToken } = await getScytaleConfig(companyId);
+    const url = `${baseUrl}/${contextId}/types`;
     const headers: Record<string, string> = {};
-    if (scytaleAuthToken) {
-      headers['Authorization'] = `Bearer ${scytaleAuthToken}`;
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
     }
     const response = await fetch(url, { headers });
 
@@ -124,22 +134,11 @@ export const getIndexingStatus = async (
   error?: string;
 }> => {
   try {
-    let scytaleBaseUrl = await getApiKey(companyId, 'scytale_base_url');
-    const scytaleAuthToken = await getApiKey(companyId, 'scytale_auth_token');
-
-    if (!scytaleBaseUrl) {
-      throw new Error('Scytale Base URL not configured.');
-    }
-
-    // Ensure the base URL ends with /context if it's missing
-    if (!scytaleBaseUrl.endsWith('/context')) {
-      scytaleBaseUrl = `${scytaleBaseUrl}/context`;
-    }
-
-    const url = `${scytaleBaseUrl}/indexing-status`;
+    const { baseUrl, authToken } = await getScytaleConfig(companyId);
+    const url = `${baseUrl}/indexing-status`;
     const headers: Record<string, string> = {};
-    if (scytaleAuthToken) {
-      headers['Authorization'] = `Bearer ${scytaleAuthToken}`;
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
     }
     const response = await fetch(url, { headers });
 
@@ -180,19 +179,8 @@ export const getContextItems = async (
     throw new Error('Both contextId and contextType parameters are required.');
   }
   try {
-    let scytaleBaseUrl = await getApiKey(companyId, 'scytale_base_url');
-    const scytaleAuthToken = await getApiKey(companyId, 'scytale_auth_token');
-
-    if (!scytaleBaseUrl) {
-      throw new Error('Scytale Base URL not configured.');
-    }
-
-    // Temporary fix: Ensure the base URL ends with /context if it's missing
-    if (!scytaleBaseUrl.endsWith('/context')) {
-      scytaleBaseUrl = `${scytaleBaseUrl}/context`;
-    }
-
-    let url = `${scytaleBaseUrl}/${contextId}/${contextType}/items`;
+    const { baseUrl, authToken } = await getScytaleConfig(companyId);
+    let url = `${baseUrl}/${contextId}/${contextType}/items`;
     const queryParams = new URLSearchParams();
     if (limit !== undefined) {
       queryParams.append('limit', limit.toString());
@@ -206,8 +194,8 @@ export const getContextItems = async (
     }
 
     const headers: Record<string, string> = {};
-    if (scytaleAuthToken) {
-      headers['Authorization'] = `Bearer ${scytaleAuthToken}`;
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
     }
     const response = await fetch(url, { headers });
 
@@ -255,24 +243,13 @@ export const vectorSearch = async (
     );
   }
   try {
-    let scytaleBaseUrl = await getApiKey(companyId, 'scytale_base_url');
-    const scytaleAuthToken = await getApiKey(companyId, 'scytale_auth_token');
-
-    if (!scytaleBaseUrl) {
-      throw new Error('Scytale Base URL not configured.');
-    }
-
-    // Temporary fix: Ensure the base URL ends with /context if it's missing
-    if (!scytaleBaseUrl.endsWith('/context')) {
-      scytaleBaseUrl = `${scytaleBaseUrl}/context`;
-    }
-
-    const url = `${scytaleBaseUrl}/${contextId}/search`;
+    const { baseUrl, authToken } = await getScytaleConfig(companyId);
+    const url = `${baseUrl}/${contextId}/search`;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    if (scytaleAuthToken) {
-      headers['Authorization'] = `Bearer ${scytaleAuthToken}`;
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
     }
     const response = await fetch(url, {
       method: 'POST',
@@ -326,24 +303,13 @@ export const createContextItem = async (
   }
   
   try {
-    let scytaleBaseUrl = await getApiKey(companyId, 'scytale_base_url');
-    const scytaleAuthToken = await getApiKey(companyId, 'scytale_auth_token');
-
-    if (!scytaleBaseUrl) {
-      throw new Error('Scytale Base URL not configured.');
-    }
-
-    // Ensure the base URL ends with /context if it's missing
-    if (!scytaleBaseUrl.endsWith('/context')) {
-      scytaleBaseUrl = `${scytaleBaseUrl}/context`;
-    }
-
-    const url = `${scytaleBaseUrl}/${contextId}/${contextType}/items`;
+    const { baseUrl, authToken } = await getScytaleConfig(companyId);
+    const url = `${baseUrl}/${contextId}/${contextType}/items`;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    if (scytaleAuthToken) {
-      headers['Authorization'] = `Bearer ${scytaleAuthToken}`;
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
     }
 
     const response = await fetch(url, {
