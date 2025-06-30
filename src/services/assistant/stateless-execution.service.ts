@@ -282,7 +282,7 @@ export const executeAssistantStateless = async (
             args,
           );
           
-          // Add Zod validation logging
+          // Continue with validation...
           const parseResult = zodSchema.safeParse(args);
           logParse(parseResult, currentFuncName, args);
           if (!parseResult.success) {

@@ -13,6 +13,7 @@ import {
   askAnotherAssistant as askAnotherAssistantService,
   getTeams as getTeamsService,
   getAssistantsByTeam as getAssistantsByTeamService,
+  getAssistantById as getAssistantByIdService, // Import the new service function
 } from './assistant.service';
 import { IAssistant, IIdentifier } from '../../models/Assistant';
 import { ITeam } from '../../models/Team';
@@ -26,6 +27,7 @@ type UpdateAssistantData = IAssistant;
 type AskAssistantData = any;
 type GetTeamsData = ITeam[];
 type GetAssistantsByTeamData = Partial<IAssistant>[] | IAssistant[];
+type GetAssistantByIdData = IAssistant; // New data type for getAssistantById
 
 const ASSISTANT_SERVICE_NAME = 'AssistantService';
 
@@ -45,6 +47,35 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
           serviceName: ASSISTANT_SERVICE_NAME,
           successMessage: 'Assistants retrieved successfully.',
           dataExtractor: (result) => result.data as GetAssistantsData,
+        },
+      );
+    },
+  },
+
+  getAssistantById: {
+    description: 'Get information about a specific assistant by its ID, including enabled integration actions and conversation starters.',
+    parameters: {
+      type: 'object',
+      properties: {
+        assistantId: {
+          type: 'string',
+          description: 'The ID of the assistant to retrieve information for.',
+        },
+      },
+      required: ['assistantId'],
+    },
+    function: async ({
+      assistantId,
+    }: {
+      assistantId: string;
+    }): Promise<StandardActionResult<GetAssistantByIdData>> => {
+      return executeAction<GetAssistantByIdData>(
+        'getAssistantById',
+        () => getAssistantByIdService(context.sessionId, assistantId),
+        {
+          serviceName: ASSISTANT_SERVICE_NAME,
+          successMessage: 'Assistant information retrieved successfully.',
+          dataExtractor: (result) => result.data as GetAssistantByIdData,
         },
       );
     },

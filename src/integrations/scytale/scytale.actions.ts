@@ -232,7 +232,8 @@ export const createScytaleActions = (
         key: { type: 'string', description: 'Unique identifier for the context item.' },
         attributes: {
           type: 'array',
-          description: 'An array of key-value pairs for dynamic attributes.',
+          description: 'Optional attributes. Pass empty array [] if no attributes needed.',
+          default: [], // Provide default
           items: {
             type: 'object',
             properties: {
@@ -250,56 +251,102 @@ export const createScytaleActions = (
           },
         },
       },
-      required: ['contextId', 'contextType', 'key', 'attributes'],
+      required: ['contextId', 'contextType', 'key'], // attributes NOT required
       additionalProperties: false, // Enforce strictness for the root parameters object
     },
     function: async (params: {
       contextId: string;
       contextType: string;
       key: string;
-      attributes: Array<{ name: string; value: string; dataType?: "string" | "number" | "boolean" }>;
+      attributes?: Array<{ name: string; value: string; dataType?: "string" | "number" | "boolean" }>;
     }) => {
       const actionName = 'createContextItem';
 
-      if (!params.contextId) {
-        throw new ActionValidationError('contextId is required.', {
-          fieldErrors: { contextId: 'contextId is required.' },
-        });
-      }
-      if (!params.contextType) {
-        throw new ActionValidationError('contextType is required.', {
-          fieldErrors: { contextType: 'contextType is required.' },
-        });
-      }
-      if (!params.key) {
-        throw new ActionValidationError('key is required.', {
-          fieldErrors: { key: 'key is required.' },
-        });
-      }
-      if (!params.attributes || !Array.isArray(params.attributes)) {
-        throw new ActionValidationError('attributes is required and must be an array.', {
-          fieldErrors: { attributes: 'attributes is required and must be an array.' },
-        });
+      // Repair problematic argument patterns before defensive defaults
+      // Ensure attributes exists and is an array
+      if (!params.hasOwnProperty('attributes')) {
+        console.log('[Tool Repair] Adding missing attributes array to params');
+        params.attributes = [];
+      } else if (params.attributes === null || params.attributes === undefined) {
+        console.log('[Tool Repair] Converting null/undefined attributes to empty array in params');
+        params.attributes = [];
+      } else if (!Array.isArray(params.attributes)) {
+        console.log('[Tool Repair] Converting non-array attributes to empty array in params');
+        params.attributes = []; // Or attempt to convert if a specific non-array format is expected
       }
 
+      // Defensive defaults
+      const safeParams = {
+        contextId: params.contextId || '',
+        contextType: params.contextType || '',
+        key: params.key || '',
+        attributes: params.attributes // Now params.attributes is guaranteed to be an array
+      };
+
+      // Validate with clear error messages
+      const validationErrors: string[] = [];
+
+      if (!safeParams.contextId.trim()) {
+        validationErrors.push('contextId cannot be empty');
+      }
+      if (!safeParams.contextType.trim()) {
+        validationErrors.push('contextType cannot be empty');
+      }
+      if (!safeParams.key.trim()) {
+        validationErrors.push('key cannot be empty');
+      }
+
+      if (validationErrors.length > 0) {
+        throw new ActionValidationError(
+          `Validation failed: ${validationErrors.join(', ')}`,
+          { fieldErrors: Object.fromEntries(validationErrors.map(e => [e.split(' ')[0], e])) }
+        );
+      }
+
+      // Process attributes safely
       const dynamicData: Record<string, any> = {};
-      params.attributes.forEach(({ name, value, dataType }) => {
-        let processedValue: any = value;
-        if (dataType === 'number') {
-          processedValue = parseFloat(value);
-          if (isNaN(processedValue)) {
-            throw new ActionValidationError(`Invalid number value for attribute '${name}'.`, {
-              fieldErrors: { [`attributes.${name}.value`]: `Value '${value}' is not a valid number.` },
-            });
-          }
-        } else if (dataType === 'boolean') {
-          processedValue = value.toLowerCase() === 'true';
+
+      try {
+        console.log(`[createContextItem Action] Before forEach. safeParams.attributes:`, safeParams.attributes);
+        console.log(`[createContextItem Action] Before forEach. Is Array: ${Array.isArray(safeParams.attributes)}`);
+        
+        if (Array.isArray(safeParams.attributes)) { // Defensive check
+          safeParams.attributes.forEach(({ name, value, dataType = 'string' }) => {
+            if (!name || !value) {
+              console.warn(`Skipping invalid attribute: name="${name}", value="${value}"`);
+              return;
+            }
+
+            switch (dataType) {
+              case 'number':
+                const num = parseFloat(value);
+                if (!isNaN(num)) {
+                  dynamicData[name] = num;
+                } else {
+                  console.warn(`Invalid number value for ${name}: ${value}`);
+                  dynamicData[name] = value; // Keep as string
+                }
+                break;
+              case 'boolean':
+                dynamicData[name] = value.toLowerCase() === 'true';
+                break;
+              default:
+                dynamicData[name] = value;
+            }
+          });
+        } // Closing brace for if (Array.isArray(safeParams.attributes))
+      } catch (error) {
+        console.error('Error processing attributes:', error);
+        // Continue with empty data rather than failing
+      } finally {
+        // Ensure the forEach loop is closed if the if-condition was added
+        if (!Array.isArray(safeParams.attributes)) {
+          console.error(`[createContextItem Action] safeParams.attributes was not an array after all defensive checks. Value:`, safeParams.attributes);
         }
-        dynamicData[name] = processedValue;
-      });
+      }
 
       const createRequest: CreateContextItemRequest = {
-        key: params.key,
+        key: safeParams.key,
         data: dynamicData, // Convert array of attributes to object
       };
 
