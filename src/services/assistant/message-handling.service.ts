@@ -399,6 +399,11 @@ export const handleSessionMessage = async (
               } else {
                 zodType = z.array(z.any()); // Default if items is not defined or not an object
               }
+              
+              // Add default for arrays
+              if (paramDef.default !== undefined) {
+                zodType = zodType.default(paramDef.default);
+              }
               break;
             case 'object':
               if (paramDef.additionalProperties === true) {
@@ -432,9 +437,9 @@ export const handleSessionMessage = async (
       const currentFuncName = funcName;
 
       const executeFunc = async (args: any) => {
-        console.log(`[Tool Execution] Function ${currentFuncName} called with args: ${JSON.stringify(args)}`);
+        console.log(`[Tool Execution] Function ${currentFuncName} called with args:`, args);
         
-        // Add Zod validation logging
+        // Continue with validation...
         const parseResult = zodSchema.safeParse(args);
         logParse(parseResult, currentFuncName, args);
         if (!parseResult.success) {

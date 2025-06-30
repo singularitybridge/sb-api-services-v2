@@ -60,6 +60,61 @@ export const getCurrentAssistant = async (
   }
 };
 
+export const getAssistantById = async (
+  sessionId: string,
+  assistantId: string,
+): Promise<{ success: boolean; description: string; data?: any }> => {
+  try {
+    const session = await Session.findById(sessionId);
+    if (!session) {
+      return { success: false, description: 'Invalid session' };
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(assistantId)) {
+      return { success: false, description: 'Invalid assistantId format' };
+    }
+
+    const assistant = await Assistant.findById(assistantId);
+    if (!assistant) {
+      return { success: false, description: 'Assistant not found' };
+    }
+
+    // Verify the assistant belongs to the same company as the session
+    if (assistant.companyId.toString() !== session.companyId.toString()) {
+      return {
+        success: false,
+        description:
+          'Access denied. Assistant does not belong to this company.',
+      };
+    }
+
+    return {
+      success: true,
+      description: 'Assistant retrieved successfully',
+      data: {
+        _id: assistant._id,
+        name: assistant.name,
+        description: assistant.description,
+        llmPrompt: assistant.llmPrompt,
+        llmProvider: assistant.llmProvider,
+        llmModel: assistant.llmModel,
+        language: assistant.language,
+        voice: assistant.voice,
+        conversationStarters: assistant.conversationStarters,
+        allowedActions: assistant.allowedActions,
+        avatarImage: assistant.avatarImage,
+        assistantId: assistant.assistantId,
+      },
+    };
+  } catch (error) {
+    console.error(`Error getting assistant ${assistantId}:`, error);
+    return {
+      success: false,
+      description: `Failed to retrieve assistant ${assistantId}`,
+    };
+  }
+};
+
 export const updateAssistantById = async (
   sessionId: string,
   assistantId: string,
