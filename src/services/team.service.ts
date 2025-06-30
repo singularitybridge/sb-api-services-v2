@@ -47,27 +47,18 @@ export const updateTeam = async (
 };
 
 export const deleteTeam = async (id: string): Promise<void> => {
-  const session = await mongoose.startSession();
   try {
-    session.startTransaction();
-
     // Remove the team from all assistants that reference it
     await Assistant.updateMany(
       { teams: id },
-      { $pull: { teams: id } },
-      { session },
+      { $pull: { teams: id } }
     );
 
     // Delete the team
-    await Team.findByIdAndDelete(id).session(session);
-
-    await session.commitTransaction();
+    await Team.findByIdAndDelete(id);
   } catch (error) {
-    await session.abortTransaction();
     console.error('Error deleting team:', error);
     throw new Error('Error deleting team');
-  } finally {
-    session.endSession();
   }
 };
 
@@ -75,24 +66,15 @@ export const assignAssistantToTeam = async (
   assistantId: string,
   teamId: string,
 ): Promise<void> => {
-  const session = await mongoose.startSession();
   try {
-    session.startTransaction();
-
     // Add team to assistant's teams array if not already present
     await Assistant.findByIdAndUpdate(
       assistantId,
-      { $addToSet: { teams: teamId } },
-      { session },
+      { $addToSet: { teams: teamId } }
     );
-
-    await session.commitTransaction();
   } catch (error) {
-    await session.abortTransaction();
     console.error('Error assigning assistant to team:', error);
     throw new Error('Error assigning assistant to team');
-  } finally {
-    session.endSession();
   }
 };
 
@@ -100,24 +82,15 @@ export const removeAssistantFromTeam = async (
   assistantId: string,
   teamId: string,
 ): Promise<void> => {
-  const session = await mongoose.startSession();
   try {
-    session.startTransaction();
-
     // Remove team from assistant's teams array
     await Assistant.findByIdAndUpdate(
       assistantId,
-      { $pull: { teams: teamId } },
-      { session },
+      { $pull: { teams: teamId } }
     );
-
-    await session.commitTransaction();
   } catch (error) {
-    await session.abortTransaction();
     console.error('Error removing assistant from team:', error);
     throw new Error('Error removing assistant from team');
-  } finally {
-    session.endSession();
   }
 };
 
