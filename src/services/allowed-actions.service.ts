@@ -5,12 +5,8 @@ export const updateAllowedActions = async (
   assistantId: string,
   allowedActions: string[],
 ): Promise<IAssistant | null> => {
-  let session = null;
   try {
-    session = await mongoose.startSession();
-    session.startTransaction();
-
-    const assistant = await Assistant.findById(assistantId).session(session);
+    const assistant = await Assistant.findById(assistantId);
     if (!assistant) {
       throw new Error('Assistant not found');
     }
@@ -22,9 +18,8 @@ export const updateAllowedActions = async (
 
     // Update the local database with the allowed actions
     assistant.allowedActions = allowedActions;
-    const updatedAssistant = await assistant.save({ session });
+    const updatedAssistant = await assistant.save();
 
-    await session.commitTransaction();
     console.log(
       `Successfully updated allowed actions for assistant ${assistantId}`,
     );
@@ -35,14 +30,7 @@ export const updateAllowedActions = async (
 
     return updatedAssistant;
   } catch (error) {
-    if (session) {
-      await session.abortTransaction();
-    }
     console.error('Error updating allowed actions:', error);
     throw error;
-  } finally {
-    if (session) {
-      session.endSession();
-    }
   }
 };
