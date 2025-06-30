@@ -219,67 +219,48 @@ export const createScytaleActions = (
   },
   createContextItem: {
     description:
-      'Creates a new context item in Scytale.',
+      'Creates a new context item in Scytale with dynamic key-value pairs.',
     parameters: {
       type: 'object' as const,
       properties: {
-        contextId: {
-          type: 'string',
-          description: 'The ID of the context.',
-        },
+        contextId: { type: 'string', description: 'The ID of the context.' },
         contextType: {
           type: 'string',
-          description:
-            'The type of context item to create (e.g., "controls", "policies").',
+          description: 'The type of context item to create (e.g., "note", "data", "reference").',
+          enum: ["note", "data", "reference", "products", "controls", "policies"], // Added common types
         },
-        key: {
-          type: 'string',
-          description: 'Unique identifier for the context item.',
-        },
-        name: {
-          type: 'string',
-          description: 'The name of the context item.',
-        },
-        description: {
-          type: 'string',
-          description: 'The description of the context item.',
-        },
-        id: {
-          type: 'string',
-          description: 'Optional custom ID for the item.',
-        },
-        category: {
-          type: 'string',
-          description: 'Optional category for the item.',
-        },
-        owner: {
-          type: 'string',
-          description: 'Optional owner of the item.',
-        },
-        tags: {
+        key: { type: 'string', description: 'Unique identifier for the context item.' },
+        attributes: {
           type: 'array',
-          description: 'Optional array of tags.',
+          description: 'An array of key-value pairs for dynamic attributes.',
           items: {
-            type: 'string',
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'The name of the attribute (e.g., "productName", "price").' },
+              value: { type: 'string', description: 'The value of the attribute (always as a string).' },
+              dataType: {
+                type: 'string',
+                description: 'Optional: The original data type of the value (e.g., "string", "number", "boolean"). Defaults to "string".',
+                enum: ["string", "number", "boolean"],
+                default: "string",
+              },
+            },
+            required: ["name", "value"],
+            additionalProperties: false, // Enforce strictness for attribute objects
           },
         },
       },
-      required: ['contextId', 'contextType', 'key', 'name', 'description'],
-      additionalProperties: false,
+      required: ['contextId', 'contextType', 'key', 'attributes'],
+      additionalProperties: false, // Enforce strictness for the root parameters object
     },
     function: async (params: {
       contextId: string;
       contextType: string;
       key: string;
-      name: string;
-      description: string;
-      id?: string;
-      category?: string;
-      owner?: string;
-      tags?: string[];
+      attributes: Array<{ name: string; value: string; dataType?: "string" | "number" | "boolean" }>;
     }) => {
       const actionName = 'createContextItem';
-      
+
       if (!params.contextId) {
         throw new ActionValidationError('contextId is required.', {
           fieldErrors: { contextId: 'contextId is required.' },
@@ -295,31 +276,31 @@ export const createScytaleActions = (
           fieldErrors: { key: 'key is required.' },
         });
       }
-      if (!params.name) {
-        throw new ActionValidationError('name is required.', {
-          fieldErrors: { name: 'name is required.' },
-        });
-      }
-      if (!params.description) {
-        throw new ActionValidationError('description is required.', {
-          fieldErrors: { description: 'description is required.' },
+      if (!params.attributes || !Array.isArray(params.attributes)) {
+        throw new ActionValidationError('attributes is required and must be an array.', {
+          fieldErrors: { attributes: 'attributes is required and must be an array.' },
         });
       }
 
+      const dynamicData: Record<string, any> = {};
+      params.attributes.forEach(({ name, value, dataType }) => {
+        let processedValue: any = value;
+        if (dataType === 'number') {
+          processedValue = parseFloat(value);
+          if (isNaN(processedValue)) {
+            throw new ActionValidationError(`Invalid number value for attribute '${name}'.`, {
+              fieldErrors: { [`attributes.${name}.value`]: `Value '${value}' is not a valid number.` },
+            });
+          }
+        } else if (dataType === 'boolean') {
+          processedValue = value.toLowerCase() === 'true';
+        }
+        dynamicData[name] = processedValue;
+      });
+
       const createRequest: CreateContextItemRequest = {
         key: params.key,
-        data: {
-          name: params.name,
-          description: params.description,
-        },
-        ...(params.id && { id: params.id }),
-        ...(params.category || params.owner ? {
-          metadata: {
-            ...(params.category && { category: params.category }),
-            ...(params.owner && { owner: params.owner }),
-          }
-        } : {}),
-        ...(params.tags && { tags: params.tags }),
+        data: dynamicData, // Convert array of attributes to object
       };
 
       return executeAction<CreateContextItemResponse>(

@@ -14,7 +14,7 @@ export const summarizeText = async (
     apiKey,
     systemPrompt,
     userInput,
-    'gpt-4o-mini',
+    'gpt-4.1-mini',
     0.7,
   );
 };
@@ -54,7 +54,7 @@ export const getCompletionResponse = async (
   apiKey: string,
   systemPrompt: string,
   userInput: string,
-  model: string = 'gpt-4o-mini',
+  model: string = 'gpt-4.1-mini',
   temperature: number = 0.7,
   pdfUrl?: string,
 ): Promise<string> => {

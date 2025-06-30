@@ -32,6 +32,15 @@ const cleanActionAnnotations = (text: string): string => {
     .trim();
 };
 
+// Helper function for Zod parsing diagnostics
+function logParse(result: z.SafeParseReturnType<any, any>, fnName: string, raw: any) {
+  if (!result.success) {
+    console.error(`[ToolArgError] ${fnName} args failed Zod parse`, {
+      raw, issues: result.error.issues
+    });
+  }
+}
+
 // Helper function to generate unique message IDs
 const generateMessageId = (): string => {
   return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -199,16 +208,55 @@ export const executeAssistantStateless = async (
               zodType = z.boolean();
               break;
             case 'array':
-              if (paramDef.items && paramDef.items.type === 'string')
-                zodType = z.array(z.string());
-              else if (paramDef.items && paramDef.items.type === 'number')
-                zodType = z.array(z.number());
-              else if (paramDef.items && paramDef.items.type === 'boolean')
-                zodType = z.array(z.boolean());
-              else zodType = z.array(z.any());
+              if (paramDef.items && typeof paramDef.items === 'object') {
+                if (paramDef.items.type === 'object' && paramDef.items.properties) {
+                  // Handle array of objects, like the 'attributes' array
+                  const itemZodShape: Record<string, ZodTypeAny> = {};
+                  for (const itemPropName in paramDef.items.properties) {
+                    const itemPropDef = paramDef.items.properties[itemPropName] as any;
+                    let itemZodType: ZodTypeAny;
+                    switch (itemPropDef.type) {
+                      case 'string': itemZodType = z.string(); break;
+                      case 'number': itemZodType = z.number(); break;
+                      case 'boolean': itemZodType = z.boolean(); break;
+                      case 'array': itemZodType = z.array(z.any()); break; // Nested arrays
+                      case 'object': itemZodType = z.record(z.string(), z.any()); break; // Nested objects
+                      default: itemZodType = z.any();
+                    }
+                    if (itemPropDef.description) itemZodType = itemZodType.describe(itemPropDef.description);
+                    if (paramDef.items.required && !paramDef.items.required.includes(itemPropName)) {
+                      itemZodType = itemZodType.optional();
+                    }
+                    itemZodShape[itemPropName] = itemZodType;
+                  }
+                  zodType = z.array(z.object(itemZodShape));
+                } else if (paramDef.items.type === 'string') {
+                  zodType = z.array(z.string());
+                } else if (paramDef.items.type === 'number') {
+                  zodType = z.array(z.number());
+                } else if (paramDef.items.type === 'boolean') {
+                  zodType = z.array(z.boolean());
+                } else {
+                  zodType = z.array(z.any()); // Fallback for other primitive types or if type is not specified
+                }
+              } else {
+                zodType = z.array(z.any()); // Default if items is not defined or not an object
+              }
               break;
             case 'object':
-              zodType = z.record(z.string(), z.any());
+              if (paramDef.additionalProperties === true) {
+                // open spec: any JSON value
+                zodType = z.record(z.string(), z.any());
+              } else if (typeof paramDef.additionalProperties === 'object') {
+                const t = paramDef.additionalProperties.type;
+                zodType =
+                  t === 'string'  ? z.record(z.string(), z.string())  :
+                  t === 'number'  ? z.record(z.string(), z.number())  :
+                  t === 'boolean' ? z.record(z.string(), z.boolean()) :
+                                    z.record(z.string(), z.any());
+              } else {
+                zodType = z.record(z.string(), z.any());
+              }
               break;
             default:
               zodType = z.any();
@@ -233,6 +281,17 @@ export const executeAssistantStateless = async (
             `[Stateless Tool Execution] Attempting to execute function: ${currentFuncName} with args:`,
             args,
           );
+          
+          // Add Zod validation logging
+          const parseResult = zodSchema.safeParse(args);
+          logParse(parseResult, currentFuncName, args);
+          if (!parseResult.success) {
+            const errorMessage = `Invalid arguments for tool ${currentFuncName}: ${JSON.stringify(parseResult.error.issues)}`;
+            console.error(`[Stateless Tool Execution] ${errorMessage}`);
+            // Return an error object that the LLM can process as a tool result
+            return { success: false, error: errorMessage };
+          }
+
           // Directly use the functionFactory created with the stateless actionContext
           const factoryForStateless = await createFunctionFactory(
             actionContext,
@@ -293,7 +352,7 @@ export const executeAssistantStateless = async (
     toolsCache.set(cacheKey, toolsForSdk);
   }
 
-  let modelIdentifier = assistant.llmModel || 'gpt-4o-mini';
+  let modelIdentifier = assistant.llmModel || 'gpt-4.1-mini';
   const llmApiKey = await getApiKey(companyId, `${providerKey}_api_key`);
   if (!llmApiKey)
     throw new Error(`${providerKey} API key not found for company.`);
