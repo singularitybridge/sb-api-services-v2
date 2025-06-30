@@ -12,7 +12,7 @@ completionRouter.post(
     const {
       systemPrompt,
       userInput,
-      model = 'gpt-4o-mini',
+      model = 'gpt-4.1-mini',
       temperature,
       pdfUrl,
     } = req.body;

@@ -7,8 +7,10 @@ import { initializeTelegramBots } from './services/telegram.bot';
 import { initializeWebSocket } from './services/websocket';
 import http from 'http';
 import { logger } from './utils/logger';
+import { applyToolArgPatch } from './patch-empty-args'; // Import the patch
 
 const initializeApp = async () => {
+  applyToolArgPatch(); // Apply the patch at startup
   try {
     logger.info('Attempting to connect to MongoDB...');
     const dbUri = process.env.MONGODB_URI || '';

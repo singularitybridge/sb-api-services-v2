@@ -42,6 +42,15 @@ const cleanActionAnnotations = (text: string): string => {
     .trim();
 };
 
+// Helper function for Zod parsing diagnostics
+function logParse(result: z.SafeParseReturnType<any, any>, fnName: string, raw: any) {
+  if (!result.success) {
+    console.error(`[ToolArgError] ${fnName} args failed Zod parse`, {
+      raw, issues: result.error.issues
+    });
+  }
+}
+
 const saveSystemMessage = async (
   sessionId: mongoose.Types.ObjectId,
   assistantId: mongoose.Types.ObjectId,
@@ -356,16 +365,55 @@ export const handleSessionMessage = async (
               zodType = z.boolean();
               break;
             case 'array':
-              if (paramDef.items && paramDef.items.type === 'string')
-                zodType = z.array(z.string());
-              else if (paramDef.items && paramDef.items.type === 'number')
-                zodType = z.array(z.number());
-              else if (paramDef.items && paramDef.items.type === 'boolean')
-                zodType = z.array(z.boolean());
-              else zodType = z.array(z.any());
+              if (paramDef.items && typeof paramDef.items === 'object') {
+                if (paramDef.items.type === 'object' && paramDef.items.properties) {
+                  // Handle array of objects, like the 'attributes' array
+                  const itemZodShape: Record<string, ZodTypeAny> = {};
+                  for (const itemPropName in paramDef.items.properties) {
+                    const itemPropDef = paramDef.items.properties[itemPropName] as any;
+                    let itemZodType: ZodTypeAny;
+                    switch (itemPropDef.type) {
+                      case 'string': itemZodType = z.string(); break;
+                      case 'number': itemZodType = z.number(); break;
+                      case 'boolean': itemZodType = z.boolean(); break;
+                      case 'array': itemZodType = z.array(z.any()); break; // Nested arrays
+                      case 'object': itemZodType = z.record(z.string(), z.any()); break; // Nested objects
+                      default: itemZodType = z.any();
+                    }
+                    if (itemPropDef.description) itemZodType = itemZodType.describe(itemPropDef.description);
+                    if (paramDef.items.required && !paramDef.items.required.includes(itemPropName)) {
+                      itemZodType = itemZodType.optional();
+                    }
+                    itemZodShape[itemPropName] = itemZodType;
+                  }
+                  zodType = z.array(z.object(itemZodShape));
+                } else if (paramDef.items.type === 'string') {
+                  zodType = z.array(z.string());
+                } else if (paramDef.items.type === 'number') {
+                  zodType = z.array(z.number());
+                } else if (paramDef.items.type === 'boolean') {
+                  zodType = z.array(z.boolean());
+                } else {
+                  zodType = z.array(z.any()); // Fallback for other primitive types or if type is not specified
+                }
+              } else {
+                zodType = z.array(z.any()); // Default if items is not defined or not an object
+              }
               break;
             case 'object':
-              zodType = z.record(z.string(), z.any());
+              if (paramDef.additionalProperties === true) {
+                // open spec: any JSON value
+                zodType = z.record(z.string(), z.any());
+              } else if (typeof paramDef.additionalProperties === 'object') {
+                const t = paramDef.additionalProperties.type;
+                zodType =
+                  t === 'string'  ? z.record(z.string(), z.string())  :
+                  t === 'number'  ? z.record(z.string(), z.number())  :
+                  t === 'boolean' ? z.record(z.string(), z.boolean()) :
+                                    z.record(z.string(), z.any());
+              } else {
+                zodType = z.record(z.string(), z.any());
+              }
               break;
             default:
               zodType = z.any();
@@ -384,12 +432,24 @@ export const handleSessionMessage = async (
       const currentFuncName = funcName;
 
       const executeFunc = async (args: any) => {
-        // console.log(`[Tool Execution] Function ${currentFuncName} called with sessionId from closure: ${sessionId}`);
+        console.log(`[Tool Execution] Function ${currentFuncName} called with args: ${JSON.stringify(args)}`);
+        
+        // Add Zod validation logging
+        const parseResult = zodSchema.safeParse(args);
+        logParse(parseResult, currentFuncName, args);
+        if (!parseResult.success) {
+          const errorMessage = `Invalid arguments for tool ${currentFuncName}: ${JSON.stringify(parseResult.error.issues)}`;
+          console.error(`[Tool Execution] ${errorMessage}`);
+          // Return an error object that the LLM can process as a tool result
+          return { success: false, error: errorMessage };
+        }
+
         const currentSession = await Session.findById(sessionId);
         if (!currentSession) {
+          console.error(`[Tool Execution] Session not found during tool execution for sessionId: ${sessionId}`);
           throw new Error('Session not found during tool execution');
         }
-        // console.log(`[Tool Execution] Retrieved current session ID: ${currentSession._id.toString()}, company ID: ${currentSession.companyId.toString()}`);
+        console.log(`[Tool Execution] Retrieved current session ID: ${currentSession._id.toString()}, company ID: ${currentSession.companyId.toString()}`);
 
         const functionCallPayload: FunctionCall = {
           function: { name: currentFuncName, arguments: JSON.stringify(args) },
@@ -421,7 +481,7 @@ export const handleSessionMessage = async (
     // console.log(`Cached toolsForSdk for assistant ${assistant._id}`);
   }
 
-  let modelIdentifier = assistant.llmModel || 'gpt-4o-mini';
+  let modelIdentifier = assistant.llmModel || 'gpt-4.1-mini';
   console.log(
     `[handleSessionMessage] About to get API key for provider ${providerKey} and company ${session.companyId.toString()}`,
   );
@@ -608,10 +668,17 @@ export const handleSessionMessage = async (
           const toolCalls = await streamResult.toolCalls;
           const toolResults = await streamResult.toolResults;
 
-          // console.log('Stream finished, saving full assistant message to DB.');
-          // if (finalText) console.log('Final text length (for DB):', finalText.length);
-          // if (toolCalls) console.log('Tool Calls (for DB):', JSON.stringify(toolCalls, null, 2));
-          // if (toolResults) console.log('Tool Results (for DB):', JSON.stringify(toolResults, null, 2));
+          console.log(`[handleSessionMessage] Stream finished. Final text length: ${finalText.length}`);
+          if (toolCalls && toolCalls.length > 0) {
+            console.log(`[handleSessionMessage] Detected Tool Calls: ${JSON.stringify(toolCalls, null, 2)}`);
+          } else {
+            console.log('[handleSessionMessage] No tool calls detected in streamResult.');
+          }
+          if (toolResults && toolResults.length > 0) {
+            console.log(`[handleSessionMessage] Detected Tool Results: ${JSON.stringify(toolResults, null, 2)}`);
+          } else {
+            console.log('[handleSessionMessage] No tool results detected in streamResult.');
+          }
 
           const cleanedText = cleanActionAnnotations(finalText);
           const processedResponse = await processTemplate(
