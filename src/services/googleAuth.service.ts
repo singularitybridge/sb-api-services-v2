@@ -9,7 +9,7 @@ const G_CLIENT_ID_ENV: string | undefined = process.env.G_CLIENT_ID;
 let client: OAuth2Client | undefined;
 
 if (G_CLIENT_ID_ENV) {
-  client = new OAuth2Client(G_CLIENT_ID_ENV);
+  client = new OAuth2Client(G_CLIENT_ID_ENV, undefined, 'postmessage');
 } else {
   console.warn(
     'G_CLIENT_ID not found in environment variables. Google login will not be available.',
