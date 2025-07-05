@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { Company } from '../models/Company';
 import { User, IUser } from '../models/User';
 import { decryptData } from './encryption.service';
+import { AuthenticationError } from '../utils/errors';
 
 export const verifyToken = async (
   token: string,
@@ -45,11 +46,11 @@ export const extractTokenFromHeader = (
   authHeader: string | undefined,
 ): string => {
   if (!authHeader) {
-    throw new Error('No authorization header provided');
+    throw new AuthenticationError('No authorization header provided');
   }
   const parts = authHeader.split(' ');
   if (parts.length !== 2 || parts[0] !== 'Bearer') {
-    throw new Error('Invalid authorization header format');
+    throw new AuthenticationError('Invalid authorization header format');
   }
   return parts[1];
 };

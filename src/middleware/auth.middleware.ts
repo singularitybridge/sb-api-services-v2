@@ -5,6 +5,7 @@ import { Company } from '../models/Company';
 import { IUser } from '../models/User';
 import { logger } from '../utils/logger';
 import { ApiKeyService } from '../services/apiKey.service';
+import { AuthenticationError } from '../utils/errors';
 
 export interface AuthenticatedRequest extends Request {
   user?: IUser;
@@ -19,46 +20,38 @@ export const verifyTokenMiddleware = async (
   try {
     const authHeader = req.headers.authorization;
 
-    // Check if it's an API key (starts with 'Bearer sk_live_')
-    if (authHeader && authHeader.startsWith('Bearer sk_live_')) {
-      const apiKey = authHeader.substring(7); // Remove 'Bearer ' prefix
+    if (!authHeader) {
+      throw new AuthenticationError('No authorization header provided');
+    }
+
+    if (authHeader.startsWith('Bearer sk_live_')) {
+      const apiKey = authHeader.substring(7);
       const result = await ApiKeyService.validateApiKey(apiKey);
 
       if (!result) {
-        throw new Error('Invalid or expired API key');
+        throw new AuthenticationError('Invalid or expired API key');
       }
 
       req.user = result.user;
       req.company = result.company;
-
-      // Add API key metadata to request for logging/rate limiting
       (req as any).apiKeyId = result.apiKeyDoc._id;
       (req as any).isApiKeyAuth = true;
+    } else {
+      const token = extractTokenFromHeader(authHeader);
+      const { user, company } = await verifyToken(token);
 
-      return next();
+      if (!company || !company._id) {
+        throw new AuthenticationError('Company or Company ID is missing');
+      }
+
+      req.user = user;
+      req.company = company;
+      (req as any).isApiKeyAuth = false;
     }
-
-    // Otherwise, it's a JWT token
-    const token = extractTokenFromHeader(authHeader);
-    const { user, company } = await verifyToken(token);
-
-    if (!company || !company._id) {
-      throw new Error('Company or Company ID is missing');
-    }
-
-    req.user = user;
-    req.company = company;
-    (req as any).isApiKeyAuth = false;
 
     next();
-  } catch (error: any) {
-    logger.error('Error verifying authentication', {
-      error: error.message,
-      stack: error.stack,
-    });
-    res
-      .status(401)
-      .json({ message: 'Authentication failed: ' + error.message });
+  } catch (error) {
+    next(error);
   }
 };
 
