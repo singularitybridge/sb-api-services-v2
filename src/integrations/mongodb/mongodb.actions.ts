@@ -322,4 +322,39 @@ export const createMongoDbActions = (
       );
     },
   },
+
+  connectToDatabase: {
+    description: 'Connect to a new MongoDB database instance',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        connectionString: {
+          type: 'string',
+          description: 'The MongoDB connection string (e.g., mongodb://user:pass@host:port/db)',
+        },
+      },
+      required: ['connectionString'],
+      additionalProperties: false,
+    },
+    function: async (params: {
+      connectionString: string;
+    }): Promise<StandardActionResult<MessageData>> => {
+      if (!params.connectionString)
+        throw new ActionValidationError('connectionString parameter is required.');
+      
+      return executeAction<MessageData, ServiceLambdaResponse<MessageData>>(
+        'connectToDatabase',
+        async () => {
+          await mongoDbService.connectToDatabase(params.connectionString);
+          const dbName = await mongoDbService.getCurrentDatabase();
+          return {
+            success: true,
+            data: { message: `Successfully connected to database: ${dbName}` },
+          };
+        },
+        { serviceName: SERVICE_NAME },
+      );
+    },
+  },
 });

@@ -1,6 +1,15 @@
 import { handleUserQuery } from './mongodb.query.service';
 import { logger } from '../../utils/logger';
-import mongoose from 'mongoose';
+import mongoose, { Connection } from 'mongoose';
+
+let aoiConnection: Connection | null = null;
+
+export const getAoiConnection = (): Connection => {
+  if (!aoiConnection) {
+    throw new Error('No active MongoDB connection. Please use the connectToDatabase action first.');
+  }
+  return aoiConnection;
+};
 
 interface QueryResult {
   success: boolean;
@@ -11,9 +20,29 @@ interface QueryResult {
 }
 
 export const mongoDbService = {
+  async connectToDatabase(connectionString: string): Promise<void> {
+    try {
+      if (aoiConnection) {
+        await aoiConnection.close();
+        aoiConnection = null;
+        logger.info('Closed existing AOI MongoDB connection.');
+      }
+
+      logger.info(`Attempting to connect to new MongoDB instance...`);
+      const newConnection = await mongoose.createConnection(connectionString).asPromise();
+      aoiConnection = newConnection;
+      logger.info(`Successfully connected to new MongoDB instance.`);
+      
+    } catch (error) {
+      logger.error('Error connecting to new MongoDB instance:', error);
+      throw new Error('Failed to connect to new MongoDB instance');
+    }
+  },
+
   async getCurrentDatabase(): Promise<string> {
     try {
-      return mongoose.connection.db.databaseName;
+      const conn = getAoiConnection();
+      return conn.db.databaseName;
     } catch (error) {
       logger.error('Error getting current database:', error);
       throw new Error('Failed to get current database name');
@@ -22,7 +51,8 @@ export const mongoDbService = {
 
   async listDatabases(): Promise<string[]> {
     try {
-      const adminDb = mongoose.connection.db.admin();
+      const conn = getAoiConnection();
+      const adminDb = conn.db.admin();
       const dbs = await adminDb.listDatabases();
       return dbs.databases.map((db) => db.name);
     } catch (error) {
@@ -33,7 +63,8 @@ export const mongoDbService = {
 
   async useDatabase(dbName: string): Promise<void> {
     try {
-      await mongoose.connection.useDb(dbName, { useCache: true });
+      const conn = getAoiConnection();
+      await conn.useDb(dbName, { useCache: true });
       console.log(`Switched to database ${dbName}`);
     } catch (error) {
       logger.error(`Error switching to database ${dbName}:`, error);
@@ -43,9 +74,8 @@ export const mongoDbService = {
 
   async listCollections(): Promise<string[]> {
     try {
-      const collections = await mongoose.connection.db
-        .listCollections()
-        .toArray();
+      const conn = getAoiConnection();
+      const collections = await conn.db.listCollections().toArray();
       return collections.map((col) => col.name);
     } catch (error) {
       logger.error('Error listing collections:', error);
@@ -55,7 +85,8 @@ export const mongoDbService = {
 
   async describeCollection(collectionName: string): Promise<any> {
     try {
-      return await mongoose.connection.db.command({
+      const conn = getAoiConnection();
+      return await conn.db.command({
         collStats: collectionName,
       });
     } catch (error) {
@@ -66,9 +97,8 @@ export const mongoDbService = {
 
   async countDocuments(collectionName: string): Promise<number> {
     try {
-      return await mongoose.connection.db
-        .collection(collectionName)
-        .countDocuments();
+      const conn = getAoiConnection();
+      return await conn.db.collection(collectionName).countDocuments();
     } catch (error) {
       logger.error(
         `Error counting documents in collection ${collectionName}:`,
@@ -115,8 +145,8 @@ export const mongoDbService = {
       if (!collectionName || !pipeline || !Array.isArray(pipeline)) {
         throw new Error('Invalid aggregation parameters');
       }
-
-      const collection = mongoose.connection.db.collection(collectionName);
+      const conn = getAoiConnection();
+      const collection = conn.db.collection(collectionName);
       const results = await collection.aggregate(pipeline).toArray();
 
       return {

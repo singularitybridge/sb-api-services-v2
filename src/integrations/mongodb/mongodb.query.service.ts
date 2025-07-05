@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { Collection, Filter, Sort, UpdateFilter, ObjectId } from 'mongodb';
 import { logger } from '../../utils/logger';
+import { getAoiConnection } from './mongodb.service';
 
 // Define the type for query parameters
 type QueryParams = {
@@ -16,7 +17,8 @@ type QueryParams = {
 
 // Get a collection
 const getCollection = (collectionName: string): Collection => {
-  return mongoose.connection.db.collection(
+  const conn = getAoiConnection();
+  return conn.db.collection(
     collectionName,
   ) as unknown as Collection;
 };
@@ -28,7 +30,8 @@ const executeQuery = async (queryParams: QueryParams): Promise<any> => {
       'Executing query with params:',
       JSON.stringify(queryParams, null, 2),
     );
-    logger.log('Connected to database:', mongoose.connection.db.databaseName);
+    const conn = getAoiConnection();
+    logger.log('Connected to database:', conn.db.databaseName);
 
     const collection = getCollection(queryParams.collection);
 

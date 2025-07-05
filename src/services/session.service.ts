@@ -1,6 +1,6 @@
 import { Assistant } from '../models/Assistant';
 import { ISession, Session } from '../models/Session';
-import { CustomError, NotFoundError } from '../utils/errors';
+import { CustomError, NotFoundError, BadRequestError } from '../utils/errors';
 // OpenAI thread service calls removed as it's deprecated in favor of Vercel AI
 import { ChannelType } from '../types/ChannelType';
 import { getApiKey, ApiKeyType } from './api.key.service';
@@ -161,10 +161,9 @@ export const getSessionOrCreate = async (
   if (!assistantToUseId) {
     const defaultAssistant = await Assistant.findOne({ companyId });
     if (!defaultAssistant) {
-      console.error(
-        `No default assistant available for companyId: ${companyId}`,
+      throw new BadRequestError(
+        'No default assistant available for this company. Please configure a default assistant.',
       );
-      throw new Error('No default assistant available for this company');
     }
     assistantToUseId = defaultAssistant._id;
   }
