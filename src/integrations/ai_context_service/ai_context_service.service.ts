@@ -2,16 +2,16 @@ import fetch from 'node-fetch';
 import { getApiKey } from '../../services/api.key.service';
 
 /**
- * Helper function to get Scytale API configuration
+ * Helper function to get AI Context Service API configuration
  * @param companyId The ID of the company
- * @returns The base URL and auth token for Scytale API
+ * @returns The base URL and auth token for AI Context Service API
  */
-const getScytaleConfig = async (companyId: string) => {
-  let baseUrl = await getApiKey(companyId, 'scytale_base_url');
-  const authToken = await getApiKey(companyId, 'scytale_auth_token');
+const getAIContextServiceConfig = async (companyId: string) => {
+  let baseUrl = await getApiKey(companyId, 'ai_context_service_base_url');
+  const authToken = await getApiKey(companyId, 'ai_context_service_auth_token');
 
   if (!baseUrl) {
-    throw new Error('Scytale Base URL not configured.');
+    throw new Error('AI Context Service Base URL not configured.');
   }
 
   // Ensure the base URL ends with /context if it's missing
@@ -90,7 +90,7 @@ export const getContextTypes = async (
   error?: string;
 }> => {
   try {
-    const { baseUrl, authToken } = await getScytaleConfig(companyId);
+    const { baseUrl, authToken } = await getAIContextServiceConfig(companyId);
     const url = `${baseUrl}/${contextId}/types`;
     const headers: Record<string, string> = {};
     if (authToken) {
@@ -134,7 +134,7 @@ export const getIndexingStatus = async (
   error?: string;
 }> => {
   try {
-    const { baseUrl, authToken } = await getScytaleConfig(companyId);
+    const { baseUrl, authToken } = await getAIContextServiceConfig(companyId);
     const url = `${baseUrl}/indexing-status`;
     const headers: Record<string, string> = {};
     if (authToken) {
@@ -179,7 +179,7 @@ export const getContextItems = async (
     throw new Error('Both contextId and contextType parameters are required.');
   }
   try {
-    const { baseUrl, authToken } = await getScytaleConfig(companyId);
+    const { baseUrl, authToken } = await getAIContextServiceConfig(companyId);
     let url = `${baseUrl}/${contextId}/${contextType}/items`;
     const queryParams = new URLSearchParams();
     if (limit !== undefined) {
@@ -243,7 +243,7 @@ export const vectorSearch = async (
     );
   }
   try {
-    const { baseUrl, authToken } = await getScytaleConfig(companyId);
+    const { baseUrl, authToken } = await getAIContextServiceConfig(companyId);
     const url = `${baseUrl}/${contextId}/search`;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -279,7 +279,7 @@ export const vectorSearch = async (
 };
 
 /**
- * Creates a new context item in Scytale.
+ * Creates a new context item in AI Context Service.
  * @param companyId The ID of the company.
  * @param contextId The ID of the context.
  * @param contextType The type of context item (e.g., 'controls', 'policies').
@@ -303,7 +303,7 @@ export const createContextItem = async (
   }
   
   try {
-    const { baseUrl, authToken } = await getScytaleConfig(companyId);
+    const { baseUrl, authToken } = await getAIContextServiceConfig(companyId);
     const url = `${baseUrl}/${contextId}/${contextType}/items`;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
