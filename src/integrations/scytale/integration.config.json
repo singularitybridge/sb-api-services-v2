@@ -1,7 +1,0 @@
-{
-  "name": "scytale",
-  "icon": "scytale",
-  "apiKeyName": "scytale_api_key",
-  "actionCreator": "createScytaleActions",
-  "actionsFile": "scytale.actions.ts"
-}

@@ -1,5 +1,5 @@
 {
-  "serviceName": "Scytale AI",
+  "serviceName": "AI Context Service",
   "getContextTypes": {
     "actionTitle": "Get Context Types",
     "description": "Fetches the list of available context types (e.g., audits, controls, policies) for a given context."
@@ -18,6 +18,6 @@
   },
   "createContextItem": {
     "actionTitle": "Create Context Item",
-    "description": "Creates a new context item in Scytale with flexible data structure."
+    "description": "Creates a new context item in AI Context Service with flexible data structure."
   }
 }

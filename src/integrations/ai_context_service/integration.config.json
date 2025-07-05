@@ -1,0 +1,7 @@
+{
+  "name": "ai_context_service",
+  "icon": "ai_context_service",
+  "apiKeyName": "ai_context_service_api_key",
+  "actionCreator": "createAIContextServiceActions",
+  "actionsFile": "ai_context_service.actions.ts"
+}

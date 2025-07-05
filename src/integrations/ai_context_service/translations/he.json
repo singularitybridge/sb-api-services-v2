@@ -1,5 +1,5 @@
 {
-  "serviceName": "Scytale AI",
+  "serviceName": "שירות הקשר AI",
   "getContextTypes": {
     "actionTitle": "קבל סוגי הקשר",
     "description": "מאחזר את רשימת סוגי ההקשר הזמינים (למשל ביקורות, בקרות, מדיניות) עבור הקשר נתון."
@@ -18,6 +18,6 @@
   },
   "createContextItem": {
     "actionTitle": "צור פריט הקשר",
-    "description": "יוצר פריט הקשר חדש ב-Scytale עם מבנה נתונים גמיש."
+    "description": "יוצר פריט הקשר חדש בשירות הקשר AI עם מבנה נתונים גמיש."
   }
 }

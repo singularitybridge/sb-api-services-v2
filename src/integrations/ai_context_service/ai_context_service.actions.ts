@@ -12,11 +12,11 @@ import {
   IndexingStatusResponse,
   CreateContextItemRequest,
   CreateContextItemResponse,
-} from './scytale.service';
+} from './ai_context_service.service';
 import { executeAction } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
 
-export const createScytaleActions = (
+export const createAIContextServiceActions = (
   context: ActionContext,
 ): FunctionFactory => ({
   getContextTypes: {
@@ -57,7 +57,7 @@ export const createScytaleActions = (
           }
           return serviceResult;
         },
-        { serviceName: 'ScytaleService' },
+        { serviceName: 'AIContextService' },
       );
     },
   },
@@ -127,7 +127,7 @@ export const createScytaleActions = (
           }
           return serviceResult;
         },
-        { serviceName: 'ScytaleService' },
+        { serviceName: 'AIContextService' },
       );
     },
   },
@@ -185,7 +185,7 @@ export const createScytaleActions = (
           }
           return serviceResult;
         },
-        { serviceName: 'ScytaleService' },
+        { serviceName: 'AIContextService' },
       );
     },
   },
@@ -213,13 +213,13 @@ export const createScytaleActions = (
           }
           return serviceResult;
         },
-        { serviceName: 'ScytaleService' },
+        { serviceName: 'AIContextService' },
       );
     },
   },
   createContextItem: {
     description:
-      'Creates a new context item in Scytale with dynamic key-value pairs.',
+      'Creates a new context item in AI Context Service with dynamic key-value pairs.',
     parameters: {
       type: 'object' as const,
       properties: {
@@ -368,7 +368,7 @@ export const createScytaleActions = (
           }
           return serviceResult;
         },
-        { serviceName: 'ScytaleService' },
+        { serviceName: 'AIContextService' },
       );
     },
   },
