@@ -42,7 +42,9 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
     function: async (): Promise<StandardActionResult<GetAssistantsData>> => {
       return executeAction<GetAssistantsData>(
         'getAssistants',
-        () => getAssistantsService(context.sessionId),
+        () => context.isStateless 
+          ? getAssistantsService(context.sessionId, context.companyId)
+          : getAssistantsService(context.sessionId),
         {
           serviceName: ASSISTANT_SERVICE_NAME,
           successMessage: 'Assistants retrieved successfully.',
@@ -329,7 +331,9 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
           // const teamData = await getTeamsService(context.sessionId);
           // return { success: true, data: teamData, description: 'Teams retrieved successfully.' };
           // If it returns { success, data, description }
-          return getTeamsService(context.sessionId);
+          return context.isStateless 
+            ? getTeamsService(context.sessionId, context.companyId)
+            : getTeamsService(context.sessionId);
         },
         {
           serviceName: ASSISTANT_SERVICE_NAME,
@@ -364,7 +368,9 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
     }): Promise<StandardActionResult<GetAssistantsByTeamData>> => {
       return executeAction<GetAssistantsByTeamData>(
         'getAssistantsByTeam',
-        () => getAssistantsByTeamService(context.sessionId, teamId, lean),
+        () => context.isStateless 
+          ? getAssistantsByTeamService(context.sessionId, teamId, lean, context.companyId)
+          : getAssistantsByTeamService(context.sessionId, teamId, lean),
         {
           serviceName: ASSISTANT_SERVICE_NAME,
           successMessage: 'Assistants for team retrieved successfully.',
