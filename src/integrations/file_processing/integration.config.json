@@ -1,0 +1,7 @@
+{
+  "name": "file_processing",
+  "icon": "file_processing",
+  "apiKeyName": "file_processing_api_key",
+  "actionCreator": "createFileProcessingActions",
+  "actionsFile": "file_processing.actions.ts"
+}
