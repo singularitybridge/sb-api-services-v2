@@ -1,0 +1,7 @@
+{
+  "serviceName": "File Processing Service",
+  "processFile": {
+    "actionTitle": "Process File from URL",
+    "description": "Downloads a file from a URL and processes it. Supports text files and Excel spreadsheets, returning content in a readable format."
+  }
+}
