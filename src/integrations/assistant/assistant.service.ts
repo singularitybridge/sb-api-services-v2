@@ -209,17 +209,31 @@ export const updateAssistantById = async (
 
 export const getAssistants = async (
   sessionId: string,
+  companyId?: string,
 ): Promise<{ success: boolean; description: string; data?: any }> => {
   try {
-    const session = await Session.findById(sessionId);
-    if (!session) {
+    let effectiveCompanyId = companyId;
+    
+    if (sessionId !== 'stateless_execution') {
+      const session = await Session.findById(sessionId);
+      if (!session) {
+        return {
+          success: false,
+          description: 'Invalid session',
+        };
+      }
+      effectiveCompanyId = session.companyId.toString();
+    }
+    
+    if (!effectiveCompanyId) {
       return {
         success: false,
-        description: 'Invalid session',
+        description: 'Company ID is required for stateless execution.',
       };
     }
+    
     const assistants = await Assistant.find(
-      { companyId: session.companyId },
+      { companyId: effectiveCompanyId },
       { _id: 1, name: 1, description: 1 },
     );
     return {
@@ -484,15 +498,26 @@ export const askAnotherAssistant = async (
 
 export const getTeams = async (
   sessionId: string,
+  companyId?: string,
 ): Promise<{ success: boolean; description: string; data: ITeam[] }> => {
   try {
-    const session = await Session.findById(sessionId);
-    if (!session) {
-      // Throw error to be caught by executeAction or higher level handler
-      throw new Error('Invalid session');
+    let effectiveCompanyId = companyId;
+    
+    if (sessionId !== 'stateless_execution') {
+      const session = await Session.findById(sessionId);
+      if (!session) {
+        // Throw error to be caught by executeAction or higher level handler
+        throw new Error('Invalid session');
+      }
+      effectiveCompanyId = session.companyId.toString();
     }
+    
+    if (!effectiveCompanyId) {
+      throw new Error('Company ID is required for stateless execution.');
+    }
+    
     const teams = await Team.find(
-      { companyId: session.companyId },
+      { companyId: effectiveCompanyId },
       { _id: 1, name: 1, description: 1, icon: 1 },
     );
     // Team.find returns ITeam[] (empty if none). This is correct.
@@ -516,15 +541,25 @@ export const getAssistantsByTeam = async (
   sessionId: string,
   teamId: string,
   lean: boolean = true,
+  companyId?: string,
 ): Promise<{
   success: boolean;
   description: string;
   data: Partial<IAssistant>[] | IAssistant[];
 }> => {
   try {
-    const session = await Session.findById(sessionId);
-    if (!session) {
-      throw new Error('Invalid session');
+    let effectiveCompanyId = companyId;
+    
+    if (sessionId !== 'stateless_execution') {
+      const session = await Session.findById(sessionId);
+      if (!session) {
+        throw new Error('Invalid session');
+      }
+      effectiveCompanyId = session.companyId.toString();
+    }
+    
+    if (!effectiveCompanyId) {
+      throw new Error('Company ID is required for stateless execution.');
     }
 
     if (!mongoose.Types.ObjectId.isValid(teamId)) {
@@ -533,7 +568,7 @@ export const getAssistantsByTeam = async (
 
     const team = await Team.findOne({
       _id: teamId,
-      companyId: session.companyId,
+      companyId: effectiveCompanyId,
     });
     if (!team) {
       // If team not found, it implies no assistants can be found for it under this company.
@@ -548,7 +583,7 @@ export const getAssistantsByTeam = async (
       ? { _id: 1, name: 1, description: 1, avatarImage: 1 }
       : {};
     const assistants = await Assistant.find(
-      { companyId: session.companyId, teams: teamId },
+      { companyId: effectiveCompanyId, teams: teamId },
       projection,
     );
     // Assistant.find returns IAssistant[] (empty if none). This is correct.
