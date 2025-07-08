@@ -42,27 +42,38 @@ export const processFile = async (
     let fileBuffer: Buffer;
     let filename = request.url;
 
-    // Check if it's a sandbox URL
-    if (request.url.startsWith('sandbox:')) {
-      // Extract filename from sandbox URL
-      const sandboxPath = request.url.substring('sandbox:'.length);
+    // Check if it's a sandbox URL or plain filename (not a valid HTTP URL)
+    const isHttpUrl = request.url.startsWith('http://') || request.url.startsWith('https://');
+    const isSandboxUrl = request.url.startsWith('sandbox:');
+    
+    if (!isHttpUrl) {
+      // Treat as sandbox file (either sandbox: prefix or plain filename)
+      let searchFilename = request.url;
+      
+      // Remove sandbox: prefix if present
+      if (isSandboxUrl) {
+        searchFilename = request.url.substring('sandbox:'.length);
+      }
+      
+      // Remove leading slash if present
+      searchFilename = searchFilename.replace(/^\//, '');
       
       // Try to find the file by title/filename
       const file = await ContentFile.findOne({
         companyId: new mongoose.Types.ObjectId(companyId),
         $or: [
-          { title: sandboxPath.replace(/^\//, '') },
-          { filename: sandboxPath.replace(/^\//, '') }
+          { title: searchFilename },
+          { filename: searchFilename }
         ]
       });
 
       if (!file) {
-        throw new Error(`Sandbox file not found: ${sandboxPath}`);
+        throw new Error(`File not found: ${searchFilename}`);
       }
 
       // Download the file buffer from GCS
       fileBuffer = await downloadContentFileBuffer(file, companyId);
-      filename = file.filename || file.title || sandboxPath;
+      filename = file.filename || file.title || searchFilename;
     } else {
       // Download from HTTP/HTTPS URL
       fileBuffer = await downloadFile(request.url);
@@ -145,7 +156,7 @@ function processExcelFile(buffer: Buffer, filename: string): Promise<{
       totalRows += data.length;
 
       // Convert to tab-separated format
-      const maxRowsToShow = 100; // Limit for readability
+      const maxRowsToShow = 50; // Reduced from 100 to 50 to prevent Pusher payload size issues
       const rowsToProcess = Math.min(data.length, maxRowsToShow);
 
       for (let i = 0; i < rowsToProcess; i++) {
@@ -161,7 +172,7 @@ function processExcelFile(buffer: Buffer, filename: string): Promise<{
       }
 
       if (data.length > maxRowsToShow) {
-        textContent += `\n... (${data.length - maxRowsToShow} more rows)\n`;
+        textContent += `\n... (${data.length - maxRowsToShow} more rows not shown)\n`;
       }
     });
 

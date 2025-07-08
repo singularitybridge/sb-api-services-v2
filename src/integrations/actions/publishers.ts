@@ -9,7 +9,8 @@ const generateMessageId = (): string => {
 };
 
 // Helper function to truncate large output for Pusher
-const truncateForPusher = (data: any, maxSize: number = 8000): any => {
+// Reduced from 8000 to 6000 to leave more room for message envelope and metadata
+const truncateForPusher = (data: any, maxSize: number = 6000): any => {
   // First, handle the case where data itself is an array (e.g. direct array output)
   if (Array.isArray(data)) {
     const jsonString = JSON.stringify(data);

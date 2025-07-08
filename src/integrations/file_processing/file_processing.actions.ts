@@ -11,13 +11,13 @@ export const createFileProcessingActions = (
   context: ActionContext,
 ): FunctionFactory => ({
   processFile: {
-    description: 'Downloads a file from a URL and returns its content. Supports text files and Excel spreadsheets.',
+    description: 'Processes a file and returns its content. Supports text files and Excel spreadsheets. Accepts HTTP/HTTPS URLs, sandbox: URLs, or plain filenames for uploaded files.',
     parameters: {
       type: 'object',
       properties: {
         url: {
           type: 'string',
-          description: 'The URL of the file to process.',
+          description: 'The file to process. Can be an HTTP/HTTPS URL, a sandbox: URL, or a filename for an uploaded file.',
         },
         fileType: {
           type: 'string',
