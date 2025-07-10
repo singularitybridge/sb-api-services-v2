@@ -24,7 +24,8 @@ export type ApiKeyType =
   | 'jira_domain'
   | 'jira_email'
   | 'ai_context_service_base_url'
-  | 'ai_context_service_auth_token';
+  | 'ai_context_service_auth_token'
+  | 'codesandbox_api_key';
 
 // Initialize cache with a 15-minute TTL (time to live)
 const apiKeyCache = new NodeCache({ stdTTL: 900 });

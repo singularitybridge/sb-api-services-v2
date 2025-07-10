@@ -154,19 +154,109 @@ threadRouter.post(
             textStream,
             assistantId: messageAssistantId,
             threadId: messageThreadId,
+            hasEmptyResponse,
+            errorMessage,
+            provider
           } = result as any; // Assuming these are returned
+          
+          // Get provider-specific API key documentation URL
+          const getApiKeyDocsUrl = (provider: string) => {
+            switch (provider) {
+              case 'openai':
+                return 'https://platform.openai.com/api-keys';
+              case 'google':
+                return 'https://aistudio.google.com/app/apikey';
+              case 'anthropic':
+                return 'https://console.anthropic.com/settings/keys';
+              default:
+                return '';
+            }
+          };
+          
+          const providerDisplayName = provider === 'google' ? 'Google' : 
+                                    provider === 'openai' ? 'OpenAI' : 
+                                    provider === 'anthropic' ? 'Anthropic' : 
+                                    provider || 'AI';
+          const apiKeyDocsUrl = getApiKeyDocsUrl(provider);
+          
+          // Check if the stream has error indicators from the service
+          if (hasEmptyResponse && errorMessage && !res.writableEnded) {
+            console.error('[SSE] Stream has empty response indicator:', errorMessage);
+            res.write(
+              `event:error\ndata:${JSON.stringify({
+                type: 'error',
+                errorDetails: { 
+                  message: errorMessage + ' at http://localhost:5173/admin/companies/' + companyId
+                },
+              })}\n\n`,
+            );
+            res.end();
+            return; // Exit early since we have an error
+          }
 
           // Step 5: Persist the assistant reply even in stream mode
           let fullText = '';
-          for await (const chunk of textStream) {
-            if (res.writableEnded) break;
-            fullText += chunk;
-            // Step 4: Wrap each model chunk in JSON
-            res.write(
-              `data:${JSON.stringify({ type: 'token', value: chunk })}\n\n`,
-            );
+          let hasContent = false;
+          let hasError = false;
+          
+          try {
+            for await (const chunk of textStream) {
+              if (res.writableEnded) break;
+              fullText += chunk;
+              hasContent = true;
+              // Step 4: Wrap each model chunk in JSON
+              res.write(
+                `data:${JSON.stringify({ type: 'token', value: chunk })}\n\n`,
+              );
+            }
+            
+            // Check if stream was empty (likely due to API key issue)
+            if (!hasContent && !res.writableEnded) {
+              console.error('[SSE] Stream completed with no content');
+              hasError = true;
+              const errorMsg = `Failed to generate response. Please check your ${providerDisplayName} API key configuration at http://localhost:5173/admin/companies/${companyId}.${apiKeyDocsUrl ? ` Need help getting an API key? Visit ${apiKeyDocsUrl}` : ''}`;
+              res.write(
+                `event:error\ndata:${JSON.stringify({
+                  type: 'error',
+                  errorDetails: { 
+                    message: errorMsg
+                  },
+                })}\n\n`,
+              );
+            }
+          } catch (streamError) {
+            console.error('[SSE] Error reading stream:', streamError);
+            hasError = true;
+            if (!res.writableEnded) {
+              const error = streamError as Error;
+              const errorMessage = error.message?.toLowerCase() || '';
+              const isApiKeyError = errorMessage.includes('invalid api key') || 
+                                   errorMessage.includes('unauthorized') || 
+                                   errorMessage.includes('401');
+              
+              res.write(
+                `event:error\ndata:${JSON.stringify({
+                  type: 'error',
+                  errorDetails: { 
+                    message: isApiKeyError 
+                      ? `Invalid ${providerDisplayName} API key. Please update your API key at http://localhost:5173/admin/companies/${companyId}`
+                      : 'An error occurred while generating the response: ' + error.message
+                  },
+                })}\n\n`,
+              );
+            }
           }
-
+          
+          // Send done event only if there was no error
+          if (!hasError && !res.writableEnded) {
+            res.write(`data:${JSON.stringify({ type: 'done' })}\n\n`);
+          }
+          
+          // End the response
+          if (!res.writableEnded) {
+            res.end();
+          }
+          
           // Removed Message.create from here as it's handled in message-handling.service.ts
           // The console.log for "Assistant SSE reply persisted" is also removed as the save happens elsewhere.
         } else {
@@ -189,11 +279,8 @@ threadRouter.post(
                 errorDetails: { message: errorMessage },
               })}\n\n`,
             );
+            res.end();
           }
-        }
-        if (!res.writableEnded) {
-          res.write(`data:${JSON.stringify({ type: 'done' })}\n\n`);
-          res.end();
         }
       } else {
         // JSON Logic (non-streaming) - FIXED: Return standard message format

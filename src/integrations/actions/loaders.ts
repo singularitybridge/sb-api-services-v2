@@ -17,13 +17,22 @@ const loadActionModule = async (
     const actionCreator = module[config.actionCreator as string];
 
     if (typeof actionCreator === 'function') {
-      return actionCreator(context) as FunctionFactory;
+      try {
+        // Wrap the action creator call in a separate try-catch
+        // to handle errors during initialization (e.g., missing API keys)
+        const factory = actionCreator(context) as FunctionFactory;
+        return factory || {};
+      } catch (initError) {
+        console.error(`Failed to initialize actions in ${actionFilePath}:`, initError);
+        console.error(`Integration ${config.name || 'unknown'} will be skipped due to initialization error`);
+        return {};
+      }
     } else {
       console.log(`No valid action creator found in ${actionFilePath}`);
       return {};
     }
   } catch (error) {
-    console.error(`Failed to process ${actionFilePath}:`, error);
+    console.error(`Failed to import module ${actionFilePath}:`, error);
     return {};
   }
 };
@@ -33,20 +42,25 @@ const processIntegrationFolder = async (
   integrationsPath: string,
   context: ActionContext,
 ): Promise<FunctionFactory> => {
-  const integrationPath = join(integrationsPath, folder);
-  const configFilePath = join(integrationPath, 'integration.config.json');
-  const config = loadConfig(configFilePath);
+  try {
+    const integrationPath = join(integrationsPath, folder);
+    const configFilePath = join(integrationPath, 'integration.config.json');
+    const config = loadConfig(configFilePath);
 
-  if (!config) return {};
+    if (!config) return {};
 
-  const actionFilePath = join(
-    integrationPath,
-    (config.actionsFile as string) || `${folder}.actions.ts`,
-  );
-  const actionObj = await loadActionModule(actionFilePath, config, context);
-  const integrationName = (config.name as string) || folder;
+    const actionFilePath = join(
+      integrationPath,
+      (config.actionsFile as string) || `${folder}.actions.ts`,
+    );
+    const actionObj = await loadActionModule(actionFilePath, config, context);
+    const integrationName = (config.name as string) || folder;
 
-  return createPrefixedActions(actionObj, integrationName);
+    return createPrefixedActions(actionObj, integrationName);
+  } catch (error) {
+    console.error(`Failed to process integration folder ${folder}:`, error);
+    return {};
+  }
 };
 
 export const createFunctionFactory = async (

@@ -473,7 +473,8 @@ export const handleSessionMessage = async (
               : (error as any)?.message || 'Tool execution failed',
           );
         }
-        return result;
+        // Ensure result is never null or undefined
+        return result ?? 'Action completed successfully';
       };
 
       toolsForSdk[funcName] = tool({
@@ -632,7 +633,10 @@ export const handleSessionMessage = async (
         streamCallOptions.system = systemPrompt;
       }
 
-      let streamResult;
+      let streamResult: any;
+      let streamErrorOccurred = false;
+      let streamErrorMessage = '';
+      
       try {
         streamResult = await streamText(streamCallOptions);
         console.log(
@@ -664,6 +668,30 @@ export const handleSessionMessage = async (
             streamError.cause,
           );
         }
+        
+        // Check if this is an API key error
+        const errorMessage = streamError.message?.toLowerCase() || '';
+        if (
+          errorMessage.includes('invalid api key') ||
+          errorMessage.includes('api key not valid') ||
+          errorMessage.includes('incorrect api key') ||
+          errorMessage.includes('unauthorized') ||
+          errorMessage.includes('401')
+        ) {
+          streamErrorOccurred = true;
+          streamErrorMessage = `Invalid ${providerKey} API key. Please check your API key configuration.`;
+          
+          // Save a user-friendly error message
+          await saveSystemMessage(
+            new mongoose.Types.ObjectId(session._id),
+            new mongoose.Types.ObjectId(assistant._id),
+            new mongoose.Types.ObjectId(session.userId),
+            streamErrorMessage,
+            'error',
+            { error: 'invalid_api_key', provider: providerKey, originalError: streamError.message }
+          );
+        }
+        
         throw streamError; // Re-throw to be caught by the outer try-catch
       }
 
@@ -674,6 +702,23 @@ export const handleSessionMessage = async (
           const toolResults = await streamResult.toolResults;
 
           console.log(`[handleSessionMessage] Stream finished. Final text length: ${finalText.length}`);
+          
+          // Check for empty response which might indicate an API key error
+          if (!finalText || finalText.length === 0) {
+            console.error(`[handleSessionMessage] Empty response from LLM stream for session ${sessionId}. This might indicate an invalid API key.`);
+            
+            // Save an error message to inform the user
+            await saveSystemMessage(
+              new mongoose.Types.ObjectId(session._id),
+              new mongoose.Types.ObjectId(assistant._id),
+              new mongoose.Types.ObjectId(session.userId),
+              'Failed to generate response. Please check your API key configuration.',
+              'error',
+              { error: 'empty_response', provider: providerKey }
+            );
+            return;
+          }
+          
           if (toolCalls && toolCalls.length > 0) {
             console.log(`[handleSessionMessage] Detected Tool Calls: ${JSON.stringify(toolCalls, null, 2)}`);
           } else {
@@ -723,13 +768,64 @@ export const handleSessionMessage = async (
           await assistantMessage.save();
           // console.log('Assistant message from streamed response (with potential tool data) saved to DB.');
         } catch (dbError) {
-          // console.error('Error saving streamed assistant message to DB:', dbError);
+          console.error('[handleSessionMessage] Error saving streamed assistant message to DB:', dbError);
         }
       })().catch((streamProcessingError) => {
-        // console.error('Error processing full streamed text for DB save:', streamProcessingError);
+        console.error('[handleSessionMessage] Error processing full streamed text for DB save:', streamProcessingError);
+        if (streamProcessingError.stack) {
+          console.error('[handleSessionMessage] Stack trace:', streamProcessingError.stack);
+        }
       });
 
       // console.log(`Returning stream object for session ${sessionId} for client consumption.`);
+      
+      // If there was a stream initialization error, throw it to be caught by outer handler
+      if (streamErrorOccurred) {
+        throw new Error(streamErrorMessage || 'Stream initialization failed');
+      }
+      
+      // Monitor the stream to catch empty responses and save error messages
+      // Also attach an error indicator to the stream result for the route handler
+      streamResult.text.then((text: string) => {
+        if (!text || text.length === 0) {
+          console.error(`[handleSessionMessage] Stream completed with empty text for session ${sessionId}`);
+          // Attach error indicator to stream result
+          (streamResult as any).hasEmptyResponse = true;
+          const providerDisplayName = providerKey === 'google' ? 'Google' : 
+                                     providerKey === 'openai' ? 'OpenAI' : 
+                                     providerKey === 'anthropic' ? 'Anthropic' : providerKey;
+          (streamResult as any).errorMessage = `Failed to generate response. Please check your ${providerDisplayName} API key configuration.`;
+          
+          // Save error message asynchronously
+          saveSystemMessage(
+            new mongoose.Types.ObjectId(session._id),
+            new mongoose.Types.ObjectId(assistant._id),
+            new mongoose.Types.ObjectId(session.userId),
+            `Failed to generate response. Please check your ${providerKey} API key configuration.`,
+            'error',
+            { error: 'empty_response', provider: providerKey }
+          ).catch(err => console.error('Failed to save error message:', err));
+        }
+      }).catch((err: any) => {
+        console.error(`[handleSessionMessage] Stream text promise rejected for session ${sessionId}:`, err);
+        // Attach error indicator to stream result
+        (streamResult as any).hasStreamError = true;
+        (streamResult as any).errorMessage = `Stream error: ${err.message || 'Unknown error'}`;
+        
+        // Save error message asynchronously
+        saveSystemMessage(
+          new mongoose.Types.ObjectId(session._id),
+          new mongoose.Types.ObjectId(assistant._id),
+          new mongoose.Types.ObjectId(session.userId),
+          `Stream error: ${err.message || 'Unknown error'}`,
+          'error',
+          { error: 'stream_error', provider: providerKey, originalError: err.message }
+        ).catch(saveErr => console.error('Failed to save error message:', saveErr));
+      });
+      
+      // Attach provider information to the stream result
+      (streamResult as any).provider = providerKey;
+      
       return streamResult;
     } else {
       const generateCallOptions: Parameters<typeof generateText>[0] = {
@@ -763,10 +859,23 @@ export const handleSessionMessage = async (
         errorMessage.includes('model not found') ||
         errorMessage.includes('permission denied') ||
         errorMessage.includes('api key not valid') ||
-        errorMessage.includes('invalid api key')
+        errorMessage.includes('invalid api key') ||
+        errorMessage.includes('incorrect api key') ||
+        errorMessage.includes('unauthorized') ||
+        errorMessage.includes('401')
       ) {
         // console.error('Gemini API Error (detected by message):', error);
         specificGeminiError = true;
+        
+        // Save a user-friendly error message for API key errors
+        await saveSystemMessage(
+          new mongoose.Types.ObjectId(session._id),
+          new mongoose.Types.ObjectId(assistant._id),
+          new mongoose.Types.ObjectId(session.userId),
+          `Invalid ${providerKey} API key. Please check your API key configuration.`,
+          'error',
+          { error: 'invalid_api_key', provider: providerKey, originalError: error.message }
+        );
       }
     }
     if (!specificGeminiError) {
@@ -778,6 +887,23 @@ export const handleSessionMessage = async (
   if (!shouldStream) {
     if (!finalLlmResult) {
       throw new Error('LLM result was not obtained for non-streaming case.');
+    }
+
+    // Check for empty response which might indicate an API key error
+    if (!aggregatedResponse || aggregatedResponse.length === 0) {
+      console.error(`[handleSessionMessage] Empty response from LLM for session ${sessionId}. This might indicate an invalid API key.`);
+      
+      // Save an error message to inform the user
+      await saveSystemMessage(
+        new mongoose.Types.ObjectId(session._id),
+        new mongoose.Types.ObjectId(assistant._id),
+        new mongoose.Types.ObjectId(session.userId),
+        'Failed to generate response. Please check your API key configuration.',
+        'error',
+        { error: 'empty_response', provider: providerKey }
+      );
+      
+      return 'Failed to generate response. Please check your API key configuration.';
     }
 
     const cleanedResponse = cleanActionAnnotations(aggregatedResponse);
