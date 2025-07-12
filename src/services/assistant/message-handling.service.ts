@@ -642,16 +642,10 @@ export const handleSessionMessage = async (
         console.log(
           `[handleSessionMessage] streamText call appears to have completed for session ${sessionId}.`,
         );
-        // Log initial streamResult properties
+        // Log that streamResult was created successfully
         if (streamResult) {
           console.log(
-            `[handleSessionMessage] Initial streamResult properties for session ${sessionId}:`,
-            {
-              // Be careful about logging the entire object if it's huge or contains sensitive stream internals
-              type: (streamResult as any).type, // Vercel AI SDK often includes a 'type'
-              usage: (streamResult as any).usage, // Often contains token usage
-              // Log other potentially relevant non-iterable properties if known
-            },
+            `[handleSessionMessage] StreamTextResult created successfully for session ${sessionId}. Stream properties available: text, usage, toolCalls, toolResults`,
           );
         }
       } catch (streamError: any) {

@@ -11,10 +11,30 @@ import {
   listSandboxes,
   getSandboxInfo,
   getSandboxUrl,
+  setEnvironmentVariables as setEnvironmentVariablesService,
+  clearEnvironmentVariables as clearEnvironmentVariablesService,
+  getEnvironmentVariables as getEnvironmentVariablesService,
+  setPersistentEnvironmentVariables as setPersistentEnvironmentVariablesService,
 } from './codesandbox.service';
 
 interface CreateSandboxArgs {
   templateId: string;
+}
+
+interface SetEnvironmentVariablesArgs {
+  sandboxId: string;
+  envVars: Array<{ name: string; value: string }>;
+  persistent?: boolean;
+}
+
+interface ClearEnvironmentVariablesArgs {
+  sandboxId: string;
+  varNames: string[];
+}
+
+interface GetEnvironmentVariablesArgs {
+  sandboxId: string;
+  varNames?: string[];
 }
 
 interface RunCommandInSandboxArgs {
@@ -46,7 +66,10 @@ interface GetSandboxUrlArgs {
 }
 
 export const createCodeSandboxActions = (context: ActionContext): FunctionFactory => {
-  console.log('[CodeSandbox] Creating actions for company:', context.companyId);
+  // Only log when we have a valid context with companyId
+  if (context && context.companyId) {
+    console.log('[CodeSandbox] Creating actions for company:', context.companyId);
+  }
   return {
   createSandbox: {
     description: 'Creates a new CodeSandbox sandbox from a template.',
@@ -238,6 +261,152 @@ export const createCodeSandboxActions = (context: ActionContext): FunctionFactor
         };
       }
       throw new Error(result.error || 'Failed to get sandbox URLs');
+    },
+  },
+  setEnvironmentVariables: {
+    description: 'Sets environment variables programmatically without using .env files',
+    parameters: {
+      type: 'object',
+      properties: {
+        sandboxId: {
+          type: 'string',
+          description: 'The ID of the sandbox.',
+        },
+        envVars: {
+          type: 'array',
+          description: 'Array of environment variables to set',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Variable name (e.g., API_KEY)' },
+              value: { type: 'string', description: 'Variable value' }
+            },
+            required: ['name', 'value'],
+            additionalProperties: false
+          }
+        },
+        persistent: {
+          type: 'boolean',
+          description: 'If true, variables persist across sandbox restarts',
+          default: false
+        }
+      },
+      required: ['sandboxId', 'envVars'],
+      additionalProperties: false
+    },
+    function: async (params: SetEnvironmentVariablesArgs): Promise<StandardActionResult<any>> => {
+      const envObject: Record<string, string> = {};
+      let envVarsToProcess: Array<{ name: string; value: string }>;
+
+      if (Array.isArray(params.envVars)) {
+        envVarsToProcess = params.envVars;
+      } else if (typeof params.envVars === 'object' && params.envVars !== null) {
+        // If it's an object but not an array, try to convert it assuming it's an object with numeric keys
+        // This is a fallback for unexpected deserialization behavior
+        envVarsToProcess = Object.values(params.envVars) as Array<{ name: string; value: string }>;
+      } else {
+        throw new Error('Invalid envVars parameter: Expected an array or an object convertible to an array.');
+      }
+
+      envVarsToProcess.forEach(({ name, value }) => {
+        envObject[name] = value;
+      });
+      
+      const result = params.persistent
+        ? await setPersistentEnvironmentVariablesService(context.companyId, params.sandboxId, envObject)
+        : await setEnvironmentVariablesService(context.companyId, params.sandboxId, envObject);
+      
+      if (result.success) {
+        let message: string;
+        let data: any;
+
+        if (params.persistent) {
+          message = (result.data as { message: string }).message;
+          data = result.data;
+        } else {
+          message = `Set ${envVarsToProcess.length} environment variables`;
+          data = result.data;
+        }
+
+        return {
+          success: true,
+          message: message,
+          data: data
+        };
+      }
+      throw new Error(result.error || 'Failed to set environment variables');
+    },
+  },
+  clearEnvironmentVariables: {
+    description: 'Clears specific environment variables from the sandbox',
+    parameters: {
+      type: 'object',
+      properties: {
+        sandboxId: {
+          type: 'string',
+          description: 'The ID of the sandbox.',
+        },
+        varNames: {
+          type: 'array',
+          description: 'Names of variables to clear',
+          items: { type: 'string' }
+        }
+      },
+      required: ['sandboxId', 'varNames'],
+      additionalProperties: false
+    },
+    function: async (params: ClearEnvironmentVariablesArgs): Promise<StandardActionResult<any>> => {
+      const result = await clearEnvironmentVariablesService(context.companyId, params.sandboxId, params.varNames);
+      
+      if (result.success) {
+        return { 
+          success: true, 
+          message: `Cleared ${params.varNames.length} environment variables`,
+          data: result.data
+        };
+      }
+      throw new Error(result.error || 'Failed to clear environment variables');
+    },
+  },
+  getEnvironmentVariables: {
+    description: 'Gets current environment variables from the sandbox runtime',
+    parameters: {
+      type: 'object',
+      properties: {
+        sandboxId: {
+          type: 'string',
+          description: 'The ID of the sandbox.',
+        },
+        varNames: {
+          type: 'array',
+          description: 'Specific variables to get (omit for all)',
+          items: { type: 'string' },
+          default: []
+        }
+      },
+      required: ['sandboxId'],
+      additionalProperties: false
+    },
+    function: async (params: GetEnvironmentVariablesArgs): Promise<StandardActionResult<any>> => {
+      const result = await getEnvironmentVariablesService(
+        context.companyId, 
+        params.sandboxId, 
+        params.varNames && params.varNames.length > 0 ? params.varNames : undefined
+      );
+      
+      if (result.success) {
+        const retrievedData = result.data;
+        if (retrievedData) {
+          return { 
+            success: true, 
+            data: retrievedData,
+            message: `Retrieved ${Object.keys(retrievedData).length} environment variables`
+          };
+        } else {
+          return { success: true, data: {}, message: 'Retrieved 0 environment variables' };
+        }
+      }
+      throw new Error(result.error || 'Failed to get environment variables');
     },
   },
 };};
