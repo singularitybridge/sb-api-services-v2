@@ -52,15 +52,6 @@ export async function getSessionMessages(apiKey: string, sessionId: string) {
   console.log(
     `Retrieved ${mongoMessages.length} messages for session ${sessionId}`,
   );
-  const systemMessages = mongoMessages.filter((msg) => msg.sender === 'system');
-  console.log(
-    `Found ${systemMessages.length} system messages:`,
-    systemMessages.map((msg) => ({
-      id: msg._id,
-      messageType: msg.messageType,
-      sender: msg.sender,
-    })),
-  );
 
   if (!mongoMessages || mongoMessages.length === 0) {
     return [];

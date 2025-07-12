@@ -51,9 +51,7 @@ export const runCommandInSandbox = async (companyId: string, sandboxId: string, 
     
     const sandbox = await sdkResult.sdk.sandboxes.resume(sandboxId);
     const client = await sandbox.connect();
-    const result = await client.commands.run(command, {
-      cwd: '/workspace',
-    });
+    const result = await client.commands.run(command);
     return { success: true, data: result };
   } catch (error) {
     console.error('Failed to execute command:', error);
@@ -163,6 +161,139 @@ export const getSandboxUrl = async (companyId: string, sandboxId: string) => {
     return { success: true, data: urls };
   } catch (error) {
     console.error('Failed to get sandbox URL:', error);
+    return { success: false, error: (error as Error).message };
+  }
+};
+
+// Set environment variables programmatically (no .env files)
+export const setEnvironmentVariables = async (
+  companyId: string, 
+  sandboxId: string, 
+  envVars: Record<string, string>
+) => {
+  const sdkResult = await getSDK(companyId);
+  if (!sdkResult.success || !sdkResult.sdk) {
+    return { success: false, error: sdkResult.error || 'Failed to initialize CodeSandbox SDK' };
+  }
+  const sdk = sdkResult.sdk;
+  try {
+    const sandbox = await sdk.sandboxes.resume(sandboxId);
+    const client = await sandbox.connect();
+    
+    // Method 1: Direct environment manipulation (preferred)
+    // Set environment variables directly in the sandbox runtime
+    for (const [key, value] of Object.entries(envVars)) {
+      await client.commands.run(`export ${key}="${value}"`);
+    }
+    
+    
+    return { success: true, data: { count: Object.keys(envVars).length } };
+  } catch (error) {
+    console.error('Failed to set environment variables:', error);
+    return { success: false, error: (error as Error).message };
+  }
+};
+
+// Clear specific environment variables
+export const clearEnvironmentVariables = async (
+  companyId: string, 
+  sandboxId: string, 
+  varNames: string[]
+) => {
+  const sdkResult = await getSDK(companyId);
+  if (!sdkResult.success || !sdkResult.sdk) {
+    return { success: false, error: sdkResult.error || 'Failed to initialize CodeSandbox SDK' };
+  }
+  const sdk = sdkResult.sdk;
+  try {
+    const sandbox = await sdk.sandboxes.resume(sandboxId);
+    const client = await sandbox.connect();
+    
+    // Unset each variable
+    for (const varName of varNames) {
+      await client.commands.run(`unset ${varName}`);
+    }
+    
+    
+    return { success: true, data: { cleared: varNames } };
+  } catch (error) {
+    console.error('Failed to clear environment variables:', error);
+    return { success: false, error: (error as Error).message };
+  }
+};
+
+// Get current environment variables (from runtime)
+export const getEnvironmentVariables = async (
+  companyId: string, 
+  sandboxId: string,
+  varNames?: string[]
+) => {
+  const sdkResult = await getSDK(companyId);
+  if (!sdkResult.success || !sdkResult.sdk) {
+    return { success: false, error: sdkResult.error || 'Failed to initialize CodeSandbox SDK' };
+  }
+  const sdk = sdkResult.sdk;
+  try {
+    const sandbox = await sdk.sandboxes.resume(sandboxId);
+    const client = await sandbox.connect();
+    
+    
+    // Method 2: Get from runtime
+    const envVars: Record<string, string> = {};
+    
+    if (varNames) {
+      // Get specific vars
+      for (const varName of varNames) {
+        const result = await client.commands.run(`echo $${varName}`);
+        envVars[varName] = (result as any).stdout ? (result as any).stdout.trim() : '';
+      }
+    } else {
+      // Get all vars (parse printenv output)
+      const result = await client.commands.run('printenv');
+      ((result as any).stdout || '').split('\n').forEach((line: string) => {
+        const [key, ...valueParts] = line.split('=');
+        if (key) envVars[key] = valueParts.join('=');
+      });
+    }
+    
+    return { success: true, data: envVars };
+  } catch (error) {
+    console.error('Failed to get environment variables:', error);
+    return { success: false, error: (error as Error).message };
+  }
+};
+
+// Set persistent environment variables that survive sandbox restarts
+export const setPersistentEnvironmentVariables = async (
+  companyId: string, 
+  sandboxId: string, 
+  envVars: Record<string, string>
+) => {
+  const sdkResult = await getSDK(companyId);
+  if (!sdkResult.success || !sdkResult.sdk) {
+    return { success: false, error: sdkResult.error || 'Failed to initialize CodeSandbox SDK' };
+  }
+  const sdk = sdkResult.sdk;
+  try {
+    const sandbox = await sdk.sandboxes.resume(sandboxId);
+    const client = await sandbox.connect();
+    
+    // Create a startup script that sets env vars
+    const envScript = Object.entries(envVars)
+      .map(([key, value]) => `export ${key}="${value}"`)
+      .join('\n');
+    
+    // Add to bashrc for persistence
+    await client.commands.run(
+      `echo '${envScript}' >> ~/.bashrc`
+    );
+    
+    // Also set them immediately
+    await client.commands.run(envScript);
+    
+    return { success: true, data: { message: 'Persistent environment variables set' } };
+  } catch (error) {
+    console.error('Failed to set persistent environment variables:', error);
     return { success: false, error: (error as Error).message };
   }
 };
