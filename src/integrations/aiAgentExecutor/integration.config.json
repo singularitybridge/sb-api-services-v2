@@ -1,6 +1,0 @@
-{
-  "name": "ai_agent_executor",
-  "icon": "square-terminal",
-  "actionCreator": "createAIAgentExecutorActions",
-  "actionsFile": "aiAgentExecutor.actions.ts"
-}

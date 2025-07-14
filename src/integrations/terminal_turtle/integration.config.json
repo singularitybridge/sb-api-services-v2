@@ -1,0 +1,26 @@
+{
+  "name": "terminal_turtle",
+  "displayName": "Terminal Turtle AI Environment",
+  "description": "AI-powered development environment with command execution and hot reload capabilities",
+  "icon": "square-terminal",
+  "category": "development",
+  "actionCreator": "createTerminalTurtleActions",
+  "actionsFile": "terminal_turtle.actions.ts",
+  "requiredSecrets": [
+    {
+      "key": "FLY_API_TOKEN",
+      "description": "Fly.io API token for managing virtual machines"
+    },
+    {
+      "key": "TERMINAL_TURTLE_API_KEY",
+      "description": "API key for Terminal Turtle instance (auto-generated)"
+    },
+    {
+      "key": "TERMINAL_TURTLE_URL",
+      "description": "URL for Terminal Turtle instance (auto-generated)"
+    }
+  ],
+  "setupInstructions": "The environment will be automatically provisioned on first use. You can execute any shell command in your isolated environment.",
+  "websiteUrl": "https://github.com/terminal-turtle/terminal-turtle",
+  "documentationUrl": "https://terminal-turtle.dev/docs"
+}

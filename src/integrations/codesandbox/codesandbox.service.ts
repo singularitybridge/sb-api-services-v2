@@ -1,5 +1,6 @@
 import { CodeSandbox } from '@codesandbox/sdk';
 import { getApiKey } from '../../services/api.key.service';
+import { shellEscape } from './utils';
 
 const getSDK = async (companyId: string): Promise<{ success: boolean; sdk?: CodeSandbox; error?: string }> => {
   try {
@@ -42,58 +43,208 @@ export const createSandbox = async (companyId: string, templateId: string) => {
   }
 };
 
-export const runCommandInSandbox = async (companyId: string, sandboxId: string, command: string) => {
+export const runCommandInSandbox = async (
+  companyId: string, 
+  sandboxId: string, 
+  command: string
+) => {
+  const sdkResult = await getSDK(companyId);
+  if (!sdkResult.success || !sdkResult.sdk) {
+    return { success: false, error: sdkResult.error || 'Failed to initialize SDK' };
+  }
+  
   try {
-    const sdkResult = await getSDK(companyId);
-    if (!sdkResult.success || !sdkResult.sdk) {
-      return { success: false, error: sdkResult.error || 'Failed to initialize CodeSandbox SDK' };
-    }
-    
     const sandbox = await sdkResult.sdk.sandboxes.resume(sandboxId);
     const client = await sandbox.connect();
-    const result = await client.commands.run(command);
-    return { success: true, data: result };
+    
+    // Determine if this is a long-running command
+    // Temporarily disable background execution for git clone to debug
+    const longRunningCommands = ['npm install', 'yarn install', 'npm run', 'yarn run'];
+    const isLongRunning = longRunningCommands.some(cmd => command.includes(cmd));
+    
+    if (isLongRunning) {
+      console.log(`[CodeSandbox] Running long command in background: ${command}`);
+      
+      // Use runBackground for long operations
+      const bgCommand = await client.commands.runBackground(command);
+      console.log(`[CodeSandbox] Background command started, type:`, typeof bgCommand);
+      
+      // Check if bgCommand has the expected methods
+      if (!bgCommand || typeof bgCommand.waitUntilComplete !== 'function') {
+        console.error(`[CodeSandbox] Invalid background command object:`, bgCommand);
+        throw new Error('Failed to start background command - invalid command object');
+      }
+      
+      // Collect output
+      let output = '';
+      let errorOutput = '';
+      
+      const outputDisposer = bgCommand.onOutput((data: any) => {
+        if (data.type === 'stdout') {
+          output += data.data;
+          console.log(`[CodeSandbox] stdout:`, data.data.substring(0, 100));
+        } else if (data.type === 'stderr') {
+          errorOutput += data.data;
+          console.log(`[CodeSandbox] stderr:`, data.data.substring(0, 100));
+        }
+      });
+      
+      try {
+        console.log(`[CodeSandbox] Waiting for command completion...`);
+        // Wait for completion with a timeout (5 minutes for git clone)
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Command timeout after 5 minutes')), 300000)
+        );
+        
+        const result = await Promise.race([
+          bgCommand.waitUntilComplete(),
+          timeoutPromise
+        ]);
+        
+        console.log(`[CodeSandbox] Command completed with result:`, result);
+        outputDisposer.dispose();
+        
+        return {
+          success: (result as any).exitCode === 0,
+          data: {
+            stdout: output,
+            stderr: errorOutput,
+            exitCode: (result as any).exitCode,
+            output: output || errorOutput || 'Command completed'
+          }
+        };
+      } catch (error) {
+        outputDisposer.dispose();
+        console.error(`[CodeSandbox] Background command error:`, error);
+        // Return partial output even on error
+        return {
+          success: false,
+          error: (error as Error).message,
+          details: errorOutput || output || 'Command failed or timed out'
+        };
+      }
+    } else {
+      // For short commands, use regular run with stderr redirect
+      console.log(`[CodeSandbox] Running command: ${command}`);
+      const modifiedCommand = command.includes('2>&1') ? command : `${command} 2>&1`;
+      
+      try {
+        const result = await client.commands.run(modifiedCommand);
+        console.log(`[CodeSandbox] Command result:`, result);
+        
+        // Check if result is a string or object
+        if (typeof result === 'string') {
+          return { 
+            success: true, 
+            data: {
+              stdout: result,
+              output: result
+            }
+          };
+        } else {
+          return { 
+            success: true, 
+            data: result 
+          };
+        }
+      } catch (cmdError) {
+        console.error(`[CodeSandbox] Command error:`, cmdError);
+        return {
+          success: false,
+          error: (cmdError as Error).message,
+          details: (cmdError as any).stderr || (cmdError as any).output || 'Command failed'
+        };
+      }
+    }
   } catch (error) {
     console.error('Failed to execute command:', error);
-    return { success: false, error: (error as Error).message };
+    return { 
+      success: false, 
+      error: (error as Error).message,
+      details: (error as any).stderr || (error as any).output 
+    };
   }
 };
 
-export const readFileFromSandbox = async (companyId: string, sandboxId: string, path: string) => {
+export const readFileFromSandbox = async (
+  companyId: string, 
+  sandboxId: string, 
+  path: string
+) => {
+  const sdkResult = await getSDK(companyId);
+  if (!sdkResult.success || !sdkResult.sdk) {
+    return { success: false, error: sdkResult.error || 'Failed to initialize SDK' };
+  }
+  
   try {
-    const sdkResult = await getSDK(companyId);
-    if (!sdkResult.success || !sdkResult.sdk) {
-      return { success: false, error: sdkResult.error || 'Failed to initialize CodeSandbox SDK' };
-    }
-    
     const sandbox = await sdkResult.sdk.sandboxes.resume(sandboxId);
     const client = await sandbox.connect();
-    // Use cat to read file content
-    const content = await client.commands.run(`cat ${path}`);
+    
+    // Use FileSystem API instead of cat command
+    const content = await client.fs.readTextFile(path);
+    
     return { success: true, data: content };
   } catch (error) {
-    console.error('Failed to read file:', error);
-    return { success: false, error: (error as Error).message };
+    // Try to read as binary if text fails
+    try {
+      const sandbox = await sdkResult.sdk.sandboxes.resume(sandboxId);
+      const client = await sandbox.connect();
+      const binaryContent = await client.fs.readFile(path);
+      
+      // Convert Uint8Array to string
+      const decoder = new TextDecoder();
+      const content = decoder.decode(binaryContent);
+      
+      return { success: true, data: content };
+    } catch (binaryError) {
+      console.error('Failed to read file:', error);
+      return { 
+        success: false, 
+        error: `File not found or cannot be read: ${path}` 
+      };
+    }
   }
 };
 
-export const writeFileToSandbox = async (companyId: string, sandboxId: string, path: string, content: string) => {
+export const writeFileToSandbox = async (
+  companyId: string, 
+  sandboxId: string, 
+  path: string, 
+  content: string
+) => {
+  const sdkResult = await getSDK(companyId);
+  if (!sdkResult.success || !sdkResult.sdk) {
+    return { success: false, error: sdkResult.error || 'Failed to initialize SDK' };
+  }
+  
   try {
-    const sdkResult = await getSDK(companyId);
-    if (!sdkResult.success || !sdkResult.sdk) {
-      return { success: false, error: sdkResult.error || 'Failed to initialize CodeSandbox SDK' };
-    }
-    
     const sandbox = await sdkResult.sdk.sandboxes.resume(sandboxId);
     const client = await sandbox.connect();
-    // Use echo and redirection to write file content
-    // Escape single quotes in the content to prevent shell injection issues
-    const escapedContent = content.replace(/'/g, "'\\''");
-    await client.commands.run(`echo '${escapedContent}' > ${path}`);
-    return { success: true, message: 'File updated successfully' };
+    
+    // Ensure directory exists
+    const dir = path.substring(0, path.lastIndexOf('/'));
+    if (dir) {
+      try {
+        await client.fs.mkdir(dir, true);
+      } catch (e) {
+        // Directory might already exist, that's ok
+      }
+    }
+    
+    // Use FileSystem API instead of echo command
+    await client.fs.writeTextFile(path, content);
+    
+    return { 
+      success: true, 
+      message: 'File written successfully',
+      data: { path }
+    };
   } catch (error) {
     console.error('Failed to write file:', error);
-    return { success: false, error: (error as Error).message };
+    return { 
+      success: false, 
+      error: (error as Error).message 
+    };
   }
 };
 
@@ -165,135 +316,60 @@ export const getSandboxUrl = async (companyId: string, sandboxId: string) => {
   }
 };
 
-// Set environment variables programmatically (no .env files)
-export const setEnvironmentVariables = async (
-  companyId: string, 
-  sandboxId: string, 
-  envVars: Record<string, string>
-) => {
-  const sdkResult = await getSDK(companyId);
-  if (!sdkResult.success || !sdkResult.sdk) {
-    return { success: false, error: sdkResult.error || 'Failed to initialize CodeSandbox SDK' };
-  }
-  const sdk = sdkResult.sdk;
-  try {
-    const sandbox = await sdk.sandboxes.resume(sandboxId);
-    const client = await sandbox.connect();
-    
-    // Method 1: Direct environment manipulation (preferred)
-    // Set environment variables directly in the sandbox runtime
-    for (const [key, value] of Object.entries(envVars)) {
-      await client.commands.run(`export ${key}="${value}"`);
-    }
-    
-    
-    return { success: true, data: { count: Object.keys(envVars).length } };
-  } catch (error) {
-    console.error('Failed to set environment variables:', error);
-    return { success: false, error: (error as Error).message };
-  }
-};
-
-// Clear specific environment variables
-export const clearEnvironmentVariables = async (
-  companyId: string, 
-  sandboxId: string, 
-  varNames: string[]
-) => {
-  const sdkResult = await getSDK(companyId);
-  if (!sdkResult.success || !sdkResult.sdk) {
-    return { success: false, error: sdkResult.error || 'Failed to initialize CodeSandbox SDK' };
-  }
-  const sdk = sdkResult.sdk;
-  try {
-    const sandbox = await sdk.sandboxes.resume(sandboxId);
-    const client = await sandbox.connect();
-    
-    // Unset each variable
-    for (const varName of varNames) {
-      await client.commands.run(`unset ${varName}`);
-    }
-    
-    
-    return { success: true, data: { cleared: varNames } };
-  } catch (error) {
-    console.error('Failed to clear environment variables:', error);
-    return { success: false, error: (error as Error).message };
-  }
-};
-
-// Get current environment variables (from runtime)
-export const getEnvironmentVariables = async (
-  companyId: string, 
+export const deleteFile = async (
+  companyId: string,
   sandboxId: string,
-  varNames?: string[]
+  path: string
 ) => {
   const sdkResult = await getSDK(companyId);
   if (!sdkResult.success || !sdkResult.sdk) {
-    return { success: false, error: sdkResult.error || 'Failed to initialize CodeSandbox SDK' };
+    return { success: false, error: sdkResult.error || 'Failed to initialize SDK' };
   }
-  const sdk = sdkResult.sdk;
+  
   try {
-    const sandbox = await sdk.sandboxes.resume(sandboxId);
+    const sandbox = await sdkResult.sdk.sandboxes.resume(sandboxId);
     const client = await sandbox.connect();
     
+    await client.fs.remove(path);
     
-    // Method 2: Get from runtime
-    const envVars: Record<string, string> = {};
-    
-    if (varNames) {
-      // Get specific vars
-      for (const varName of varNames) {
-        const result = await client.commands.run(`echo $${varName}`);
-        envVars[varName] = (result as any).stdout ? (result as any).stdout.trim() : '';
-      }
-    } else {
-      // Get all vars (parse printenv output)
-      const result = await client.commands.run('printenv');
-      ((result as any).stdout || '').split('\n').forEach((line: string) => {
-        const [key, ...valueParts] = line.split('=');
-        if (key) envVars[key] = valueParts.join('=');
-      });
-    }
-    
-    return { success: true, data: envVars };
+    return { 
+      success: true, 
+      message: 'File or directory deleted successfully' 
+    };
   } catch (error) {
-    console.error('Failed to get environment variables:', error);
-    return { success: false, error: (error as Error).message };
+    console.error('Failed to delete file:', error);
+    return { 
+      success: false, 
+      error: (error as Error).message 
+    };
   }
 };
 
-// Set persistent environment variables that survive sandbox restarts
-export const setPersistentEnvironmentVariables = async (
-  companyId: string, 
-  sandboxId: string, 
-  envVars: Record<string, string>
+export const listDirectory = async (
+  companyId: string,
+  sandboxId: string,
+  path: string = '.'
 ) => {
   const sdkResult = await getSDK(companyId);
   if (!sdkResult.success || !sdkResult.sdk) {
-    return { success: false, error: sdkResult.error || 'Failed to initialize CodeSandbox SDK' };
+    return { success: false, error: sdkResult.error || 'Failed to initialize SDK' };
   }
-  const sdk = sdkResult.sdk;
+  
   try {
-    const sandbox = await sdk.sandboxes.resume(sandboxId);
+    const sandbox = await sdkResult.sdk.sandboxes.resume(sandboxId);
     const client = await sandbox.connect();
     
-    // Create a startup script that sets env vars
-    const envScript = Object.entries(envVars)
-      .map(([key, value]) => `export ${key}="${value}"`)
-      .join('\n');
+    const files = await client.fs.readdir(path);
     
-    // Add to bashrc for persistence
-    await client.commands.run(
-      `echo '${envScript}' >> ~/.bashrc`
-    );
-    
-    // Also set them immediately
-    await client.commands.run(envScript);
-    
-    return { success: true, data: { message: 'Persistent environment variables set' } };
+    return { 
+      success: true, 
+      data: files 
+    };
   } catch (error) {
-    console.error('Failed to set persistent environment variables:', error);
-    return { success: false, error: (error as Error).message };
+    console.error('Failed to list directory:', error);
+    return { 
+      success: false, 
+      error: (error as Error).message 
+    };
   }
 };

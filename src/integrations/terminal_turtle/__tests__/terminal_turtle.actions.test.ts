@@ -1,4 +1,4 @@
-import { createAIAgentExecutorActions } from '../aiAgentExecutor.actions';
+import { createTerminalTurtleActions } from '../terminal_turtle.actions';
 import { ActionContext } from '../../actions/types';
 import axios from 'axios';
 import { SupportedLanguage } from '../../../services/discovery.service';
@@ -10,15 +10,15 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 jest.mock('../../../services/api.key.service');
 const mockedApiKeyService = apiKeyService as jest.Mocked<typeof apiKeyService>;
 
-// Import or define the AIAgentExecutorResponse interface
-interface AIAgentExecutorResponse {
+// Import or define the TerminalTurtleResponse interface
+interface TerminalTurtleResponse {
   success: boolean;
   data?: any;
   error?: string;
 }
 
-describe('AI Agent Executor Actions', () => {
-  let actions: ReturnType<typeof createAIAgentExecutorActions>;
+describe('Terminal Turtle Actions', () => {
+  let actions: ReturnType<typeof createTerminalTurtleActions>;
 
   beforeEach(() => {
     // Reset mocks
@@ -41,7 +41,7 @@ describe('AI Agent Executor Actions', () => {
       companyId: 'test-company', // This will be used by getApiKey mock
       language: 'en' as SupportedLanguage,
     };
-    actions = createAIAgentExecutorActions(context);
+    actions = createTerminalTurtleActions(context);
   });
 
   it('should execute a command and handle immediate response', async () => {
@@ -50,7 +50,7 @@ describe('AI Agent Executor Actions', () => {
     });
     const result = (await actions.executeCommand.function({
       command: 'echo "Hello, World!"',
-    })) as AIAgentExecutorResponse;
+    })) as TerminalTurtleResponse;
     expect(result.success).toBe(true);
     expect(result.data).toEqual({
       output: 'Command executed',
@@ -69,7 +69,7 @@ describe('AI Agent Executor Actions', () => {
     });
     const result = (await actions.executeCommand.function({
       command: 'npm run dev',
-    })) as AIAgentExecutorResponse;
+    })) as TerminalTurtleResponse;
     expect(result.success).toBe(true);
     expect(result.data).toEqual({
       taskId: 'task-123',
@@ -93,7 +93,7 @@ describe('AI Agent Executor Actions', () => {
     // Corrected action name
     const result = (await actions.getTaskStatus.function({
       taskId: '12345',
-    })) as AIAgentExecutorResponse;
+    })) as TerminalTurtleResponse;
     expect(result.success).toBe(true);
     expect(result.data).toEqual(mockTaskData);
   });
@@ -107,7 +107,7 @@ describe('AI Agent Executor Actions', () => {
     // Corrected action name and parameters
     const result = (await actions.endTask.function({
       taskId: 'task-123',
-    })) as AIAgentExecutorResponse;
+    })) as TerminalTurtleResponse;
     expect(result.success).toBe(true);
     expect(result.data).toEqual(mockEndTaskResponse);
   });
@@ -122,7 +122,7 @@ describe('AI Agent Executor Actions', () => {
     const result = (await actions.performFileOperation.function({
       operation: 'read',
       path: '/path/to/file.txt',
-    })) as AIAgentExecutorResponse;
+    })) as TerminalTurtleResponse;
     expect(result.success).toBe(true);
     expect(result.data).toBe('File operation completed');
   });
@@ -130,7 +130,7 @@ describe('AI Agent Executor Actions', () => {
   // Commenting out stopExecution test as the action does not exist
   // it('should stop execution', async () => {
   //   mockedAxios.post.mockResolvedValue({ data: { message: 'Execution stopped' } });
-  //   const result = await actions.stopExecution.function({}) as AIAgentExecutorResponse;
+  //   const result = await actions.stopExecution.function({}) as TerminalTurtleResponse;
   //   expect(result.success).toBe(true);
   //   expect(result.data).toBe('Execution stopped');
   // });
@@ -139,7 +139,7 @@ describe('AI Agent Executor Actions', () => {
     mockedAxios.post.mockRejectedValue(new Error('API Error'));
     const result = (await actions.executeCommand.function({
       command: 'invalid_command',
-    })) as AIAgentExecutorResponse;
+    })) as TerminalTurtleResponse;
     expect(result.success).toBe(false);
     expect(result.error).toBe('API Error');
   });

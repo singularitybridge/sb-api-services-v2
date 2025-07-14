@@ -11,30 +11,12 @@ import {
   listSandboxes,
   getSandboxInfo,
   getSandboxUrl,
-  setEnvironmentVariables as setEnvironmentVariablesService,
-  clearEnvironmentVariables as clearEnvironmentVariablesService,
-  getEnvironmentVariables as getEnvironmentVariablesService,
-  setPersistentEnvironmentVariables as setPersistentEnvironmentVariablesService,
+  deleteFile,
+  listDirectory,
 } from './codesandbox.service';
 
 interface CreateSandboxArgs {
   templateId: string;
-}
-
-interface SetEnvironmentVariablesArgs {
-  sandboxId: string;
-  envVars: Array<{ name: string; value: string }>;
-  persistent?: boolean;
-}
-
-interface ClearEnvironmentVariablesArgs {
-  sandboxId: string;
-  varNames: string[];
-}
-
-interface GetEnvironmentVariablesArgs {
-  sandboxId: string;
-  varNames?: string[];
 }
 
 interface RunCommandInSandboxArgs {
@@ -113,11 +95,52 @@ export const createCodeSandboxActions = (context: ActionContext): FunctionFactor
     function: async (
       params: RunCommandInSandboxArgs,
     ): Promise<StandardActionResult<any>> => {
-      const result = await runCommandInSandbox(context.companyId, params.sandboxId, params.command);
-      if (result.success) {
-        return { success: true, data: result.data, message: 'Command executed successfully.' };
+      try {
+        const result = await runCommandInSandbox(
+          context.companyId, 
+          params.sandboxId, 
+          params.command
+        );
+        
+        if (result.success) {
+          // Handle different output scenarios
+          let output = '';
+          const resultData = result.data as any;
+          if (resultData) {
+            if (typeof resultData === 'string') {
+              output = resultData;
+            } else if (typeof resultData === 'object') {
+              output = resultData.output || resultData.stdout || '';
+            }
+          }
+          const hasOutput = output && output.toString().trim().length > 0;
+          
+          return { 
+            success: true, 
+            data: result.data,
+            message: hasOutput 
+              ? 'Command executed successfully.' 
+              : 'Command executed successfully (no output).'
+          };
+        } else {
+          // Throw error instead of returning success: false
+          const errorDetails = result.details ? ` Details: ${result.details}` : '';
+          throw new Error(`${result.error || 'Command execution failed'}${errorDetails}`);
+        }
+      } catch (error) {
+        // Log the full error for debugging
+        console.error('[CodeSandbox] Command execution error:', {
+          sandboxId: params.sandboxId,
+          command: params.command,
+          error: error,
+          message: (error as Error).message,
+          stack: (error as Error).stack
+        });
+        
+        throw new Error(
+          `Failed to execute command: ${(error as Error).message || 'Unknown error'}`
+        );
       }
-      throw new Error(result.error || 'Failed to run command in CodeSandbox sandbox');
     },
   },
   readFileFromSandbox: {
@@ -263,8 +286,8 @@ export const createCodeSandboxActions = (context: ActionContext): FunctionFactor
       throw new Error(result.error || 'Failed to get sandbox URLs');
     },
   },
-  setEnvironmentVariables: {
-    description: 'Sets environment variables programmatically without using .env files',
+  deleteFile: {
+    description: 'Deletes a file or directory from the sandbox.',
     parameters: {
       type: 'object',
       properties: {
@@ -272,104 +295,26 @@ export const createCodeSandboxActions = (context: ActionContext): FunctionFactor
           type: 'string',
           description: 'The ID of the sandbox.',
         },
-        envVars: {
-          type: 'array',
-          description: 'Array of environment variables to set',
-          items: {
-            type: 'object',
-            properties: {
-              name: { type: 'string', description: 'Variable name (e.g., API_KEY)' },
-              value: { type: 'string', description: 'Variable value' }
-            },
-            required: ['name', 'value'],
-            additionalProperties: false
-          }
-        },
-        persistent: {
-          type: 'boolean',
-          description: 'If true, variables persist across sandbox restarts',
-          default: false
-        }
-      },
-      required: ['sandboxId', 'envVars'],
-      additionalProperties: false
-    },
-    function: async (params: SetEnvironmentVariablesArgs): Promise<StandardActionResult<any>> => {
-      const envObject: Record<string, string> = {};
-      let envVarsToProcess: Array<{ name: string; value: string }>;
-
-      if (Array.isArray(params.envVars)) {
-        envVarsToProcess = params.envVars;
-      } else if (typeof params.envVars === 'object' && params.envVars !== null) {
-        // If it's an object but not an array, try to convert it assuming it's an object with numeric keys
-        // This is a fallback for unexpected deserialization behavior
-        envVarsToProcess = Object.values(params.envVars) as Array<{ name: string; value: string }>;
-      } else {
-        throw new Error('Invalid envVars parameter: Expected an array or an object convertible to an array.');
-      }
-
-      envVarsToProcess.forEach(({ name, value }) => {
-        envObject[name] = value;
-      });
-      
-      const result = params.persistent
-        ? await setPersistentEnvironmentVariablesService(context.companyId, params.sandboxId, envObject)
-        : await setEnvironmentVariablesService(context.companyId, params.sandboxId, envObject);
-      
-      if (result.success) {
-        let message: string;
-        let data: any;
-
-        if (params.persistent) {
-          message = (result.data as { message: string }).message;
-          data = result.data;
-        } else {
-          message = `Set ${envVarsToProcess.length} environment variables`;
-          data = result.data;
-        }
-
-        return {
-          success: true,
-          message: message,
-          data: data
-        };
-      }
-      throw new Error(result.error || 'Failed to set environment variables');
-    },
-  },
-  clearEnvironmentVariables: {
-    description: 'Clears specific environment variables from the sandbox',
-    parameters: {
-      type: 'object',
-      properties: {
-        sandboxId: {
+        path: {
           type: 'string',
-          description: 'The ID of the sandbox.',
+          description: 'The path of the file or directory to delete.',
         },
-        varNames: {
-          type: 'array',
-          description: 'Names of variables to clear',
-          items: { type: 'string' }
-        }
       },
-      required: ['sandboxId', 'varNames'],
-      additionalProperties: false
+      required: ['sandboxId', 'path'],
     },
-    function: async (params: ClearEnvironmentVariablesArgs): Promise<StandardActionResult<any>> => {
-      const result = await clearEnvironmentVariablesService(context.companyId, params.sandboxId, params.varNames);
-      
+    function: async (params: { sandboxId: string; path: string }) => {
+      const result = await deleteFile(context.companyId, params.sandboxId, params.path);
       if (result.success) {
         return { 
           success: true, 
-          message: `Cleared ${params.varNames.length} environment variables`,
-          data: result.data
+          message: result.message 
         };
       }
-      throw new Error(result.error || 'Failed to clear environment variables');
+      throw new Error(result.error || 'Failed to delete file');
     },
   },
-  getEnvironmentVariables: {
-    description: 'Gets current environment variables from the sandbox runtime',
+  listDirectory: {
+    description: 'Lists files and directories in a sandbox path.',
     parameters: {
       type: 'object',
       properties: {
@@ -377,36 +322,29 @@ export const createCodeSandboxActions = (context: ActionContext): FunctionFactor
           type: 'string',
           description: 'The ID of the sandbox.',
         },
-        varNames: {
-          type: 'array',
-          description: 'Specific variables to get (omit for all)',
-          items: { type: 'string' },
-          default: []
-        }
+        path: {
+          type: 'string',
+          description: 'The directory path to list (default: current directory).',
+          default: '.',
+        },
       },
       required: ['sandboxId'],
-      additionalProperties: false
     },
-    function: async (params: GetEnvironmentVariablesArgs): Promise<StandardActionResult<any>> => {
-      const result = await getEnvironmentVariablesService(
+    function: async (params: { sandboxId: string; path?: string }) => {
+      const result = await listDirectory(
         context.companyId, 
         params.sandboxId, 
-        params.varNames && params.varNames.length > 0 ? params.varNames : undefined
+        params.path || '.'
       );
-      
       if (result.success) {
-        const retrievedData = result.data;
-        if (retrievedData) {
-          return { 
-            success: true, 
-            data: retrievedData,
-            message: `Retrieved ${Object.keys(retrievedData).length} environment variables`
-          };
-        } else {
-          return { success: true, data: {}, message: 'Retrieved 0 environment variables' };
-        }
+        const itemCount = result.data ? result.data.length : 0;
+        return { 
+          success: true, 
+          data: result.data,
+          message: `Found ${itemCount} items` 
+        };
       }
-      throw new Error(result.error || 'Failed to get environment variables');
+      throw new Error(result.error || 'Failed to list directory');
     },
   },
 };};
