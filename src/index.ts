@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import mongoose from 'mongoose';
 import { startAgenda } from './integrations/agenda/agenda.service';
 import { initializeTelegramBots } from './services/telegram.bot';
@@ -68,6 +70,15 @@ import { teamRouter } from './routes/team.routes';
 import memoryRouter from './routes/memory.routes'; // Added import for memory router
 import apiKeyRouter from './routes/apiKey.routes';
 
+// Read package.json at startup
+let packageJson: { version: string; name: string };
+try {
+  packageJson = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
+} catch (error) {
+  logger.warn('Could not read package.json', error);
+  packageJson = { version: 'unknown', name: 'unknown' };
+}
+
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -92,7 +103,11 @@ app.use(
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).send('OK');
+  res.status(200).json({
+    status: 'ok',
+    version: packageJson.version,
+    name: packageJson.name
+  });
 });
 
 import compression from 'compression'; // Added for SSE Step 2
