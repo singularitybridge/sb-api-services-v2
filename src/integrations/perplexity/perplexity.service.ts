@@ -23,6 +23,7 @@ export async function performPerplexitySearch(
   companyId: string,
   model: string,
   query: string,
+  searchMode?: string,
 ): Promise<string> {
   const apiKey = await getApiKey(companyId, 'perplexity_api_key');
   if (!apiKey) {
@@ -30,29 +31,40 @@ export async function performPerplexitySearch(
   }
 
   const validModels = [
-    'llama-3.1-sonar-small-128k-online',
-    'llama-3.1-sonar-large-128k-online',
+    'sonar',
+    'sonar-pro',
+    'sonar-reasoning',
+    'sonar-reasoning-pro',
+    'sonar-deep-research',
   ];
+  
   if (!validModels.includes(model)) {
     throw new Error('Invalid model specified');
   }
 
   try {
+    const requestBody: any = {
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: 'Be precise and concise.',
+        },
+        {
+          role: 'user',
+          content: query,
+        },
+      ],
+    };
+
+    // Add search mode for applicable models
+    if (searchMode && ['sonar', 'sonar-pro', 'sonar-reasoning', 'sonar-reasoning-pro'].includes(model)) {
+      requestBody.search_mode = searchMode;
+    }
+
     const response = await axios.post<PerplexityResponse>(
       'https://api.perplexity.ai/chat/completions',
-      {
-        model,
-        messages: [
-          {
-            role: 'system',
-            content: 'Be precise and concise.',
-          },
-          {
-            role: 'user',
-            content: query,
-          },
-        ],
-      },
+      requestBody,
       {
         headers: {
           accept: 'application/json',
@@ -62,7 +74,15 @@ export async function performPerplexitySearch(
       },
     );
 
-    // Extract and return only the content from the response
+    // Handle different response structures for reasoning models
+    if (model.includes('reasoning')) {
+      // Reasoning models may include <think> tags before the content
+      const content = response.data.choices[0]?.message?.content || '';
+      // Extract content after any <think> sections if present
+      const cleanContent = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      return cleanContent;
+    }
+
     const content = response.data.choices[0]?.message?.content || '';
     return content;
   } catch (error) {

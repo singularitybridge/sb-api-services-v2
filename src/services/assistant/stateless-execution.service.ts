@@ -128,15 +128,8 @@ export const executeAssistantStateless = async (
           const fileContent = fileBuffer.toString('utf-8');
 
           if (fileContent) {
-            let fileTextToAppend = fileContent;
-            const MAX_FILE_TEXT_CHARS = 10000; // Max characters for appended file content
-            if (fileTextToAppend.length > MAX_FILE_TEXT_CHARS) {
-              fileTextToAppend =
-                fileTextToAppend.substring(0, MAX_FILE_TEXT_CHARS) +
-                `\n\n[...File text truncated: ${attachment.fileName}...]\n`;
-            }
             (userMessageContentParts[0] as TextPart).text +=
-              `\n\n--- Attached File: ${attachment.fileName} ---\n${fileTextToAppend}\n--- End of File ---`;
+              `\n\n--- Attached File: ${attachment.fileName} ---\n${fileContent}\n--- End of File ---`;
           } else {
             (userMessageContentParts[0] as TextPart).text +=
               `\n\n[Could not load file: ${attachment.fileName}]`;
@@ -386,132 +379,20 @@ export const executeAssistantStateless = async (
   // If you need to allow passing a short history, this would be the place to inject it.
   const messagesForLlm: CoreMessage[] = [userMessageForLlm];
 
-  const TOKEN_LIMITS = {
-    google: { 'gemini-1.5': 20000, default: 7000 },
-    openai: {
-      'gpt-4o': 8000,
-      'gpt-4': 8000,
-      'gpt-4-turbo': 8000,
-      default: 7000,
-    },
-    anthropic: {
-      'claude-3-opus-20240229': 190000,
-      'claude-3-sonnet-20240229': 190000,
-      'claude-3-haiku-20240307': 190000,
-      default: 100000,
-    },
-    default: { default: 7000 },
-  } as const;
-
-  let maxPromptTokens: number;
-  const providerConfig =
-    TOKEN_LIMITS[providerKey as keyof typeof TOKEN_LIMITS] ||
-    TOKEN_LIMITS.default;
-
-  if (providerKey === 'google') {
-    maxPromptTokens = modelIdentifier?.includes('gemini-1.5')
-      ? providerConfig['gemini-1.5' as keyof typeof providerConfig]
-      : providerConfig.default;
-  } else if (providerKey === 'openai') {
-    if (modelIdentifier?.includes('gpt-4o'))
-      maxPromptTokens = providerConfig['gpt-4o' as keyof typeof providerConfig];
-    else if (modelIdentifier?.includes('gpt-4-turbo'))
-      maxPromptTokens =
-        providerConfig['gpt-4-turbo' as keyof typeof providerConfig];
-    else if (modelIdentifier?.includes('gpt-4'))
-      maxPromptTokens = providerConfig['gpt-4' as keyof typeof providerConfig];
-    else maxPromptTokens = providerConfig.default;
-  } else if (providerKey === 'anthropic') {
-    if (modelIdentifier && providerConfig.hasOwnProperty(modelIdentifier)) {
-      maxPromptTokens =
-        providerConfig[modelIdentifier as keyof typeof providerConfig];
-    } else {
-      maxPromptTokens = providerConfig.default;
-    }
-  } else {
-    maxPromptTokens = providerConfig.default;
-  }
+  // Use the assistant's configured maxTokens instead of hardcoded limits
+  const maxPromptTokens: number = assistant.maxTokens || 25000;
 
   let { trimmedMessages } = trimToWindow(messagesForLlm, maxPromptTokens);
 
   // If after trimming, messagesForLlm is empty, it means the initial content was too large.
   // This can happen if userInput + appended files exceed maxPromptTokens significantly.
-  if (
-    trimmedMessages.length === 0 &&
-    messagesForLlm.length > 0 &&
-    messagesForLlm[0].content
-  ) {
-    console.warn(
-      'Initial message content too large, attempting aggressive truncation.',
+  if (trimmedMessages.length === 0 && messagesForLlm.length > 0) {
+    console.error(
+      `All messages were trimmed. This usually means the content (e.g., an attached file) exceeded the token limit of ${maxPromptTokens}.`,
     );
-    const originalMessage = messagesForLlm[0];
-    let contentForRetrim: string | TextPart[] | undefined = undefined;
-
-    // Define aggressive character limit (e.g., 75% of maxTokens, assuming ~3 chars/token)
-    const aggressiveCharLimit = Math.floor(maxPromptTokens * 0.75 * 3);
-
-    if (Array.isArray(originalMessage.content)) {
-      // Explicitly cast to the known type of userMessageContentParts
-      const contentParts = originalMessage.content as (TextPart | ImagePart)[];
-      // Filter out only text parts, concatenate them, and then truncate.
-      const textParts = contentParts.filter(
-        (p: TextPart | ImagePart): p is TextPart => p.type === 'text',
-      );
-      if (textParts.length > 0) {
-        let combinedText = textParts.map((p) => p.text).join('\n');
-        if (combinedText.length > aggressiveCharLimit) {
-          combinedText =
-            combinedText.substring(0, aggressiveCharLimit) +
-            '\n\n[...Content aggressively truncated...]\n';
-        }
-        contentForRetrim = [{ type: 'text', text: combinedText }];
-      }
-    } else if (typeof originalMessage.content === 'string') {
-      // Handle if original content is a simple string
-      let textContent = originalMessage.content;
-      if (textContent.length > aggressiveCharLimit) {
-        textContent =
-          textContent.substring(0, aggressiveCharLimit) +
-          '\n\n[...Content aggressively truncated...]\n';
-      }
-      contentForRetrim = textContent;
-    }
-
-    if (contentForRetrim) {
-      let aggressivelyTrimmedMessage: CoreMessage;
-      if (typeof contentForRetrim === 'string') {
-        // Explicitly set role to 'user' as originalMessage is known to be a user message here
-        aggressivelyTrimmedMessage = {
-          role: 'user',
-          content: contentForRetrim,
-        };
-      } else {
-        // contentForRetrim is TextPart[]
-        // Explicitly set role to 'user'
-        aggressivelyTrimmedMessage = {
-          role: 'user',
-          content: contentForRetrim,
-        };
-      }
-      const reTrimResult = trimToWindow(
-        [aggressivelyTrimmedMessage],
-        maxPromptTokens,
-      );
-      trimmedMessages = reTrimResult.trimmedMessages;
-      if (trimmedMessages.length === 0) {
-        console.error(
-          'Failed to trim message even after aggressive truncation. Prompt will likely be empty.',
-        );
-      } else {
-        console.log(
-          'Aggressive truncation successful, proceeding with trimmed message.',
-        );
-      }
-    } else {
-      console.error(
-        'Aggressive truncation: No text content found or suitable for re-trimming in the original message.',
-      );
-    }
+    throw new Error(
+      `The content provided (e.g., an attached file) is too large to process. Please reduce the size and try again. Max token limit: ${maxPromptTokens}`,
+    );
   }
 
   if (providerKey === 'anthropic') {

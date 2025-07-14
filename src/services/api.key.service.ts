@@ -25,7 +25,10 @@ export type ApiKeyType =
   | 'jira_email'
   | 'ai_context_service_base_url'
   | 'ai_context_service_auth_token'
-  | 'codesandbox_api_key';
+  | 'codesandbox_api_key'
+  | 'FLY_API_TOKEN'
+  | 'TERMINAL_TURTLE_API_KEY'
+  | 'TERMINAL_TURTLE_URL';
 
 // Initialize cache with a 15-minute TTL (time to live)
 const apiKeyCache = new NodeCache({ stdTTL: 900 });

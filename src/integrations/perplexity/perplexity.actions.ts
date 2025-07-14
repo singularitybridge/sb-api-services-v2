@@ -9,10 +9,13 @@ import { ActionValidationError } from '../../utils/actionErrors';
 
 interface PerplexitySearchArgs {
   model:
-    | 'llama-3.1-sonar-small-128k-online'
-    | 'llama-3.1-sonar-large-128k-online';
+    | 'sonar'
+    | 'sonar-pro'
+    | 'sonar-reasoning'
+    | 'sonar-reasoning-pro'
+    | 'sonar-deep-research';
   query: string;
-  // No other properties allowed due to additionalProperties: false in schema
+  searchMode?: 'low' | 'medium' | 'high'; // New optional parameter
 }
 
 // R type for StandardActionResult<R>
@@ -29,8 +32,11 @@ interface ServiceCallLambdaResponse {
 
 const SERVICE_NAME = 'perplexityService';
 const ALLOWED_MODELS = [
-  'llama-3.1-sonar-small-128k-online',
-  'llama-3.1-sonar-large-128k-online',
+  'sonar',
+  'sonar-pro',
+  'sonar-reasoning',
+  'sonar-reasoning-pro',
+  'sonar-deep-research',
 ];
 
 export const createPerplexityActions = (
@@ -51,14 +57,20 @@ export const createPerplexityActions = (
           type: 'string',
           description: 'The search query',
         },
+        searchMode: {
+          type: 'string',
+          enum: ['low', 'medium', 'high'],
+          description: 'Search depth mode (optional, defaults to medium)',
+          default: 'medium',
+        },
       },
       required: ['model', 'query'],
-      additionalProperties: false, // Explicitly defined here
+      additionalProperties: false,
     },
     function: async (
       args: PerplexitySearchArgs,
     ): Promise<StandardActionResult<PerplexityResponseData>> => {
-      const { model, query } = args;
+      const { model, query, searchMode } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -73,19 +85,14 @@ export const createPerplexityActions = (
 
       // Check for additional properties manually if strict mode isn't fully relied upon for arg shape
       const argKeys = Object.keys(args);
-      if (
-        argKeys.length > 2 ||
-        !argKeys.every((key) => ['model', 'query'].includes(key))
-      ) {
-        const allowedProps = ['model', 'query'];
-        const extraProps = argKeys.filter(
-          (prop) => !allowedProps.includes(prop),
+      const allowedProps = ['model', 'query', 'searchMode'];
+      const extraProps = argKeys.filter(
+        (prop) => !allowedProps.includes(prop),
+      );
+      if (extraProps.length > 0) {
+        throw new ActionValidationError(
+          `Additional properties are not allowed: ${extraProps.join(', ')}`,
         );
-        if (extraProps.length > 0) {
-          throw new ActionValidationError(
-            `Additional properties are not allowed: ${extraProps.join(', ')}`,
-          );
-        }
       }
 
       if (typeof model !== 'string' || !ALLOWED_MODELS.includes(model)) {
@@ -108,6 +115,7 @@ export const createPerplexityActions = (
             context.companyId!,
             model,
             query,
+            searchMode,
           );
           return { success: true, data: { searchResult: searchResultString } };
         },
