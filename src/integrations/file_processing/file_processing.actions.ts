@@ -11,13 +11,13 @@ export const createFileProcessingActions = (
   context: ActionContext,
 ): FunctionFactory => ({
   processFile: {
-    description: 'Processes a file and returns its content. Supports text files and Excel spreadsheets. Accepts HTTP/HTTPS URLs, sandbox: URLs, or plain filenames for uploaded files.',
+    description: 'Processes a file and returns its content. Supports text files and Excel spreadsheets. For external files, use the full HTTP/HTTPS URL exactly as provided (e.g., http://localhost:3004/file.csv). For uploaded files in the system, use just the filename. The sandbox: prefix is only for CodeSandbox integration.',
     parameters: {
       type: 'object',
       properties: {
         url: {
           type: 'string',
-          description: 'The file to process. Can be an HTTP/HTTPS URL, a sandbox: URL, or a filename for an uploaded file.',
+          description: 'The file URL or filename. For external files, use the complete HTTP/HTTPS URL (e.g., http://example.com/file.csv). For uploaded files, use just the filename. Do NOT add sandbox: prefix unless specifically for CodeSandbox.',
         },
         fileType: {
           type: 'string',
