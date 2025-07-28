@@ -10,7 +10,7 @@ const generateMessageId = (): string => {
 
 export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
   const { assistantId } = req.params;
-  const { userInput, attachments, responseFormat } = req.body; // Add responseFormat
+  const { userInput, attachments, responseFormat, promptOverride } = req.body; // Add responseFormat and promptOverride
 
   // Determine if client wants SSE
   const acceptHeader = req.get('Accept');
@@ -94,6 +94,7 @@ export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
         attachments,
         undefined, // responseFormat is undefined for SSE
         { 'X-Experimental-Stream': 'true' }, // metadata
+        promptOverride, // Pass promptOverride
       );
 
       if (
@@ -138,6 +139,8 @@ export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
         userId,
         attachments,
         responseFormat, // Pass responseFormat
+        undefined, // metadata
+        promptOverride, // Pass promptOverride
       );
 
       // Handle structured response

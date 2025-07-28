@@ -87,6 +87,7 @@ export const executeAssistantStateless = async (
   attachments?: Attachment[],
   responseFormat?: ResponseFormat, // Add responseFormat parameter
   metadata?: Record<string, string>,
+  promptOverride?: string, // Add promptOverride parameter
 ): Promise<
   | string
   | StreamTextResult<Record<string, Tool<any, any>>, unknown>
@@ -368,7 +369,8 @@ export const executeAssistantStateless = async (
 
   // For stateless execution, we'll use the prompt directly without template processing
   // or provide basic context if needed
-  const systemPrompt = assistant.llmPrompt || 'You are a helpful assistant.';
+  // Use promptOverride if provided, otherwise use the assistant's default prompt
+  const systemPrompt = promptOverride || assistant.llmPrompt || 'You are a helpful assistant.';
 
   const userMessageForLlm: CoreMessage = {
     role: 'user',
