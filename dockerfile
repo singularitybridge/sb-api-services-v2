@@ -1,23 +1,52 @@
-# Use an official Node.js runtime as a parent image
+# Multi-stage build for TypeScript application
+# Stage 1: Build stage
+FROM node:21-slim AS builder
+
+# Set memory limit for TypeScript compiler
+ENV NODE_OPTIONS="--max-old-space-size=1536"
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY tsconfig.json ./
+
+# Install all dependencies (including devDependencies)
+RUN npm ci
+
+# Copy source code
+COPY src ./src
+
+# Build TypeScript
+RUN npm run build
+
+# Stage 2: Production stage  
 FROM node:21-slim
 
-# Update CA certificates
-RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates
+# Update CA certificates for Google API calls
+RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set the working directory in the container
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# Copy package.json and package-lock.json (if available)
+# Copy package files
 COPY package*.json ./
 
-# Install any dependencies
-RUN npm install
+# Install production dependencies AND ts-node (required by start script)
+RUN npm ci --only=production && \
+    npm install ts-node typescript @types/node
 
-# Copy the rest of the application code
-COPY . .
+# Copy built application from builder
+COPY --from=builder /app/dist ./dist
 
-# Make port 3000 available to the world outside this container
+# Copy source files (required by ts-node)
+COPY --from=builder /app/src ./src
+
+# Copy tsconfig for ts-node
+COPY tsconfig.json ./
+
+# Expose port
 EXPOSE 3000
 
-# Run the app when the container launches
+# Use the existing start script that uses ts-node
 CMD ["npm", "run", "start"]
