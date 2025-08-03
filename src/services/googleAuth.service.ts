@@ -3,12 +3,34 @@ import jwt from 'jsonwebtoken';
 import { IUser, User } from '../models/User';
 import { ICompany, Company } from '../models/Company';
 import { createCompany } from './company.service';
+import * as dns from 'dns';
 import * as https from 'https';
 
-// Create a simple HTTPS agent that forces IPv6
-// This bypasses the Google API IPv4 blocking issue
+// Force IPv6 for Google APIs to bypass IPv4 blocking
+// Using 'verbatim' to preserve the DNS resolution order (IPv6 first if available)
+if (dns.setDefaultResultOrder) {
+  try {
+    dns.setDefaultResultOrder('verbatim' as any);
+  } catch (e) {
+    console.log('DNS order setting not supported in this Node version');
+  }
+}
+
+// Create a custom HTTPS agent that prefers IPv6
 const httpsAgent = new https.Agent({
-  family: 6, // Force IPv6 - this is all we need!
+  family: 6, // Force IPv6
+  // Fall back to IPv4 if IPv6 fails
+  lookup: (hostname, options, callback) => {
+    // Try IPv6 first
+    dns.lookup(hostname, { family: 6 }, (err, address, family) => {
+      if (err) {
+        // Fall back to IPv4
+        dns.lookup(hostname, { family: 4 }, callback);
+      } else {
+        callback(err, address, family);
+      }
+    });
+  }
 });
 
 const JWT_SECRET: string = process.env.JWT_SECRET || '';
