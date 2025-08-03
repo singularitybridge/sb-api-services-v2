@@ -3,6 +3,10 @@ import jwt from 'jsonwebtoken';
 import { IUser, User } from '../models/User';
 import { ICompany, Company } from '../models/Company';
 import { createCompany } from './company.service';
+import * as dns from 'dns';
+
+// Force IPv6 for Google APIs to bypass IPv4 blocking
+dns.setDefaultResultOrder('ipv6first');
 
 const JWT_SECRET: string = process.env.JWT_SECRET || '';
 const G_CLIENT_ID_ENV: string | undefined = process.env.G_CLIENT_ID;

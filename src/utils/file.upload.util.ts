@@ -27,8 +27,8 @@ export async function saveToFile(
   } else if (data instanceof stream.Readable) {
     const writable = fs.createWriteStream(filePath);
     data.pipe(writable);
-    await new Promise((resolve, reject) => {
-      writable.on('finish', resolve);
+    await new Promise<void>((resolve, reject) => {
+      writable.on('finish', () => resolve());
       writable.on('error', reject);
     });
   } else {
