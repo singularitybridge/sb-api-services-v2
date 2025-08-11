@@ -15,6 +15,9 @@ completionRouter.post(
       model = 'gpt-4.1-mini',
       temperature,
       pdfUrl,
+      imageUrl,
+      imageBase64,
+      maxTokens,
     } = req.body;
 
     const apiKey = (await getApiKey(
@@ -30,6 +33,9 @@ completionRouter.post(
         model,
         temperature,
         pdfUrl,
+        imageUrl,
+        imageBase64,
+        maxTokens,
       );
       res.json({ content: response });
     } catch (error) {
@@ -37,7 +43,7 @@ completionRouter.post(
         error instanceof Error
           ? error.message
           : 'An error occurred while processing the completion request';
-      const statusCode = errorMessage.includes('PDF') ? 400 : 500;
+      const statusCode = errorMessage.includes('PDF') || errorMessage.includes('image') ? 400 : 500;
 
       res.status(statusCode).json({
         error: errorMessage,
