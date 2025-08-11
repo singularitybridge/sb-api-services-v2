@@ -57,8 +57,12 @@ export const getCompletionResponse = async (
   model: string = 'gpt-4.1-mini',
   temperature: number = 0.7,
   pdfUrl?: string,
+  imageUrl?: string,
+  imageBase64?: string,
+  maxTokens?: number,
 ): Promise<string> => {
   let enhancedUserInput = userInput;
+  let messages: any[] = [];
 
   if (pdfUrl) {
     try {
@@ -72,7 +76,21 @@ export const getCompletionResponse = async (
 
   const o1Models = ['o1', 'o1-mini', 'o1-preview'];
 
+  // Handle image inputs for vision-capable models
+  const visionModels = ['gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'];
+  const isVisionCapable = visionModels.some(vm => model.includes(vm)) || model === 'gpt-4o';
+  
+  if ((imageUrl || imageBase64) && !isVisionCapable) {
+    // Auto-upgrade to vision model if an image is provided
+    console.log(`Auto-upgrading from ${model} to gpt-4o for image analysis`);
+    model = 'gpt-4o';
+  }
+
   if (o1Models.includes(model)) {
+    // O1 models don't support images yet
+    if (imageUrl || imageBase64) {
+      throw new Error('O1 models do not support image inputs');
+    }
     return getO1CompletionResponse(
       apiKey,
       [{ role: 'user', content: `${systemPrompt}\n\n${enhancedUserInput}` }],
@@ -83,10 +101,34 @@ export const getCompletionResponse = async (
   const openai = new OpenAI({ apiKey });
 
   try {
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: enhancedUserInput },
-    ];
+    // Construct messages based on whether we have an image
+    if (imageUrl || imageBase64) {
+      // Use multimodal format for vision models
+      const imageUrlToUse = imageUrl || `data:image/jpeg;base64,${imageBase64}`;
+      
+      messages = [
+        { role: 'system', content: systemPrompt },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: enhancedUserInput },
+            { 
+              type: 'image_url', 
+              image_url: { 
+                url: imageUrlToUse,
+                detail: 'high' // Can be 'low', 'high', or 'auto'
+              }
+            }
+          ]
+        }
+      ];
+    } else {
+      // Standard text-only format
+      messages = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: enhancedUserInput },
+      ];
+    }
 
     const params: any = {
       model,
@@ -96,6 +138,13 @@ export const getCompletionResponse = async (
       frequency_penalty: 0,
       presence_penalty: 0,
     };
+
+    // Add max_tokens if provided or for vision models
+    if (maxTokens) {
+      params.max_tokens = maxTokens;
+    } else if (imageUrl || imageBase64) {
+      params.max_tokens = 4096;
+    }
 
     const response = await openai.chat.completions.create(params);
 
