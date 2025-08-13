@@ -64,8 +64,9 @@ interface ResponseFormat {
 }
 
 interface Attachment {
-  fileId: string;
-  url: string;
+  fileId?: string;
+  url?: string;
+  data?: string; // Base64 encoded data
   mimeType: string;
   fileName: string;
 }
@@ -109,24 +110,47 @@ export const executeAssistantStateless = async (
     for (const attachment of attachments) {
       if (attachment.mimeType.startsWith('image/')) {
         try {
-          const response = await axios.get(attachment.url, {
-            responseType: 'arraybuffer',
-          });
-          const imageBuffer = Buffer.from(response.data);
+          let imageBuffer: Buffer;
+          
+          if (attachment.data) {
+            // Handle base64 encoded image data
+            imageBuffer = Buffer.from(attachment.data, 'base64');
+          } else if (attachment.url) {
+            // Handle URL-based image (existing behavior)
+            const response = await axios.get(attachment.url, {
+              responseType: 'arraybuffer',
+            });
+            imageBuffer = Buffer.from(response.data);
+          } else {
+            throw new Error('Image attachment must have either data or url');
+          }
+          
           userMessageContentParts.push({
             type: 'image',
             image: new Uint8Array(imageBuffer),
             mimeType: attachment.mimeType,
           });
         } catch (error) {
-          console.error(`Error fetching image ${attachment.fileName}:`, error);
+          console.error(`Error processing image ${attachment.fileName}:`, error);
           (userMessageContentParts[0] as TextPart).text +=
             `\n\n[Could not load image: ${attachment.fileName}]`;
         }
-      } else if (attachment.fileId) {
+      } else if (attachment.url || attachment.data) {
+        // Handle non-image files (CSV, PDF, TXT, etc.)
         try {
-          const fileBuffer = await downloadFile(attachment.url);
-          const fileContent = fileBuffer.toString('utf-8');
+          let fileContent: string;
+          
+          if (attachment.data) {
+            // Handle base64 encoded file data
+            const fileBuffer = Buffer.from(attachment.data, 'base64');
+            fileContent = fileBuffer.toString('utf-8');
+          } else if (attachment.url) {
+            // Handle URL-based file (existing behavior)
+            const fileBuffer = await downloadFile(attachment.url);
+            fileContent = fileBuffer.toString('utf-8');
+          } else {
+            throw new Error('File attachment must have either data or url');
+          }
 
           if (fileContent) {
             (userMessageContentParts[0] as TextPart).text +=
