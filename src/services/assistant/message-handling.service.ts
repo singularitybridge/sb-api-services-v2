@@ -125,8 +125,9 @@ export const handleProductOffer = async (
 };
 
 interface Attachment {
-  fileId: string;
-  url: string;
+  fileId?: string;
+  url?: string;
+  data?: string; // Base64 encoded data
   mimeType: string;
   fileName: string;
 }
@@ -195,11 +196,20 @@ export const handleSessionMessage = async (
     for (const attachment of attachments) {
       if (attachment.mimeType.startsWith('image/')) {
         try {
-          // console.log(`Fetching image: ${attachment.fileName} from ${attachment.url}`);
-          const response = await axios.get(attachment.url, {
-            responseType: 'arraybuffer',
-          });
-          const imageBuffer = Buffer.from(response.data);
+          let imageBuffer: Buffer;
+          
+          if (attachment.data) {
+            // Handle base64 encoded image data
+            imageBuffer = Buffer.from(attachment.data, 'base64');
+          } else if (attachment.url) {
+            // Handle URL-based image (existing behavior)
+            const response = await axios.get(attachment.url, {
+              responseType: 'arraybuffer',
+            });
+            imageBuffer = Buffer.from(response.data);
+          } else {
+            throw new Error('Image attachment must have either data or url');
+          }
 
           // Use Uint8Array for all providers (recommended approach)
           userMessageContentParts.push({
@@ -209,17 +219,27 @@ export const handleSessionMessage = async (
           });
           // console.log(`Image attachment processed as Uint8Array for ${providerKey}: ${attachment.fileName}`);
         } catch (error) {
-          // console.error(`Error fetching or processing image data from URL ${attachment.url} for ${attachment.fileName}:`, error);
+          // console.error(`Error processing image ${attachment.fileName}:`, error);
           // Append error info to the text part of the user message
           (userMessageContentParts[0] as TextPart).text +=
             `\n\n[Could not load image: ${attachment.fileName}]`;
         }
-      } else if (attachment.fileId) {
-        // Other non-image files (TXT, CSV, etc.)
+      } else if (attachment.url || attachment.data) {
+        // Other non-image files (TXT, CSV, PDF, etc.)
         try {
-          // console.log(`Fetching non-image file content AS TEXT: ${attachment.fileName} (ID: ${attachment.fileId}) for provider ${providerKey}`);
-          const fileBuffer = await downloadFile(attachment.url);
-          const fileContent = fileBuffer.toString('utf-8');
+          let fileContent: string;
+          
+          if (attachment.data) {
+            // Handle base64 encoded file data
+            const fileBuffer = Buffer.from(attachment.data, 'base64');
+            fileContent = fileBuffer.toString('utf-8');
+          } else if (attachment.url) {
+            // Handle URL-based file (existing behavior)
+            const fileBuffer = await downloadFile(attachment.url);
+            fileContent = fileBuffer.toString('utf-8');
+          } else {
+            throw new Error('File attachment must have either data or url');
+          }
 
           if (fileContent) {
             (userMessageContentParts[0] as TextPart).text +=
@@ -231,7 +251,7 @@ export const handleSessionMessage = async (
               `\n\n[Could not load content for attached file: ${attachment.fileName}]`;
           }
         } catch (error) {
-          // console.error(`Error fetching content for file ${attachment.fileName} (ID: ${attachment.fileId}):`, error);
+          // console.error(`Error processing file ${attachment.fileName}:`, error);
           (userMessageContentParts[0] as TextPart).text +=
             `\n\n[Error loading content for attached file: ${attachment.fileName}]`;
         }
