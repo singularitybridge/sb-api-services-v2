@@ -331,7 +331,8 @@ export const createMongoDbActions = (
       properties: {
         connectionString: {
           type: 'string',
-          description: 'The MongoDB connection string (e.g., mongodb://user:pass@host:port/db)',
+          description:
+            'The MongoDB connection string (e.g., mongodb://user:pass@host:port/db)',
         },
       },
       required: ['connectionString'],
@@ -341,8 +342,10 @@ export const createMongoDbActions = (
       connectionString: string;
     }): Promise<StandardActionResult<MessageData>> => {
       if (!params.connectionString)
-        throw new ActionValidationError('connectionString parameter is required.');
-      
+        throw new ActionValidationError(
+          'connectionString parameter is required.',
+        );
+
       return executeAction<MessageData, ServiceLambdaResponse<MessageData>>(
         'connectToDatabase',
         async () => {

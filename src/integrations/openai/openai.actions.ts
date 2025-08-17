@@ -151,14 +151,16 @@ export const createOpenAiActions = (
     },
   },
   webSearch: {
-    description: 'Search the web using OpenAI\'s native web search capabilities. When providing location, use ISO 3166-1 two-letter country codes (US, GB, FR, DE, IL, etc.)',
+    description:
+      "Search the web using OpenAI's native web search capabilities. When providing location, use ISO 3166-1 two-letter country codes (US, GB, FR, DE, IL, etc.)",
     strict: true,
     parameters: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'The search query or question to answer using web search',
+          description:
+            'The search query or question to answer using web search',
         },
         location: {
           type: 'string',
@@ -175,7 +177,7 @@ export const createOpenAiActions = (
     },
     function: async ({ query, location, sites }: WebSearchArgs) => {
       const actionName = 'webSearch';
-      
+
       const apiKey = await getApiKey(context.companyId, 'openai_api_key');
       if (!apiKey) {
         throw new ActionExecutionError(
@@ -198,9 +200,11 @@ export const createOpenAiActions = (
             if (location && location.trim() !== '') {
               // Ensure it's uppercase and exactly 2 letters
               const countryCode = location.toUpperCase().trim();
-              
+
               if (countryCode.length !== 2) {
-                console.warn(`Invalid country code "${location}" - must be 2 letters. Defaulting to US.`);
+                console.warn(
+                  `Invalid country code "${location}" - must be 2 letters. Defaulting to US.`,
+                );
                 searchOptions.userLocation = {
                   type: 'approximate',
                   country: 'US',
@@ -218,7 +222,7 @@ export const createOpenAiActions = (
                 country: 'US',
               };
             }
-            
+
             // Note: sites filtering may not be directly supported in the current API
 
             const result = await generateText({
@@ -228,7 +232,7 @@ export const createOpenAiActions = (
                 web_search: customOpenAI.tools.webSearchPreview(searchOptions),
               },
             });
-            
+
             return {
               success: true,
               data: {
@@ -242,12 +246,12 @@ export const createOpenAiActions = (
               message: error.message,
               response: error.response,
               statusCode: error.statusCode,
-              responseBody: error.responseBody
+              responseBody: error.responseBody,
             });
-            throw new ActionExecutionError(
-              'Failed to perform web search',
-              { actionName, originalError: error },
-            );
+            throw new ActionExecutionError('Failed to perform web search', {
+              actionName,
+              originalError: error,
+            });
           }
         },
         { serviceName: 'OpenAIService' },

@@ -1,9 +1,0 @@
-- name: latest-jira-tickets
-  prompt: "Get 4 latest JIRA tickets for project ABC."
-  mustContain:
-    - "ABC-"
-  mustNotContain:
-    - "Error"
-  expectedBehavior: >
-    Assistant should call the JIRA tool,
-    stream ticket summaries, and end with a list of 4 links.

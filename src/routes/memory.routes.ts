@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { z, ZodError } from 'zod';
+import { z, ZodError } from 'zod/v3';
 import {
   createJournalEntry as createJournalEntryService,
   getJournalEntries as getJournalEntriesService,

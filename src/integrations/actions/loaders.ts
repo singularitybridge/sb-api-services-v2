@@ -23,8 +23,15 @@ const loadActionModule = async (
         const factory = actionCreator(context) as FunctionFactory;
         return factory || {};
       } catch (initError) {
-        console.error(`Failed to initialize actions in ${actionFilePath}:`, initError);
-        console.error(`Integration ${config.name || 'unknown'} will be skipped due to initialization error`);
+        console.error(
+          `Failed to initialize actions in ${actionFilePath}:`,
+          initError,
+        );
+        console.error(
+          `Integration ${
+            config.name || 'unknown'
+          } will be skipped due to initialization error`,
+        );
         return {};
       }
     } else {

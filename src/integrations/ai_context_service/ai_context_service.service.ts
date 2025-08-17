@@ -301,7 +301,7 @@ export const createContextItem = async (
       'contextId, contextType, item.key, and item.data are required.',
     );
   }
-  
+
   try {
     const { baseUrl, authToken } = await getAIContextServiceConfig(companyId);
     const url = `${baseUrl}/${contextId}/${contextType}/items`;

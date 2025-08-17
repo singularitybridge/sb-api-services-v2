@@ -42,9 +42,10 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
     function: async (): Promise<StandardActionResult<GetAssistantsData>> => {
       return executeAction<GetAssistantsData>(
         'getAssistants',
-        () => context.isStateless 
-          ? getAssistantsService(context.sessionId, context.companyId)
-          : getAssistantsService(context.sessionId),
+        () =>
+          context.isStateless
+            ? getAssistantsService(context.sessionId, context.companyId)
+            : getAssistantsService(context.sessionId),
         {
           serviceName: ASSISTANT_SERVICE_NAME,
           successMessage: 'Assistants retrieved successfully.',
@@ -55,7 +56,8 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
   },
 
   getAssistantById: {
-    description: 'Get information about a specific assistant by its ID, including enabled integration actions and conversation starters.',
+    description:
+      'Get information about a specific assistant by its ID, including enabled integration actions and conversation starters.',
     parameters: {
       type: 'object',
       properties: {
@@ -331,7 +333,7 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
           // const teamData = await getTeamsService(context.sessionId);
           // return { success: true, data: teamData, description: 'Teams retrieved successfully.' };
           // If it returns { success, data, description }
-          return context.isStateless 
+          return context.isStateless
             ? getTeamsService(context.sessionId, context.companyId)
             : getTeamsService(context.sessionId);
         },
@@ -368,9 +370,15 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
     }): Promise<StandardActionResult<GetAssistantsByTeamData>> => {
       return executeAction<GetAssistantsByTeamData>(
         'getAssistantsByTeam',
-        () => context.isStateless 
-          ? getAssistantsByTeamService(context.sessionId, teamId, lean, context.companyId)
-          : getAssistantsByTeamService(context.sessionId, teamId, lean),
+        () =>
+          context.isStateless
+            ? getAssistantsByTeamService(
+                context.sessionId,
+                teamId,
+                lean,
+                context.companyId,
+              )
+            : getAssistantsByTeamService(context.sessionId, teamId, lean),
         {
           serviceName: ASSISTANT_SERVICE_NAME,
           successMessage: 'Assistants for team retrieved successfully.',

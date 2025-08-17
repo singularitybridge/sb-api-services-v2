@@ -11,29 +11,29 @@ export const createFileProcessingActions = (
   context: ActionContext,
 ): FunctionFactory => ({
   processFile: {
-    description: 'Processes a file and returns its content. Supports text files and Excel spreadsheets. For external files, use the full HTTP/HTTPS URL exactly as provided (e.g., http://localhost:3004/file.csv). For uploaded files in the system, use just the filename. The sandbox: prefix is only for CodeSandbox integration.',
+    description:
+      'Processes a file and returns its content. Supports text files and Excel spreadsheets. For external files, use the full HTTP/HTTPS URL exactly as provided (e.g., http://localhost:3004/file.csv). For uploaded files in the system, use just the filename. The sandbox: prefix is only for CodeSandbox integration.',
     parameters: {
       type: 'object',
       properties: {
         url: {
           type: 'string',
-          description: 'The file URL or filename. For external files, use the complete HTTP/HTTPS URL (e.g., http://example.com/file.csv). For uploaded files, use just the filename. Do NOT add sandbox: prefix unless specifically for CodeSandbox.',
+          description:
+            'The file URL or filename. For external files, use the complete HTTP/HTTPS URL (e.g., http://example.com/file.csv). For uploaded files, use just the filename. Do NOT add sandbox: prefix unless specifically for CodeSandbox.',
         },
         fileType: {
           type: 'string',
-          description: 'The type of file to process. Currently supports "text" and "excel". Defaults to "text".',
+          description:
+            'The type of file to process. Currently supports "text" and "excel". Defaults to "text".',
           enum: ['text', 'excel'],
         },
       },
       required: ['url'],
       additionalProperties: false,
     },
-    function: async (params: {
-      url: string;
-      fileType?: 'text' | 'excel';
-    }) => {
+    function: async (params: { url: string; fileType?: 'text' | 'excel' }) => {
       const actionName = 'processFile';
-      
+
       if (!params.url) {
         throw new ActionValidationError('url is required.', {
           fieldErrors: { url: 'url is required.' },

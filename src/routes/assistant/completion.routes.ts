@@ -17,8 +17,12 @@ completionRouter.post(
       pdfUrl,
       imageUrl,
       imageBase64,
-      maxTokens,
+      maxOutputTokens,
+      maxTokens: legacyMaxTokens, // Support old name for backwards compatibility
     } = req.body;
+
+    // Use maxOutputTokens if provided, fall back to maxTokens for backwards compatibility
+    const maxTokens = maxOutputTokens || legacyMaxTokens;
 
     const apiKey = (await getApiKey(
       req.company._id,
@@ -43,7 +47,10 @@ completionRouter.post(
         error instanceof Error
           ? error.message
           : 'An error occurred while processing the completion request';
-      const statusCode = errorMessage.includes('PDF') || errorMessage.includes('image') ? 400 : 500;
+      const statusCode =
+        errorMessage.includes('PDF') || errorMessage.includes('image')
+          ? 400
+          : 500;
 
       res.status(statusCode).json({
         error: errorMessage,

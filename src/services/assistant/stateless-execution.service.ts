@@ -8,17 +8,23 @@ import { getApiKey } from '../api.key.service';
 import { downloadFile } from '../file-downloader.service';
 import axios from 'axios';
 import {
+  calculateCost,
+  logCostTracking,
+  CostTrackingInfo,
+} from '../../utils/cost-tracking';
+import {
   generateText,
   tool,
   streamText,
-  CoreMessage,
+  ModelMessage,
   StreamTextResult,
   Tool,
   ImagePart,
   TextPart,
   generateObject,
+  stepCountIs,
 } from 'ai';
-import { z, ZodTypeAny } from 'zod';
+import { z, ZodTypeAny } from 'zod/v3';
 import { trimToWindow } from '../../utils/tokenWindow';
 import { getProvider } from './provider.service';
 // import { getSessionOrStatelessContext } from '../session.service'; // This utility was merged into getSessionById
@@ -33,10 +39,15 @@ const cleanActionAnnotations = (text: string): string => {
 };
 
 // Helper function for Zod parsing diagnostics
-function logParse(result: z.SafeParseReturnType<any, any>, fnName: string, raw: any) {
+function logParse(
+  result: z.SafeParseReturnType<any, any>,
+  fnName: string,
+  raw: any,
+) {
   if (!result.success) {
     console.error(`[ToolArgError] ${fnName} args failed Zod parse`, {
-      raw, issues: result.error.issues
+      raw,
+      issues: result.error.issues,
     });
   }
 }
@@ -111,7 +122,7 @@ export const executeAssistantStateless = async (
       if (attachment.mimeType.startsWith('image/')) {
         try {
           let imageBuffer: Buffer;
-          
+
           if (attachment.data) {
             // Handle base64 encoded image data
             imageBuffer = Buffer.from(attachment.data, 'base64');
@@ -124,14 +135,16 @@ export const executeAssistantStateless = async (
           } else {
             throw new Error('Image attachment must have either data or url');
           }
-          
+
           userMessageContentParts.push({
             type: 'image',
             image: new Uint8Array(imageBuffer),
-            mimeType: attachment.mimeType,
-          });
+          } as ImagePart);
         } catch (error) {
-          console.error(`Error processing image ${attachment.fileName}:`, error);
+          console.error(
+            `Error processing image ${attachment.fileName}:`,
+            error,
+          );
           (userMessageContentParts[0] as TextPart).text +=
             `\n\n[Could not load image: ${attachment.fileName}]`;
         }
@@ -139,7 +152,7 @@ export const executeAssistantStateless = async (
         // Handle non-image files (CSV, PDF, TXT, etc.)
         try {
           let fileContent: string;
-          
+
           if (attachment.data) {
             // Handle base64 encoded file data
             const fileBuffer = Buffer.from(attachment.data, 'base64');
@@ -227,22 +240,44 @@ export const executeAssistantStateless = async (
               break;
             case 'array':
               if (paramDef.items && typeof paramDef.items === 'object') {
-                if (paramDef.items.type === 'object' && paramDef.items.properties) {
+                if (
+                  paramDef.items.type === 'object' &&
+                  paramDef.items.properties
+                ) {
                   // Handle array of objects, like the 'attributes' array
                   const itemZodShape: Record<string, ZodTypeAny> = {};
                   for (const itemPropName in paramDef.items.properties) {
-                    const itemPropDef = paramDef.items.properties[itemPropName] as any;
+                    const itemPropDef = paramDef.items.properties[
+                      itemPropName
+                    ] as any;
                     let itemZodType: ZodTypeAny;
                     switch (itemPropDef.type) {
-                      case 'string': itemZodType = z.string(); break;
-                      case 'number': itemZodType = z.number(); break;
-                      case 'boolean': itemZodType = z.boolean(); break;
-                      case 'array': itemZodType = z.array(z.any()); break; // Nested arrays
-                      case 'object': itemZodType = z.record(z.string(), z.any()); break; // Nested objects
-                      default: itemZodType = z.any();
+                      case 'string':
+                        itemZodType = z.string();
+                        break;
+                      case 'number':
+                        itemZodType = z.number();
+                        break;
+                      case 'boolean':
+                        itemZodType = z.boolean();
+                        break;
+                      case 'array':
+                        itemZodType = z.array(z.any());
+                        break; // Nested arrays
+                      case 'object':
+                        itemZodType = z.record(z.string(), z.any());
+                        break; // Nested objects
+                      default:
+                        itemZodType = z.any();
                     }
-                    if (itemPropDef.description) itemZodType = itemZodType.describe(itemPropDef.description);
-                    if (paramDef.items.required && !paramDef.items.required.includes(itemPropName)) {
+                    if (itemPropDef.description)
+                      itemZodType = itemZodType.describe(
+                        itemPropDef.description,
+                      );
+                    if (
+                      paramDef.items.required &&
+                      !paramDef.items.required.includes(itemPropName)
+                    ) {
                       itemZodType = itemZodType.optional();
                     }
                     itemZodShape[itemPropName] = itemZodType;
@@ -268,10 +303,13 @@ export const executeAssistantStateless = async (
               } else if (typeof paramDef.additionalProperties === 'object') {
                 const t = paramDef.additionalProperties.type;
                 zodType =
-                  t === 'string'  ? z.record(z.string(), z.string())  :
-                  t === 'number'  ? z.record(z.string(), z.number())  :
-                  t === 'boolean' ? z.record(z.string(), z.boolean()) :
-                                    z.record(z.string(), z.any());
+                  t === 'string'
+                    ? z.record(z.string(), z.string())
+                    : t === 'number'
+                      ? z.record(z.string(), z.number())
+                      : t === 'boolean'
+                        ? z.record(z.string(), z.boolean())
+                        : z.record(z.string(), z.any());
               } else {
                 zodType = z.record(z.string(), z.any());
               }
@@ -291,20 +329,23 @@ export const executeAssistantStateless = async (
         Object.keys(zodShape).length > 0 ? z.object(zodShape) : z.object({});
       const currentFuncName = funcName;
 
+      // Type cast to avoid deep instantiation error
       toolsForSdk[currentFuncName] = tool({
         description: funcDef.description,
-        parameters: zodSchema,
+        inputSchema: zodSchema as z.ZodType<any>,
         execute: async (args: any) => {
           console.log(
             `[Stateless Tool Execution] Attempting to execute function: ${currentFuncName} with args:`,
             args,
           );
-          
+
           // Continue with validation...
           const parseResult = zodSchema.safeParse(args);
           logParse(parseResult, currentFuncName, args);
           if (!parseResult.success) {
-            const errorMessage = `Invalid arguments for tool ${currentFuncName}: ${JSON.stringify(parseResult.error.issues)}`;
+            const errorMessage = `Invalid arguments for tool ${currentFuncName}: ${JSON.stringify(
+              parseResult.error.issues,
+            )}`;
             console.error(`[Stateless Tool Execution] ${errorMessage}`);
             // Return an error object that the LLM can process as a tool result
             return { success: false, error: errorMessage };
@@ -394,19 +435,20 @@ export const executeAssistantStateless = async (
   // For stateless execution, we'll use the prompt directly without template processing
   // or provide basic context if needed
   // Use promptOverride if provided, otherwise use the assistant's default prompt
-  const systemPrompt = promptOverride || assistant.llmPrompt || 'You are a helpful assistant.';
+  const systemPrompt =
+    promptOverride || assistant.llmPrompt || 'You are a helpful assistant.';
 
-  const userMessageForLlm: CoreMessage = {
+  const userMessageForLlm: ModelMessage = {
     role: 'user',
     content: userMessageContentParts,
   };
 
   // For stateless, history is just the current user message.
   // If you need to allow passing a short history, this would be the place to inject it.
-  const messagesForLlm: CoreMessage[] = [userMessageForLlm];
+  const messagesForLlm: ModelMessage[] = [userMessageForLlm];
 
   // Use the assistant's configured maxTokens instead of hardcoded limits
-  const maxPromptTokens: number = assistant.maxTokens || 25000;
+  const maxPromptTokens: number = assistant.maxOutputTokens || 25000;
 
   let { trimmedMessages } = trimToWindow(messagesForLlm, maxPromptTokens);
 
@@ -437,7 +479,7 @@ export const executeAssistantStateless = async (
         model: llm,
         messages: trimmedMessages,
         tools: relevantTools,
-        maxSteps: 3, // Consider making this configurable per assistant or request
+        stopWhen: stepCountIs(3), // Consider making this configurable per assistant or request
       };
       if (systemPrompt !== undefined && providerKey !== 'anthropic') {
         // Anthropic handles system prompt in messages
@@ -480,7 +522,7 @@ export const executeAssistantStateless = async (
           model: llm,
           messages: trimmedMessages,
           tools: relevantTools,
-          maxSteps: 3,
+          stopWhen: stepCountIs(3),
           system: providerKey !== 'anthropic' ? systemPrompt : undefined,
         };
 
@@ -493,7 +535,43 @@ export const executeAssistantStateless = async (
         // Anthropic typically uses tool calling for structured JSON, which `generateObject` handles.
         // Google's Gemini can be instructed via prompt or might have a responseMimeType config.
 
+        const startTime = Date.now();
         const result = await generateText(generateTextOptions);
+        const duration = Date.now() - startTime;
+
+        // Log cost tracking for JSON format
+        if (result.usage) {
+          const costs = calculateCost(
+            modelIdentifier,
+            result.usage.inputTokens || 0,
+            result.usage.outputTokens || 0,
+          );
+
+          const costInfo: CostTrackingInfo = {
+            companyId: companyId?.toString() || 'unknown',
+            assistantId: assistant._id.toString(),
+            sessionId: 'stateless-json',
+            userId: userId || 'unknown',
+            provider: providerKey,
+            model: modelIdentifier,
+            inputTokens: result.usage.inputTokens || 0,
+            outputTokens: result.usage.outputTokens || 0,
+            totalTokens:
+              result.usage.totalTokens ||
+              (result.usage.inputTokens || 0) +
+                (result.usage.outputTokens || 0),
+            inputCost: costs.inputCost,
+            outputCost: costs.outputCost,
+            totalCost: costs.totalCost,
+            timestamp: new Date(),
+            duration,
+            toolCalls: 0,
+            cached: false,
+            requestType: 'stateless',
+          };
+
+          await logCostTracking(costInfo);
+        }
 
         // Parse the JSON response
         let jsonContent;
@@ -534,12 +612,48 @@ export const executeAssistantStateless = async (
         model: llm,
         messages: trimmedMessages,
         tools: relevantTools,
-        maxSteps: 3,
+        stopWhen: stepCountIs(3),
       };
       if (systemPrompt !== undefined && providerKey !== 'anthropic') {
         generateCallOptions.system = systemPrompt;
       }
+      const startTime = Date.now();
       const result = await generateText(generateCallOptions);
+      const duration = Date.now() - startTime;
+
+      // Log cost tracking for stateless execution
+      if (result.usage) {
+        const costs = calculateCost(
+          modelIdentifier,
+          result.usage.inputTokens || 0,
+          result.usage.outputTokens || 0,
+        );
+
+        const costInfo: CostTrackingInfo = {
+          companyId: companyId?.toString() || 'unknown',
+          assistantId: assistant._id.toString(),
+          sessionId: 'stateless',
+          userId: userId || 'unknown',
+          provider: providerKey,
+          model: modelIdentifier,
+          inputTokens: result.usage.inputTokens || 0,
+          outputTokens: result.usage.outputTokens || 0,
+          totalTokens:
+            result.usage.totalTokens ||
+            (result.usage.inputTokens || 0) + (result.usage.outputTokens || 0),
+          inputCost: costs.inputCost,
+          outputCost: costs.outputCost,
+          totalCost: costs.totalCost,
+          timestamp: new Date(),
+          duration,
+          toolCalls: result.toolCalls?.length || 0,
+          cached: false,
+          requestType: 'stateless',
+        };
+
+        await logCostTracking(costInfo);
+      }
+
       const cleanedResponse = cleanActionAnnotations(result.text);
       // Skip template processing for stateless execution
       const processedResponse = cleanedResponse;

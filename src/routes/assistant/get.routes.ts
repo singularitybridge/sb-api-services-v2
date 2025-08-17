@@ -12,20 +12,18 @@ const router = Router();
 
 router.get('/', async (req: AuthenticatedRequest, res) => {
   try {
-    const sortBy = req.query.sortBy as string || 'name';
+    const sortBy = (req.query.sortBy as string) || 'name';
     const companyId = req.user!.companyId.toString();
-    
+
     let assistants;
     if (sortBy === 'lastUsed') {
       assistants = await Assistant.find({ companyId })
         .sort({ lastAccessedAt: -1, name: 1 })
         .lean();
     } else {
-      assistants = await Assistant.find({ companyId })
-        .sort({ name: 1 })
-        .lean();
+      assistants = await Assistant.find({ companyId }).sort({ name: 1 }).lean();
     }
-    
+
     res.send(assistants);
   } catch (error) {
     console.error('Error retrieving assistants:', error);
@@ -33,27 +31,31 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
   }
 });
 
-router.get('/:id', validateObjectId('id'), async (req: AuthenticatedRequest, res) => {
-  try {
-    const assistant = await getAssistantById(req.params.id);
-    if (!assistant) {
-      return res.status(404).send({ message: 'Assistant not found' });
-    }
+router.get(
+  '/:id',
+  validateObjectId('id'),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const assistant = await getAssistantById(req.params.id);
+      if (!assistant) {
+        return res.status(404).send({ message: 'Assistant not found' });
+      }
 
-    // Check if the assistant belongs to the user's company or if the user is an Admin
-    if (
-      req.user?.role !== 'Admin' &&
-      assistant.companyId.toString() !== req.user?.companyId.toString()
-    ) {
-      return res.status(403).send({ message: 'Access denied' });
-    }
+      // Check if the assistant belongs to the user's company or if the user is an Admin
+      if (
+        req.user?.role !== 'Admin' &&
+        assistant.companyId.toString() !== req.user?.companyId.toString()
+      ) {
+        return res.status(403).send({ message: 'Access denied' });
+      }
 
-    res.send(assistant);
-  } catch (error) {
-    console.error('Error retrieving assistant:', error);
-    res.status(500).send({ message: 'Error retrieving assistant' });
-  }
-});
+      res.send(assistant);
+    } catch (error) {
+      console.error('Error retrieving assistant:', error);
+      res.status(500).send({ message: 'Error retrieving assistant' });
+    }
+  },
+);
 
 // Get assistants by team
 router.get('/by-team/:teamId', async (req: AuthenticatedRequest, res) => {

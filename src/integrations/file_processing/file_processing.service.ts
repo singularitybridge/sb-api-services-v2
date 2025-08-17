@@ -43,28 +43,26 @@ export const processFile = async (
     let filename = request.url;
 
     // Check if it's a sandbox URL or plain filename (not a valid HTTP URL)
-    const isHttpUrl = request.url.startsWith('http://') || request.url.startsWith('https://');
+    const isHttpUrl =
+      request.url.startsWith('http://') || request.url.startsWith('https://');
     const isSandboxUrl = request.url.startsWith('sandbox:');
-    
+
     if (!isHttpUrl) {
       // Treat as sandbox file (either sandbox: prefix or plain filename)
       let searchFilename = request.url;
-      
+
       // Remove sandbox: prefix if present
       if (isSandboxUrl) {
         searchFilename = request.url.substring('sandbox:'.length);
       }
-      
+
       // Remove leading slash if present
       searchFilename = searchFilename.replace(/^\//, '');
-      
+
       // Try to find the file by title/filename
       const file = await ContentFile.findOne({
         companyId: new mongoose.Types.ObjectId(companyId),
-        $or: [
-          { title: searchFilename },
-          { filename: searchFilename }
-        ]
+        $or: [{ title: searchFilename }, { filename: searchFilename }],
       });
 
       if (!file) {
@@ -78,7 +76,7 @@ export const processFile = async (
       // Download from HTTP/HTTPS URL
       fileBuffer = await downloadFile(request.url);
     }
-    
+
     // Process based on file type
     if (request.fileType === 'excel') {
       return processExcelFile(fileBuffer, filename);
@@ -95,7 +93,8 @@ export const processFile = async (
     console.error('Error in processFile:', error);
     return {
       success: false,
-      error: error.message || 'An unknown error occurred while processing file.',
+      error:
+        error.message || 'An unknown error occurred while processing file.',
     };
   }
 };
@@ -103,7 +102,10 @@ export const processFile = async (
 /**
  * Downloads the raw file buffer from Google Cloud Storage
  */
-async function downloadContentFileBuffer(file: any, companyId: string): Promise<Buffer> {
+async function downloadContentFileBuffer(
+  file: any,
+  companyId: string,
+): Promise<Buffer> {
   const bucketName = process.env.GCP_STORAGE_BUCKET;
   if (!bucketName) {
     throw new Error('GCP_STORAGE_BUCKET not configured');
@@ -111,11 +113,11 @@ async function downloadContentFileBuffer(file: any, companyId: string): Promise<
 
   const storage = new Storage();
   const bucket = storage.bucket(bucketName);
-  
+
   // Strip query parameters from gcpStorageUrl to get the blob name
   const urlWithoutParams = file.gcpStorageUrl.split('?')[0];
   const blobName = path.basename(urlWithoutParams);
-  
+
   const [fileBuffer] = await bucket.file(blobName).download();
   return fileBuffer;
 }
@@ -123,7 +125,10 @@ async function downloadContentFileBuffer(file: any, companyId: string): Promise<
 /**
  * Processes an Excel file and converts it to text format
  */
-function processExcelFile(buffer: Buffer, filename: string): Promise<{
+function processExcelFile(
+  buffer: Buffer,
+  filename: string,
+): Promise<{
   success: boolean;
   data?: ProcessFileResponse;
   error?: string;
@@ -132,10 +137,10 @@ function processExcelFile(buffer: Buffer, filename: string): Promise<{
     // Parse Excel file
     const workbook = xlsx.parse(buffer, {
       cellFormula: false, // Don't parse formulas for security
-      cellHTML: false,    // Don't parse HTML
-      cellNF: false,      // Don't parse number formats
-      sheetStubs: true,   // Include empty cells
-      defval: null        // Default value for empty cells
+      cellHTML: false, // Don't parse HTML
+      cellNF: false, // Don't parse number formats
+      sheetStubs: true, // Include empty cells
+      defval: null, // Default value for empty cells
     });
 
     let textContent = `Excel File: ${filename}\n`;
@@ -144,9 +149,9 @@ function processExcelFile(buffer: Buffer, filename: string): Promise<{
     // Process each sheet
     workbook.forEach((sheet: any, sheetIndex: number) => {
       const { name, data } = sheet;
-      
+
       textContent += `\n--- Sheet ${sheetIndex + 1}: ${name} ---\n`;
-      
+
       if (!data || data.length === 0) {
         textContent += `(Empty sheet)\n`;
         return;
@@ -172,27 +177,31 @@ function processExcelFile(buffer: Buffer, filename: string): Promise<{
       }
 
       if (data.length > maxRowsToShow) {
-        textContent += `\n... (${data.length - maxRowsToShow} more rows not shown)\n`;
+        textContent += `\n... (${
+          data.length - maxRowsToShow
+        } more rows not shown)\n`;
       }
     });
 
     const response: ProcessFileResponse = {
       content: textContent,
       size: buffer.length,
-      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      mimeType:
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       metadata: {
         totalSheets: workbook.length,
-        totalRows: totalRows
-      }
+        totalRows: totalRows,
+      },
     };
 
     return Promise.resolve({ success: true, data: response });
-
   } catch (error: any) {
     console.error('Error processing Excel file:', error);
     return Promise.resolve({
       success: false,
-      error: `Failed to process Excel file: ${error.message || 'Unknown error'}`
+      error: `Failed to process Excel file: ${
+        error.message || 'Unknown error'
+      }`,
     });
   }
 }

@@ -226,27 +226,47 @@ export const createAIContextServiceActions = (
         contextId: { type: 'string', description: 'The ID of the context.' },
         contextType: {
           type: 'string',
-          description: 'The type of context item to create (e.g., "note", "data", "reference").',
-          enum: ["note", "data", "reference", "products", "controls", "policies"], // Added common types
+          description:
+            'The type of context item to create (e.g., "note", "data", "reference").',
+          enum: [
+            'note',
+            'data',
+            'reference',
+            'products',
+            'controls',
+            'policies',
+          ], // Added common types
         },
-        key: { type: 'string', description: 'Unique identifier for the context item.' },
+        key: {
+          type: 'string',
+          description: 'Unique identifier for the context item.',
+        },
         attributes: {
           type: 'array',
-          description: 'Optional attributes. Pass empty array [] if no attributes needed.',
+          description:
+            'Optional attributes. Pass empty array [] if no attributes needed.',
           default: [], // Provide default
           items: {
             type: 'object',
             properties: {
-              name: { type: 'string', description: 'The name of the attribute (e.g., "productName", "price").' },
-              value: { type: 'string', description: 'The value of the attribute (always as a string).' },
+              name: {
+                type: 'string',
+                description:
+                  'The name of the attribute (e.g., "productName", "price").',
+              },
+              value: {
+                type: 'string',
+                description: 'The value of the attribute (always as a string).',
+              },
               dataType: {
                 type: 'string',
-                description: 'Optional: The original data type of the value (e.g., "string", "number", "boolean"). Defaults to "string".',
-                enum: ["string", "number", "boolean"],
-                default: "string",
+                description:
+                  'Optional: The original data type of the value (e.g., "string", "number", "boolean"). Defaults to "string".',
+                enum: ['string', 'number', 'boolean'],
+                default: 'string',
               },
             },
-            required: ["name", "value"],
+            required: ['name', 'value'],
             additionalProperties: false, // Enforce strictness for attribute objects
           },
         },
@@ -258,7 +278,11 @@ export const createAIContextServiceActions = (
       contextId: string;
       contextType: string;
       key: string;
-      attributes?: Array<{ name: string; value: string; dataType?: "string" | "number" | "boolean" }>;
+      attributes?: Array<{
+        name: string;
+        value: string;
+        dataType?: 'string' | 'number' | 'boolean';
+      }>;
     }) => {
       const actionName = 'createContextItem';
 
@@ -267,11 +291,18 @@ export const createAIContextServiceActions = (
       if (!params.hasOwnProperty('attributes')) {
         console.log('[Tool Repair] Adding missing attributes array to params');
         params.attributes = [];
-      } else if (params.attributes === null || params.attributes === undefined) {
-        console.log('[Tool Repair] Converting null/undefined attributes to empty array in params');
+      } else if (
+        params.attributes === null ||
+        params.attributes === undefined
+      ) {
+        console.log(
+          '[Tool Repair] Converting null/undefined attributes to empty array in params',
+        );
         params.attributes = [];
       } else if (!Array.isArray(params.attributes)) {
-        console.log('[Tool Repair] Converting non-array attributes to empty array in params');
+        console.log(
+          '[Tool Repair] Converting non-array attributes to empty array in params',
+        );
         params.attributes = []; // Or attempt to convert if a specific non-array format is expected
       }
 
@@ -280,7 +311,7 @@ export const createAIContextServiceActions = (
         contextId: params.contextId || '',
         contextType: params.contextType || '',
         key: params.key || '',
-        attributes: params.attributes // Now params.attributes is guaranteed to be an array
+        attributes: params.attributes, // Now params.attributes is guaranteed to be an array
       };
 
       // Validate with clear error messages
@@ -299,7 +330,11 @@ export const createAIContextServiceActions = (
       if (validationErrors.length > 0) {
         throw new ActionValidationError(
           `Validation failed: ${validationErrors.join(', ')}`,
-          { fieldErrors: Object.fromEntries(validationErrors.map(e => [e.split(' ')[0], e])) }
+          {
+            fieldErrors: Object.fromEntries(
+              validationErrors.map((e) => [e.split(' ')[0], e]),
+            ),
+          },
         );
       }
 
@@ -307,33 +342,45 @@ export const createAIContextServiceActions = (
       const dynamicData: Record<string, any> = {};
 
       try {
-        console.log(`[createContextItem Action] Before forEach. safeParams.attributes:`, safeParams.attributes);
-        console.log(`[createContextItem Action] Before forEach. Is Array: ${Array.isArray(safeParams.attributes)}`);
-        
-        if (Array.isArray(safeParams.attributes)) { // Defensive check
-          safeParams.attributes.forEach(({ name, value, dataType = 'string' }) => {
-            if (!name || !value) {
-              console.warn(`Skipping invalid attribute: name="${name}", value="${value}"`);
-              return;
-            }
+        console.log(
+          `[createContextItem Action] Before forEach. safeParams.attributes:`,
+          safeParams.attributes,
+        );
+        console.log(
+          `[createContextItem Action] Before forEach. Is Array: ${Array.isArray(
+            safeParams.attributes,
+          )}`,
+        );
 
-            switch (dataType) {
-              case 'number':
-                const num = parseFloat(value);
-                if (!isNaN(num)) {
-                  dynamicData[name] = num;
-                } else {
-                  console.warn(`Invalid number value for ${name}: ${value}`);
-                  dynamicData[name] = value; // Keep as string
-                }
-                break;
-              case 'boolean':
-                dynamicData[name] = value.toLowerCase() === 'true';
-                break;
-              default:
-                dynamicData[name] = value;
-            }
-          });
+        if (Array.isArray(safeParams.attributes)) {
+          // Defensive check
+          safeParams.attributes.forEach(
+            ({ name, value, dataType = 'string' }) => {
+              if (!name || !value) {
+                console.warn(
+                  `Skipping invalid attribute: name="${name}", value="${value}"`,
+                );
+                return;
+              }
+
+              switch (dataType) {
+                case 'number':
+                  const num = parseFloat(value);
+                  if (!isNaN(num)) {
+                    dynamicData[name] = num;
+                  } else {
+                    console.warn(`Invalid number value for ${name}: ${value}`);
+                    dynamicData[name] = value; // Keep as string
+                  }
+                  break;
+                case 'boolean':
+                  dynamicData[name] = value.toLowerCase() === 'true';
+                  break;
+                default:
+                  dynamicData[name] = value;
+              }
+            },
+          );
         } // Closing brace for if (Array.isArray(safeParams.attributes))
       } catch (error) {
         console.error('Error processing attributes:', error);
@@ -341,7 +388,10 @@ export const createAIContextServiceActions = (
       } finally {
         // Ensure the forEach loop is closed if the if-condition was added
         if (!Array.isArray(safeParams.attributes)) {
-          console.error(`[createContextItem Action] safeParams.attributes was not an array after all defensive checks. Value:`, safeParams.attributes);
+          console.error(
+            `[createContextItem Action] safeParams.attributes was not an array after all defensive checks. Value:`,
+            safeParams.attributes,
+          );
         }
       }
 

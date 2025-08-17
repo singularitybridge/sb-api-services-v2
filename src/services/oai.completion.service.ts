@@ -78,8 +78,9 @@ export const getCompletionResponse = async (
 
   // Handle image inputs for vision-capable models
   const visionModels = ['gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'];
-  const isVisionCapable = visionModels.some(vm => model.includes(vm)) || model === 'gpt-4o';
-  
+  const isVisionCapable =
+    visionModels.some((vm) => model.includes(vm)) || model === 'gpt-4o';
+
   if ((imageUrl || imageBase64) && !isVisionCapable) {
     // Auto-upgrade to vision model if an image is provided
     console.log(`Auto-upgrading from ${model} to gpt-4o for image analysis`);
@@ -105,22 +106,22 @@ export const getCompletionResponse = async (
     if (imageUrl || imageBase64) {
       // Use multimodal format for vision models
       const imageUrlToUse = imageUrl || `data:image/jpeg;base64,${imageBase64}`;
-      
+
       messages = [
         { role: 'system', content: systemPrompt },
         {
           role: 'user',
           content: [
             { type: 'text', text: enhancedUserInput },
-            { 
-              type: 'image_url', 
-              image_url: { 
+            {
+              type: 'image_url',
+              image_url: {
                 url: imageUrlToUse,
-                detail: 'high' // Can be 'low', 'high', or 'auto'
-              }
-            }
-          ]
-        }
+                detail: 'high', // Can be 'low', 'high', or 'auto'
+              },
+            },
+          ],
+        },
       ];
     } else {
       // Standard text-only format

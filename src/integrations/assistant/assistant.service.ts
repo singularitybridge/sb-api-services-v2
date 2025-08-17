@@ -213,7 +213,7 @@ export const getAssistants = async (
 ): Promise<{ success: boolean; description: string; data?: any }> => {
   try {
     let effectiveCompanyId = companyId;
-    
+
     if (sessionId !== 'stateless_execution') {
       const session = await Session.findById(sessionId);
       if (!session) {
@@ -224,14 +224,14 @@ export const getAssistants = async (
       }
       effectiveCompanyId = session.companyId.toString();
     }
-    
+
     if (!effectiveCompanyId) {
       return {
         success: false,
         description: 'Company ID is required for stateless execution.',
       };
     }
-    
+
     const assistants = await Assistant.find(
       { companyId: effectiveCompanyId },
       { _id: 1, name: 1, description: 1 },
@@ -502,7 +502,7 @@ export const getTeams = async (
 ): Promise<{ success: boolean; description: string; data: ITeam[] }> => {
   try {
     let effectiveCompanyId = companyId;
-    
+
     if (sessionId !== 'stateless_execution') {
       const session = await Session.findById(sessionId);
       if (!session) {
@@ -511,11 +511,11 @@ export const getTeams = async (
       }
       effectiveCompanyId = session.companyId.toString();
     }
-    
+
     if (!effectiveCompanyId) {
       throw new Error('Company ID is required for stateless execution.');
     }
-    
+
     const teams = await Team.find(
       { companyId: effectiveCompanyId },
       { _id: 1, name: 1, description: 1, icon: 1 },
@@ -549,7 +549,7 @@ export const getAssistantsByTeam = async (
 }> => {
   try {
     let effectiveCompanyId = companyId;
-    
+
     if (sessionId !== 'stateless_execution') {
       const session = await Session.findById(sessionId);
       if (!session) {
@@ -557,7 +557,7 @@ export const getAssistantsByTeam = async (
       }
       effectiveCompanyId = session.companyId.toString();
     }
-    
+
     if (!effectiveCompanyId) {
       throw new Error('Company ID is required for stateless execution.');
     }
