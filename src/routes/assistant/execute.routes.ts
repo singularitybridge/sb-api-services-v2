@@ -41,10 +41,18 @@ export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
     );
     console.log(`[Execute Route] Company ID from token: ${req.company._id}`);
 
-    const assistant = await Assistant.findOne({
-      _id: new mongoose.Types.ObjectId(assistantId),
-      companyId: req.company._id,
-    });
+    const assistant = await Assistant.findOneAndUpdate(
+      {
+        _id: new mongoose.Types.ObjectId(assistantId),
+        companyId: req.company._id,
+      },
+      {
+        $set: { lastAccessedAt: new Date() }
+      },
+      {
+        new: true
+      }
+    );
 
     if (!assistant) {
       console.log(`[Execute Route] Assistant not found or access denied`);

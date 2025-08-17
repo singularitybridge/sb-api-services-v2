@@ -19,6 +19,12 @@ export function getProvider(pk: ProviderKey, model: string, key: string) {
       return createAnthropic({ apiKey: key }).chat(model);
     case 'openai': // Defaulting to openai, or you can make it explicit
     default:
-      return createOpenAI({ apiKey: key }).chat(model);
+      // For o3-mini models, we need to use just 'o3-mini' as the model name
+      // The reasoning effort (low/medium/high) should be passed via providerOptions
+      let actualModel = model;
+      if (model.startsWith('o3-mini-')) {
+        actualModel = 'o3-mini';
+      }
+      return createOpenAI({ apiKey: key }).chat(actualModel);
   }
 }

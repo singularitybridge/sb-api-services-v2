@@ -169,9 +169,17 @@ export const handleSessionMessage = async (
   console.log(
     `[handleSessionMessage] About to fetch assistant ${session.assistantId}`,
   );
-  const assistant = await Assistant.findOne({
-    _id: new mongoose.Types.ObjectId(session.assistantId),
-  });
+  const assistant = await Assistant.findOneAndUpdate(
+    {
+      _id: new mongoose.Types.ObjectId(session.assistantId),
+    },
+    {
+      $set: { lastAccessedAt: new Date() }
+    },
+    {
+      new: true
+    }
+  );
 
   if (!assistant) {
     console.error(
@@ -652,12 +660,35 @@ export const handleSessionMessage = async (
       if (systemPrompt !== undefined) {
         streamCallOptions.system = systemPrompt;
       }
+      
+      // Add reasoningEffort for o3-mini models
+      if (providerKey === 'openai' && modelIdentifier && modelIdentifier.startsWith('o3-mini')) {
+        let reasoningEffort: 'low' | 'medium' | 'high' = 'medium'; // Default
+        
+        if (modelIdentifier === 'o3-mini-low') {
+          reasoningEffort = 'low';
+        } else if (modelIdentifier === 'o3-mini-medium') {
+          reasoningEffort = 'medium';
+        } else if (modelIdentifier === 'o3-mini-high') {
+          reasoningEffort = 'high';
+        }
+        
+        streamCallOptions.providerOptions = {
+          openai: {
+            reasoningEffort: reasoningEffort
+          }
+        };
+        console.log(`[handleSessionMessage] Setting reasoningEffort: ${reasoningEffort} for model: ${modelIdentifier}`);
+      }
 
       let streamResult: any;
       let streamErrorOccurred = false;
       let streamErrorMessage = '';
       
       try {
+        console.log(`[handleSessionMessage] About to call streamText with model: ${modelIdentifier}, provider: ${providerKey}`);
+        console.log(`[handleSessionMessage] Number of tools: ${Object.keys(relevantTools).length}`);
+        
         streamResult = await streamText(streamCallOptions);
         console.log(
           `[handleSessionMessage] streamText call appears to have completed for session ${sessionId}.`,
@@ -676,6 +707,15 @@ export const handleSessionMessage = async (
         console.error(
           `[handleSessionMessage] StreamError Name: ${streamError.name}, Message: ${streamError.message}, Stack: ${streamError.stack}`,
         );
+        console.error(
+          `[handleSessionMessage] Model: ${modelIdentifier}, Provider: ${providerKey}, Tools: ${Object.keys(relevantTools).length}`,
+        );
+        if (streamError.response) {
+          console.error(
+            `[handleSessionMessage] StreamError Response Status: ${streamError.response?.status}`,
+            `Body: ${JSON.stringify(streamError.response?.body)}`,
+          );
+        }
         if (streamError.cause) {
           console.error(
             `[handleSessionMessage] StreamError Cause:`,
@@ -719,7 +759,19 @@ export const handleSessionMessage = async (
           
           // Check for empty response which might indicate an API key error
           if (!finalText || finalText.length === 0) {
-            console.error(`[handleSessionMessage] Empty response from LLM stream for session ${sessionId}. This might indicate an invalid API key.`);
+            console.error(`[handleSessionMessage] Empty response from LLM stream for session ${sessionId}.`);
+            console.error(`[handleSessionMessage] Model: ${modelIdentifier}, Provider: ${providerKey}`);
+            console.error(`[handleSessionMessage] Tools count: ${Object.keys(relevantTools).length}`);
+            console.error(`[handleSessionMessage] Tool calls: ${toolCalls?.length || 0}`);
+            console.error(`[handleSessionMessage] Tool results: ${toolResults?.length || 0}`);
+            
+            // Log streamResult properties for debugging
+            try {
+              const usage = await streamResult.usage;
+              console.error(`[handleSessionMessage] Stream usage:`, usage);
+            } catch (e) {
+              console.error(`[handleSessionMessage] Could not get stream usage:`, e);
+            }
             
             // Save an error message to inform the user
             await saveSystemMessage(
@@ -728,7 +780,7 @@ export const handleSessionMessage = async (
               new mongoose.Types.ObjectId(session.userId),
               'Failed to generate response. Please check your API key configuration.',
               'error',
-              { error: 'empty_response', provider: providerKey }
+              { error: 'empty_response', provider: providerKey, model: modelIdentifier }
             );
             return;
           }
@@ -851,6 +903,26 @@ export const handleSessionMessage = async (
       };
       if (systemPrompt !== undefined) {
         generateCallOptions.system = systemPrompt;
+      }
+      
+      // Add reasoningEffort for o3-mini models (non-streaming)
+      if (providerKey === 'openai' && modelIdentifier && modelIdentifier.startsWith('o3-mini')) {
+        let reasoningEffort: 'low' | 'medium' | 'high' = 'medium'; // Default
+        
+        if (modelIdentifier === 'o3-mini-low') {
+          reasoningEffort = 'low';
+        } else if (modelIdentifier === 'o3-mini-medium') {
+          reasoningEffort = 'medium';
+        } else if (modelIdentifier === 'o3-mini-high') {
+          reasoningEffort = 'high';
+        }
+        
+        generateCallOptions.providerOptions = {
+          openai: {
+            reasoningEffort: reasoningEffort
+          }
+        };
+        console.log(`[handleSessionMessage] Setting reasoningEffort (non-streaming): ${reasoningEffort} for model: ${modelIdentifier}`);
       }
       // No separate experimental_attachments or attachments field needed here
       // console.log('Calling generateText. Multimodal content is part of the messages array.');

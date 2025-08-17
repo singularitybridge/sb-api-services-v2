@@ -9,14 +9,6 @@
     "actionTitle": "Transcribe Audio (Whisper)",
     "description": "Transcribe audio from a URL using OpenAI's Whisper API"
   },
-  "askO1Model": {
-    "actionTitle": "Ask O1 Model",
-    "description": "Ask a question to OpenAI's O1 model"
-  },
-  "askO1ModelWithFiles": {
-    "actionTitle": "Ask O1 Model with Files",
-    "description": "Ask a question to OpenAI's O1 model with file context"
-  },
   "webSearch": {
     "actionTitle": "Web Search",
     "description": "Search the web for up-to-date information using OpenAI's native web search"
