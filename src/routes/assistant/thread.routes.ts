@@ -181,7 +181,6 @@ threadRouter.post(
           
           // Check if the stream has error indicators from the service
           if (hasEmptyResponse && errorMessage && !res.writableEnded) {
-            console.error('[SSE] Stream has empty response indicator:', errorMessage);
             res.write(
               `event:error\ndata:${JSON.stringify({
                 type: 'error',
@@ -212,7 +211,6 @@ threadRouter.post(
             
             // Check if stream was empty (likely due to API key issue)
             if (!hasContent && !res.writableEnded) {
-              console.error('[SSE] Stream completed with no content');
               hasError = true;
               const errorMsg = `Failed to generate response. Please check your ${providerDisplayName} API key configuration at http://localhost:5173/admin/companies/${companyId}.${apiKeyDocsUrl ? ` Need help getting an API key? Visit ${apiKeyDocsUrl}` : ''}`;
               res.write(

@@ -25,6 +25,7 @@ export interface IAssistant extends Document {
   allowedActions: string[];
   avatarImage?: string;
   teams?: mongoose.Schema.Types.ObjectId[];
+  lastAccessedAt?: Date;
 }
 
 const AssistantSchema: Schema = new Schema({
@@ -54,6 +55,7 @@ const AssistantSchema: Schema = new Schema({
   teams: [
     { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: false },
   ],
+  lastAccessedAt: { type: Date, required: false },
 });
 
 export const Assistant = mongoose.model<IAssistant>(

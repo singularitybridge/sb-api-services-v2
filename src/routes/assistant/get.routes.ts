@@ -12,7 +12,20 @@ const router = Router();
 
 router.get('/', async (req: AuthenticatedRequest, res) => {
   try {
-    const assistants = await getAssistants(req.user!.companyId.toString());
+    const sortBy = req.query.sortBy as string || 'name';
+    const companyId = req.user!.companyId.toString();
+    
+    let assistants;
+    if (sortBy === 'lastUsed') {
+      assistants = await Assistant.find({ companyId })
+        .sort({ lastAccessedAt: -1, name: 1 })
+        .lean();
+    } else {
+      assistants = await Assistant.find({ companyId })
+        .sort({ name: 1 })
+        .lean();
+    }
+    
     res.send(assistants);
   } catch (error) {
     console.error('Error retrieving assistants:', error);

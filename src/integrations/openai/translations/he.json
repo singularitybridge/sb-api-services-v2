@@ -9,14 +9,6 @@
     "actionTitle": "תמלל קול (Whisper)",
     "description": "תמלל קובץ קול מ-URL באמצעות Whisper API של OpenAI"
   },
-  "askO1Model": {
-    "actionTitle": "שאל את מודל O1",
-    "description": "שאל שאלה למודל O1 של OpenAI"
-  },
-  "askO1ModelWithFiles": {
-    "actionTitle": "שאל את מודל O1 עם קבצים",
-    "description": "שאל שאלה למודל O1 של OpenAI עם קבצי קוד נוספים כהקשר"
-  },
   "webSearch": {
     "actionTitle": "חיפוש באינטרנט",
     "description": "חפש באינטרנט מידע עדכני באמצעות יכולות החיפוש המובנות של OpenAI"

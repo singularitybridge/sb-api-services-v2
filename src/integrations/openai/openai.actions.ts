@@ -1,9 +1,7 @@
 import { ActionContext, FunctionFactory } from '../actions/types';
 import { generateSpeech } from '../../services/oai.speech.service';
 import { transcribeAudioWhisperFromURL } from '../../services/speech.recognition.service';
-import { getO1CompletionResponse } from '../../services/oai.completion.service';
 import { getApiKey } from '../../services/api.key.service';
-import { getFileContent } from '../code_indexer/code_indexer.service';
 import OpenAI from 'openai';
 import { executeAction } from '../actions/executor';
 import {
@@ -15,7 +13,6 @@ import { openai, createOpenAI } from '@ai-sdk/openai';
 
 type OpenAIVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 type OpenAIModel = 'tts-1' | 'tts-1-hd';
-type O1Model = 'o1-preview' | 'o1-mini';
 
 interface GenerateSpeechArgs {
   text: string;
@@ -30,26 +27,10 @@ interface TranscribeAudioArgs {
   language?: string;
 }
 
-interface O1Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-interface AskO1ModelArgs {
-  question: string;
-  model: O1Model;
-}
-
-interface AskO1ModelWithFilesArgs {
-  question: string;
-  model: O1Model;
-  filePaths: string[];
-}
-
 interface WebSearchArgs {
   query: string;
-  location?: string;
-  sites?: string[];
+  location: string;
+  sites: string[];
 }
 
 export const createOpenAiActions = (
@@ -169,145 +150,8 @@ export const createOpenAiActions = (
       );
     },
   },
-  askO1Model: {
-    description:
-      'Ask a question to the OpenAI o1 models (o1-preview or o1-mini)',
-    strict: true,
-    parameters: {
-      type: 'object',
-      properties: {
-        question: {
-          type: 'string',
-          description: 'The question or input to send to the model',
-        },
-        model: {
-          type: 'string',
-          enum: ['o1-preview', 'o1-mini'],
-          description: 'The OpenAI o1 model to use',
-        },
-      },
-      required: ['question', 'model'],
-      additionalProperties: false,
-    },
-    function: async ({ question, model }: AskO1ModelArgs) => {
-      const actionName = 'askO1Model';
-      const allowedModels: O1Model[] = ['o1-preview', 'o1-mini'];
-      if (!allowedModels.includes(model)) {
-        throw new ActionValidationError(
-          `Invalid model specified. Allowed models are ${allowedModels.join(
-            ', ',
-          )}`,
-          {
-            fieldErrors: {
-              model: `Invalid model. Allowed: ${allowedModels.join(', ')}`,
-            },
-          },
-        );
-      }
-
-      const apiKey = await getApiKey(context.companyId, 'openai_api_key');
-      if (!apiKey) {
-        throw new ActionExecutionError(
-          'OpenAI API key is missing for this company.',
-          { actionName, statusCode: 400 },
-        );
-      }
-
-      return executeAction<{ response: string }>(
-        actionName,
-        async () => {
-          const messages: O1Message[] = [{ role: 'user', content: question }];
-          const responseText = await getO1CompletionResponse(
-            apiKey,
-            messages,
-            model,
-          );
-          return { success: true, data: { response: responseText } };
-        },
-        { serviceName: 'OpenAIService' },
-      );
-    },
-  },
-  askO1ModelWithFiles: {
-    description:
-      'Ask a question to the OpenAI O1 models with additional code files as context',
-    strict: true,
-    parameters: {
-      type: 'object',
-      properties: {
-        question: {
-          type: 'string',
-          description: 'The question or input to send to the model',
-        },
-        model: {
-          type: 'string',
-          enum: ['o1-preview', 'o1-mini'],
-          description: 'The OpenAI O1 model to use',
-        },
-        filePaths: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'List of file paths to include as context',
-        },
-      },
-      required: ['question', 'model', 'filePaths'],
-      additionalProperties: false,
-    },
-    function: async ({
-      question,
-      model,
-      filePaths,
-    }: AskO1ModelWithFilesArgs) => {
-      const actionName = 'askO1ModelWithFiles';
-      const allowedModels: O1Model[] = ['o1-preview', 'o1-mini'];
-      if (!allowedModels.includes(model)) {
-        throw new ActionValidationError(
-          `Invalid model specified. Allowed models are ${allowedModels.join(
-            ', ',
-          )}`,
-          {
-            fieldErrors: {
-              model: `Invalid model. Allowed: ${allowedModels.join(', ')}`,
-            },
-          },
-        );
-      }
-
-      const apiKey = await getApiKey(context.companyId, 'openai_api_key');
-      if (!apiKey) {
-        throw new ActionExecutionError(
-          'OpenAI API key is missing for this company.',
-          { actionName, statusCode: 400 },
-        );
-      }
-
-      return executeAction<{ response: string }>(
-        actionName,
-        async () => {
-          let combinedContext = await loadAndProcessFiles(filePaths);
-          combinedContext = truncateContextIfNecessary(
-            combinedContext,
-            question,
-          );
-          const messages: O1Message[] = [
-            {
-              role: 'user',
-              content: `${combinedContext}\n\nQuestion: ${question}`,
-            },
-          ];
-          const responseText = await getO1CompletionResponse(
-            apiKey,
-            messages,
-            model,
-          );
-          return { success: true, data: { response: responseText } };
-        },
-        { serviceName: 'OpenAIService' },
-      );
-    },
-  },
   webSearch: {
-    description: 'Search the web using OpenAI\'s native web search capabilities',
+    description: 'Search the web using OpenAI\'s native web search capabilities. When providing location, use ISO 3166-1 two-letter country codes (US, GB, FR, DE, IL, etc.)',
     strict: true,
     parameters: {
       type: 'object',
@@ -318,7 +162,7 @@ export const createOpenAiActions = (
         },
         location: {
           type: 'string',
-          description: 'Optional location context for the search (e.g., "United States", "Europe")',
+          description: 'ISO 3166-1 two-letter country code (e.g., US, GB, FR)',
         },
         sites: {
           type: 'array',
@@ -326,11 +170,12 @@ export const createOpenAiActions = (
           description: 'Optional list of specific sites to search within',
         },
       },
-      required: ['query'],
+      required: ['query', 'location', 'sites'],
       additionalProperties: false,
     },
     function: async ({ query, location, sites }: WebSearchArgs) => {
       const actionName = 'webSearch';
+      
       const apiKey = await getApiKey(context.companyId, 'openai_api_key');
       if (!apiKey) {
         throw new ActionExecutionError(
@@ -350,12 +195,30 @@ export const createOpenAiActions = (
 
             // Build options object only with provided values
             const searchOptions: any = {};
-            if (location) {
+            if (location && location.trim() !== '') {
+              // Ensure it's uppercase and exactly 2 letters
+              const countryCode = location.toUpperCase().trim();
+              
+              if (countryCode.length !== 2) {
+                console.warn(`Invalid country code "${location}" - must be 2 letters. Defaulting to US.`);
+                searchOptions.userLocation = {
+                  type: 'approximate',
+                  country: 'US',
+                };
+              } else {
+                searchOptions.userLocation = {
+                  type: 'approximate',
+                  country: countryCode,
+                };
+              }
+            } else {
+              // Default to US if no location provided
               searchOptions.userLocation = {
                 type: 'approximate',
-                country: location,
+                country: 'US',
               };
             }
+            
             // Note: sites filtering may not be directly supported in the current API
 
             const result = await generateText({
@@ -365,7 +228,7 @@ export const createOpenAiActions = (
                 web_search: customOpenAI.tools.webSearchPreview(searchOptions),
               },
             });
-
+            
             return {
               success: true,
               data: {
@@ -373,8 +236,14 @@ export const createOpenAiActions = (
                 sources: result.sources,
               },
             };
-          } catch (error) {
-            console.error('Error performing web search:', error);
+          } catch (error: any) {
+            console.error('[webSearch] Error performing web search:', error);
+            console.error('[webSearch] Error details:', {
+              message: error.message,
+              response: error.response,
+              statusCode: error.statusCode,
+              responseBody: error.responseBody
+            });
             throw new ActionExecutionError(
               'Failed to perform web search',
               { actionName, originalError: error },
@@ -386,46 +255,3 @@ export const createOpenAiActions = (
     },
   },
 });
-
-async function loadAndProcessFiles(filePaths: string[]): Promise<string> {
-  let combinedContext = '';
-
-  for (const filePath of filePaths) {
-    try {
-      const content = await getFileContent(filePath);
-      const processedContent = await processFileContent(content, filePath);
-      combinedContext += `File: ${filePath}\n${processedContent}\n\n`;
-    } catch (error) {
-      console.error(`Error loading file ${filePath}:`, error);
-      combinedContext += `File: ${filePath}\nError loading file content.\n\n`;
-    }
-  }
-
-  return combinedContext;
-}
-
-async function processFileContent(
-  content: string,
-  filePath: string,
-): Promise<string> {
-  // For now, we'll return the content as is
-  // In the future, you might want to implement summarization or preprocessing here
-  return content;
-}
-
-function truncateContextIfNecessary(context: string, question: string): string {
-  const MAX_TOKENS = 4096; // Adjust based on the model's max tokens
-  const ESTIMATED_TOKENS_PER_CHAR = 0.5; // Rough estimate
-
-  const totalEstimatedTokens =
-    (context.length + question.length) * ESTIMATED_TOKENS_PER_CHAR;
-
-  if (totalEstimatedTokens > MAX_TOKENS) {
-    const allowedContextLength =
-      (MAX_TOKENS - question.length * ESTIMATED_TOKENS_PER_CHAR) /
-      ESTIMATED_TOKENS_PER_CHAR;
-    context = context.slice(-Math.floor(allowedContextLength));
-  }
-
-  return context;
-}
