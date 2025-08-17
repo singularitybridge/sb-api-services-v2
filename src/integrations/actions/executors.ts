@@ -117,12 +117,15 @@ export const executeFunctionCall = async (
     companyId,
     language: sessionLanguage,
   };
-  
+
   let functionFactory: FunctionFactory;
   try {
     functionFactory = await createFunctionFactory(context, allowedActions);
   } catch (error) {
-    console.error('[executeFunctionCall] Critical error creating function factory:', error);
+    console.error(
+      '[executeFunctionCall] Critical error creating function factory:',
+      error,
+    );
     // Return an empty factory to allow the assistant to continue working
     functionFactory = {};
   }
@@ -255,7 +258,9 @@ export const executeFunctionCall = async (
           });
         }
         // Ensure result.data is never null or undefined
-        const resultData = result.data ?? { message: 'Action completed successfully' };
+        const resultData = result.data ?? {
+          message: 'Action completed successfully',
+        };
         const successReturn = { result: resultData };
         // console.log(`[executeFunctionCall] Returning success data to AI SDK for ${functionName}:`, JSON.stringify(successReturn, null, 2));
         return successReturn;

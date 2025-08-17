@@ -17,13 +17,13 @@ export const isValidObjectId = (id: string): boolean => {
 export const validateObjectId = (paramName: string = 'id') => {
   return (req: Request, res: Response, next: NextFunction) => {
     const id = req.params[paramName];
-    
+
     if (!id || !isValidObjectId(id)) {
       return res.status(400).json({
         error: `Invalid ${paramName} format. Must be a valid 24-character hex string.`,
       });
     }
-    
+
     next();
   };
 };
@@ -36,14 +36,14 @@ export const validateObjectIds = (...paramNames: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     for (const paramName of paramNames) {
       const id = req.params[paramName];
-      
+
       if (!id || !isValidObjectId(id)) {
         return res.status(400).json({
           error: `Invalid ${paramName} format. Must be a valid 24-character hex string.`,
         });
       }
     }
-    
+
     next();
   };
 };

@@ -80,9 +80,7 @@ export const createPerplexityActions = (
       // Check for additional properties manually if strict mode isn't fully relied upon for arg shape
       const argKeys = Object.keys(args);
       const allowedProps = ['model', 'query'];
-      const extraProps = argKeys.filter(
-        (prop) => !allowedProps.includes(prop),
-      );
+      const extraProps = argKeys.filter((prop) => !allowedProps.includes(prop));
       if (extraProps.length > 0) {
         throw new ActionValidationError(
           `Additional properties are not allowed: ${extraProps.join(', ')}`,

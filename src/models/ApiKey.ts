@@ -64,4 +64,3 @@ ApiKeySchema.statics.hashApiKey = function (key: string): string {
 };
 
 export const ApiKey = mongoose.model<IApiKey>('ApiKey', ApiKeySchema);
-

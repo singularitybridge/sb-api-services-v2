@@ -6,7 +6,9 @@ let aoiConnection: Connection | null = null;
 
 export const getAoiConnection = (): Connection => {
   if (!aoiConnection) {
-    throw new Error('No active MongoDB connection. Please use the connectToDatabase action first.');
+    throw new Error(
+      'No active MongoDB connection. Please use the connectToDatabase action first.',
+    );
   }
   return aoiConnection;
 };
@@ -29,10 +31,11 @@ export const mongoDbService = {
       }
 
       logger.info(`Attempting to connect to new MongoDB instance...`);
-      const newConnection = await mongoose.createConnection(connectionString).asPromise();
+      const newConnection = await mongoose
+        .createConnection(connectionString)
+        .asPromise();
       aoiConnection = newConnection;
       logger.info(`Successfully connected to new MongoDB instance.`);
-      
     } catch (error) {
       logger.error('Error connecting to new MongoDB instance:', error);
       throw new Error('Failed to connect to new MongoDB instance');

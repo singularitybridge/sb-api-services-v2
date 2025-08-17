@@ -31,7 +31,8 @@ export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
     // Validate assistant ID format
     if (!assistantId || !isValidObjectId(assistantId)) {
       return res.status(400).json({
-        error: 'Invalid assistant ID format. Must be a valid 24-character hex string.',
+        error:
+          'Invalid assistant ID format. Must be a valid 24-character hex string.',
       });
     }
 
@@ -47,11 +48,11 @@ export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
         companyId: req.company._id,
       },
       {
-        $set: { lastAccessedAt: new Date() }
+        $set: { lastAccessedAt: new Date() },
       },
       {
-        new: true
-      }
+        new: true,
+      },
     );
 
     if (!assistant) {

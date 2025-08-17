@@ -9,10 +9,8 @@ import { initializeTelegramBots } from './services/telegram.bot';
 import { initializeWebSocket } from './services/websocket';
 import http from 'http';
 import { logger } from './utils/logger';
-import { applyToolArgPatch } from './patch-empty-args'; // Import the patch
 
 const initializeApp = async () => {
-  applyToolArgPatch(); // Apply the patch at startup
   try {
     logger.info('Attempting to connect to MongoDB...');
     const dbUri = process.env.MONGODB_URI || '';
@@ -69,11 +67,14 @@ import integrationRouter from './routes/integration.routes';
 import { teamRouter } from './routes/team.routes';
 import memoryRouter from './routes/memory.routes'; // Added import for memory router
 import apiKeyRouter from './routes/apiKey.routes';
+import { costTrackingRouter } from './routes/cost-tracking.routes';
 
 // Read package.json at startup
 let packageJson: { version: string; name: string };
 try {
-  packageJson = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'));
+  packageJson = JSON.parse(
+    readFileSync(join(process.cwd(), 'package.json'), 'utf8'),
+  );
 } catch (error) {
   logger.warn('Could not read package.json', error);
   packageJson = { version: 'unknown', name: 'unknown' };
@@ -106,7 +107,7 @@ app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'ok',
     version: packageJson.version,
-    name: packageJson.name
+    name: packageJson.name,
   });
 });
 
@@ -171,6 +172,12 @@ app.use(
 app.use('/teams', verifyTokenMiddleware, verifyAccess(), teamRouter);
 app.use('/memory', verifyTokenMiddleware, verifyAccess(), memoryRouter); // Added memory router
 app.use('/api/keys', verifyTokenMiddleware, verifyAccess(), apiKeyRouter); // API key management
+app.use(
+  '/api/costs',
+  verifyTokenMiddleware,
+  verifyAccess(),
+  costTrackingRouter,
+); // Cost tracking
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);

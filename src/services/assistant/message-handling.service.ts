@@ -12,21 +12,27 @@ import { FunctionCall } from '../../integrations/actions/types';
 import { getApiKey } from '../api.key.service';
 import { downloadFile } from '../file-downloader.service';
 import axios from 'axios'; // Added axios for fetching image data
+import {
+  calculateCost,
+  logCostTracking,
+  CostTrackingInfo,
+} from '../../utils/cost-tracking';
 
 // Vercel AI SDK imports
 import {
   generateText,
   tool,
   streamText,
-  CoreMessage,
+  ModelMessage,
   StreamTextResult,
   Tool,
   ImagePart,
   TextPart,
+  stepCountIs,
 } from 'ai';
-import { z, ZodTypeAny } from 'zod';
+import { z, ZodTypeAny } from 'zod/v3';
 import { trimToWindow } from '../../utils/tokenWindow';
-import { getProvider } from './provider.service';
+import { getProvider, MODEL_CONFIGS } from './provider.service';
 // import util from 'node:util'; // No longer needed after debug log removal
 
 // Simple in-memory cache for toolsForSdk
@@ -43,10 +49,15 @@ const cleanActionAnnotations = (text: string): string => {
 };
 
 // Helper function for Zod parsing diagnostics
-function logParse(result: z.SafeParseReturnType<any, any>, fnName: string, raw: any) {
+function logParse(
+  result: z.SafeParseReturnType<any, any>,
+  fnName: string,
+  raw: any,
+) {
   if (!result.success) {
     console.error(`[ToolArgError] ${fnName} args failed Zod parse`, {
-      raw, issues: result.error.issues
+      raw,
+      issues: result.error.issues,
     });
   }
 }
@@ -146,11 +157,26 @@ export const handleSessionMessage = async (
 ): Promise<
   string | StreamTextResult<Record<string, Tool<any, any>>, unknown>
 > => {
+  const requestStartTime = Date.now();
   console.log(
-    `[handleSessionMessage] Entered. UserInput: "${userInput}", SessionID: ${sessionId}, Channel: ${channel}, Attachments: ${
+    `[AI_REQUEST_START] Session: ${sessionId} | Input length: ${
+      userInput.length
+    } chars | Attachments: ${
       attachments ? attachments.length : 0
-    }`,
+    } | Channel: ${channel}`,
   );
+
+  if (attachments && attachments.length > 0) {
+    const attachmentDetails = attachments.map((a) => ({
+      name: a.fileName,
+      type: a.mimeType,
+      size: a.data ? Buffer.from(a.data, 'base64').length : 'url-based',
+    }));
+    console.log(
+      `[ATTACHMENTS_INFO] Processing files:`,
+      JSON.stringify(attachmentDetails, null, 2),
+    );
+  }
   // console.log(`Handling session message for session ${sessionId} on channel ${channel}`);
   console.log(`[handleSessionMessage] About to fetch session ${sessionId}`);
   const session = await Session.findById(sessionId);
@@ -174,11 +200,11 @@ export const handleSessionMessage = async (
       _id: new mongoose.Types.ObjectId(session.assistantId),
     },
     {
-      $set: { lastAccessedAt: new Date() }
+      $set: { lastAccessedAt: new Date() },
     },
     {
-      new: true
-    }
+      new: true,
+    },
   );
 
   if (!assistant) {
@@ -200,12 +226,20 @@ export const handleSessionMessage = async (
   ];
 
   if (attachments && attachments.length > 0) {
-    // console.log(`Processing ${attachments.length} attachments for session ${sessionId} with provider ${providerKey}`);
+    console.log(
+      `[ATTACHMENT_PROCESSING_START] Processing ${attachments.length} files for provider: ${providerKey}`,
+    );
+    let attachmentIndex = 0;
     for (const attachment of attachments) {
+      attachmentIndex++;
+      console.log(
+        `[PROCESSING_FILE] ${attachmentIndex}/${attachments.length}: ${attachment.fileName} (${attachment.mimeType})`,
+      );
+
       if (attachment.mimeType.startsWith('image/')) {
         try {
           let imageBuffer: Buffer;
-          
+
           if (attachment.data) {
             // Handle base64 encoded image data
             imageBuffer = Buffer.from(attachment.data, 'base64');
@@ -234,25 +268,55 @@ export const handleSessionMessage = async (
         }
       } else if (attachment.url || attachment.data) {
         // Other non-image files (TXT, CSV, PDF, etc.)
+        const isCSV =
+          attachment.mimeType.includes('csv') ||
+          attachment.fileName.toLowerCase().endsWith('.csv');
+        console.log(
+          `[FILE_TYPE] Processing ${isCSV ? 'CSV' : 'text'} file: ${
+            attachment.fileName
+          }`,
+        );
+
         try {
           let fileContent: string;
-          
+          const downloadStart = Date.now();
+
           if (attachment.data) {
             // Handle base64 encoded file data
             const fileBuffer = Buffer.from(attachment.data, 'base64');
             fileContent = fileBuffer.toString('utf-8');
+            console.log(
+              `[FILE_DECODED] Decoded base64 data: ${fileBuffer.length} bytes`,
+            );
           } else if (attachment.url) {
             // Handle URL-based file (existing behavior)
+            console.log(`[FILE_DOWNLOAD_START] Downloading from URL...`);
             const fileBuffer = await downloadFile(attachment.url);
             fileContent = fileBuffer.toString('utf-8');
+            console.log(
+              `[FILE_DOWNLOADED] Downloaded ${fileBuffer.length} bytes in ${
+                Date.now() - downloadStart
+              }ms`,
+            );
           } else {
             throw new Error('File attachment must have either data or url');
           }
 
           if (fileContent) {
+            const contentLength = fileContent.length;
+            const lineCount = fileContent.split('\n').length;
+            console.log(
+              `[FILE_CONTENT] Size: ${contentLength} chars, Lines: ${lineCount}`,
+            );
+
+            if (isCSV) {
+              const rowCount = lineCount - 1; // Subtract header row
+              console.log(`[CSV_INFO] Estimated rows: ${rowCount}`);
+            }
+
             (userMessageContentParts[0] as TextPart).text +=
               `\n\n--- Attached File: ${attachment.fileName} ---\n${fileContent}\n--- End of File: ${attachment.fileName} ---`;
-            // console.log(`Non-image file content (text) appended for ${providerKey}: ${attachment.fileName}`);
+            console.log(`[FILE_APPENDED] Added to message content`);
           } else {
             // console.warn(`Could not fetch content for file: ${attachment.fileName} (ID: ${attachment.fileId}).`);
             (userMessageContentParts[0] as TextPart).text +=
@@ -316,7 +380,7 @@ export const handleSessionMessage = async (
   console.log(
     `[handleSessionMessage] Fetched ${dbMessages.length} DB messages for session ${sessionId}`,
   );
-  const history: CoreMessage[] = dbMessages
+  const history: ModelMessage[] = dbMessages
     .filter(
       (msg) =>
         (msg.sender === 'user' || msg.sender === 'assistant') &&
@@ -343,11 +407,6 @@ export const handleSessionMessage = async (
     // console.log(`Using cached toolsForSdk for assistant ${assistant._id}`);
   } else {
     toolsForSdk = {};
-    console.log(
-      `[handleSessionMessage] About to create function factory for assistant ${
-        assistant._id
-      }. Allowed actions: ${JSON.stringify(assistant.allowedActions)}`,
-    );
     const functionFactory = await createFunctionFactory(
       actionContext,
       assistant.allowedActions,
@@ -394,22 +453,44 @@ export const handleSessionMessage = async (
               break;
             case 'array':
               if (paramDef.items && typeof paramDef.items === 'object') {
-                if (paramDef.items.type === 'object' && paramDef.items.properties) {
+                if (
+                  paramDef.items.type === 'object' &&
+                  paramDef.items.properties
+                ) {
                   // Handle array of objects, like the 'attributes' array
                   const itemZodShape: Record<string, ZodTypeAny> = {};
                   for (const itemPropName in paramDef.items.properties) {
-                    const itemPropDef = paramDef.items.properties[itemPropName] as any;
+                    const itemPropDef = paramDef.items.properties[
+                      itemPropName
+                    ] as any;
                     let itemZodType: ZodTypeAny;
                     switch (itemPropDef.type) {
-                      case 'string': itemZodType = z.string(); break;
-                      case 'number': itemZodType = z.number(); break;
-                      case 'boolean': itemZodType = z.boolean(); break;
-                      case 'array': itemZodType = z.array(z.any()); break; // Nested arrays
-                      case 'object': itemZodType = z.record(z.string(), z.any()); break; // Nested objects
-                      default: itemZodType = z.any();
+                      case 'string':
+                        itemZodType = z.string();
+                        break;
+                      case 'number':
+                        itemZodType = z.number();
+                        break;
+                      case 'boolean':
+                        itemZodType = z.boolean();
+                        break;
+                      case 'array':
+                        itemZodType = z.array(z.any());
+                        break; // Nested arrays
+                      case 'object':
+                        itemZodType = z.record(z.string(), z.any());
+                        break; // Nested objects
+                      default:
+                        itemZodType = z.any();
                     }
-                    if (itemPropDef.description) itemZodType = itemZodType.describe(itemPropDef.description);
-                    if (paramDef.items.required && !paramDef.items.required.includes(itemPropName)) {
+                    if (itemPropDef.description)
+                      itemZodType = itemZodType.describe(
+                        itemPropDef.description,
+                      );
+                    if (
+                      paramDef.items.required &&
+                      !paramDef.items.required.includes(itemPropName)
+                    ) {
                       itemZodType = itemZodType.optional();
                     }
                     itemZodShape[itemPropName] = itemZodType;
@@ -427,7 +508,7 @@ export const handleSessionMessage = async (
               } else {
                 zodType = z.array(z.any()); // Default if items is not defined or not an object
               }
-              
+
               // Add default for arrays
               if (paramDef.default !== undefined) {
                 zodType = zodType.default(paramDef.default);
@@ -440,10 +521,13 @@ export const handleSessionMessage = async (
               } else if (typeof paramDef.additionalProperties === 'object') {
                 const t = paramDef.additionalProperties.type;
                 zodType =
-                  t === 'string'  ? z.record(z.string(), z.string())  :
-                  t === 'number'  ? z.record(z.string(), z.number())  :
-                  t === 'boolean' ? z.record(z.string(), z.boolean()) :
-                                    z.record(z.string(), z.any());
+                  t === 'string'
+                    ? z.record(z.string(), z.string())
+                    : t === 'number'
+                      ? z.record(z.string(), z.number())
+                      : t === 'boolean'
+                        ? z.record(z.string(), z.boolean())
+                        : z.record(z.string(), z.any());
               } else {
                 zodType = z.record(z.string(), z.any());
               }
@@ -465,13 +549,19 @@ export const handleSessionMessage = async (
       const currentFuncName = funcName;
 
       const executeFunc = async (args: any) => {
-        console.log(`[Tool Execution] Function ${currentFuncName} called with args:`, args);
-        
+        const toolStartTime = Date.now();
+        console.log(
+          `[TOOL_EXECUTION_START] Function: ${currentFuncName} | Args:`,
+          JSON.stringify(args, null, 2),
+        );
+
         // Continue with validation...
         const parseResult = zodSchema.safeParse(args);
         logParse(parseResult, currentFuncName, args);
         if (!parseResult.success) {
-          const errorMessage = `Invalid arguments for tool ${currentFuncName}: ${JSON.stringify(parseResult.error.issues)}`;
+          const errorMessage = `Invalid arguments for tool ${currentFuncName}: ${JSON.stringify(
+            parseResult.error.issues,
+          )}`;
           console.error(`[Tool Execution] ${errorMessage}`);
           // Return an error object that the LLM can process as a tool result
           return { success: false, error: errorMessage };
@@ -479,10 +569,14 @@ export const handleSessionMessage = async (
 
         const currentSession = await Session.findById(sessionId);
         if (!currentSession) {
-          console.error(`[Tool Execution] Session not found during tool execution for sessionId: ${sessionId}`);
+          console.error(
+            `[Tool Execution] Session not found during tool execution for sessionId: ${sessionId}`,
+          );
           throw new Error('Session not found during tool execution');
         }
-        console.log(`[Tool Execution] Retrieved current session ID: ${currentSession._id.toString()}, company ID: ${currentSession.companyId.toString()}`);
+        console.log(
+          `[Tool Execution] Retrieved current session ID: ${currentSession._id.toString()}, company ID: ${currentSession.companyId.toString()}`,
+        );
 
         const functionCallPayload: FunctionCall = {
           function: { name: currentFuncName, arguments: JSON.stringify(args) },
@@ -492,6 +586,11 @@ export const handleSessionMessage = async (
           currentSession._id.toString(),
           currentSession.companyId.toString(),
           assistant.allowedActions,
+        );
+
+        const toolDuration = Date.now() - toolStartTime;
+        console.log(
+          `[TOOL_EXECUTION_COMPLETE] Function: ${currentFuncName} | Duration: ${toolDuration}ms | Success: ${!error}`,
         );
         if (error) {
           // console.error(`Error in tool ${currentFuncName} execution:`, error);
@@ -505,11 +604,12 @@ export const handleSessionMessage = async (
         return result ?? 'Action completed successfully';
       };
 
+      // Type cast to avoid deep instantiation error
       toolsForSdk[funcName] = tool({
         description: funcDef.description,
-        parameters: zodSchema,
+        inputSchema: zodSchema as z.ZodType<any>,
         execute: executeFunc,
-      });
+      } as any);
     }
     toolsCache.set(cacheKey, toolsForSdk);
     // console.log(`Cached toolsForSdk for assistant ${assistant._id}`);
@@ -559,12 +659,12 @@ export const handleSessionMessage = async (
 
   // Construct user message content for LLM
   // The userMessageForLlm will now use the userMessageContentParts array
-  const userMessageForLlm: CoreMessage = {
+  const userMessageForLlm: ModelMessage = {
     role: 'user',
     content: userMessageContentParts, // This array contains text and formatted image parts
   };
 
-  const messagesForLlm: CoreMessage[] = [...history];
+  const messagesForLlm: ModelMessage[] = [...history];
   const lastHistoryMessage =
     history.length > 0 ? history[history.length - 1] : null;
 
@@ -595,12 +695,33 @@ export const handleSessionMessage = async (
   //   }))
   // );
 
-  const maxPromptTokens: number = assistant.maxTokens || 25000; // Use assistant's maxTokens, default to 25k if somehow undefined
+  const maxPromptTokens: number = assistant.maxOutputTokens || 25000; // Use assistant's maxTokens, default to 25k if somehow undefined
+
+  console.log(
+    `[TOKEN_WINDOW] Starting token window trimming. Max tokens: ${maxPromptTokens}, Messages: ${messagesForLlm.length}`,
+  );
+  const trimStart = Date.now();
 
   let { trimmedMessages, tokensInPrompt: actualTokensInPrompt } = trimToWindow(
     messagesForLlm,
     maxPromptTokens,
   );
+
+  console.log(
+    `[TOKEN_WINDOW_COMPLETE] Trimming took ${
+      Date.now() - trimStart
+    }ms. Original: ${messagesForLlm.length} msgs, Trimmed: ${
+      trimmedMessages.length
+    } msgs, Tokens: ${actualTokensInPrompt}`,
+  );
+
+  if (messagesForLlm.length > trimmedMessages.length) {
+    console.log(
+      `[TOKEN_WINDOW_TRIMMED] Removed ${
+        messagesForLlm.length - trimmedMessages.length
+      } messages to fit token window`,
+    );
+  }
 
   // Handle the case where trimmedMessages is empty, especially after the trimToWindow call
   if (trimmedMessages.length === 0 && messagesForLlm.length > 0) {
@@ -654,42 +775,110 @@ export const handleSessionMessage = async (
         model: llm,
         messages: trimmedMessages, // This now contains correctly formatted multimodal messages
         tools: relevantTools,
-        maxSteps: 5,
         maxRetries: 2,
+        stopWhen: stepCountIs(5), // Stop after 5 tool steps
       };
       if (systemPrompt !== undefined) {
         streamCallOptions.system = systemPrompt;
       }
-      
-      // Add reasoningEffort for o3-mini models
-      if (providerKey === 'openai' && modelIdentifier && modelIdentifier.startsWith('o3-mini')) {
-        let reasoningEffort: 'low' | 'medium' | 'high' = 'medium'; // Default
-        
-        if (modelIdentifier === 'o3-mini-low') {
-          reasoningEffort = 'low';
-        } else if (modelIdentifier === 'o3-mini-medium') {
-          reasoningEffort = 'medium';
-        } else if (modelIdentifier === 'o3-mini-high') {
-          reasoningEffort = 'high';
-        }
-        
-        streamCallOptions.providerOptions = {
-          openai: {
-            reasoningEffort: reasoningEffort
-          }
-        };
-        console.log(`[handleSessionMessage] Setting reasoningEffort: ${reasoningEffort} for model: ${modelIdentifier}`);
+
+      // Add provider-specific options from model config
+      const modelConfig = MODEL_CONFIGS[modelIdentifier];
+      if (modelConfig?.providerOptions) {
+        Object.assign(streamCallOptions, modelConfig.providerOptions);
       }
 
       let streamResult: any;
       let streamErrorOccurred = false;
       let streamErrorMessage = '';
-      
+
       try {
-        console.log(`[handleSessionMessage] About to call streamText with model: ${modelIdentifier}, provider: ${providerKey}`);
-        console.log(`[handleSessionMessage] Number of tools: ${Object.keys(relevantTools).length}`);
-        
+        console.log(
+          `[AI_STREAM_START] Model: ${modelIdentifier} | Provider: ${providerKey} | Tools: ${
+            Object.keys(relevantTools).length
+          } | Messages: ${
+            trimmedMessages.length
+          } | Tokens: ${actualTokensInPrompt}`,
+        );
+
+        const streamStartTime = Date.now();
         streamResult = await streamText(streamCallOptions);
+
+        console.log(
+          `[AI_STREAM_INITIATED] Stream created in ${
+            Date.now() - streamStartTime
+          }ms. Waiting for response...`,
+        );
+
+        // Monitor stream progress for O3 and other slow models
+        if (modelIdentifier.includes('o3') || modelIdentifier.includes('O3')) {
+          console.log(
+            `[O3_MODEL_WARNING] Using O3 model (${modelIdentifier}) - this model may take 30-200+ seconds to respond`,
+          );
+        }
+
+        // Set up periodic progress logging for long-running streams
+        let progressLogInterval: NodeJS.Timeout | null = null;
+        const lastProgressTime = Date.now();
+        let chunksReceived = 0;
+
+        progressLogInterval = setInterval(() => {
+          const elapsed = Math.floor((Date.now() - streamStartTime) / 1000);
+          console.log(
+            `[STREAM_PROGRESS] Still waiting for ${modelIdentifier} response... ${elapsed}s elapsed | Session: ${sessionId}`,
+          );
+        }, 10000); // Log every 10 seconds
+
+        // Monitor the text stream for first chunk
+        (async () => {
+          try {
+            let firstChunkTime: number | null = null;
+            // textStream is a ReadableStream, not a promise
+            for await (const chunk of streamResult.textStream) {
+              chunksReceived++;
+              if (!firstChunkTime) {
+                firstChunkTime = Date.now() - streamStartTime;
+                console.log(
+                  `[FIRST_CHUNK_RECEIVED] Got first chunk after ${firstChunkTime}ms | Model: ${modelIdentifier}`,
+                );
+                if (progressLogInterval) {
+                  clearInterval(progressLogInterval);
+                  progressLogInterval = null;
+                }
+              }
+
+              // Log progress every 50 chunks
+              if (chunksReceived % 50 === 0) {
+                console.log(
+                  `[STREAM_CHUNKS] Received ${chunksReceived} chunks | Elapsed: ${
+                    Date.now() - streamStartTime
+                  }ms`,
+                );
+              }
+            }
+          } catch (e: any) {
+            // Don't log error if stream is already consumed (normal behavior)
+            if (!e.message?.includes('already consumed')) {
+              console.error(
+                `[STREAM_MONITOR_ERROR] Error monitoring stream:`,
+                e.message,
+              );
+            }
+          }
+        })();
+
+        // Clean up interval when stream completes
+        streamResult.text
+          .then(() => {
+            if (progressLogInterval) {
+              clearInterval(progressLogInterval);
+            }
+          })
+          .catch(() => {
+            if (progressLogInterval) {
+              clearInterval(progressLogInterval);
+            }
+          });
         console.log(
           `[handleSessionMessage] streamText call appears to have completed for session ${sessionId}.`,
         );
@@ -708,7 +897,9 @@ export const handleSessionMessage = async (
           `[handleSessionMessage] StreamError Name: ${streamError.name}, Message: ${streamError.message}, Stack: ${streamError.stack}`,
         );
         console.error(
-          `[handleSessionMessage] Model: ${modelIdentifier}, Provider: ${providerKey}, Tools: ${Object.keys(relevantTools).length}`,
+          `[handleSessionMessage] Model: ${modelIdentifier}, Provider: ${providerKey}, Tools: ${
+            Object.keys(relevantTools).length
+          }`,
         );
         if (streamError.response) {
           console.error(
@@ -722,7 +913,7 @@ export const handleSessionMessage = async (
             streamError.cause,
           );
         }
-        
+
         // Check if this is an API key error
         const errorMessage = streamError.message?.toLowerCase() || '';
         if (
@@ -734,7 +925,7 @@ export const handleSessionMessage = async (
         ) {
           streamErrorOccurred = true;
           streamErrorMessage = `Invalid ${providerKey} API key. Please check your API key configuration.`;
-          
+
           // Save a user-friendly error message
           await saveSystemMessage(
             new mongoose.Types.ObjectId(session._id),
@@ -742,37 +933,108 @@ export const handleSessionMessage = async (
             new mongoose.Types.ObjectId(session.userId),
             streamErrorMessage,
             'error',
-            { error: 'invalid_api_key', provider: providerKey, originalError: streamError.message }
+            {
+              error: 'invalid_api_key',
+              provider: providerKey,
+              originalError: streamError.message,
+            },
           );
         }
-        
+
         throw streamError; // Re-throw to be caught by the outer try-catch
       }
 
       (async () => {
         try {
+          const startTime = Date.now();
           const finalText = await streamResult.text;
           const toolCalls = await streamResult.toolCalls;
           const toolResults = await streamResult.toolResults;
 
-          console.log(`[handleSessionMessage] Stream finished. Final text length: ${finalText.length}`);
-          
+          // Get usage data for cost tracking
+          let usage: any;
+          try {
+            usage = await streamResult.usage;
+          } catch (e) {
+            console.log(
+              `[handleSessionMessage] Could not get usage data: ${e}`,
+            );
+          }
+
+          const streamDuration = Date.now() - startTime;
+          console.log(
+            `[AI_STREAM_COMPLETE] Duration: ${streamDuration}ms | Response length: ${
+              finalText.length
+            } chars | Tool calls: ${toolCalls?.length || 0}`,
+          );
+
+          // Log cost tracking information
+          if (usage) {
+            const duration = Date.now() - startTime;
+            const costs = calculateCost(
+              modelIdentifier,
+              usage.inputTokens || 0,
+              usage.outputTokens || 0,
+            );
+
+            const costInfo: CostTrackingInfo = {
+              companyId: session.companyId?.toString() || 'unknown',
+              assistantId: assistant._id.toString(),
+              sessionId: sessionId.toString(),
+              userId: session.userId?.toString() || 'unknown',
+              provider: providerKey,
+              model: modelIdentifier,
+              inputTokens: usage.inputTokens || 0,
+              outputTokens: usage.outputTokens || 0,
+              totalTokens:
+                usage.totalTokens ||
+                (usage.inputTokens || 0) + (usage.outputTokens || 0),
+              inputCost: costs.inputCost,
+              outputCost: costs.outputCost,
+              totalCost: costs.totalCost,
+              timestamp: new Date(),
+              duration,
+              toolCalls: toolCalls?.length || 0,
+              cached: false, // Can be enhanced later if SDK provides cached token info
+              requestType: 'streaming' as any,
+            };
+
+            await logCostTracking(costInfo);
+          }
+
           // Check for empty response which might indicate an API key error
           if (!finalText || finalText.length === 0) {
-            console.error(`[handleSessionMessage] Empty response from LLM stream for session ${sessionId}.`);
-            console.error(`[handleSessionMessage] Model: ${modelIdentifier}, Provider: ${providerKey}`);
-            console.error(`[handleSessionMessage] Tools count: ${Object.keys(relevantTools).length}`);
-            console.error(`[handleSessionMessage] Tool calls: ${toolCalls?.length || 0}`);
-            console.error(`[handleSessionMessage] Tool results: ${toolResults?.length || 0}`);
-            
+            console.error(
+              `[handleSessionMessage] Empty response from LLM stream for session ${sessionId}.`,
+            );
+            console.error(
+              `[handleSessionMessage] Model: ${modelIdentifier}, Provider: ${providerKey}`,
+            );
+            console.error(
+              `[handleSessionMessage] Tools count: ${
+                Object.keys(relevantTools).length
+              }`,
+            );
+            console.error(
+              `[handleSessionMessage] Tool calls: ${toolCalls?.length || 0}`,
+            );
+            console.error(
+              `[handleSessionMessage] Tool results: ${
+                toolResults?.length || 0
+              }`,
+            );
+
             // Log streamResult properties for debugging
             try {
               const usage = await streamResult.usage;
               console.error(`[handleSessionMessage] Stream usage:`, usage);
             } catch (e) {
-              console.error(`[handleSessionMessage] Could not get stream usage:`, e);
+              console.error(
+                `[handleSessionMessage] Could not get stream usage:`,
+                e,
+              );
             }
-            
+
             // Save an error message to inform the user
             await saveSystemMessage(
               new mongoose.Types.ObjectId(session._id),
@@ -780,20 +1042,40 @@ export const handleSessionMessage = async (
               new mongoose.Types.ObjectId(session.userId),
               'Failed to generate response. Please check your API key configuration.',
               'error',
-              { error: 'empty_response', provider: providerKey, model: modelIdentifier }
+              {
+                error: 'empty_response',
+                provider: providerKey,
+                model: modelIdentifier,
+              },
             );
             return;
           }
-          
+
           if (toolCalls && toolCalls.length > 0) {
-            console.log(`[handleSessionMessage] Detected Tool Calls: ${JSON.stringify(toolCalls, null, 2)}`);
+            console.log(
+              `[handleSessionMessage] Detected Tool Calls: ${JSON.stringify(
+                toolCalls,
+                null,
+                2,
+              )}`,
+            );
           } else {
-            console.log('[handleSessionMessage] No tool calls detected in streamResult.');
+            console.log(
+              '[handleSessionMessage] No tool calls detected in streamResult.',
+            );
           }
           if (toolResults && toolResults.length > 0) {
-            console.log(`[handleSessionMessage] Detected Tool Results: ${JSON.stringify(toolResults, null, 2)}`);
+            console.log(
+              `[handleSessionMessage] Detected Tool Results: ${JSON.stringify(
+                toolResults,
+                null,
+                2,
+              )}`,
+            );
           } else {
-            console.log('[handleSessionMessage] No tool results detected in streamResult.');
+            console.log(
+              '[handleSessionMessage] No tool results detected in streamResult.',
+            );
           }
 
           const cleanedText = cleanActionAnnotations(finalText);
@@ -834,101 +1116,174 @@ export const handleSessionMessage = async (
           await assistantMessage.save();
           // console.log('Assistant message from streamed response (with potential tool data) saved to DB.');
         } catch (dbError) {
-          console.error('[handleSessionMessage] Error saving streamed assistant message to DB:', dbError);
+          console.error(
+            '[handleSessionMessage] Error saving streamed assistant message to DB:',
+            dbError,
+          );
         }
       })().catch((streamProcessingError) => {
-        console.error('[handleSessionMessage] Error processing full streamed text for DB save:', streamProcessingError);
+        console.error(
+          '[handleSessionMessage] Error processing full streamed text for DB save:',
+          streamProcessingError,
+        );
         if (streamProcessingError.stack) {
-          console.error('[handleSessionMessage] Stack trace:', streamProcessingError.stack);
+          console.error(
+            '[handleSessionMessage] Stack trace:',
+            streamProcessingError.stack,
+          );
         }
       });
 
       // console.log(`Returning stream object for session ${sessionId} for client consumption.`);
-      
+
       // If there was a stream initialization error, throw it to be caught by outer handler
       if (streamErrorOccurred) {
         throw new Error(streamErrorMessage || 'Stream initialization failed');
       }
-      
+
       // Monitor the stream to catch empty responses and save error messages
       // Also attach an error indicator to the stream result for the route handler
-      streamResult.text.then((text: string) => {
-        if (!text || text.length === 0) {
-          console.error(`[handleSessionMessage] Stream completed with empty text for session ${sessionId}`);
+      streamResult.text
+        .then((text: string) => {
+          if (!text || text.length === 0) {
+            console.error(
+              `[handleSessionMessage] Stream completed with empty text for session ${sessionId}`,
+            );
+            // Attach error indicator to stream result
+            (streamResult as any).hasEmptyResponse = true;
+            const providerDisplayName =
+              providerKey === 'google'
+                ? 'Google'
+                : providerKey === 'openai'
+                  ? 'OpenAI'
+                  : providerKey === 'anthropic'
+                    ? 'Anthropic'
+                    : providerKey;
+            (streamResult as any).errorMessage =
+              `Failed to generate response. Please check your ${providerDisplayName} API key configuration.`;
+
+            // Save error message asynchronously
+            saveSystemMessage(
+              new mongoose.Types.ObjectId(session._id),
+              new mongoose.Types.ObjectId(assistant._id),
+              new mongoose.Types.ObjectId(session.userId),
+              `Failed to generate response. Please check your ${providerKey} API key configuration.`,
+              'error',
+              { error: 'empty_response', provider: providerKey },
+            ).catch((err) =>
+              console.error('Failed to save error message:', err),
+            );
+          }
+        })
+        .catch((err: any) => {
+          console.error(
+            `[handleSessionMessage] Stream text promise rejected for session ${sessionId}:`,
+            err,
+          );
           // Attach error indicator to stream result
-          (streamResult as any).hasEmptyResponse = true;
-          const providerDisplayName = providerKey === 'google' ? 'Google' : 
-                                     providerKey === 'openai' ? 'OpenAI' : 
-                                     providerKey === 'anthropic' ? 'Anthropic' : providerKey;
-          (streamResult as any).errorMessage = `Failed to generate response. Please check your ${providerDisplayName} API key configuration.`;
-          
+          (streamResult as any).hasStreamError = true;
+          (streamResult as any).errorMessage = `Stream error: ${
+            err.message || 'Unknown error'
+          }`;
+
           // Save error message asynchronously
           saveSystemMessage(
             new mongoose.Types.ObjectId(session._id),
             new mongoose.Types.ObjectId(assistant._id),
             new mongoose.Types.ObjectId(session.userId),
-            `Failed to generate response. Please check your ${providerKey} API key configuration.`,
+            `Stream error: ${err.message || 'Unknown error'}`,
             'error',
-            { error: 'empty_response', provider: providerKey }
-          ).catch(err => console.error('Failed to save error message:', err));
-        }
-      }).catch((err: any) => {
-        console.error(`[handleSessionMessage] Stream text promise rejected for session ${sessionId}:`, err);
-        // Attach error indicator to stream result
-        (streamResult as any).hasStreamError = true;
-        (streamResult as any).errorMessage = `Stream error: ${err.message || 'Unknown error'}`;
-        
-        // Save error message asynchronously
-        saveSystemMessage(
-          new mongoose.Types.ObjectId(session._id),
-          new mongoose.Types.ObjectId(assistant._id),
-          new mongoose.Types.ObjectId(session.userId),
-          `Stream error: ${err.message || 'Unknown error'}`,
-          'error',
-          { error: 'stream_error', provider: providerKey, originalError: err.message }
-        ).catch(saveErr => console.error('Failed to save error message:', saveErr));
-      });
-      
+            {
+              error: 'stream_error',
+              provider: providerKey,
+              originalError: err.message,
+            },
+          ).catch((saveErr) =>
+            console.error('Failed to save error message:', saveErr),
+          );
+        });
+
       // Attach provider information to the stream result
       (streamResult as any).provider = providerKey;
-      
+
+      const totalDuration = Date.now() - requestStartTime;
+      console.log(
+        `[AI_REQUEST_COMPLETE] Total duration: ${totalDuration}ms | Session: ${sessionId} | Mode: streaming`,
+      );
+
       return streamResult;
     } else {
       const generateCallOptions: Parameters<typeof generateText>[0] = {
         model: llm,
         messages: trimmedMessages, // This now contains correctly formatted multimodal messages
         tools: relevantTools,
-        maxSteps: 5,
         maxRetries: 2,
+        stopWhen: stepCountIs(5), // Stop after 5 tool steps
       };
       if (systemPrompt !== undefined) {
         generateCallOptions.system = systemPrompt;
       }
-      
-      // Add reasoningEffort for o3-mini models (non-streaming)
-      if (providerKey === 'openai' && modelIdentifier && modelIdentifier.startsWith('o3-mini')) {
-        let reasoningEffort: 'low' | 'medium' | 'high' = 'medium'; // Default
-        
-        if (modelIdentifier === 'o3-mini-low') {
-          reasoningEffort = 'low';
-        } else if (modelIdentifier === 'o3-mini-medium') {
-          reasoningEffort = 'medium';
-        } else if (modelIdentifier === 'o3-mini-high') {
-          reasoningEffort = 'high';
-        }
-        
-        generateCallOptions.providerOptions = {
-          openai: {
-            reasoningEffort: reasoningEffort
-          }
-        };
-        console.log(`[handleSessionMessage] Setting reasoningEffort (non-streaming): ${reasoningEffort} for model: ${modelIdentifier}`);
+
+      // Add provider-specific options from model config (non-streaming)
+      const modelConfigNonStream = MODEL_CONFIGS[modelIdentifier];
+      if (modelConfigNonStream?.providerOptions) {
+        Object.assign(
+          generateCallOptions,
+          modelConfigNonStream.providerOptions,
+        );
       }
       // No separate experimental_attachments or attachments field needed here
-      // console.log('Calling generateText. Multimodal content is part of the messages array.');
+      console.log(
+        `[AI_GENERATE_START] Model: ${modelIdentifier} | Provider: ${providerKey} | Tools: ${
+          Object.keys(relevantTools).length
+        } | Messages: ${trimmedMessages.length}`,
+      );
+
+      const startTime = Date.now();
       const result = await generateText(generateCallOptions);
+      const duration = Date.now() - startTime;
+
+      console.log(
+        `[AI_GENERATE_COMPLETE] Duration: ${duration}ms | Response length: ${
+          result.text.length
+        } chars | Tool calls: ${result.toolCalls?.length || 0}`,
+      );
+
       aggregatedResponse = result.text;
       finalLlmResult = result;
+
+      // Log cost tracking for non-streaming generateText
+      if (result.usage) {
+        const costs = calculateCost(
+          modelIdentifier,
+          result.usage.inputTokens || 0,
+          result.usage.outputTokens || 0,
+        );
+
+        const costInfo: CostTrackingInfo = {
+          companyId: session.companyId?.toString() || 'unknown',
+          assistantId: assistant._id.toString(),
+          sessionId: sessionId.toString(),
+          userId: session.userId?.toString() || 'unknown',
+          provider: providerKey,
+          model: modelIdentifier,
+          inputTokens: result.usage.inputTokens || 0,
+          outputTokens: result.usage.outputTokens || 0,
+          totalTokens:
+            result.usage.totalTokens ||
+            (result.usage.inputTokens || 0) + (result.usage.outputTokens || 0),
+          inputCost: costs.inputCost,
+          outputCost: costs.outputCost,
+          totalCost: costs.totalCost,
+          timestamp: new Date(),
+          duration,
+          toolCalls: finalLlmResult.toolCalls?.length || 0,
+          cached: false,
+          requestType: 'non-streaming' as any,
+        };
+
+        await logCostTracking(costInfo);
+      }
 
       if (finalLlmResult.toolCalls && finalLlmResult.toolCalls.length > 0) {
         // console.log('Tool Calls from generateText:', JSON.stringify(finalLlmResult.toolCalls, null, 2));
@@ -952,7 +1307,7 @@ export const handleSessionMessage = async (
       ) {
         // console.error('Gemini API Error (detected by message):', error);
         specificGeminiError = true;
-        
+
         // Save a user-friendly error message for API key errors
         await saveSystemMessage(
           new mongoose.Types.ObjectId(session._id),
@@ -960,7 +1315,11 @@ export const handleSessionMessage = async (
           new mongoose.Types.ObjectId(session.userId),
           `Invalid ${providerKey} API key. Please check your API key configuration.`,
           'error',
-          { error: 'invalid_api_key', provider: providerKey, originalError: error.message }
+          {
+            error: 'invalid_api_key',
+            provider: providerKey,
+            originalError: error.message,
+          },
         );
       }
     }
@@ -977,8 +1336,10 @@ export const handleSessionMessage = async (
 
     // Check for empty response which might indicate an API key error
     if (!aggregatedResponse || aggregatedResponse.length === 0) {
-      console.error(`[handleSessionMessage] Empty response from LLM for session ${sessionId}. This might indicate an invalid API key.`);
-      
+      console.error(
+        `[handleSessionMessage] Empty response from LLM for session ${sessionId}. This might indicate an invalid API key.`,
+      );
+
       // Save an error message to inform the user
       await saveSystemMessage(
         new mongoose.Types.ObjectId(session._id),
@@ -986,9 +1347,9 @@ export const handleSessionMessage = async (
         new mongoose.Types.ObjectId(session.userId),
         'Failed to generate response. Please check your API key configuration.',
         'error',
-        { error: 'empty_response', provider: providerKey }
+        { error: 'empty_response', provider: providerKey },
       );
-      
+
       return 'Failed to generate response. Please check your API key configuration.';
     }
 
@@ -1028,6 +1389,11 @@ export const handleSessionMessage = async (
 
     const assistantMessage = new Message(assistantMessageData);
     await assistantMessage.save();
+
+    const totalDuration = Date.now() - requestStartTime;
+    console.log(
+      `[AI_REQUEST_COMPLETE] Total duration: ${totalDuration}ms | Session: ${sessionId} | Mode: non-streaming | Response length: ${processedResponse.length} chars`,
+    );
 
     return processedResponse;
   }

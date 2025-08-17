@@ -30,14 +30,14 @@ if (G_CLIENT_ID_ENV) {
     clientId: G_CLIENT_ID_ENV,
     redirectUri: 'postmessage',
   };
-  
+
   // Only add the custom agent if we're forcing IPv6
   if (httpsAgent) {
     clientOptions.transporterOptions = {
-      agent: httpsAgent
+      agent: httpsAgent,
     };
   }
-  
+
   client = new OAuth2Client(clientOptions);
 } else {
   console.warn(

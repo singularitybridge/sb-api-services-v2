@@ -18,9 +18,7 @@ type QueryParams = {
 // Get a collection
 const getCollection = (collectionName: string): Collection => {
   const conn = getAoiConnection();
-  return conn.db.collection(
-    collectionName,
-  ) as unknown as Collection;
+  return conn.db.collection(collectionName) as unknown as Collection;
 };
 
 // Execute a query

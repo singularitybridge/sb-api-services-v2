@@ -20,4 +20,3 @@ router.get('/', verifyAccess(), ApiKeyController.listApiKeys);
 router.delete('/:keyId', verifyAccess(), ApiKeyController.revokeApiKey);
 
 export default router;
-

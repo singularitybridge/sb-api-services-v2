@@ -36,7 +36,7 @@ export async function performPerplexitySearch(
     'sonar-reasoning-pro',
     'sonar-deep-research',
   ];
-  
+
   if (!validModels.includes(model)) {
     throw new Error('Invalid model specified');
   }
@@ -77,7 +77,9 @@ export async function performPerplexitySearch(
       // Reasoning models may include <think> tags before the content
       const content = response.data.choices[0]?.message?.content || '';
       // Extract content after any <think> sections if present
-      const cleanContent = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      const cleanContent = content
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        .trim();
       return cleanContent;
     }
 

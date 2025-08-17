@@ -20,7 +20,7 @@ export interface IAssistant extends Document {
   llmModel: string; // Existing field, will now be the primary model identifier
   llmPrompt: string;
   llmProvider: 'openai' | 'google' | 'anthropic'; // New field for provider
-  maxTokens?: number; // New field for token limit
+  maxOutputTokens?: number; // New field for token limit
   companyId: string;
   allowedActions: string[];
   avatarImage?: string;
@@ -48,7 +48,7 @@ const AssistantSchema: Schema = new Schema({
     default: 'openai', // Default provider
     required: true,
   },
-  maxTokens: { type: Number, required: false, default: 25000 }, // Default to 25k tokens
+  maxOutputTokens: { type: Number, required: false, default: 25000 }, // Default to 25k tokens
   companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
   allowedActions: [{ type: String, required: false }],
   avatarImage: { type: String, required: false, default: 'default-avatar' },
@@ -56,6 +56,25 @@ const AssistantSchema: Schema = new Schema({
     { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: false },
   ],
   lastAccessedAt: { type: Date, required: false },
+});
+
+// Virtual property for backwards compatibility with 'maxTokens'
+AssistantSchema.virtual('maxTokens')
+  .get(function () {
+    return this.maxOutputTokens;
+  })
+  .set(function (value: number) {
+    this.maxOutputTokens = value;
+  });
+
+// Ensure virtual fields are included in JSON output
+AssistantSchema.set('toJSON', {
+  virtuals: true,
+  transform: function (doc, ret) {
+    // Optional: Remove maxTokens from output to avoid confusion
+    // delete ret.maxTokens;
+    return ret;
+  },
 });
 
 export const Assistant = mongoose.model<IAssistant>(

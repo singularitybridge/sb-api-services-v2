@@ -46,7 +46,7 @@ export const verifyToken = async (
       // Re-throw AuthenticationErrors as-is
       throw error;
     }
-    
+
     // For any other unexpected errors, log them but still throw as AuthenticationError
     console.error('Unexpected authentication error:', (error as Error).message);
     throw new AuthenticationError('Authentication failed');

@@ -49,10 +49,7 @@ export const updateTeam = async (
 export const deleteTeam = async (id: string): Promise<void> => {
   try {
     // Remove the team from all assistants that reference it
-    await Assistant.updateMany(
-      { teams: id },
-      { $pull: { teams: id } }
-    );
+    await Assistant.updateMany({ teams: id }, { $pull: { teams: id } });
 
     // Delete the team
     await Team.findByIdAndDelete(id);
@@ -68,10 +65,9 @@ export const assignAssistantToTeam = async (
 ): Promise<void> => {
   try {
     // Add team to assistant's teams array if not already present
-    await Assistant.findByIdAndUpdate(
-      assistantId,
-      { $addToSet: { teams: teamId } }
-    );
+    await Assistant.findByIdAndUpdate(assistantId, {
+      $addToSet: { teams: teamId },
+    });
   } catch (error) {
     console.error('Error assigning assistant to team:', error);
     throw new Error('Error assigning assistant to team');
@@ -84,10 +80,9 @@ export const removeAssistantFromTeam = async (
 ): Promise<void> => {
   try {
     // Remove team from assistant's teams array
-    await Assistant.findByIdAndUpdate(
-      assistantId,
-      { $pull: { teams: teamId } }
-    );
+    await Assistant.findByIdAndUpdate(assistantId, {
+      $pull: { teams: teamId },
+    });
   } catch (error) {
     console.error('Error removing assistant from team:', error);
     throw new Error('Error removing assistant from team');

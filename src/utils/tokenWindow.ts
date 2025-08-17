@@ -1,4 +1,4 @@
-import { CoreMessage, ImagePart, TextPart } from 'ai';
+import { ModelMessage, ImagePart, TextPart } from 'ai';
 import { encode } from 'gpt-tokenizer';
 
 // Estimated token counts for images based on OpenAI's documentation
@@ -22,12 +22,12 @@ function estimateImageTokens(imagePart: ImagePart): number {
 }
 
 export function trimToWindow(
-  messages: CoreMessage[],
+  messages: ModelMessage[],
   maxTokens: number,
-): { trimmedMessages: CoreMessage[]; tokensInPrompt: number } {
-  const reversed: CoreMessage[] = [...messages].reverse();
+): { trimmedMessages: ModelMessage[]; tokensInPrompt: number } {
+  const reversed: ModelMessage[] = [...messages].reverse();
   let totalTokens = 0;
-  const kept: CoreMessage[] = [];
+  const kept: ModelMessage[] = [];
 
   for (const m of reversed) {
     let messageTokens = 0;
@@ -67,7 +67,7 @@ export function trimToWindow(
 
         if (textPartTokens + 4 <= maxTokens) {
           // If only text parts fit, keep them
-          const partialMessage: CoreMessage = {
+          const partialMessage: ModelMessage = {
             ...m,
             content: textPartsContent,
           };
