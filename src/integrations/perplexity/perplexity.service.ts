@@ -23,7 +23,6 @@ export async function performPerplexitySearch(
   companyId: string,
   model: string,
   query: string,
-  searchMode?: string,
 ): Promise<string> {
   const apiKey = await getApiKey(companyId, 'perplexity_api_key');
   if (!apiKey) {
@@ -57,10 +56,9 @@ export async function performPerplexitySearch(
       ],
     };
 
-    // Add search mode for applicable models
-    if (searchMode && ['sonar', 'sonar-pro', 'sonar-reasoning', 'sonar-reasoning-pro'].includes(model)) {
-      requestBody.search_mode = searchMode;
-    }
+    // Note: search_mode parameter has been deprecated
+    // The API now uses different parameters for search customization
+    // For now, we'll omit the searchMode to avoid 400 errors
 
     const response = await axios.post<PerplexityResponse>(
       'https://api.perplexity.ai/chat/completions',

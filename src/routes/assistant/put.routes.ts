@@ -3,12 +3,14 @@ import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { validateApiKeys, getApiKey } from '../../services/api.key.service';
 import { Assistant } from '../../models/Assistant';
 import { updateAllowedActions } from '../../services/allowed-actions.service';
+import { validateObjectId } from '../../utils/validation';
 // OpenAI Assistant API calls removed as it's deprecated in favor of Vercel AI
 
 const router = Router();
 
 router.put(
   '/:id',
+  validateObjectId('id'),
   validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     try {

@@ -6,6 +6,7 @@ import {
 } from '../../services/assistant/assistant-management.service';
 import { getAssistantsByTeam, getTeamById } from '../../services/team.service';
 import { Assistant } from '../../models/Assistant';
+import { validateObjectId } from '../../utils/validation';
 
 const router = Router();
 
@@ -19,7 +20,7 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
   }
 });
 
-router.get('/:id', async (req: AuthenticatedRequest, res) => {
+router.get('/:id', validateObjectId('id'), async (req: AuthenticatedRequest, res) => {
   try {
     const assistant = await getAssistantById(req.params.id);
     if (!assistant) {

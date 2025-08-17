@@ -83,7 +83,7 @@ interface GetActiveSprintForBoardArgs {
   boardId: string;
 }
 interface GetIssuesForSprintArgs {
-  sprintId: string;
+  sprintId: string | number;
   projectKey?: string;
   maxResults?: number;
   startAt?: number;
@@ -579,7 +579,7 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
       type: 'object',
       properties: {
         sprintId: {
-          type: 'string',
+          type: ['string', 'number'],
           description: 'The numeric ID of the JIRA sprint.',
         },
         assigneeAccountId: {
@@ -618,7 +618,7 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
         context.sessionId,
         context.companyId,
         {
-          sprintId: params.sprintId,
+          sprintId: String(params.sprintId), // Convert to string to handle both number and string inputs
           projectKey: params.projectKey,
           maxResults: params.maxResults,
           startAt: params.startAt,

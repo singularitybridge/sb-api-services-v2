@@ -10,6 +10,8 @@ import {
   ActionExecutionError,
   ActionValidationError,
 } from '../../utils/actionErrors';
+import { generateText } from 'ai';
+import { openai, createOpenAI } from '@ai-sdk/openai';
 
 type OpenAIVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 type OpenAIModel = 'tts-1' | 'tts-1-hd';
@@ -42,6 +44,12 @@ interface AskO1ModelWithFilesArgs {
   question: string;
   model: O1Model;
   filePaths: string[];
+}
+
+interface WebSearchArgs {
+  query: string;
+  location?: string;
+  sites?: string[];
 }
 
 export const createOpenAiActions = (
@@ -293,6 +301,85 @@ export const createOpenAiActions = (
             model,
           );
           return { success: true, data: { response: responseText } };
+        },
+        { serviceName: 'OpenAIService' },
+      );
+    },
+  },
+  webSearch: {
+    description: 'Search the web using OpenAI\'s native web search capabilities',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The search query or question to answer using web search',
+        },
+        location: {
+          type: 'string',
+          description: 'Optional location context for the search (e.g., "United States", "Europe")',
+        },
+        sites: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional list of specific sites to search within',
+        },
+      },
+      required: ['query'],
+      additionalProperties: false,
+    },
+    function: async ({ query, location, sites }: WebSearchArgs) => {
+      const actionName = 'webSearch';
+      const apiKey = await getApiKey(context.companyId, 'openai_api_key');
+      if (!apiKey) {
+        throw new ActionExecutionError(
+          'OpenAI API key is missing for this company.',
+          { actionName, statusCode: 400 },
+        );
+      }
+
+      return executeAction<{ answer: string; sources?: string[] }>(
+        actionName,
+        async () => {
+          try {
+            // Create a custom OpenAI provider instance with the API key
+            const customOpenAI = createOpenAI({
+              apiKey,
+            });
+
+            // Build options object only with provided values
+            const searchOptions: any = {};
+            if (location) {
+              searchOptions.userLocation = {
+                type: 'approximate',
+                country: location,
+              };
+            }
+            // Note: sites filtering may not be directly supported in the current API
+
+            const result = await generateText({
+              model: customOpenAI.responses('gpt-4.1-mini'),
+              prompt: query,
+              tools: {
+                web_search: customOpenAI.tools.webSearchPreview(searchOptions),
+              },
+            });
+
+            return {
+              success: true,
+              data: {
+                answer: result.text,
+                sources: result.sources,
+              },
+            };
+          } catch (error) {
+            console.error('Error performing web search:', error);
+            throw new ActionExecutionError(
+              'Failed to perform web search',
+              { actionName, originalError: error },
+            );
+          }
         },
         { serviceName: 'OpenAIService' },
       );
