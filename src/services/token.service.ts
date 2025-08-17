@@ -17,12 +17,12 @@ export const verifyToken = async (
 
     const user = await User.findById(decoded.userId);
     if (!user) {
-      throw new Error('User not found');
+      throw new AuthenticationError('User not found');
     }
 
     const company = await Company.findById(decoded.companyId);
     if (!company) {
-      throw new Error('Company not found');
+      throw new AuthenticationError('Company not found');
     }
 
     let decryptedApiKey = 'not set';
@@ -37,8 +37,19 @@ export const verifyToken = async (
 
     return { user, company, decryptedApiKey };
   } catch (error) {
-    console.error('Detailed token verification error:', error);
-    throw new Error('Invalid token');
+    // Check if it's a JWT-specific error
+    if (error instanceof jwt.TokenExpiredError) {
+      throw new AuthenticationError('Token expired');
+    } else if (error instanceof jwt.JsonWebTokenError) {
+      throw new AuthenticationError('Invalid token');
+    } else if (error instanceof AuthenticationError) {
+      // Re-throw AuthenticationErrors as-is
+      throw error;
+    }
+    
+    // For any other unexpected errors, log them but still throw as AuthenticationError
+    console.error('Unexpected authentication error:', (error as Error).message);
+    throw new AuthenticationError('Authentication failed');
   }
 };
 

@@ -15,7 +15,7 @@ interface PerplexitySearchArgs {
     | 'sonar-reasoning-pro'
     | 'sonar-deep-research';
   query: string;
-  searchMode?: 'low' | 'medium' | 'high'; // New optional parameter
+  // searchMode deprecated - removed to avoid API errors
 }
 
 // R type for StandardActionResult<R>
@@ -57,12 +57,6 @@ export const createPerplexityActions = (
           type: 'string',
           description: 'The search query',
         },
-        searchMode: {
-          type: 'string',
-          enum: ['low', 'medium', 'high'],
-          description: 'Search depth mode (optional, defaults to medium)',
-          default: 'medium',
-        },
       },
       required: ['model', 'query'],
       additionalProperties: false,
@@ -70,7 +64,7 @@ export const createPerplexityActions = (
     function: async (
       args: PerplexitySearchArgs,
     ): Promise<StandardActionResult<PerplexityResponseData>> => {
-      const { model, query, searchMode } = args;
+      const { model, query } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -85,7 +79,7 @@ export const createPerplexityActions = (
 
       // Check for additional properties manually if strict mode isn't fully relied upon for arg shape
       const argKeys = Object.keys(args);
-      const allowedProps = ['model', 'query', 'searchMode'];
+      const allowedProps = ['model', 'query'];
       const extraProps = argKeys.filter(
         (prop) => !allowedProps.includes(prop),
       );
@@ -115,7 +109,6 @@ export const createPerplexityActions = (
             context.companyId!,
             model,
             query,
-            searchMode,
           );
           return { success: true, data: { searchResult: searchResultString } };
         },

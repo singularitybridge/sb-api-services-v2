@@ -4,6 +4,7 @@ import { assistantRouter } from './assistant/assistant.routes';
 import { completionRouter } from './assistant/completion.routes';
 import { executeHandler } from './assistant/execute.routes'; // Import the handler function
 import { validateApiKeys } from '../services/api.key.service';
+import { validateObjectId } from '../utils/validation';
 
 const router = express.Router();
 
@@ -17,6 +18,7 @@ router.use('/completion', completionRouter);
 // Execute handler with proper parameter handling
 router.post(
   '/:assistantId/execute',
+  validateObjectId('assistantId'),
   validateApiKeys(['openai_api_key']),
   executeHandler,
 );

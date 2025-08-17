@@ -2,6 +2,7 @@ import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { executeAssistantStateless } from '../../services/assistant/stateless-execution.service';
 import { Assistant } from '../../models/Assistant';
 import mongoose from 'mongoose';
+import { isValidObjectId } from '../../utils/validation';
 
 // Helper function to generate unique message IDs
 const generateMessageId = (): string => {
@@ -24,6 +25,13 @@ export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
       return res.status(401).json({
         error:
           'User or company context not found. Authentication may have failed.',
+      });
+    }
+
+    // Validate assistant ID format
+    if (!assistantId || !isValidObjectId(assistantId)) {
+      return res.status(400).json({
+        error: 'Invalid assistant ID format. Must be a valid 24-character hex string.',
       });
     }
 
