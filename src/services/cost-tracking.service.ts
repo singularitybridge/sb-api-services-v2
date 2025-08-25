@@ -83,9 +83,7 @@ export async function saveCostTracking(
     });
 
     const saved = await costRecord.save();
-    console.log(
-      `[COST_TRACKING_SAVED] Cost record saved to DB. ID: ${saved._id} | Total: $${costInfo.totalCost}`,
-    );
+    // Cost tracking saved successfully
     return saved;
   } catch (error) {
     console.error(

@@ -33,7 +33,7 @@ const ASSISTANT_SERVICE_NAME = 'AssistantService';
 
 const createAssistantActions = (context: ActionContext): FunctionFactory => ({
   getAssistants: {
-    description: "List all AI assistants available in your company. Returns an array of assistant objects with their IDs, names, descriptions, and configuration details. Use this to discover available assistants before interacting with them.",
+    description: "Get a list of all assistants for the current user's company",
     parameters: {
       type: 'object',
       properties: {},
@@ -57,26 +57,25 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
 
   getAssistantById: {
     description:
-      'Retrieve complete details of a specific assistant including its system prompt (llmPrompt), LLM configuration, enabled integrations, and conversation starters. Essential for reading an assistant\'s current prompt before modification. Returns the full assistant object with all configuration fields.',
+      'Get information about a specific assistant by its ID, including enabled integration actions and conversation starters.',
     parameters: {
       type: 'object',
       properties: {
-        assistant_id: {
+        assistantId: {
           type: 'string',
-          description: 'The unique identifier of the assistant (24-character hex string, e.g., "681b41850f470a9a746f280e"). Find this using getAssistants action.',
-          pattern: '^[a-f0-9]{24}$',
+          description: 'The ID of the assistant to retrieve information for.',
         },
       },
-      required: ['assistant_id'],
+      required: ['assistantId'],
     },
     function: async ({
-      assistant_id,
+      assistantId,
     }: {
-      assistant_id: string;
+      assistantId: string;
     }): Promise<StandardActionResult<GetAssistantByIdData>> => {
       return executeAction<GetAssistantByIdData>(
         'getAssistantById',
-        () => getAssistantByIdService(context.sessionId, assistant_id),
+        () => getAssistantByIdService(context.sessionId, assistantId),
         {
           serviceName: ASSISTANT_SERVICE_NAME,
           successMessage: 'Assistant information retrieved successfully.',
@@ -86,27 +85,26 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
     },
   },
 
-  setCurrentSessionAssistant: {
-    description: 'Switch the current session to use a different assistant. This changes which assistant will handle subsequent messages in the current conversation session. Does not modify the assistant itself.',
+  setAssistant: {
+    description: 'Set the current assistant',
     parameters: {
       type: 'object',
       properties: {
-        assistant_id: {
+        _id: {
           type: 'string',
-          description: 'The unique identifier of the assistant to activate for this session (24-character hex string)',
-          pattern: '^[a-f0-9]{24}$',
+          description: 'The ID of the assistant to set',
         },
       },
-      required: ['assistant_id'],
+      required: ['_id'],
     },
     function: async ({
-      assistant_id,
+      _id,
     }: {
-      assistant_id: string;
+      _id: string;
     }): Promise<StandardActionResult<SetAssistantData>> => {
       return executeAction<SetAssistantData>(
         'setAssistant',
-        () => setAssistantService(context.sessionId, assistant_id),
+        () => setAssistantService(context.sessionId, _id),
         {
           serviceName: ASSISTANT_SERVICE_NAME,
           successMessage: 'Assistant set successfully.',
@@ -119,58 +117,41 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
   },
 
   createNewAssistant: {
-    description: 'Create a new AI assistant with custom configuration. Returns the created assistant object with its generated ID.',
+    description: 'Create a new assistant',
     parameters: {
       type: 'object',
       properties: {
-        name: { 
-          type: 'string', 
-          description: 'Display name for the assistant (e.g., "Customer Support Bot", "Code Reviewer")',
-          minLength: 1,
-          maxLength: 100
-        },
+        name: { type: 'string', description: 'The name of the new assistant' },
         description: {
           type: 'string',
-          description: 'Brief description of the assistant\'s purpose and capabilities',
-          maxLength: 500
+          description: 'A description of the new assistant',
         },
         prompt: {
           type: 'string',
-          description: 'System prompt that defines the assistant\'s behavior, knowledge, and response style. This is the core instruction set.',
-          minLength: 10,
-          maxLength: 10000
+          description: 'The initial prompt for the new assistant',
         },
         language: {
           type: 'string',
-          description: 'Primary language code for the assistant',
-          enum: ['en', 'he'],
-          default: 'en'
+          description: 'The language of the assistant, can be he or en',
         },
-        voice: { 
-          type: 'string', 
-          description: 'Voice identifier for text-to-speech (e.g., "alloy", "echo", "nova" for OpenAI voices)',
-          default: 'alloy'
-        },
-        conversation_starters: {
+        voice: { type: 'string', description: 'The voice of the assistant' },
+        conversationStarters: {
           type: 'array',
-          description: 'Suggested conversation starters to guide users',
+          description: 'Array of conversation starters with title and content',
           items: {
             type: 'object',
             properties: {
               key: {
                 type: 'string',
-                description: 'Short display title (e.g., "Get Started")',
-                maxLength: 50
+                description: 'The title of the conversation starter',
               },
               value: {
                 type: 'string',
-                description: 'The actual message to send when selected (e.g., "Help me understand your features")',
-                maxLength: 200
+                description: 'The content of the conversation starter',
               },
             },
             required: ['key', 'value'],
           },
-          maxItems: 10
         },
       },
       required: ['name', 'description', 'prompt', 'language', 'voice'],
@@ -181,7 +162,7 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
       prompt: string;
       language: string;
       voice: string;
-      conversation_starters?: IIdentifier[];
+      conversationStarters?: IIdentifier[];
     }): Promise<StandardActionResult<CreateNewAssistantData>> => {
       return executeAction<CreateNewAssistantData>(
         'createNewAssistant',
@@ -193,7 +174,7 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
             args.prompt,
             args.language,
             args.voice,
-            args.conversation_starters || [],
+            args.conversationStarters || [],
           ),
         {
           serviceName: ASSISTANT_SERVICE_NAME,
@@ -204,8 +185,8 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
     },
   },
 
-  getCurrentSessionAssistant: {
-    description: "Retrieve information about the assistant currently active in this session. Returns null if no assistant is set. Useful for checking which assistant is handling the current conversation.",
+  getCurrentAssistant: {
+    description: "Get the current assistant's information for the session",
     parameters: {
       type: 'object',
       properties: {},
@@ -226,70 +207,57 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
     },
   },
 
-  modifyAssistant: {
+  updateAssistantById: {
     description:
-      'Update an existing assistant\'s configuration. Use this to modify prompts, change models, or update metadata. Only fields you provide will be updated (partial update). Returns the updated assistant object.',
+      'Update a specific assistant by ID with new information. Only provided fields will be updated.',
     parameters: {
       type: 'object',
       properties: {
-        assistant_id: {
+        assistantId: {
           type: 'string',
-          description: 'The unique identifier of the assistant to modify (24-character hex string)',
-          pattern: '^[a-f0-9]{24}$',
+          description: 'The ID of the assistant to update',
         },
         name: {
           type: 'string',
-          description: 'New display name for the assistant',
-          minLength: 1,
-          maxLength: 100
+          description: 'New name (title) for the assistant',
         },
         description: {
           type: 'string',
-          description: 'New description of assistant capabilities',
-          maxLength: 500
+          description: 'New description for the assistant',
         },
-        llm_model: {
+        llmModel: {
           type: 'string',
-          description: 'LLM model to use (e.g., "gpt-4-turbo", "gpt-3.5-turbo", "claude-3-opus", "gemini-pro")',
+          description: 'New LLM model identifier (e.g., gpt-4.1-mini)',
         },
-        llm_provider: {
+        llmProvider: {
           type: 'string',
           enum: ['openai', 'google', 'anthropic'],
-          description: 'AI provider for the model',
+          description: 'New LLM provider',
         },
-        llm_prompt: {
+        llmPrompt: {
           type: 'string',
-          description: 'New system prompt defining the assistant\'s behavior. This is the main instruction that controls how the assistant responds.',
-          minLength: 10,
-          maxLength: 10000
+          description: 'New LLM prompt for the assistant',
         },
       },
-      required: ['assistant_id'],
+      required: ['assistantId'],
       additionalProperties: false,
     },
     function: async (params: {
-      assistant_id: string;
+      assistantId: string;
       name?: string;
       description?: string;
-      llm_model?: string;
-      llm_provider?: 'openai' | 'google' | 'anthropic';
-      llm_prompt?: string;
+      llmModel?: string;
+      llmProvider?: 'openai' | 'google' | 'anthropic';
+      llmPrompt?: string;
     }): Promise<StandardActionResult<UpdateAssistantData>> => {
-      const { assistant_id, ...updateData } = params;
-      // Map snake_case to camelCase for service
-      const mappedData: any = {};
-      if (updateData.name) mappedData.name = updateData.name;
-      if (updateData.description) mappedData.description = updateData.description;
-      if (updateData.llm_model) mappedData.llmModel = updateData.llm_model;
-      if (updateData.llm_provider) mappedData.llmProvider = updateData.llm_provider;
-      if (updateData.llm_prompt) mappedData.llmPrompt = updateData.llm_prompt;
+      const { assistantId, ...updateData } = params;
       return executeAction<UpdateAssistantData>(
         'updateAssistantById',
         () =>
           updateAssistantByIdService(
             context.sessionId,
-            assistant_id,
-            mappedData,
+            assistantId,
+            updateData,
           ),
         {
           serviceName: ASSISTANT_SERVICE_NAME,
@@ -300,33 +268,30 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
     },
   },
 
-  executeAssistantQuery: {
+  askAssistant: {
     description:
-      'Send a query to another assistant and get its response. Use this to test an assistant after modifying its prompt, or to delegate specialized tasks to domain-specific assistants. Returns the assistant\'s text response.',
+      'Ask another assistant to handle a specific task and return the response.',
     parameters: {
       type: 'object',
       properties: {
-        assistant_id: {
+        assistantId: {
           type: 'string',
-          description: 'The unique identifier of the target assistant to query',
-          pattern: '^[a-f0-9]{24}$',
+          description: 'The ID of the target assistant to ask',
         },
-        message: {
+        task: {
           type: 'string',
-          description: 'The message or task description to send to the assistant. Be specific and clear about what you need.',
-          minLength: 1,
-          maxLength: 5000
+          description: 'The task or prompt to send to the target assistant',
         },
       },
-      required: ['assistant_id', 'message'],
+      required: ['assistantId', 'task'],
       additionalProperties: false,
     },
     function: async ({
-      assistant_id,
-      message,
+      assistantId,
+      task,
     }: {
-      assistant_id: string;
-      message: string;
+      assistantId: string;
+      task: string;
     }): Promise<StandardActionResult<AskAssistantData>> => {
       return executeAction<AskAssistantData>(
         'askAssistant',
@@ -334,12 +299,12 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
           context.isStateless
             ? askAnotherAssistantService(
                 context.sessionId,
-                assistant_id,
-                message,
+                assistantId,
+                task,
                 context.companyId,
                 context.userId,
               )
-            : askAnotherAssistantService(context.sessionId, assistant_id, message),
+            : askAnotherAssistantService(context.sessionId, assistantId, task),
         {
           serviceName: ASSISTANT_SERVICE_NAME,
           successMessage: 'Task delegated successfully.',
@@ -349,8 +314,8 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
     },
   },
 
-  listTeams: {
-    description: "Retrieve all teams within your company. Teams are used to organize assistants into groups. Returns an array of team objects with their IDs and names.",
+  getTeams: {
+    description: "Get a list of all teams for the current user's company",
     parameters: {
       type: 'object',
       properties: {},
@@ -381,30 +346,26 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
     },
   },
 
-  listTeamAssistants: {
-    description: 'List all assistants belonging to a specific team. Useful for discovering assistants organized by department or function.',
+  getAssistantsByTeam: {
+    description: 'Get a list of assistants for a specific team',
     parameters: {
       type: 'object',
       properties: {
-        team_id: { 
-          type: 'string', 
-          description: 'The unique identifier of the team',
-          pattern: '^[a-f0-9]{24}$',
-        },
+        teamId: { type: 'string', description: 'The ID of the team' },
         lean: {
           type: 'boolean',
           description:
-            'If true, returns only essential fields (ID, name, description). If false, returns complete assistant objects. Default is true for performance.',
+            'If true, returns a lean representation. Defaults to true.',
           default: true,
         },
       },
-      required: ['team_id'],
+      required: ['teamId'],
     },
     function: async ({
-      team_id,
+      teamId,
       lean = true,
     }: {
-      team_id: string;
+      teamId: string;
       lean?: boolean;
     }): Promise<StandardActionResult<GetAssistantsByTeamData>> => {
       return executeAction<GetAssistantsByTeamData>(
@@ -413,11 +374,11 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
           context.isStateless
             ? getAssistantsByTeamService(
                 context.sessionId,
-                team_id,
+                teamId,
                 lean,
                 context.companyId,
               )
-            : getAssistantsByTeamService(context.sessionId, team_id, lean),
+            : getAssistantsByTeamService(context.sessionId, teamId, lean),
         {
           serviceName: ASSISTANT_SERVICE_NAME,
           successMessage: 'Assistants for team retrieved successfully.',

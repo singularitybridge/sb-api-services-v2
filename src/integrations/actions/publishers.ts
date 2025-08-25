@@ -9,8 +9,9 @@ const generateMessageId = (): string => {
 };
 
 // Helper function to truncate large output for Pusher
-// Reduced from 8000 to 6000 to leave more room for message envelope and metadata
-const truncateForPusher = (data: any, maxSize: number = 6000): any => {
+// Pusher has a 10KB (10240 bytes) limit per message
+// We use 4000 to leave room for message envelope, metadata, and UTF-8 encoding
+const truncateForPusher = (data: any, maxSize: number = 4000): any => {
   // First, handle the case where data itself is an array (e.g. direct array output)
   if (Array.isArray(data)) {
     const jsonString = JSON.stringify(data);
@@ -146,13 +147,17 @@ export const publishActionMessage = async (
     );
 
     // Create the complete message structure with truncated data for Pusher
+    // Also truncate input if it's too large
     const truncatedMessageData = {
       ...messageData,
+      input: messageData.input
+        ? truncateForPusher(messageData.input, 2000)  // Smaller limit for input
+        : messageData.input,
       output: messageData.output
-        ? truncateForPusher(messageData.output)
+        ? truncateForPusher(messageData.output, 3000)
         : messageData.output,
       error: messageData.error
-        ? truncateForPusher(messageData.error)
+        ? truncateForPusher(messageData.error, 2000)
         : messageData.error, // Truncate error object as well
     };
 
@@ -174,6 +179,18 @@ export const publishActionMessage = async (
       data: truncatedMessageData,
     };
 
+    // Check final message size before sending to Pusher
+    const messageSize = JSON.stringify(completeMessage).length;
+    if (messageSize > 10240) {
+      console.warn(
+        `[Action Publisher] Message too large even after truncation (${messageSize} bytes). Further reducing content...`,
+      );
+      // Aggressively truncate for oversized messages
+      truncatedMessageData.input = truncateForPusher(messageData.input, 500);
+      truncatedMessageData.output = truncateForPusher(messageData.output, 1000);
+      truncatedMessageData.error = truncateForPusher(messageData.error, 500);
+    }
+
     // Publish to the correct channel and event according to the guide
     // Wrap in try-catch so Pusher errors don't affect the main flow
     try {
@@ -182,8 +199,14 @@ export const publishActionMessage = async (
       );
       await publishSessionMessage(sessionId, 'chat_message', completeMessage);
       // console.log(`[Action Publisher] Successfully published action message for ${executionDetails.actionId} with status ${status}`);
-    } catch (pusherError) {
+    } catch (pusherError: any) {
       console.error('Pusher publishing failed (non-critical):', pusherError);
+      // Log more details about the error
+      if (pusherError?.status === 413) {
+        console.error(
+          `Pusher payload too large. Message size: ${JSON.stringify(completeMessage).length} bytes`,
+        );
+      }
       // Don't rethrow - Pusher errors shouldn't affect tool execution
     }
   } catch (error) {
