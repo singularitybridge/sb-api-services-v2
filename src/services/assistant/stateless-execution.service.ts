@@ -115,9 +115,6 @@ export const executeAssistantStateless = async (
   ];
 
   if (attachments && attachments.length > 0) {
-    console.log(
-      `Processing ${attachments.length} attachments for stateless execution with provider ${providerKey}`,
-    );
     for (const attachment of attachments) {
       if (attachment.mimeType.startsWith('image/')) {
         try {

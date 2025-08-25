@@ -89,15 +89,9 @@ export async function logCostTracking(info: CostTrackingInfo): Promise<void> {
       : undefined,
   };
 
-  console.log(`[COST_TRACKING] AI Request:`, JSON.stringify(costInfo, null, 2));
-
-  // Log a summary line for easy grepping
+  // Simplified cost tracking log - single line, less verbose
   console.log(
-    `[COST_TRACKING_SUMMARY] Company: ${info.companyId} | Assistant: ${
-      info.assistantId
-    } | Model: ${info.model} | Cost: $${info.totalCost.toFixed(6)} | Tokens: ${
-      info.totalTokens
-    }`,
+    `[COST] ${info.model}: $${info.totalCost.toFixed(4)} (${info.totalTokens} tokens)`,
   );
 
   // Save to MongoDB

@@ -28,7 +28,11 @@ export type ApiKeyType =
   | 'codesandbox_api_key'
   | 'FLY_API_TOKEN'
   | 'TERMINAL_TURTLE_API_KEY'
-  | 'TERMINAL_TURTLE_URL';
+  | 'TERMINAL_TURTLE_URL'
+  | 'aws_access_key_id'
+  | 'aws_secret_access_key'
+  | 'aws_bedrock_kb_id'
+  | 'aws_region';
 
 // Initialize cache with a 15-minute TTL (time to live)
 const apiKeyCache = new NodeCache({ stdTTL: 900 });
