@@ -9,7 +9,6 @@ export type ApiKeyType =
   | 'labs11_api_key'
   | 'google_api_key'
   | 'anthropic_api_key' // Added anthropic_api_key
-  | 'twilio_api_key'
   | 'jsonbin_api_key'
   | 'getimg_api_key'
   | 'perplexity_api_key'
@@ -25,7 +24,6 @@ export type ApiKeyType =
   | 'jira_email'
   | 'ai_context_service_base_url'
   | 'ai_context_service_auth_token'
-  | 'codesandbox_api_key'
   | 'FLY_API_TOKEN'
   | 'TERMINAL_TURTLE_API_KEY'
   | 'TERMINAL_TURTLE_URL'

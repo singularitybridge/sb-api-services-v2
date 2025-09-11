@@ -91,7 +91,7 @@ export async function uploadFile(
     }
 
     // Create Vector store file
-    const vectorStoreFile = await openai.beta.vectorStores.files.create(
+    const vectorStoreFile = await openai.vectorStores.files.create(
       vectorStore.openaiId,
       {
         file_id: openaiFile.id,
@@ -242,7 +242,7 @@ export async function cleanupAssistantFiles(
     if (vectorStore) {
       try {
         // Delete the vector store from OpenAI
-        await openai.beta.vectorStores.del(vectorStore.openaiId);
+        await openai.vectorStores.del(vectorStore.openaiId);
 
         // Delete the vector store document from MongoDB
         await vectorStore.deleteOne();

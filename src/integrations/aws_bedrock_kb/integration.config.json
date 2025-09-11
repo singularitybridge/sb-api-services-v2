@@ -1,0 +1,15 @@
+{
+  "name": "aws_bedrock_kb",
+  "icon": "database",
+  "apiKeyName": "aws_bedrock_kb_api_key",
+  "actionCreator": "createAWSBedrockKBActions",
+  "actionsFile": "aws_bedrock_kb.actions.ts",
+  "requiredKeys": [
+    "aws_access_key_id",
+    "aws_secret_access_key",
+    "aws_bedrock_kb_id",
+    "aws_region"
+  ],
+  "description": "AWS Bedrock Knowledge Base integration for vector-based semantic search",
+  "category": "ai"
+}

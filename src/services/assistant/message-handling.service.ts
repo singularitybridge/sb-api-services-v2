@@ -30,7 +30,7 @@ import {
   TextPart,
   stepCountIs,
 } from 'ai';
-import { z, ZodTypeAny } from 'zod/v3';
+import { z, ZodTypeAny } from 'zod';
 import { trimToWindow } from '../../utils/tokenWindow';
 import { getProvider, MODEL_CONFIGS } from './provider.service';
 // import util from 'node:util'; // No longer needed after debug log removal
@@ -341,16 +341,18 @@ export const handleSessionMessage = async (
         ?.text || userInput;
   }
 
+  // Note: session and assistant are guaranteed to exist here due to earlier validation
+  // The type assertions are safe because MongoDB documents always have _id
   const userMessage = new Message({
-    sessionId: new mongoose.Types.ObjectId(session._id),
+    sessionId: new mongoose.Types.ObjectId(session._id as string),
     sender: 'user',
     // Store the user's original typed text, or the text part if it was modified by errors/fallbacks.
     // Avoid storing large extracted PDF text here if the PDF is sent as a blob.
     content:
       (userMessageContentParts.find((part) => part.type === 'text') as TextPart)
         ?.text || userInput,
-    assistantId: new mongoose.Types.ObjectId(assistant._id),
-    userId: new mongoose.Types.ObjectId(session.userId),
+    assistantId: new mongoose.Types.ObjectId(assistant._id as string),
+    userId: new mongoose.Types.ObjectId(session.userId as string),
     timestamp: new Date(),
     messageType:
       attachments && attachments.length > 0 ? 'file_upload_text' : 'text',
@@ -695,7 +697,8 @@ export const handleSessionMessage = async (
   //   }))
   // );
 
-  const maxPromptTokens: number = assistant.maxOutputTokens || 25000; // Use assistant's maxTokens, default to 25k if somehow undefined
+  // Use the assistant's configured maxTokens for input window
+  const maxPromptTokens: number = assistant.maxTokens || 25000;
 
   console.log(
     `[TOKEN_WINDOW] Starting token window trimming. Max tokens: ${maxPromptTokens}, Messages: ${messagesForLlm.length}`,
@@ -928,9 +931,9 @@ export const handleSessionMessage = async (
 
           // Save a user-friendly error message
           await saveSystemMessage(
-            new mongoose.Types.ObjectId(session._id),
-            new mongoose.Types.ObjectId(assistant._id),
-            new mongoose.Types.ObjectId(session.userId),
+            new mongoose.Types.ObjectId(session._id as string),
+            new mongoose.Types.ObjectId(assistant._id as string),
+            new mongoose.Types.ObjectId(session.userId as string),
             streamErrorMessage,
             'error',
             {
@@ -1037,9 +1040,9 @@ export const handleSessionMessage = async (
 
             // Save an error message to inform the user
             await saveSystemMessage(
-              new mongoose.Types.ObjectId(session._id),
-              new mongoose.Types.ObjectId(assistant._id),
-              new mongoose.Types.ObjectId(session.userId),
+              new mongoose.Types.ObjectId(session._id as string),
+              new mongoose.Types.ObjectId(assistant._id as string),
+              new mongoose.Types.ObjectId(session.userId as string),
               'Failed to generate response. Please check your API key configuration.',
               'error',
               {
@@ -1085,11 +1088,11 @@ export const handleSessionMessage = async (
           );
 
           const assistantMessageData: Partial<IMessage> = {
-            sessionId: new mongoose.Types.ObjectId(session._id),
+            sessionId: new mongoose.Types.ObjectId(session._id as string),
             sender: 'assistant',
             content: processedResponse,
-            assistantId: new mongoose.Types.ObjectId(assistant._id),
-            userId: new mongoose.Types.ObjectId(session.userId),
+            assistantId: new mongoose.Types.ObjectId(assistant._id as string),
+            userId: new mongoose.Types.ObjectId(session.userId as string),
             timestamp: new Date(),
             messageType: 'text',
             data: {},
@@ -1164,9 +1167,9 @@ export const handleSessionMessage = async (
 
             // Save error message asynchronously
             saveSystemMessage(
-              new mongoose.Types.ObjectId(session._id),
-              new mongoose.Types.ObjectId(assistant._id),
-              new mongoose.Types.ObjectId(session.userId),
+              new mongoose.Types.ObjectId(session._id as string),
+              new mongoose.Types.ObjectId(assistant._id as string),
+              new mongoose.Types.ObjectId(session.userId as string),
               `Failed to generate response. Please check your ${providerKey} API key configuration.`,
               'error',
               { error: 'empty_response', provider: providerKey },
@@ -1188,9 +1191,9 @@ export const handleSessionMessage = async (
 
           // Save error message asynchronously
           saveSystemMessage(
-            new mongoose.Types.ObjectId(session._id),
-            new mongoose.Types.ObjectId(assistant._id),
-            new mongoose.Types.ObjectId(session.userId),
+            new mongoose.Types.ObjectId(session._id as string),
+            new mongoose.Types.ObjectId(assistant._id as string),
+            new mongoose.Types.ObjectId(session.userId as string),
             `Stream error: ${err.message || 'Unknown error'}`,
             'error',
             {
@@ -1310,9 +1313,9 @@ export const handleSessionMessage = async (
 
         // Save a user-friendly error message for API key errors
         await saveSystemMessage(
-          new mongoose.Types.ObjectId(session._id),
-          new mongoose.Types.ObjectId(assistant._id),
-          new mongoose.Types.ObjectId(session.userId),
+          new mongoose.Types.ObjectId(session._id as string),
+          new mongoose.Types.ObjectId(assistant._id as string),
+          new mongoose.Types.ObjectId(session.userId as string),
           `Invalid ${providerKey} API key. Please check your API key configuration.`,
           'error',
           {
@@ -1342,9 +1345,9 @@ export const handleSessionMessage = async (
 
       // Save an error message to inform the user
       await saveSystemMessage(
-        new mongoose.Types.ObjectId(session._id),
-        new mongoose.Types.ObjectId(assistant._id),
-        new mongoose.Types.ObjectId(session.userId),
+        new mongoose.Types.ObjectId(session._id as string),
+        new mongoose.Types.ObjectId(assistant._id as string),
+        new mongoose.Types.ObjectId(session.userId as string),
         'Failed to generate response. Please check your API key configuration.',
         'error',
         { error: 'empty_response', provider: providerKey },
@@ -1360,11 +1363,11 @@ export const handleSessionMessage = async (
     );
 
     const assistantMessageData: Partial<IMessage> = {
-      sessionId: new mongoose.Types.ObjectId(session._id),
+      sessionId: new mongoose.Types.ObjectId(session._id as string),
       sender: 'assistant',
       content: processedResponse,
-      assistantId: new mongoose.Types.ObjectId(assistant._id),
-      userId: new mongoose.Types.ObjectId(session.userId),
+      assistantId: new mongoose.Types.ObjectId(assistant._id as string),
+      userId: new mongoose.Types.ObjectId(session.userId as string),
       timestamp: new Date(),
       messageType: 'text',
       data: {},

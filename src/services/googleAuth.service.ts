@@ -81,7 +81,7 @@ export const googleLogin = async (
 
       // Create a new user
       const newUser: Partial<IUser> = {
-        companyId: company._id,
+        companyId: company._id as any,
         name: payload['name'],
         email: payload['email'],
         googleId: payload['sub'],
@@ -103,7 +103,7 @@ export const googleLogin = async (
       if (!foundCompany) {
         throw new Error('Company not found for existing user');
       }
-      company = foundCompany.toObject() as ICompany;
+      company = foundCompany.toObject() as unknown as ICompany;
     }
 
     // Generate a session token

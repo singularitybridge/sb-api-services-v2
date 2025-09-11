@@ -4,7 +4,6 @@ dotenv.config();
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import mongoose from 'mongoose';
-import { startAgenda } from './integrations/agenda/agenda.service';
 import { initializeTelegramBots } from './services/telegram.bot';
 import { initializeWebSocket } from './services/websocket';
 import http from 'http';
@@ -18,9 +17,6 @@ const initializeApp = async () => {
     await mongoose.connect(dbUri, { dbName });
     logger.info(`Successfully connected to MongoDB database: ${dbName}`);
 
-    logger.info('Starting Agenda...');
-    await startAgenda();
-    logger.info('Agenda started successfully');
 
     logger.info('Initializing Telegram bots...');
     await initializeTelegramBots();
@@ -41,7 +37,6 @@ import cors from 'cors';
 import policyRouter from './routes/policy.routes';
 import ttsRouter from './routes/tts.routes';
 import sttRouter from './routes/stt.routes';
-import { twilioVoiceRouter } from './routes/omni_channel/omni.twilio.voice.routes';
 import { assistantRouter } from './routes/assistant.routes';
 import { sessionRouter } from './routes/session.routes';
 import { companyRouter } from './routes/company.routes';
@@ -54,7 +49,6 @@ import {
   verifyTokenMiddleware,
 } from './middleware/auth.middleware';
 import { apiKeyRateLimit } from './middleware/apiKeyRateLimit.middleware';
-import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
 import { onboardingRouter } from './routes/onboarding.routes';
 import { authRouter } from './routes/auth.routes';
 import { errorHandler } from './middleware/errorHandler.middleware';
@@ -68,6 +62,8 @@ import { teamRouter } from './routes/team.routes';
 import memoryRouter from './routes/memory.routes'; // Added import for memory router
 import apiKeyRouter from './routes/apiKey.routes';
 import { costTrackingRouter } from './routes/cost-tracking.routes';
+import filesRouter from './routes/files.routes';
+import promptHistoryRouter from './routes/prompt-history.routes';
 
 // Read package.json at startup
 let packageJson: { version: string; name: string };
@@ -136,8 +132,6 @@ app.use('/assistant/user-input', (req, res, next) => {
 // Routes that only require authentication
 app.use('/tts', verifyTokenMiddleware, ttsRouter);
 app.use('/stt', verifyTokenMiddleware, sttRouter);
-app.use('/twilio/voice', verifyTokenMiddleware, twilioVoiceRouter);
-app.use('/twilio/messaging', verifyTokenMiddleware, twilioMessagingRouter);
 
 // Routes that require company-specific access
 app.use('/assistant', verifyTokenMiddleware, verifyAccess(), assistantRouter);
@@ -153,6 +147,7 @@ app.use(
 app.use('/inbox', verifyTokenMiddleware, verifyAccess(), inboxRouter);
 app.use('/action', verifyTokenMiddleware, verifyAccess(), actionRouter);
 app.use('/session', verifyTokenMiddleware, verifyAccess(), sessionRouter);
+app.use('/files', filesRouter); // Unified file management
 app.use('/api', verifyTokenMiddleware, verifyAccess(), verificationRouter);
 app.use('/onboarding', verifyTokenMiddleware, verifyAccess(), onboardingRouter);
 app.use('/jsonbin', verifyTokenMiddleware, verifyAccess(), jsonbinRouter);
@@ -178,6 +173,7 @@ app.use(
   verifyAccess(),
   costTrackingRouter,
 ); // Cost tracking
+app.use('/api', verifyTokenMiddleware, verifyAccess(), promptHistoryRouter); // Prompt history
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);
@@ -195,4 +191,38 @@ if (process.env.NODE_ENV !== 'test') {
       `WebSocket server is available at ws://localhost:${port}/realtime`,
     );
   });
+
+  // Cleanup handlers for graceful shutdown
+  const gracefulShutdown = async () => {
+    logger.info('Shutting down gracefully...');
+
+    // Cleanup OpenAI Code Executor resources
+    // TODO: Re-enable when openai-code-execution.service is implemented
+    // try {
+    //   const { cleanupCodeExecutor } = await import('./services/openai-code-execution.service');
+    //   await cleanupCodeExecutor();
+    //   logger.info('OpenAI Code Executor cleaned up');
+    // } catch (error) {
+    //   logger.error('Error cleaning up OpenAI Code Executor:', error);
+    // }
+
+    // Cleanup file manager
+    try {
+      const { getFileManager } = await import(
+        './services/file-manager.service'
+      );
+      await getFileManager().shutdown();
+      logger.info('File manager cleaned up');
+    } catch (error) {
+      logger.error('Error cleaning up file manager:', error);
+    }
+
+    server.close(() => {
+      logger.info('Server closed');
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGTERM', gracefulShutdown);
+  process.on('SIGINT', gracefulShutdown);
 }

@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { z, ZodError } from 'zod/v3';
+import { z, ZodError } from 'zod';
 import {
   createJournalEntry as createJournalEntryService,
   getJournalEntries as getJournalEntriesService,
@@ -37,12 +37,12 @@ const GetEntriesQuerySchema = z.object({
   sessionId: z
     .string()
     .optional()
-    .refine((val) => !val || mongoose.Types.ObjectId.isValid(val), {
+    .refine((val: any) => !val || mongoose.Types.ObjectId.isValid(val), {
       message: 'Invalid sessionId',
     }),
   entryType: z.string().optional(),
   tags: z.preprocess(
-    (val) => (typeof val === 'string' ? val.split(',') : val),
+    (val: any) => (typeof val === 'string' ? val.split(',') : val),
     z.array(z.string()).optional(),
   ),
   limit: z.coerce.number().int().min(1).max(100).optional().default(25),
@@ -50,13 +50,13 @@ const GetEntriesQuerySchema = z.object({
   userId: z
     .string()
     .optional()
-    .refine((val) => !val || mongoose.Types.ObjectId.isValid(val), {
+    .refine((val: any) => !val || mongoose.Types.ObjectId.isValid(val), {
       message: 'Invalid userId',
     }), // Made optional
   companyId: z
     .string()
     .optional()
-    .refine((val) => !val || mongoose.Types.ObjectId.isValid(val), {
+    .refine((val: any) => !val || mongoose.Types.ObjectId.isValid(val), {
       message: 'Invalid companyId',
     }), // Made optional
 });
@@ -65,20 +65,20 @@ const SearchEntriesQuerySchema = z.object({
   q: z.string().min(1),
   entryType: z.string().optional(),
   tags: z.preprocess(
-    (val) => (typeof val === 'string' ? val.split(',') : val),
+    (val: any) => (typeof val === 'string' ? val.split(',') : val),
     z.array(z.string()).optional(),
   ),
   limit: z.coerce.number().int().min(1).max(100).optional().default(10),
   userId: z
     .string()
     .optional()
-    .refine((val) => !val || mongoose.Types.ObjectId.isValid(val), {
+    .refine((val: any) => !val || mongoose.Types.ObjectId.isValid(val), {
       message: 'Invalid userId',
     }), // Already optional
   companyId: z
     .string()
     .optional()
-    .refine((val) => !val || mongoose.Types.ObjectId.isValid(val), {
+    .refine((val: any) => !val || mongoose.Types.ObjectId.isValid(val), {
       message: 'Invalid companyId',
     }), // Made optional
 });
@@ -100,7 +100,7 @@ const validate =
       if (error instanceof ZodError) {
         res.status(400).json({ errors: error.errors });
       } else {
-        next(error);
+        next(error as Error);
       }
     }
   };
@@ -131,8 +131,8 @@ router.post(
         entryType,
         tags,
         metadata,
-        userId: new mongoose.Types.ObjectId(userId),
-        companyId: new mongoose.Types.ObjectId(companyId),
+        userId: new mongoose.Types.ObjectId(userId as string),
+        companyId: new mongoose.Types.ObjectId(companyId as string),
       };
       const entry = await createJournalEntryService(
         journalData,

@@ -173,7 +173,7 @@ export const createAssistant = async (
     const assistant = await openaiClient.beta.assistants.create(createParams);
 
     // Create a new vector store
-    const vectorStore = await openaiClient.beta.vectorStores.create({
+    const vectorStore = await openaiClient.vectorStores.create({
       name: `${name} Vector Store`,
     });
 

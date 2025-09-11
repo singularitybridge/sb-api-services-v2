@@ -24,7 +24,7 @@ import {
   generateObject,
   stepCountIs,
 } from 'ai';
-import { z, ZodTypeAny } from 'zod/v3';
+import { z, ZodTypeAny } from 'zod';
 import { trimToWindow } from '../../utils/tokenWindow';
 import { getProvider } from './provider.service';
 // import { getSessionOrStatelessContext } from '../session.service'; // This utility was merged into getSessionById
@@ -67,6 +67,85 @@ const extractJsonFromString = (text: string): string => {
     return match[1].trim();
   }
   return trimmedText; // Return original text if no markdown block found
+};
+
+// Helper function to attempt to fix truncated JSON
+const attemptJsonRepair = (jsonString: string): any | null => {
+  try {
+    // First try parsing as-is
+    return JSON.parse(jsonString);
+  } catch (e) {
+    // Try to fix common truncation issues
+    let fixed = jsonString;
+
+    // Count open/close braces and brackets
+    const openBraces = (fixed.match(/{/g) || []).length;
+    const closeBraces = (fixed.match(/}/g) || []).length;
+    const openBrackets = (fixed.match(/\[/g) || []).length;
+    const closeBrackets = (fixed.match(/]/g) || []).length;
+
+    // Add missing closing characters
+    if (openBrackets > closeBrackets) {
+      // Close any incomplete string first
+      if (fixed.match(/"[^"]*$/)) {
+        fixed += '"';
+      }
+      // Add missing brackets
+      for (let i = 0; i < openBrackets - closeBrackets; i++) {
+        fixed += ']';
+      }
+    }
+
+    if (openBraces > closeBraces) {
+      // Close any incomplete string first
+      if (fixed.match(/"[^"]*$/)) {
+        fixed += '"';
+      }
+      // Add missing braces
+      for (let i = 0; i < openBraces - closeBraces; i++) {
+        fixed += '}';
+      }
+    }
+
+    try {
+      return JSON.parse(fixed);
+    } catch (e2) {
+      // If still fails, try to extract the valid portion
+      // Find the last complete object or array
+      const lastValidBrace = fixed.lastIndexOf('"}');
+      const lastValidBracket = fixed.lastIndexOf('"]');
+      const lastValid = Math.max(lastValidBrace, lastValidBracket);
+
+      if (lastValid > 0) {
+        let truncated = fixed.substring(0, lastValid + 2);
+        // Close any open structures
+        const openCount =
+          (truncated.match(/{/g) || []).length -
+          (truncated.match(/}/g) || []).length;
+        const bracketCount =
+          (truncated.match(/\[/g) || []).length -
+          (truncated.match(/]/g) || []).length;
+
+        for (let i = 0; i < bracketCount; i++) truncated += ']';
+        for (let i = 0; i < openCount; i++) truncated += '}';
+
+        try {
+          const result = JSON.parse(truncated);
+          // Mark that this was truncated
+          if (typeof result === 'object' && result !== null) {
+            result._truncated = true;
+            result._truncation_note =
+              'Response was cut off and partially recovered';
+          }
+          return result;
+        } catch (e3) {
+          return null;
+        }
+      }
+
+      return null;
+    }
+  }
 };
 
 interface ResponseFormat {
@@ -148,27 +227,88 @@ export const executeAssistantStateless = async (
       } else if (attachment.url || attachment.data) {
         // Handle non-image files (CSV, PDF, TXT, etc.)
         try {
-          let fileContent: string;
+          let fileBuffer: Buffer;
+          let base64Data: string;
+          let fileContent: string | null = null;
+
+          // Determine if file is text-based or binary
+          const isTextFile =
+            attachment.mimeType.startsWith('text/') ||
+            attachment.mimeType === 'application/json' ||
+            attachment.mimeType === 'application/xml' ||
+            attachment.mimeType === 'application/javascript' ||
+            attachment.fileName.endsWith('.csv') ||
+            attachment.fileName.endsWith('.txt') ||
+            attachment.fileName.endsWith('.json') ||
+            attachment.fileName.endsWith('.xml') ||
+            attachment.fileName.endsWith('.md');
 
           if (attachment.data) {
             // Handle base64 encoded file data
-            const fileBuffer = Buffer.from(attachment.data, 'base64');
-            fileContent = fileBuffer.toString('utf-8');
+            fileBuffer = Buffer.from(attachment.data, 'base64');
+            base64Data = attachment.data;
           } else if (attachment.url) {
-            // Handle URL-based file (existing behavior)
-            const fileBuffer = await downloadFile(attachment.url);
-            fileContent = fileBuffer.toString('utf-8');
+            // Handle URL-based file - download and convert to base64
+            console.log(`Downloading file from URL: ${attachment.url}`);
+            fileBuffer = await downloadFile(attachment.url);
+            // Convert downloaded content to base64 for consistent handling
+            base64Data = fileBuffer.toString('base64');
           } else {
             throw new Error('File attachment must have either data or url');
           }
 
-          if (fileContent) {
-            (userMessageContentParts[0] as TextPart).text +=
-              `\n\n--- Attached File: ${attachment.fileName} ---\n${fileContent}\n--- End of File ---`;
+          // Only try to convert to UTF-8 for text files
+          if (isTextFile) {
+            try {
+              fileContent = fileBuffer.toString('utf-8');
+              // Limit console output for large files
+              const displayLength =
+                fileContent.length > 10000
+                  ? `${Math.round(fileContent.length / 1000)}K chars`
+                  : `${fileContent.length} characters`;
+              console.log(
+                `Processed text file ${attachment.fileName}: ${displayLength}`,
+              );
+            } catch (err) {
+              console.warn(
+                `Could not decode ${attachment.fileName} as UTF-8, treating as binary`,
+              );
+            }
           } else {
-            (userMessageContentParts[0] as TextPart).text +=
-              `\n\n[Could not load file: ${attachment.fileName}]`;
+            const displaySize =
+              fileBuffer.length > 10000
+                ? `${Math.round(fileBuffer.length / 1024)}KB`
+                : `${fileBuffer.length} bytes`;
+            console.log(
+              `Processed binary file ${attachment.fileName}: ${displaySize}`,
+            );
           }
+
+          // Add file information to the message
+          (userMessageContentParts[0] as TextPart).text +=
+            `\n\n[File Attachment: ${attachment.fileName} (${attachment.mimeType})]`;
+
+          if (fileContent) {
+            // For text files, include the actual content
+            (userMessageContentParts[0] as TextPart).text +=
+              `\n\nFile Content:\n${fileContent}`;
+          } else {
+            // For binary files, just note the size
+            (userMessageContentParts[0] as TextPart).text +=
+              `\n\n[Binary file: ${fileBuffer.length} bytes]`;
+          }
+
+          // Always provide base64 representation for tools that need it
+          (userMessageContentParts[0] as TextPart).text +=
+            `\n\nFor processing this file programmatically, use the following attachment data:\n${JSON.stringify(
+              {
+                fileName: attachment.fileName,
+                mimeType: attachment.mimeType,
+                data: base64Data,
+              },
+              null,
+              2,
+            )}`;
         } catch (error) {
           console.error(`Error processing file ${attachment.fileName}:`, error);
           (userMessageContentParts[0] as TextPart).text +=
@@ -327,7 +467,7 @@ export const executeAssistantStateless = async (
       const currentFuncName = funcName;
 
       // Type cast to avoid deep instantiation error
-      toolsForSdk[currentFuncName] = tool({
+      toolsForSdk[currentFuncName] = (tool as any)({
         description: funcDef.description,
         inputSchema: zodSchema as z.ZodType<any>,
         execute: async (args: any) => {
@@ -444,8 +584,11 @@ export const executeAssistantStateless = async (
   // If you need to allow passing a short history, this would be the place to inject it.
   const messagesForLlm: ModelMessage[] = [userMessageForLlm];
 
-  // Use the assistant's configured maxTokens instead of hardcoded limits
-  const maxPromptTokens: number = assistant.maxOutputTokens || 25000;
+  // Use the assistant's configured maxTokens for input window
+  const maxPromptTokens: number = assistant.maxTokens || 25000;
+  console.log(
+    `[Stateless Execution] Using max prompt tokens: ${maxPromptTokens} for assistant ${assistant.name}`,
+  );
 
   let { trimmedMessages } = trimToWindow(messagesForLlm, maxPromptTokens);
 
@@ -492,7 +635,7 @@ export const executeAssistantStateless = async (
       // Use generateObject for structured JSON output
       if (responseFormat.type === 'json_schema' && responseFormat.schema) {
         // Use provided schema
-        const objectResult = await generateObject({
+        const objectResult = await (generateObject as any)({
           model: llm,
           messages: trimmedMessages,
           schema: responseFormat.schema,
@@ -574,19 +717,38 @@ export const executeAssistantStateless = async (
         let jsonContent;
         const rawText = result.text;
         const potentialJsonString = extractJsonFromString(rawText);
-        try {
-          jsonContent = JSON.parse(potentialJsonString);
-        } catch (e) {
+
+        // Try to parse or repair the JSON
+        jsonContent = attemptJsonRepair(potentialJsonString);
+
+        if (jsonContent === null) {
+          // Complete failure to parse
           console.error(
-            'Failed to parse JSON response after attempting to extract from markdown:',
-            e,
+            'Failed to parse JSON response. Response length:',
+            potentialJsonString.length,
+            'First 500 chars:',
+            potentialJsonString.substring(0, 500),
           );
-          // Log the string that failed to parse for easier debugging
-          console.error('String that failed parsing:', potentialJsonString);
+
+          // Check if it looks like truncated JSON
+          const looksLikeJson =
+            potentialJsonString.trim().startsWith('{') ||
+            potentialJsonString.trim().startsWith('[');
+
           jsonContent = {
             error: 'Failed to parse response as JSON',
-            raw: rawText,
-          }; // return original raw text in error
+            truncated:
+              looksLikeJson &&
+              !potentialJsonString.trim().endsWith('}') &&
+              !potentialJsonString.trim().endsWith(']'),
+            raw:
+              rawText.length > 1000
+                ? rawText.substring(0, 1000) +
+                  '... (truncated in error response)'
+                : rawText,
+          };
+        } else if (jsonContent._truncated) {
+          console.warn('JSON response was truncated and partially recovered');
         }
 
         return {

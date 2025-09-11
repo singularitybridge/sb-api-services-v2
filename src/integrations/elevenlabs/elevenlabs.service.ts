@@ -76,7 +76,7 @@ export const generateSpeech = async (
 
     // The SDK returns a ReadableStream, we need to convert it to a buffer then base64
     const chunks = [];
-    for await (const chunk of audioStream) {
+    for await (const chunk of audioStream as any) {
       // Corrected typo: audio -> audioStream
       chunks.push(chunk);
     }

@@ -9,6 +9,13 @@ import { Assistant } from '../../models/Assistant';
 // OpenAI Assistant API calls removed as it's deprecated in favor of Vercel AI
 import { createDefaultAssistant } from '../../services/assistant.service';
 import mongoose from 'mongoose'; // Added for ObjectId generation
+import { promptHistoryService } from '../../services/prompt-history.service';
+import { promptChangeDescriptionService } from '../../services/prompt-change-description.service';
+import {
+  isValidAssistantName,
+  getNameValidationError,
+  suggestValidName,
+} from '../../utils/assistant-name-validation';
 
 const router = Router();
 
@@ -18,6 +25,16 @@ router.post(
   async (req: AuthenticatedRequest, res) => {
     try {
       await refreshApiKeyCache(req.company._id.toString());
+
+      // Validate assistant name
+      if (req.body.name && !isValidAssistantName(req.body.name)) {
+        const error = getNameValidationError(req.body.name);
+        const suggestion = suggestValidName(req.body.name);
+        return res.status(400).json({
+          error,
+          suggestion: suggestion ? `Try: ${suggestion}` : undefined,
+        });
+      }
 
       const assistantData = {
         ...req.body,
@@ -34,6 +51,35 @@ router.post(
       console.log(
         `Created assistant ${newAssistant._id} in local database only`,
       );
+
+      // Track initial prompt in history if prompt is provided
+      if (newAssistant.llmPrompt) {
+        try {
+          const changeDescription =
+            await promptChangeDescriptionService.generateChangeDescription(
+              req.company._id.toString(),
+              null,
+              newAssistant.llmPrompt,
+              newAssistant.name,
+            );
+
+          await promptHistoryService.savePromptVersion({
+            assistantId: newAssistant._id.toString(),
+            companyId: req.company._id.toString(),
+            promptContent: newAssistant.llmPrompt,
+            changeType: 'initial',
+            changeDescription,
+            userId: req.user?._id?.toString(),
+          });
+
+          console.log(
+            `Saved initial prompt history for assistant ${newAssistant._id}`,
+          );
+        } catch (historyError) {
+          console.error('Error saving prompt history:', historyError);
+          // Don't fail the request if history tracking fails
+        }
+      }
 
       res.send(newAssistant);
     } catch (err) {

@@ -1,0 +1,26 @@
+{
+  "serviceName": "AWS Bedrock Knowledge Base",
+  "searchKnowledgeBase": {
+    "actionTitle": "Search Knowledge Base",
+    "description": "Search AWS Bedrock Knowledge Base for relevant content using vector-based semantic search"
+  },
+  "getFormattedKBResults": {
+    "actionTitle": "Get Formatted Results",
+    "description": "Search knowledge base and return formatted results optimized for AI agent consumption"
+  },
+  "testBedrockConnection": {
+    "actionTitle": "Test Connection",
+    "description": "Test the connection to AWS Bedrock Knowledge Base to verify configuration"
+  },
+  "errors": {
+    "missingCredentials": "AWS Bedrock Knowledge Base is not configured. Please add AWS credentials and Knowledge Base ID.",
+    "invalidQuery": "Search query is required and cannot be empty.",
+    "invalidResultCount": "Number of results must be between 1 and 100.",
+    "connectionFailed": "Failed to connect to AWS Bedrock Knowledge Base. Please check your configuration."
+  },
+  "success": {
+    "searchComplete": "Successfully searched the knowledge base",
+    "connectionEstablished": "Successfully connected to AWS Bedrock Knowledge Base",
+    "noResults": "No relevant results found in the knowledge base"
+  }
+}

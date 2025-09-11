@@ -9,6 +9,9 @@ import {
   discoverLeanActions as discoverLeanActionsService,
   getIntegration as getIntegrationService,
   discoverActionById as discoverActionByIdService,
+  discoverAllIntegrations as discoverAllIntegrationsService,
+  discoverActionsByIntegration as discoverActionsByIntegrationService,
+  searchActions as searchActionsService,
 } from './debug.service';
 import { SupportedLanguage } from '../../services/discovery.service'; // Integration type might not be needed directly in actions
 import { executeAction, ExecuteActionOptions } from '../actions/executor';
@@ -60,7 +63,8 @@ export const createDebugActions = (
   context: ActionContext,
 ): FunctionFactory => ({
   getSessionInfo: {
-    description: 'Get basic session info for debug purposes',
+    description:
+      'Get detailed session information including user and company details for debugging and context understanding',
     strict: true,
     parameters: {
       type: 'object',
@@ -96,7 +100,7 @@ export const createDebugActions = (
   },
   triggerIntegrationAction: {
     description:
-      'Triggers debugging for an integration action with the specified name and service, and accepts request data either as a string or as JSON.',
+      'Execute any integration action by name for testing and debugging. Accepts integration name, action/service name, and request data (string or JSON). Returns the action result or error details.',
     strict: true,
     parameters: {
       type: 'object',
@@ -104,17 +108,18 @@ export const createDebugActions = (
       properties: {
         integrationName: {
           type: 'string',
-          description: 'The name of the integration to trigger.',
+          description:
+            'The name of the integration to trigger (e.g., "jira", "openai", "slack").',
         },
         requestData: {
           type: 'string',
           description:
-            'The request data for the integration action, which can also be provided in JSON format.',
+            "The request data/parameters for the action as a JSON string or plain string. Must match the action's parameter schema.",
         },
         service: {
           type: 'string',
           description:
-            'The specific service associated with the integration action.',
+            'The action/service name within the integration (e.g., "createIssue", "searchIssues", "sendMessage").',
         },
       },
       additionalProperties: false,
@@ -186,7 +191,8 @@ export const createDebugActions = (
     },
   },
   discoverLeanActions: {
-    description: 'Discover lean actions for all integrations',
+    description:
+      'List all available integration actions across the system with their IDs, names, and descriptions. Returns a lightweight summary of all actions available in all integrations.',
     strict: true,
     parameters: {
       type: 'object',
@@ -225,11 +231,18 @@ export const createDebugActions = (
     },
   },
   getIntegration: {
-    description: 'Get a specific integration by ID',
+    description:
+      'Get complete details about a specific integration including its name, description, icon, and all available actions with their parameters and descriptions.',
     strict: true,
     parameters: {
       type: 'object',
-      properties: { integrationId: { type: 'string' } },
+      properties: {
+        integrationId: {
+          type: 'string',
+          description:
+            'The ID of the integration to retrieve (e.g., "jira", "openai", "slack")',
+        },
+      },
       required: ['integrationId'],
       additionalProperties: false,
     },
@@ -265,11 +278,18 @@ export const createDebugActions = (
     },
   },
   discoverActionById: {
-    description: 'Discover a specific action by ID',
+    description:
+      'Get detailed information about a specific action by its ID, including parameters schema, description, service name, and icon. Action IDs follow the format: integration_name.action_name.',
     strict: true,
     parameters: {
       type: 'object',
-      properties: { actionId: { type: 'string' } },
+      properties: {
+        actionId: {
+          type: 'string',
+          description:
+            'The ID of the action in format: integration_name.action_name (e.g., "jira.createIssue")',
+        },
+      },
       required: ['actionId'],
       additionalProperties: false,
     },
@@ -292,6 +312,126 @@ export const createDebugActions = (
         async () => {
           const res = await discoverActionByIdService(
             params.actionId,
+            context.language,
+          );
+          return {
+            success: res.success,
+            data: res.data,
+            description: res.error,
+            error: res.error,
+          };
+        },
+        options,
+      );
+    },
+  },
+  discoverAllIntegrations: {
+    description:
+      'Get a comprehensive list of all available integrations in the system with their names, descriptions, icons, and action counts. Useful for understanding the system capabilities.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+    function: async (): Promise<StandardActionResult<any>> => {
+      const options: ExecuteActionOptions<any, any> = {
+        serviceName: SERVICE_NAME,
+        dataExtractor: (serviceResult) => ({ data: serviceResult.data }),
+      };
+      return executeAction<any, any>(
+        'discoverAllIntegrations',
+        async () => {
+          const res = await discoverAllIntegrationsService(context.language);
+          return {
+            success: res.success,
+            data: res.data,
+            description: res.error,
+            error: res.error,
+          };
+        },
+        options,
+      );
+    },
+  },
+  discoverActionsByIntegration: {
+    description:
+      'Get all actions available for a specific integration, including their IDs, descriptions, and parameter schemas. Useful for understanding what operations an integration supports.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        integrationId: {
+          type: 'string',
+          description:
+            'The ID of the integration to get actions for (e.g., "jira", "openai")',
+        },
+      },
+      required: ['integrationId'],
+      additionalProperties: false,
+    },
+    function: async (params: {
+      integrationId: string;
+    }): Promise<StandardActionResult<any>> => {
+      if (!params.integrationId) {
+        throw new ActionValidationError(
+          'integrationId is a required parameter.',
+        );
+      }
+      const options: ExecuteActionOptions<any, any> = {
+        serviceName: SERVICE_NAME,
+        dataExtractor: (serviceResult) => ({ data: serviceResult.data }),
+      };
+      return executeAction<any, any>(
+        'discoverActionsByIntegration',
+        async () => {
+          const res = await discoverActionsByIntegrationService(
+            params.integrationId,
+            context.language,
+          );
+          return {
+            success: res.success,
+            data: res.data,
+            description: res.error,
+            error: res.error,
+          };
+        },
+        options,
+      );
+    },
+  },
+  searchActions: {
+    description:
+      'Search for actions by keyword across all integrations. Returns actions whose ID, name, or description contains the search term. Useful for finding specific functionality.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        searchTerm: {
+          type: 'string',
+          description:
+            'The keyword to search for in action IDs, names, and descriptions',
+        },
+      },
+      required: ['searchTerm'],
+      additionalProperties: false,
+    },
+    function: async (params: {
+      searchTerm: string;
+    }): Promise<StandardActionResult<any>> => {
+      if (!params.searchTerm) {
+        throw new ActionValidationError('searchTerm is a required parameter.');
+      }
+      const options: ExecuteActionOptions<any, any> = {
+        serviceName: SERVICE_NAME,
+        dataExtractor: (serviceResult) => ({ data: serviceResult.data }),
+      };
+      return executeAction<any, any>(
+        'searchActions',
+        async () => {
+          const res = await searchActionsService(
+            params.searchTerm,
             context.language,
           );
           return {

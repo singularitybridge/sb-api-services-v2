@@ -37,7 +37,7 @@ export async function createJournalEntry(
       journalData.companyId.toString(),
       channel,
     );
-    journalData.sessionId = session._id;
+    journalData.sessionId = session._id as any;
 
     const newJournal = new Journal(journalData);
     console.log('journal service :: About to save journal entry...');

@@ -3,6 +3,7 @@ import { executeAssistantStateless } from '../../services/assistant/stateless-ex
 import { Assistant } from '../../models/Assistant';
 import mongoose from 'mongoose';
 import { isValidObjectId } from '../../utils/validation';
+import { resolveAssistantIdentifier } from '../../services/assistant/assistant-resolver.service';
 
 // Helper function to generate unique message IDs
 const generateMessageId = (): string => {
@@ -28,50 +29,34 @@ export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
       });
     }
 
-    // Validate assistant ID format
-    if (!assistantId || !isValidObjectId(assistantId)) {
+    // Validate assistant identifier (can be ID or name)
+    if (!assistantId || assistantId.trim().length === 0) {
       return res.status(400).json({
-        error:
-          'Invalid assistant ID format. Must be a valid 24-character hex string.',
+        error: 'Assistant identifier is required.',
       });
     }
 
-    // Validate assistant exists and belongs to company
+    // Resolve assistant by ID or name
     console.log(
-      `[Execute Route] Looking for assistant with ID: ${assistantId}`,
+      `[Execute Route] Looking for assistant with identifier: ${assistantId}`,
     );
     console.log(`[Execute Route] Company ID from token: ${req.company._id}`);
 
-    const assistant = await Assistant.findOneAndUpdate(
-      {
-        _id: new mongoose.Types.ObjectId(assistantId),
-        companyId: req.company._id,
-      },
-      {
-        $set: { lastAccessedAt: new Date() },
-      },
-      {
-        new: true,
-      },
+    const assistant = await resolveAssistantIdentifier(
+      assistantId,
+      req.company._id.toString(),
     );
 
     if (!assistant) {
       console.log(`[Execute Route] Assistant not found or access denied`);
-      // Try to find if assistant exists at all
-      const assistantExists = await Assistant.findById(assistantId);
-      if (assistantExists) {
-        console.log(
-          `[Execute Route] Assistant exists but belongs to company: ${assistantExists.companyId}`,
-        );
-      } else {
-        console.log(
-          `[Execute Route] Assistant with ID ${assistantId} does not exist`,
-        );
-      }
       return res.status(404).json({
         error: 'Assistant not found or access denied for this company.',
       });
     }
+
+    // Update last accessed time
+    assistant.lastAccessedAt = new Date();
+    await assistant.save();
 
     // Execute assistant message without session
     const companyId = req.company._id.toString();
