@@ -1,6 +1,14 @@
 {
+    "exec": "tsx src/index.ts",
+    "ext": "ts,js,json",
     "ignore": [
         "./src/routes/tokens.json",
-        "./src/services/tokens.json"
+        "./src/services/tokens.json",
+        "./temp/**/*",
+        "./output/**/*",
+        "temp/**/*",
+        "output/**/*",
+        "**/temp/**",
+        "**/output/**"
     ]
 }
