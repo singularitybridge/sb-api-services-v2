@@ -1,17 +1,17 @@
 import { verifyOpenAiKey } from './oai.assistant.service';
-import { TwilioKeys, verifyTwilioKeys } from './twilio/voice.service';
+// import { TwilioKeys, verifyTwilioKeys } from './twilio/voice.service'; // Removed - Twilio dependency removed
 import { verifyJsonBinKey } from './jsonbin.service';
 import axios from 'axios';
 import { verifyElevenLabsKey } from '../integrations/elevenlabs/elevenlabs.service';
 
-export type ApiKey = string | TwilioKeys;
+export type ApiKey = string;
 
 type VerificationFunction = (key: ApiKey) => Promise<boolean>;
 
 const services: Record<string, VerificationFunction> = {
   //   'gcp_key': verifyGcpKey,
   openai_api_key: verifyOpenAiKey,
-  twilio_auth_token: verifyTwilioKeys,
+  // twilio_auth_token: verifyTwilioKeys, // Removed - Twilio dependency removed
   labs11_api_key: verifyElevenLabsKey,
   jsonbin_api_key: verifyJsonBinKey,
   telegram_bot_api_key: verifyTelegramBotToken,

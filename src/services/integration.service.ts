@@ -105,7 +105,7 @@ export async function getLeanIntegrationActions(
     })) as LeanIntegration[];
   }
 
-  return leanIntegrations as LeanIntegration[];
+  return leanIntegrations as unknown as LeanIntegration[];
 }
 
 export async function discoverActionById(

@@ -7,6 +7,7 @@ import {
 import { getAssistantsByTeam, getTeamById } from '../../services/team.service';
 import { Assistant } from '../../models/Assistant';
 import { validateObjectId } from '../../utils/validation';
+import { resolveAssistantIdentifier } from '../../services/assistant/assistant-resolver.service';
 
 const router = Router();
 
@@ -33,10 +34,15 @@ router.get('/', async (req: AuthenticatedRequest, res) => {
 
 router.get(
   '/:id',
-  validateObjectId('id'),
+  // Remove validateObjectId since we now accept names too
   async (req: AuthenticatedRequest, res) => {
     try {
-      const assistant = await getAssistantById(req.params.id);
+      // Resolve assistant by ID or name
+      const assistant = await resolveAssistantIdentifier(
+        req.params.id,
+        req.user?.companyId.toString() || '',
+      );
+
       if (!assistant) {
         return res.status(404).send({ message: 'Assistant not found' });
       }

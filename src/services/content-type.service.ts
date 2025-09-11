@@ -31,7 +31,7 @@ export const ContentTypeService = {
   ): Promise<ModifyResult<
     Document<unknown, {}, IContentType> & IContentType
   > | null> {
-    return ContentType.findByIdAndDelete(id).exec();
+    return ContentType.findByIdAndDelete(id).exec() as any;
   },
 };
 

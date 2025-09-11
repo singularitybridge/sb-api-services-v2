@@ -16,9 +16,9 @@ router.use('/thread', threadRouter);
 router.use('/completion', completionRouter);
 
 // Execute handler with proper parameter handling
+// Removed validateObjectId since we now accept names too
 router.post(
   '/:assistantId/execute',
-  validateObjectId('assistantId'),
   validateApiKeys(['openai_api_key']),
   executeHandler,
 );

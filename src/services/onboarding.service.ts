@@ -43,7 +43,7 @@ export const updateOnboardingStatus = async (
     }
 
     await company.save();
-    return company.toObject() as ICompany;
+    return company.toObject() as unknown as ICompany;
   } catch (error) {
     console.error('Error updating onboarding status:', error);
     throw error;
@@ -66,7 +66,7 @@ export const updateOnboardedModule = async (
       await company.save();
     }
 
-    return company.toObject() as ICompany;
+    return company.toObject() as unknown as ICompany;
   } catch (error) {
     console.error('Error updating onboarded module:', error);
     throw error;

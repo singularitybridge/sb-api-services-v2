@@ -411,7 +411,8 @@ export const askAnotherAssistant = async (
     }
 
     // Make HTTP request to the assistant execute endpoint
-    const executeUrl = `http://localhost:3000/assistant/${targetAssistantId}/execute`;
+    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    const executeUrl = `${baseUrl}/assistant/${targetAssistantId}/execute`;
 
     const requestBody = {
       userInput: task,

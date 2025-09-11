@@ -1,7 +1,0 @@
-{
-  "name": "codesandbox",
-  "icon": "codesandbox",
-  "apiKeyName": "codesandbox_api_key",
-  "actionCreator": "createCodeSandboxActions",
-  "actionsFile": "codesandbox.actions.ts"
-}

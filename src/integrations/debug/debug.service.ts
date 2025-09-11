@@ -157,3 +157,146 @@ export const discoverActionById = async (
     };
   }
 };
+
+export const discoverAllIntegrations = async (
+  language: SupportedLanguage = 'en',
+): Promise<{ success: boolean; data?: any; error?: string }> => {
+  try {
+    const { discoveryService } = await import(
+      '../../services/discovery.service'
+    );
+    const integrations = await discoveryService.discoverIntegrations(language);
+
+    // Add action count and simplify the response
+    const integrationsWithCounts = integrations.map((integration) => ({
+      id: integration.id,
+      name: integration.name,
+      description: integration.description,
+      icon: integration.icon,
+      actionCount: integration.actions?.length || 0,
+      actions:
+        integration.actions?.map((action) => ({
+          id: action.id,
+          title: action.actionTitle,
+          description: action.description,
+        })) || [],
+    }));
+
+    return { success: true, data: integrationsWithCounts };
+  } catch (error: any) {
+    console.error('Error in discoverAllIntegrations:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to discover all integrations',
+    };
+  }
+};
+
+export const discoverActionsByIntegration = async (
+  integrationId: string,
+  language: SupportedLanguage = 'en',
+): Promise<{ success: boolean; data?: any; error?: string }> => {
+  try {
+    const integration = await getIntegrationById(integrationId, language);
+    if (!integration) {
+      return {
+        success: false,
+        error: `Integration '${integrationId}' not found`,
+      };
+    }
+
+    // Return detailed action information
+    const actionsWithDetails = integration.actions.map((action) => ({
+      id: action.id,
+      serviceName: action.serviceName,
+      actionTitle: action.actionTitle,
+      description: action.description,
+      icon: action.icon,
+      parameters: action.parameters,
+      integration: {
+        id: integration.id,
+        name: integration.name,
+        icon: integration.icon,
+      },
+    }));
+
+    return {
+      success: true,
+      data: {
+        integration: {
+          id: integration.id,
+          name: integration.name,
+          description: integration.description,
+          icon: integration.icon,
+        },
+        actions: actionsWithDetails,
+        totalActions: actionsWithDetails.length,
+      },
+    };
+  } catch (error: any) {
+    console.error('Error in discoverActionsByIntegration:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to discover actions by integration',
+    };
+  }
+};
+
+export const searchActions = async (
+  searchTerm: string,
+  language: SupportedLanguage = 'en',
+): Promise<{ success: boolean; data?: any; error?: string }> => {
+  try {
+    const { discoveryService } = await import(
+      '../../services/discovery.service'
+    );
+    const allActions = await discoveryService.discoverActions(language);
+
+    const searchLower = searchTerm.toLowerCase();
+    const matchedActions = allActions.filter(
+      (action) =>
+        action.id.toLowerCase().includes(searchLower) ||
+        action.actionTitle.toLowerCase().includes(searchLower) ||
+        action.description.toLowerCase().includes(searchLower) ||
+        action.serviceName.toLowerCase().includes(searchLower),
+    );
+
+    // Group actions by integration for better organization
+    const groupedActions = matchedActions.reduce(
+      (acc, action) => {
+        const integrationId = action.service;
+        if (!acc[integrationId]) {
+          acc[integrationId] = {
+            integrationId,
+            integrationName: action.serviceName,
+            actions: [],
+          };
+        }
+        acc[integrationId].actions.push({
+          id: action.id,
+          title: action.actionTitle,
+          description: action.description,
+          parameters: action.parameters,
+        });
+        return acc;
+      },
+      {} as Record<string, any>,
+    );
+
+    return {
+      success: true,
+      data: {
+        searchTerm,
+        totalMatches: matchedActions.length,
+        results: Object.values(groupedActions),
+        allMatches: matchedActions,
+      },
+    };
+  } catch (error: any) {
+    console.error('Error in searchActions:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to search actions',
+    };
+  }
+};
