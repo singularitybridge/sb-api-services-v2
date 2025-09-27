@@ -4,7 +4,6 @@ import {
   getSessionOrCreate,
   getSessionById,
 } from '../../services/session.service';
-import { ChannelType } from '../../types/ChannelType';
 import { getUserById } from '../../services/user.service';
 import { getAssistantById } from '../../services/assistant.service';
 import { format, toZonedTime } from 'date-fns-tz';
@@ -19,7 +18,6 @@ type JournalScope = 'user' | 'company';
 export async function createJournalEntry(
   journalData: Partial<IJournal>,
   apiKey: string,
-  channel: ChannelType = ChannelType.WEB,
 ): Promise<IJournal> {
   try {
     console.log('journal service :: Creating journal entry:', journalData);
@@ -35,7 +33,6 @@ export async function createJournalEntry(
       apiKey,
       journalData.userId.toString(),
       journalData.companyId.toString(),
-      channel,
     );
     journalData.sessionId = session._id as any;
 

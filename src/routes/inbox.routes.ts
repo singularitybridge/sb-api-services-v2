@@ -9,7 +9,6 @@ import { handleSessionMessage } from '../services/assistant.service';
 import { Session } from '../models/Session';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { getApiKey } from '../services/api.key.service';
-import { ChannelType } from '../types/ChannelType';
 
 const inboxRouter = express.Router();
 
@@ -62,7 +61,6 @@ inboxRouter.post(
       const llmResponse = await handleSessionMessage(
         responseTemplate,
         session.id,
-        ChannelType.WEB,
         {
           // This is the metadata argument
           message_type: 'human-agent-response',

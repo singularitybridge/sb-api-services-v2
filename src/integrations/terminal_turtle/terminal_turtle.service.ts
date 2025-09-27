@@ -9,23 +9,28 @@ interface ProvisionEnvironmentData {
 }
 
 export class TerminalTurtleService {
-  private static readonly HARDCODED_FLY_API_TOKEN = 'fly_hardcoded_token_phase1';
-  private static readonly HARDCODED_ORCHESTRATOR_URL = 'https://orchestrator.ai-programmer.com';
-  private static readonly HARDCODED_ORCHESTRATOR_API_KEY = 'orchestrator_hardcoded_key_phase1';
+  private static readonly HARDCODED_FLY_API_TOKEN =
+    'fly_hardcoded_token_phase1';
+  private static readonly HARDCODED_ORCHESTRATOR_URL =
+    'https://orchestrator.ai-programmer.com';
+  private static readonly HARDCODED_ORCHESTRATOR_API_KEY =
+    'orchestrator_hardcoded_key_phase1';
 
-  static async provisionEnvironment(companyId: string): Promise<ProvisionEnvironmentData> {
+  static async provisionEnvironment(
+    companyId: string,
+  ): Promise<ProvisionEnvironmentData> {
     // For Phase 1, we're using hardcoded values
     // Later these will be replaced with actual API keys from the company
-    
+
     const response = await axios.post(
       `${this.HARDCODED_ORCHESTRATOR_URL}/api/customers/${companyId}/provision`,
       {},
       {
         headers: {
-          'Authorization': `Bearer ${this.HARDCODED_ORCHESTRATOR_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
+          Authorization: `Bearer ${this.HARDCODED_ORCHESTRATOR_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      },
     );
 
     if (!response.data.success) {
@@ -42,16 +47,20 @@ export class TerminalTurtleService {
       customerId,
       apiKey,
       tunnelUrl,
-      machineId
+      machineId,
     };
   }
 
-  static async getEnvironmentInfo(companyId: string): Promise<{ apiKey: string; url: string }> {
+  static async getEnvironmentInfo(
+    companyId: string,
+  ): Promise<{ apiKey: string; url: string }> {
     const apiKey = await getApiKey(companyId, 'TERMINAL_TURTLE_API_KEY');
     const url = await getApiKey(companyId, 'TERMINAL_TURTLE_URL');
 
     if (!apiKey || !url) {
-      throw new Error('Environment not provisioned. Run provisionEnvironment first.');
+      throw new Error(
+        'Environment not provisioned. Run provisionEnvironment first.',
+      );
     }
 
     return { apiKey, url };
@@ -61,15 +70,15 @@ export class TerminalTurtleService {
     companyId: string,
     endpoint: string,
     data: any,
-    method: 'GET' | 'POST' = 'POST'
+    method: 'GET' | 'POST' = 'POST',
   ): Promise<any> {
     const { apiKey, url } = await this.getEnvironmentInfo(companyId);
 
     const config = {
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      }
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
     };
 
     if (method === 'GET') {

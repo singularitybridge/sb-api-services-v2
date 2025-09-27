@@ -13,8 +13,8 @@ export const readContentFiles = async (
   companyId: string,
 ): Promise<{ success: boolean; data: IContentFile[] }> => {
   try {
-    const files = await getContentFiles(companyId);
-    return { success: true, data: files };
+    const result = await getContentFiles(companyId);
+    return { success: true, data: result.files };
   } catch (error: unknown) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error occurred';
@@ -48,8 +48,11 @@ export const getFileContentText = async (
   try {
     // Assuming downloadContentFileText is imported from '../../services/content-file.service'
     // This import will be added in the next step if not already present by the linter/IDE
-    const content = await downloadContentFileText(fileId, companyId);
-    return { success: true, data: content };
+    const result = await downloadContentFileText(fileId, companyId);
+    if (!result.success || !result.data) {
+      throw new Error(result.error || 'Failed to download file');
+    }
+    return { success: true, data: result.data };
   } catch (error: unknown) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error occurred';

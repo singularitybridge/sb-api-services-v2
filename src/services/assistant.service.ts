@@ -1,6 +1,4 @@
 import { Session } from '../models/Session';
-import { ChannelType } from '../types/ChannelType';
-import { getApiKey } from './api.key.service';
 import { getOpenAIClient } from './assistant/openai-client.service';
 import {
   getAssistants,
@@ -11,7 +9,6 @@ import {
 } from './assistant/assistant-management.service';
 import { getSessionMessages } from './assistant/session-management.service';
 import { handleSessionMessage } from './assistant/message-handling.service';
-import { sendTelegramMessage } from './assistant/telegram.service';
 
 export {
   getOpenAIClient,
@@ -39,33 +36,11 @@ export const sendMessageToAgent = async (
     // When called without streaming metadata, handleSessionMessage returns Promise<string>.
     const response = await handleSessionMessage(
       message,
-      sessionId,
-      session.channel as ChannelType /*, no metadata for streaming */,
+      sessionId /* no metadata */,
     );
 
     if (typeof response === 'string') {
-      // Send the response to the appropriate channel
-      switch (session.channel) {
-        case ChannelType.TELEGRAM:
-          await sendTelegramMessage(
-            session.userId.toString(),
-            response,
-            session.companyId.toString(),
-          );
-          break;
-        case ChannelType.WEB:
-          // For WEB channel, if not SSE, this is how it might be logged or handled.
-          // The SSE route itself handles WEB channel streaming separately.
-          console.log(
-            `Message processed for Web channel (non-SSE): ${response}`,
-          );
-          break;
-        // Add cases for other channel types as needed
-        default:
-          console.log(
-            `Message sent to channel ${session.channel}: ${response}`,
-          );
-      }
+      console.log(`Message processed for session ${session._id}: ${response}`);
       return response; // Return the string response
     } else {
       // This case implies handleSessionMessage returned a StreamTextResult object,

@@ -21,7 +21,7 @@ export const publishMessage = async (
         `Message size (${messageSize} bytes) exceeds Pusher limit of 10240 bytes`,
       );
     }
-    
+
     // console.log(`[Pusher] Sending message to channel: ${channel}, event: ${eventName}`);
     await pusher.trigger(channel, eventName, message);
     // console.log(`[Pusher] Message sent successfully to channel: ${channel}`);
@@ -34,7 +34,7 @@ export const publishMessage = async (
       eventName,
       messageSize: JSON.stringify(message).length,
     });
-    
+
     // Re-throw only if it's not a Pusher-specific error
     // This prevents unhandled promise rejections while still surfacing other issues
     if (error?.name !== 'PusherRequestError' && error?.status !== 413) {

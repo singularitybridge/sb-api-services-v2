@@ -2,6 +2,7 @@ import { Assistant, IIdentifier, IAssistant } from '../../models/Assistant';
 import { Session } from '../../models/Session';
 import { Team, ITeam } from '../../models/Team';
 import { publishMessage } from '../../services/pusher.service';
+import { resolveAssistantIdentifier } from '../../services/assistant/assistant-resolver.service';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
@@ -70,22 +71,14 @@ export const getAssistantById = async (
       return { success: false, description: 'Invalid session' };
     }
 
-    if (!mongoose.Types.ObjectId.isValid(assistantId)) {
-      return { success: false, description: 'Invalid assistantId format' };
-    }
+    // Use resolver to handle both ID and name
+    const assistant = await resolveAssistantIdentifier(
+      assistantId,
+      session.companyId.toString(),
+    );
 
-    const assistant = await Assistant.findById(assistantId);
     if (!assistant) {
       return { success: false, description: 'Assistant not found' };
-    }
-
-    // Verify the assistant belongs to the same company as the session
-    if (assistant.companyId.toString() !== session.companyId.toString()) {
-      return {
-        success: false,
-        description:
-          'Access denied. Assistant does not belong to this company.',
-      };
     }
 
     return {
@@ -132,21 +125,16 @@ export const updateAssistantById = async (
       return { success: false, description: 'Invalid session' };
     }
 
-    if (!mongoose.Types.ObjectId.isValid(assistantId)) {
-      return { success: false, description: 'Invalid assistantId format' };
-    }
+    // Use resolver to handle both ID and name
+    const assistant = await resolveAssistantIdentifier(
+      assistantId,
+      session.companyId.toString(),
+    );
 
-    const assistant = await Assistant.findById(assistantId);
     if (!assistant) {
-      return { success: false, description: 'Assistant not found' };
-    }
-
-    // Verify the assistant belongs to the same company as the session
-    if (assistant.companyId.toString() !== session.companyId.toString()) {
       return {
         success: false,
-        description:
-          'Access denied. Assistant does not belong to this company.',
+        description: 'Assistant not found or access denied',
       };
     }
 
@@ -255,14 +243,30 @@ export const setAssistant = async (
   assistantId: string,
 ): Promise<{ success: boolean; description: string }> => {
   try {
-    const assistant = await Assistant.findById(assistantId);
+    // Get session to retrieve companyId for resolver
+    const session = await Session.findById(sessionId);
+    if (!session) {
+      return {
+        success: false,
+        description: 'Invalid session',
+      };
+    }
+
+    // Use resolver to handle both ID and name
+    const assistant = await resolveAssistantIdentifier(
+      assistantId,
+      session.companyId.toString(),
+    );
+
     if (!assistant) {
       return {
         success: false,
         description: 'Assistant not found',
       };
     }
-    publishMessage(`sb-${sessionId}`, 'setAssistant', { _id: assistantId });
+    publishMessage(`sb-${sessionId}`, 'setAssistant', {
+      _id: assistant._id.toString(),
+    });
     return {
       success: true,
       description: `Assistant set to ${assistant.name} (ID: ${assistantId})`,
@@ -369,19 +373,11 @@ export const askAnotherAssistant = async (
       };
     }
 
-    // Validate the targetAssistantId is a valid ObjectId
-    if (!mongoose.Types.ObjectId.isValid(targetAssistantId)) {
-      return {
-        success: false,
-        description: `Invalid assistantId: ${targetAssistantId}. Must be a valid ObjectId.`,
-      };
-    }
-
-    // Verify the target assistant exists and belongs to the same company
-    const targetAssistant = await Assistant.findOne({
-      _id: targetAssistantId,
-      companyId: effectiveCompanyId,
-    });
+    // Use resolver to handle both ID and name for target assistant
+    const targetAssistant = await resolveAssistantIdentifier(
+      targetAssistantId,
+      effectiveCompanyId,
+    );
 
     if (!targetAssistant) {
       return {
@@ -412,7 +408,7 @@ export const askAnotherAssistant = async (
 
     // Make HTTP request to the assistant execute endpoint
     const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
-    const executeUrl = `${baseUrl}/assistant/${targetAssistantId}/execute`;
+    const executeUrl = `${baseUrl}/assistant/${targetAssistant._id.toString()}/execute`;
 
     const requestBody = {
       userInput: task,
@@ -439,7 +435,7 @@ export const askAnotherAssistant = async (
         success: true,
         description: `Successfully received response from assistant "${targetAssistant.name}"`,
         data: {
-          assistantId: targetAssistantId,
+          assistantId: targetAssistant._id.toString(),
           assistantName: targetAssistant.name,
           response: responseData.data.json,
           messageId: responseData.id,
@@ -457,7 +453,7 @@ export const askAnotherAssistant = async (
         success: true,
         description: `Successfully received response from assistant "${targetAssistant.name}"`,
         data: {
-          assistantId: targetAssistantId,
+          assistantId: targetAssistant._id.toString(),
           assistantName: targetAssistant.name,
           response: textResponse,
           messageId: responseData.id,

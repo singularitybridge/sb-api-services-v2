@@ -205,7 +205,7 @@ export async function getCostSummary(
     // Handle both populated and non-populated assistantId
     let assistantId: string;
     let assistantName: string | undefined;
-    
+
     if (typeof record.assistantId === 'object' && record.assistantId !== null) {
       // Populated assistant object
       const assistantObj = record.assistantId as any;
@@ -216,7 +216,7 @@ export async function getCostSummary(
       assistantId = (record.assistantId as any).toString();
       assistantName = undefined;
     }
-    
+
     if (!assistantMap[assistantId]) {
       assistantMap[assistantId] = {
         cost: 0,

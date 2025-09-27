@@ -9,12 +9,10 @@ export type ApiKeyType =
   | 'labs11_api_key'
   | 'google_api_key'
   | 'anthropic_api_key' // Added anthropic_api_key
-  | 'jsonbin_api_key'
   | 'getimg_api_key'
   | 'perplexity_api_key'
   | 'sendgrid_api_key'
   | 'photoroom_api_key'
-  | 'telegram_bot_api_key'
   | 'linear_api_key'
   | 'replicate_api_key'
   | 'executor_agent_url'

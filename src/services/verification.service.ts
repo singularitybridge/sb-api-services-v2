@@ -1,7 +1,5 @@
 import { verifyOpenAiKey } from './oai.assistant.service';
 // import { TwilioKeys, verifyTwilioKeys } from './twilio/voice.service'; // Removed - Twilio dependency removed
-import { verifyJsonBinKey } from './jsonbin.service';
-import axios from 'axios';
 import { verifyElevenLabsKey } from '../integrations/elevenlabs/elevenlabs.service';
 
 export type ApiKey = string;
@@ -13,8 +11,6 @@ const services: Record<string, VerificationFunction> = {
   openai_api_key: verifyOpenAiKey,
   // twilio_auth_token: verifyTwilioKeys, // Removed - Twilio dependency removed
   labs11_api_key: verifyElevenLabsKey,
-  jsonbin_api_key: verifyJsonBinKey,
-  telegram_bot_api_key: verifyTelegramBotToken,
 };
 
 export async function verifyApiKey(
@@ -25,19 +21,4 @@ export async function verifyApiKey(
     throw new Error(`Service not supported: ${serviceName}`);
   }
   return services[serviceName](apiKey);
-}
-
-async function verifyTelegramBotToken(token: ApiKey): Promise<boolean> {
-  if (typeof token !== 'string') {
-    return false;
-  }
-  try {
-    const response = await axios.get(
-      `https://api.telegram.org/bot${token}/getMe`,
-    );
-    return response.data.ok === true;
-  } catch (error) {
-    console.error('Error verifying Telegram bot token:', error);
-    return false;
-  }
 }

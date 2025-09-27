@@ -9,7 +9,6 @@ import {
 } from '../../../../integrations/journal/journal.service';
 import { Types } from 'mongoose';
 import { getApiKey } from '../../../api.key.service';
-import { ChannelType } from '../../../../types/ChannelType';
 
 // Register createJournalEntry RPC method
 registerRpcMethod(
@@ -33,7 +32,6 @@ registerRpcMethod(
         companyId: new Types.ObjectId(companyId),
       },
       apiKey,
-      ChannelType.WEB,
     );
 
     return { success: true, data: result };

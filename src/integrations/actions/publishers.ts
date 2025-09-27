@@ -151,7 +151,7 @@ export const publishActionMessage = async (
     const truncatedMessageData = {
       ...messageData,
       input: messageData.input
-        ? truncateForPusher(messageData.input, 2000)  // Smaller limit for input
+        ? truncateForPusher(messageData.input, 2000) // Smaller limit for input
         : messageData.input,
       output: messageData.output
         ? truncateForPusher(messageData.output, 3000)

@@ -1,0 +1,21 @@
+# Ignore compiled output
+dist/
+build/
+
+# Ignore node modules
+node_modules/
+
+# Ignore test files that are not TypeScript
+*.js
+!src/**/*.js
+
+# Ignore configuration files
+*.config.js
+*.config.ts
+
+# Ignore test scripts
+test-*.js
+run-*.sh
+
+# Ignore scripts folder JavaScript files
+scripts/*.js

@@ -14,7 +14,6 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { getApiKey, validateApiKeys } from '../services/api.key.service';
 import { BadRequestError } from '../utils/errors';
 import { SupportedLanguage } from '../services/discovery.service';
-import { ChannelType } from '../types/ChannelType'; // Added for ChannelType
 
 const sessionRouter = Router();
 
@@ -41,7 +40,6 @@ sessionRouter.put(
       const activeSession = await Session.findOne({
         userId: new mongoose.Types.ObjectId(userId),
         companyId: new mongoose.Types.ObjectId(companyId),
-        channel: ChannelType.WEB, // Assuming WEB channel for active session operations
         active: true,
       });
 
@@ -85,7 +83,6 @@ sessionRouter.get(
       const activeSession = await Session.findOne({
         userId: new mongoose.Types.ObjectId(userId),
         companyId: new mongoose.Types.ObjectId(companyId),
-        channel: ChannelType.WEB, // Assuming WEB channel
         active: true,
       });
 
@@ -116,7 +113,6 @@ sessionRouter.post('/', async (req: AuthenticatedRequest, res: Response) => {
       apiKey, // This apiKey is for downstream services if needed by getSessionOrCreate, not for session creation itself.
       req.user?._id.toString() ?? '',
       req.user?.companyId.toString() ?? '',
-      // Assuming ChannelType.WEB as default for this endpoint, can be parameterized if needed
     );
     res.status(200).json(session);
   } catch (error: unknown) {
@@ -152,11 +148,10 @@ sessionRouter.post(
         );
       }
 
-      // Find current active session for this user/company/channel (assuming ChannelType.WEB)
+      // Find current active session for this user/company
       const currentActiveSession = await Session.findOne({
         userId: new mongoose.Types.ObjectId(userId),
         companyId: new mongoose.Types.ObjectId(companyId),
-        channel: ChannelType.WEB, // Assuming WEB channel for this operation
         active: true,
       });
 
@@ -172,7 +167,7 @@ sessionRouter.post(
         await endSession(apiKey, currentActiveSession._id.toString());
       } else {
         console.log(
-          `Clear Session: No existing active session found for user ${userId} in company ${companyId} on WEB channel.`,
+          `Clear Session: No existing active session found for user ${userId} in company ${companyId}.`,
         );
       }
 
@@ -181,7 +176,6 @@ sessionRouter.post(
         apiKey,
         userId,
         companyId,
-        ChannelType.WEB, // Assuming WEB channel
         lastLanguage, // Pass the last language
         lastAssistantId, // Pass the last assistantId
       );
@@ -217,7 +211,6 @@ sessionRouter.get(
       const activeSession = await Session.findOne({
         userId: new mongoose.Types.ObjectId(userId),
         companyId: new mongoose.Types.ObjectId(companyId),
-        channel: ChannelType.WEB, // Assuming WEB channel
         active: true,
       });
 
