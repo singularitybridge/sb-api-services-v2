@@ -5,6 +5,7 @@ import { Assistant } from '../../models/Assistant';
 import { deleteAssistant } from '../../services/assistant.service';
 import { updateAllowedActions } from '../../services/allowed-actions.service';
 import { validateObjectId } from '../../utils/validation';
+import { resolveAssistantIdentifier } from '../../services/assistant/assistant-resolver.service';
 
 import getRoutes from './get.routes';
 import putRoutes from './put.routes';
@@ -19,23 +20,32 @@ assistantRouter.use('/', postRoutes);
 
 assistantRouter.delete(
   '/:id',
-  validateObjectId('id'),
+  // Remove validateObjectId since we now accept names too
   validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     const { id } = req.params;
 
     try {
-      const assistant = await Assistant.findOne({
-        _id: id,
-        companyId:
-          req.user?.role === 'Admin' ? { $exists: true } : req.user?.companyId,
-      });
+      // Use resolver to handle both ID and name
+      const companyId =
+        req.user?.role === 'Admin' ? null : req.user?.companyId?.toString();
+
+      let assistant;
+      if (req.user?.role === 'Admin' && !companyId) {
+        // Admin can access any assistant - try to resolve without company constraint
+        assistant = await Assistant.findOne({
+          $or: [{ _id: id }, { name: id }],
+        });
+      } else {
+        // Regular user - use resolver with company constraint
+        assistant = await resolveAssistantIdentifier(id, companyId || '');
+      }
 
       if (!assistant) {
         return res.status(404).send({ message: 'Assistant not found' });
       }
 
-      await deleteAssistant(id, assistant.assistantId);
+      await deleteAssistant(assistant._id.toString(), assistant.assistantId);
       res.send({ message: 'Assistant deleted successfully' });
     } catch (error) {
       console.error('Error deleting assistant:', error);
@@ -48,7 +58,7 @@ assistantRouter.delete(
 
 assistantRouter.patch(
   '/:id/allowed-actions',
-  validateObjectId('id'),
+  // Remove validateObjectId since we now accept names too
   validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     try {
@@ -61,7 +71,20 @@ assistantRouter.patch(
           .send({ message: 'allowedActions must be an array of strings' });
       }
 
-      const updatedAssistant = await updateAllowedActions(id, allowedActions);
+      // Use resolver to get the actual assistant
+      const assistant = await resolveAssistantIdentifier(
+        id,
+        req.user?.companyId?.toString() || '',
+      );
+
+      if (!assistant) {
+        return res.status(404).send({ message: 'Assistant not found' });
+      }
+
+      const updatedAssistant = await updateAllowedActions(
+        assistant._id.toString(),
+        allowedActions,
+      );
 
       if (!updatedAssistant) {
         return res.status(404).send({ message: 'Assistant not found' });

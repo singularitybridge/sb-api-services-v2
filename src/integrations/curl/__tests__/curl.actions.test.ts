@@ -1,6 +1,7 @@
 import { ActionContext, FunctionFactory } from '../../actions/types';
 import { createCurlActions, CurlActionResponseData } from '../curl.actions';
 import { SupportedLanguage } from '../../../services/discovery.service';
+import { performCurlRequest } from '../curl.service';
 
 // Mock the context
 const mockContext: ActionContext = {
@@ -14,10 +15,8 @@ jest.mock('../curl.service', () => ({
   performCurlRequest: jest.fn(),
 }));
 
-// After jest.mock, we can get a reference to the mock function.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { performCurlRequest: mockPerformCurlRequestFromService } =
-  require('../curl.service') as { performCurlRequest: jest.Mock };
+const mockPerformCurlRequestFromService =
+  performCurlRequest as jest.MockedFunction<typeof performCurlRequest>;
 
 describe('curl.actions', () => {
   const curlActions = createCurlActions(mockContext);

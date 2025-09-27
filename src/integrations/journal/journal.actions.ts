@@ -8,7 +8,6 @@ import {
   searchJournalEntries,
 } from './journal.service';
 import { getSessionById } from '../../services/session.service';
-import { ChannelType } from '../../types/ChannelType';
 import { IJournal } from '../../models/Journal';
 import { getApiKey } from '../../services/api.key.service';
 import { Types } from 'mongoose';
@@ -122,7 +121,6 @@ export const createJournalActions = (
               companyId: new Types.ObjectId(companyId),
             },
             apiKey,
-            ChannelType.WEB,
           );
           return { success: true, data: result };
         },

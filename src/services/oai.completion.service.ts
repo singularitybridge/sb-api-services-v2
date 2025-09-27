@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import axios from 'axios';
-const pdf = require('pdf-parse');
+import pdfParse from 'pdf-parse';
 
 export const summarizeText = async (
   apiKey: string,
@@ -42,7 +42,7 @@ export const getO1CompletionResponse = async (
 const fetchAndParsePdf = async (url: string): Promise<string> => {
   try {
     const response = await axios.get(url, { responseType: 'arraybuffer' });
-    const data = await pdf(response.data);
+    const data = await pdfParse(response.data);
     return data.text;
   } catch (error) {
     console.error('Error fetching or parsing PDF:', error);

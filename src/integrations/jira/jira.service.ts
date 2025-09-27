@@ -398,17 +398,18 @@ export const createJiraTicket = async (
   } catch (error: any) {
     // Extract more detailed error information
     const errorDetails = error?.response?.data || error?.response || error;
-    const errorMessage = errorDetails?.errorMessages?.join(', ') || 
-                        errorDetails?.errors ? JSON.stringify(errorDetails.errors) :
-                        error?.message || 'Unknown error';
-    
+    const errorMessage =
+      errorDetails?.errorMessages?.join(', ') || errorDetails?.errors
+        ? JSON.stringify(errorDetails.errors)
+        : error?.message || 'Unknown error';
+
     console.error('[createJiraTicket] Detailed error:', {
       status: error?.response?.status,
       statusText: error?.response?.statusText,
       data: errorDetails,
-      params: params
+      params: params,
     });
-    
+
     return {
       success: false,
       error: `Failed to create JIRA ticket: ${errorMessage}`,

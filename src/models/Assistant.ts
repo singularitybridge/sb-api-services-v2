@@ -31,7 +31,7 @@ export interface IAssistant extends Document {
 const AssistantSchema: Schema = new Schema({
   assistantId: { type: String, required: false },
   name: { type: String, required: true },
-  description: { type: String, required: true },
+  description: { type: String, required: false },
   conversationStarters: {
     type: [IdentifierSchema],
     required: true,

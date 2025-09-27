@@ -1,5 +1,9 @@
 import axios, { AxiosError } from 'axios';
-import { ActionContext, FunctionFactory, StandardActionResult } from '../actions/types';
+import {
+  ActionContext,
+  FunctionFactory,
+  StandardActionResult,
+} from '../actions/types';
 import { getApiKey } from '../../services/api.key.service';
 import { executeAction } from '../actions/executor';
 import { ActionExecutionError } from '../../utils/actionErrors';
@@ -101,7 +105,7 @@ export const createTerminalTurtleActions = (
       parameters: {
         type: 'object',
         properties: {},
-        required: []
+        required: [],
       },
       function: async (): Promise<StandardActionResult<any>> => {
         const actionName = 'provisionEnvironment';
@@ -109,26 +113,31 @@ export const createTerminalTurtleActions = (
           actionName,
           async () => {
             try {
-              const result = await TerminalTurtleService.provisionEnvironment(context.companyId);
-              
+              const result = await TerminalTurtleService.provisionEnvironment(
+                context.companyId,
+              );
+
               return {
                 success: true,
                 data: {
                   previewUrl: result.tunnelUrl,
                   status: 'Environment provisioned successfully',
-                  machineId: result.machineId
-                }
+                  machineId: result.machineId,
+                },
               };
             } catch (error) {
               return {
                 success: false,
-                description: error instanceof Error ? error.message : 'Failed to provision environment'
+                description:
+                  error instanceof Error
+                    ? error.message
+                    : 'Failed to provision environment',
               };
             }
           },
-          { serviceName: 'TerminalTurtleService' }
+          { serviceName: 'TerminalTurtleService' },
         );
-      }
+      },
     },
 
     executeCommand: {
@@ -154,7 +163,7 @@ export const createTerminalTurtleActions = (
               const response = await TerminalTurtleService.executeOnFlyMachine(
                 context.companyId,
                 '/execute',
-                { command }
+                { command },
               );
 
               // Shape the data for StandardActionResult
@@ -179,7 +188,10 @@ export const createTerminalTurtleActions = (
             } catch (error) {
               return {
                 success: false,
-                description: error instanceof Error ? error.message : 'Failed to execute command'
+                description:
+                  error instanceof Error
+                    ? error.message
+                    : 'Failed to execute command',
               };
             }
           },
@@ -363,67 +375,85 @@ export const createTerminalTurtleActions = (
         properties: {
           appName: {
             type: 'string',
-            description: 'Name of the application'
+            description: 'Name of the application',
           },
           framework: {
             type: 'string',
             enum: ['react', 'nextjs'],
-            description: 'Which framework to use'
-          }
+            description: 'Which framework to use',
+          },
         },
-        required: ['appName', 'framework']
+        required: ['appName', 'framework'],
       },
-      function: async ({ appName, framework }: { appName: string; framework: string }): Promise<StandardActionResult<any>> => {
+      function: async ({
+        appName,
+        framework,
+      }: {
+        appName: string;
+        framework: string;
+      }): Promise<StandardActionResult<any>> => {
         const actionName = 'createReactApp';
         return executeAction(
           actionName,
           async () => {
             try {
               // Create app using appropriate command
-              const createCommand = framework === 'nextjs' 
-                ? `npx create-next-app@latest ${appName} --typescript --tailwind --app --no-git`
-                : `npx create-react-app ${appName} --template typescript`;
-              
-              const createResult = await TerminalTurtleService.executeOnFlyMachine(
-                context.companyId,
-                '/execute',
-                { command: createCommand }
-              );
+              const createCommand =
+                framework === 'nextjs'
+                  ? `npx create-next-app@latest ${appName} --typescript --tailwind --app --no-git`
+                  : `npx create-react-app ${appName} --template typescript`;
+
+              const createResult =
+                await TerminalTurtleService.executeOnFlyMachine(
+                  context.companyId,
+                  '/execute',
+                  { command: createCommand },
+                );
 
               // Start development server with hot reload
-              const startCommand = framework === 'nextjs'
-                ? `cd ${appName} && npm run dev -- --port 3000`
-                : `cd ${appName} && npm start`;
-              
+              const startCommand =
+                framework === 'nextjs'
+                  ? `cd ${appName} && npm run dev -- --port 3000`
+                  : `cd ${appName} && npm start`;
+
               // Run in background
               await TerminalTurtleService.executeOnFlyMachine(
                 context.companyId,
                 '/execute',
-                { command: `${startCommand} > /dev/null 2>&1 &` }
+                { command: `${startCommand} > /dev/null 2>&1 &` },
               );
 
               // Get the preview URL
-              const envInfo = await TerminalTurtleService.getEnvironmentInfo(context.companyId);
-              const previewUrl = envInfo.url.replace('https://', 'https://3000-');
+              const envInfo = await TerminalTurtleService.getEnvironmentInfo(
+                context.companyId,
+              );
+              const previewUrl = envInfo.url.replace(
+                'https://',
+                'https://3000-',
+              );
 
               return {
                 success: true,
                 data: {
                   message: `${framework} app created successfully`,
                   previewUrl,
-                  instructions: 'Your app is running with hot reload. Edit files to see changes instantly.'
-                }
+                  instructions:
+                    'Your app is running with hot reload. Edit files to see changes instantly.',
+                },
               };
             } catch (error) {
               return {
                 success: false,
-                description: error instanceof Error ? error.message : 'Failed to create React app'
+                description:
+                  error instanceof Error
+                    ? error.message
+                    : 'Failed to create React app',
               };
             }
           },
-          { serviceName: 'TerminalTurtleService' }
+          { serviceName: 'TerminalTurtleService' },
         );
-      }
+      },
     },
 
     modifyFile: {
@@ -433,16 +463,22 @@ export const createTerminalTurtleActions = (
         properties: {
           filePath: {
             type: 'string',
-            description: 'Path to the file to modify'
+            description: 'Path to the file to modify',
           },
           content: {
             type: 'string',
-            description: 'New content for the file'
-          }
+            description: 'New content for the file',
+          },
         },
-        required: ['filePath', 'content']
+        required: ['filePath', 'content'],
       },
-      function: async ({ filePath, content }: { filePath: string; content: string }): Promise<StandardActionResult<any>> => {
+      function: async ({
+        filePath,
+        content,
+      }: {
+        filePath: string;
+        content: string;
+      }): Promise<StandardActionResult<any>> => {
         const actionName = 'modifyFile';
         return executeAction(
           actionName,
@@ -454,27 +490,30 @@ export const createTerminalTurtleActions = (
                 {
                   operation: 'write',
                   path: filePath,
-                  content
-                }
+                  content,
+                },
               );
 
               return {
                 success: true,
                 data: {
                   message: 'File modified successfully',
-                  note: 'Changes should reflect immediately due to hot reload'
-                }
+                  note: 'Changes should reflect immediately due to hot reload',
+                },
               };
             } catch (error) {
               return {
                 success: false,
-                description: error instanceof Error ? error.message : 'Failed to modify file'
+                description:
+                  error instanceof Error
+                    ? error.message
+                    : 'Failed to modify file',
               };
             }
           },
-          { serviceName: 'TerminalTurtleService' }
+          { serviceName: 'TerminalTurtleService' },
         );
-      }
+      },
     },
 
     setEnvironmentVariable: {
@@ -484,16 +523,22 @@ export const createTerminalTurtleActions = (
         properties: {
           name: {
             type: 'string',
-            description: 'Environment variable name'
+            description: 'Environment variable name',
           },
           value: {
             type: 'string',
-            description: 'Environment variable value'
-          }
+            description: 'Environment variable value',
+          },
         },
-        required: ['name', 'value']
+        required: ['name', 'value'],
       },
-      function: async ({ name, value }: { name: string; value: string }): Promise<StandardActionResult<any>> => {
+      function: async ({
+        name,
+        value,
+      }: {
+        name: string;
+        value: string;
+      }): Promise<StandardActionResult<any>> => {
         const actionName = 'setEnvironmentVariable';
         return executeAction(
           actionName,
@@ -503,33 +548,38 @@ export const createTerminalTurtleActions = (
               await TerminalTurtleService.executeOnFlyMachine(
                 context.companyId,
                 '/execute',
-                { command: `echo "export ${name}='${value}'" >> ~/.bashrc && export ${name}='${value}'` }
+                {
+                  command: `echo "export ${name}='${value}'" >> ~/.bashrc && export ${name}='${value}'`,
+                },
               );
 
               // For Next.js apps, also update .env.local
               await TerminalTurtleService.executeOnFlyMachine(
                 context.companyId,
                 '/execute',
-                { command: `echo "${name}=${value}" >> .env.local` }
+                { command: `echo "${name}=${value}" >> .env.local` },
               );
 
               return {
                 success: true,
                 data: {
                   message: `Environment variable ${name} set successfully`,
-                  note: 'Restart the dev server to apply changes to running apps'
-                }
+                  note: 'Restart the dev server to apply changes to running apps',
+                },
               };
             } catch (error) {
               return {
                 success: false,
-                description: error instanceof Error ? error.message : 'Failed to set environment variable'
+                description:
+                  error instanceof Error
+                    ? error.message
+                    : 'Failed to set environment variable',
               };
             }
           },
-          { serviceName: 'TerminalTurtleService' }
+          { serviceName: 'TerminalTurtleService' },
         );
-      }
-    }
+      },
+    },
   };
 };

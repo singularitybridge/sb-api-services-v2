@@ -5,6 +5,7 @@ import {
   getCostSummary,
   getDailyCosts,
 } from '../services/cost-tracking.service';
+import { resolveAssistantIdentifier } from '../services/assistant/assistant-resolver.service';
 
 const costTrackingRouter = express.Router();
 
@@ -118,7 +119,7 @@ costTrackingRouter.get(
 
 /**
  * GET /api/costs/by-assistant/:assistantId
- * Get costs for a specific assistant
+ * Get costs for a specific assistant (supports both ID and name)
  */
 costTrackingRouter.get(
   '/by-assistant/:assistantId',
@@ -132,9 +133,19 @@ costTrackingRouter.get(
         return res.status(400).json({ error: 'Company ID is required' });
       }
 
+      // Use resolver to handle both ID and name
+      const assistant = await resolveAssistantIdentifier(
+        assistantId,
+        companyId,
+      );
+
+      if (!assistant) {
+        return res.status(404).json({ error: 'Assistant not found' });
+      }
+
       const records = await getCostRecords({
         companyId,
-        assistantId,
+        assistantId: assistant._id.toString(),
         startDate: startDate ? new Date(startDate as string) : undefined,
         endDate: endDate ? new Date(endDate as string) : undefined,
         limit: parseInt(limit as string, 10),
@@ -161,6 +172,8 @@ costTrackingRouter.get(
             averageCost: records.length > 0 ? totalCost / records.length : 0,
           },
         },
+        assistantId: assistant._id.toString(),
+        assistantName: assistant.name,
       });
     } catch (error) {
       next(error);

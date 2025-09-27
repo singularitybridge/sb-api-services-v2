@@ -1,7 +1,6 @@
 import { AuthenticatedSocket } from '../../types';
 import { handleSessionMessage } from '../../../assistant/message-handling.service';
 import { getSessionOrCreate } from '../../../session.service';
-import { ChannelType } from '../../../../types/ChannelType';
 import { registerRpcMethod } from '../utils';
 import { getApiKey } from '../../../api.key.service';
 import { publishSessionMessage } from '../../../pusher.service';
@@ -22,7 +21,6 @@ const processSessionMessage = async (
       apiKeyForSession, // Use renamed variable
       userId,
       companyId,
-      ChannelType.WEB,
       'en',
     );
     socket.sessionId = session._id.toString();
@@ -36,11 +34,7 @@ const processSessionMessage = async (
   });
 
   // Process the message and get response
-  const response = await handleSessionMessage(
-    userInput,
-    socket.sessionId!,
-    ChannelType.WEB,
-  );
+  const response = await handleSessionMessage(userInput, socket.sessionId!);
 
   // Notify UI about assistant response
   await publishSessionMessage(socket.sessionId!, 'chat_message', {

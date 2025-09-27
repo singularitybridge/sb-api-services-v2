@@ -2,7 +2,6 @@ import { Session } from '../../models/Session';
 import { Assistant } from '../../models/Assistant';
 import { Message, IMessage } from '../../models/Message'; // Added IMessage
 import { processTemplate } from '../template.service';
-import { ChannelType } from '../../types/ChannelType';
 import { SupportedLanguage } from '../discovery.service'; // Added import
 import mongoose from 'mongoose';
 import { getMessagesBySessionId } from '../../services/message.service';
@@ -151,7 +150,6 @@ type OpenAIImageUrlPart = {
 export const handleSessionMessage = async (
   userInput: string,
   sessionId: string,
-  channel: ChannelType = ChannelType.WEB,
   metadata?: Record<string, string>,
   attachments?: Attachment[],
 ): Promise<
@@ -161,9 +159,7 @@ export const handleSessionMessage = async (
   console.log(
     `[AI_REQUEST_START] Session: ${sessionId} | Input length: ${
       userInput.length
-    } chars | Attachments: ${
-      attachments ? attachments.length : 0
-    } | Channel: ${channel}`,
+    } chars | Attachments: ${attachments ? attachments.length : 0}`,
   );
 
   if (attachments && attachments.length > 0) {
@@ -177,16 +173,16 @@ export const handleSessionMessage = async (
       JSON.stringify(attachmentDetails, null, 2),
     );
   }
-  // console.log(`Handling session message for session ${sessionId} on channel ${channel}`);
+  // console.log(`Handling session message for session ${sessionId}`);
   console.log(`[handleSessionMessage] About to fetch session ${sessionId}`);
   const session = await Session.findById(sessionId);
-  if (!session || !session.active || session.channel !== channel) {
+  if (!session || !session.active) {
     console.error(
       `[handleSessionMessage] Session validation failed for ${sessionId}. Session: ${JSON.stringify(
         session,
-      )}, Channel: ${channel}`,
+      )}`,
     );
-    throw new Error('Invalid or inactive session, or channel mismatch');
+    throw new Error('Invalid or inactive session');
   }
   console.log(
     `[handleSessionMessage] Session ${sessionId} fetched successfully.`,
@@ -705,10 +701,11 @@ export const handleSessionMessage = async (
   );
   const trimStart = Date.now();
 
-  let { trimmedMessages, tokensInPrompt: actualTokensInPrompt } = trimToWindow(
-    messagesForLlm,
-    maxPromptTokens,
-  );
+  const {
+    trimmedMessages: baseTrimmedMessages,
+    tokensInPrompt: actualTokensInPrompt,
+  } = trimToWindow(messagesForLlm, maxPromptTokens);
+  let trimmedMessages = baseTrimmedMessages;
 
   console.log(
     `[TOKEN_WINDOW_COMPLETE] Trimming took ${

@@ -2,7 +2,6 @@ import { Assistant } from '../models/Assistant';
 import { ISession, Session } from '../models/Session';
 import { CustomError, NotFoundError, BadRequestError } from '../utils/errors';
 // OpenAI thread service calls removed as it's deprecated in favor of Vercel AI
-import { ChannelType } from '../types/ChannelType';
 import { getApiKey, ApiKeyType } from './api.key.service';
 import { SupportedLanguage } from './discovery.service';
 import mongoose from 'mongoose'; // Added for ObjectId generation
@@ -51,7 +50,6 @@ export const sessionFriendlyAggreationQuery = [
       companyName: '$companyDetails.name',
       threadId: 1,
       active: 1,
-      channel: 1,
       language: 1,
     },
   },
@@ -103,16 +101,18 @@ export const getSessionById = async (sessionId: string): Promise<ISession> => {
 export const getCurrentSession = async (
   userId: string,
   companyId: string,
-  channel: ChannelType = ChannelType.WEB,
 ): Promise<ISession | null> => {
-  return await Session.findOne({ userId, companyId, channel, active: true });
+  return await Session.findOne({
+    userId,
+    companyId,
+    active: true,
+  });
 };
 
 export const getSessionOrCreate = async (
   apiKey: string,
   userId: string,
   companyId: string,
-  channel: ChannelType = ChannelType.WEB,
   language: string = 'en',
   lastAssistantId?: string, // Added lastAssistantId parameter
 ) => {
@@ -120,7 +120,6 @@ export const getSessionOrCreate = async (
     const session = await Session.findOne({
       userId,
       companyId,
-      channel,
       active: true,
     });
     if (session) {
@@ -135,7 +134,6 @@ export const getSessionOrCreate = async (
     return {
       _id: session._id,
       assistantId: session.assistantId,
-      channel: session.channel,
       language: session.language,
     };
   }
@@ -178,7 +176,6 @@ export const getSessionOrCreate = async (
       assistantId: assistantToUseId, // Use determined assistantId
       active: true,
       threadId, // Use the locally generated threadId
-      channel,
       language,
     });
     console.log(
@@ -208,7 +205,6 @@ export const getSessionOrCreate = async (
   return {
     _id: session._id,
     assistantId: session.assistantId,
-    channel: session.channel,
     language: session.language,
   };
 };
@@ -229,7 +225,7 @@ export const endSession = async (
     await session.save();
 
     console.log(
-      `Session ended locally, sessionId: ${sessionId}, userId: ${session.userId}, channel: ${session.channel}`,
+      `Session ended locally, sessionId: ${sessionId}, userId: ${session.userId}`,
     );
     return true;
   } catch (error: any) {
@@ -243,7 +239,7 @@ export const ensureSessionIndex = async () => {
   try {
     await Session.collection.dropIndexes();
     await Session.collection.createIndex(
-      { companyId: 1, userId: 1, channel: 1 },
+      { companyId: 1, userId: 1 },
       { unique: true, partialFilterExpression: { active: true } },
     );
     console.log('Session index updated successfully');
@@ -269,7 +265,6 @@ export async function getSessionLanguage(
       apiKey,
       userId,
       companyId,
-      ChannelType.WEB,
       'en', // Default language
     );
 

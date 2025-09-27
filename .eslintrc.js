@@ -2,7 +2,7 @@ module.exports = {
     parser: '@typescript-eslint/parser',
     extends: [
         'plugin:@typescript-eslint/recommended',
-        'prettier/@typescript-eslint',
+        'prettier',
         'plugin:prettier/recommended',
     ],
     parserOptions: {
@@ -11,5 +11,7 @@ module.exports = {
     },
     rules: {
         'prettier/prettier': ['error', { singleQuote: true, parser: 'typescript' }],
+        '@typescript-eslint/no-explicit-any': 'off',
+        '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     },
 };

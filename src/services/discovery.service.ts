@@ -23,7 +23,7 @@ export interface ActionInfo {
 interface ActionDefinition {
   description: string;
   parameters?: object;
-  function: Function;
+  function: (...args: unknown[]) => unknown;
 }
 
 export type SupportedLanguage = 'en' | 'he';

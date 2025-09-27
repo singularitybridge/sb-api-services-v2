@@ -7,7 +7,6 @@ import { Session, ISession } from '../../models/Session'; // ISession added
 import { Message } from '../../models/Message'; // Added for Step 5
 import { handleSessionMessage } from '../../services/assistant.service';
 import { getSessionOrCreate } from '../../services/session.service'; // Added
-import { ChannelType } from '../../types/ChannelType';
 import {
   getMessagesBySessionId,
   getMessageById,
@@ -74,7 +73,7 @@ threadRouter.post(
           .json({ error: 'User or Company ID not found in request.' });
       }
 
-      // Assuming ChannelType.WEB for this endpoint. If other channels use this, it might need adjustment.
+      // Using the default web channel for this endpoint. If additional channels are introduced, revisit this logic.
       // The getSessionOrCreate function expects an API key, but it's not directly used for session retrieval logic itself,
       // rather it was a prerequisite for OpenAI calls. Since we are moving away from direct OpenAI calls in session.service for thread creation,
       // and api.key.service.getApiKey is called within session.service.getSessionLanguage,
@@ -94,7 +93,6 @@ threadRouter.post(
         '', // Placeholder for apiKey, as it's not used for session creation/retrieval itself
         userId,
         companyId,
-        ChannelType.WEB, // Defaulting to WEB for this user-input endpoint
       );
 
       if (!sessionData || !sessionData._id) {
@@ -138,7 +136,6 @@ threadRouter.post(
         const result = await handleSessionMessage(
           userInput,
           activeSessionId, // Use the retrieved/created active session ID
-          ChannelType.WEB,
           { 'X-Experimental-Stream': 'true' }, // Inform service that SSE is expected
           attachments, // Pass attachments
         );
@@ -297,8 +294,7 @@ threadRouter.post(
         // JSON Logic (non-streaming) - FIXED: Return standard message format
         const result = await handleSessionMessage(
           userInput,
-          activeSessionId, // Use the retrieved/created active session ID
-          ChannelType.WEB, // No streaming metadata, so it returns a string
+          activeSessionId,
           undefined, // No streaming metadata
           attachments, // Pass attachments
         );

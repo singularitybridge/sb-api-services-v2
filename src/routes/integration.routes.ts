@@ -7,7 +7,6 @@ import {
   getSessionOrCreate,
   getSessionLanguage,
 } from '../services/session.service';
-import { ChannelType } from '../types/ChannelType';
 import { getApiKey, ApiKeyType } from '../services/api.key.service';
 import {
   triggerAction,
@@ -160,7 +159,6 @@ router.post(
         apiKey,
         userId.toString(),
         companyId.toString(),
-        ChannelType.WEB,
       );
 
       if (!session) {
