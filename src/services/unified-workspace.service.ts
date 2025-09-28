@@ -843,9 +843,14 @@ export class UnifiedWorkspaceService {
     sessionId: string,
     path: string,
     content: any,
-    options: { scope: string; agentId?: string } = { scope: 'session' }
+    options: { scope: string; agentId?: string } = { scope: 'session' },
   ): Promise<{ version: number }> {
-    const scopePath = this.buildScopePath(options.scope, sessionId, options.agentId, path);
+    const scopePath = this.buildScopePath(
+      options.scope,
+      sessionId,
+      path,
+      options.agentId,
+    );
 
     // Get existing metadata to track version
     let version = 1;
@@ -863,7 +868,7 @@ export class UnifiedWorkspaceService {
       updatedAt: new Date(),
       scope: options.scope,
       sessionId,
-      agentId: options.agentId
+      agentId: options.agentId,
     });
 
     return { version };
@@ -875,18 +880,18 @@ export class UnifiedWorkspaceService {
   async retrieveContent(
     sessionId: string,
     path: string,
-    agentId?: string
+    agentId?: string,
   ): Promise<{ found: boolean; content?: any; metadata?: any }> {
     // Try agent scope first if agentId provided
     if (agentId) {
-      const agentPath = this.buildScopePath('agent', sessionId, agentId, path);
+      const agentPath = this.buildScopePath('agent', sessionId, path, agentId);
       try {
         const result = await this.workspace.get(agentPath);
         if (result !== undefined && result !== null) {
           return {
             found: true,
             content: result,
-            metadata: { scope: 'agent', agentId }
+            metadata: { scope: 'agent', agentId },
           };
         }
       } catch (error) {
@@ -895,14 +900,19 @@ export class UnifiedWorkspaceService {
     }
 
     // Try session scope
-    const sessionPath = this.buildScopePath('session', sessionId, undefined, path);
+    const sessionPath = this.buildScopePath(
+      'session',
+      sessionId,
+      path,
+      undefined,
+    );
     try {
       const result = await this.workspace.get(sessionPath);
       if (result !== undefined && result !== null) {
         return {
           found: true,
           content: result,
-          metadata: { scope: 'session' }
+          metadata: { scope: 'session' },
         };
       }
     } catch (error) {
@@ -918,16 +928,16 @@ export class UnifiedWorkspaceService {
   async listContent(
     sessionId: string,
     prefix?: string,
-    agentId?: string
+    agentId?: string,
   ): Promise<{ paths: string[]; count: number }> {
     const scope = agentId ? 'agent' : 'session';
-    const basePath = this.buildScopePath(scope, sessionId, agentId, '');
+    const basePath = this.buildScopePath(scope, sessionId, '', agentId);
     const fullPrefix = prefix ? `${basePath}${prefix}` : basePath;
 
     const paths = await this.workspace.list(fullPrefix);
 
     // Strip the base path from results for cleaner output
-    const cleanPaths = paths.map(p => p.replace(basePath, ''));
+    const cleanPaths = paths.map((p) => p.replace(basePath, ''));
 
     return { paths: cleanPaths, count: cleanPaths.length };
   }
@@ -938,10 +948,10 @@ export class UnifiedWorkspaceService {
   async deleteContent(
     sessionId: string,
     path: string,
-    agentId?: string
+    agentId?: string,
   ): Promise<{ deleted: boolean }> {
     const scope = agentId ? 'agent' : 'session';
-    const fullPath = this.buildScopePath(scope, sessionId, agentId, path);
+    const fullPath = this.buildScopePath(scope, sessionId, path, agentId);
 
     const deleted = await this.workspace.delete(fullPath);
     return { deleted };
@@ -953,8 +963,8 @@ export class UnifiedWorkspaceService {
   private buildScopePath(
     scope: string,
     sessionId: string,
+    path: string,
     agentId?: string,
-    path: string
   ): string {
     const cleanPath = path.startsWith('/') ? path.slice(1) : path;
 
