@@ -12,38 +12,64 @@ const isValidObjectId = (id: string): boolean => {
 };
 
 /**
- * Resolve an assistant by either ID or name within a company scope
- * @param identifier - Either a MongoDB ObjectId or assistant name
- * @param companyId - The company ID to scope the search
+ * Resolve an assistant by either ID, name, or URL within a company scope
+ * @param identifier - Either a MongoDB ObjectId, assistant name, or URL-like format
+ * @param companyId - The company ID to scope the search (optional)
  * @returns The assistant if found, null otherwise
  */
 export const resolveAssistantIdentifier = async (
   identifier: string,
-  companyId: string,
+  companyId?: string,
 ): Promise<IAssistant | null> => {
-  if (!identifier || !companyId) {
+  if (!identifier) {
     return null;
   }
 
   // Trim the identifier to handle any whitespace
   const trimmedIdentifier = identifier.trim();
 
-  // If it's a valid ObjectId, try to find by ID first, then fall back to name
-  if (isValidObjectId(trimmedIdentifier)) {
-    // Use $or to check both ID and name in a single query
-    return Assistant.findOne({
-      companyId,
-      $or: [
-        { _id: new mongoose.Types.ObjectId(trimmedIdentifier) },
-        { name: trimmedIdentifier },
-      ],
-    });
+  // Extract name from URL if it looks like a URL (contains '/' or '.')
+  const isUrl =
+    trimmedIdentifier.includes('/') || trimmedIdentifier.includes('.');
+  let searchIdentifier = trimmedIdentifier;
+
+  if (isUrl) {
+    // Extract potential name from URL (e.g., "agents/anat" -> "anat")
+    searchIdentifier =
+      trimmedIdentifier.split('/').pop()?.replace(/[-_]/g, ' ') ||
+      trimmedIdentifier;
   }
 
-  // If it's not an ObjectId, only search by name
+  // Build query based on whether companyId is provided
+  const baseQuery = companyId ? { companyId } : {};
+
+  // If it's a valid ObjectId, try to find by ID first
+  if (isValidObjectId(trimmedIdentifier)) {
+    const byId = await Assistant.findOne({
+      ...baseQuery,
+      _id: new mongoose.Types.ObjectId(trimmedIdentifier),
+    });
+    if (byId) return byId;
+  }
+
+  // Build OR conditions for name matching (exact, case-insensitive, and URL-extracted)
+  const nameConditions = [
+    { name: trimmedIdentifier }, // Exact match
+    { name: new RegExp(`^${trimmedIdentifier}$`, 'i') }, // Case-insensitive exact
+  ];
+
+  // If we extracted a name from URL, also search for that
+  if (isUrl && searchIdentifier !== trimmedIdentifier) {
+    nameConditions.push(
+      { name: searchIdentifier }, // Extracted name exact
+      { name: new RegExp(`^${searchIdentifier}$`, 'i') }, // Extracted name case-insensitive
+    );
+  }
+
+  // Search by name variations
   return Assistant.findOne({
-    companyId,
-    name: trimmedIdentifier,
+    ...baseQuery,
+    $or: nameConditions,
   });
 };
 

@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Manager API Testing | AI Agent Hub</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Shoelace -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/themes/light.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/shoelace-autoloader.js"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Pretty JSON Formatting */
+        .json-container {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            margin: 0;
+        }
+
+        .json-container .json-key {
+            color: #22d3ee;
+        }
+
+        .json-container .json-string {
+            color: #34d399;
+        }
+
+        .json-container .json-number {
+            color: #fbbf24;
+        }
+
+        .json-container .json-boolean {
+            color: #f472b6;
+        }
+
+        .json-container .json-null {
+            color: #94a3b8;
+        }
+
+        * { font-family: 'Inter', sans-serif; }
+        code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff40;
+            border-top-color: #ffffff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50" x-data="fileManagerTestingApp()">
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        <!-- Header -->
+        <header class="mb-12 fade-in">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <div class="flex items-center gap-3 mb-2">
+                        <i data-lucide="folder-open" class="w-8 h-8"></i>
+                        <h1 class="text-3xl font-light">File Manager API Testing</h1>
+                    </div>
+                    <p class="text-slate-600 ml-11">Test file upload, download, and scope-based storage features</p>
+                </div>
+                <sl-badge variant="success" pill>v2.0</sl-badge>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <i data-lucide="settings" class="w-5 h-5 text-slate-600"></i>
+                    <h2 class="font-medium">Configuration</h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">API URL</label>
+                        <input
+                            type="text"
+                            x-model="config.apiUrl"
+                            class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            placeholder="http://localhost:3000"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">JWT Token</label>
+                        <input
+                            type="password"
+                            x-model="config.jwtToken"
+                            class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            placeholder="Your JWT authentication token"
+                        >
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- File Upload Tests -->
+        <section class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <i data-lucide="upload" class="w-6 h-6"></i>
+                <h2 class="text-2xl font-light">File Upload & Management</h2>
+            </div>
+            <div class="ml-9">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Upload File -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="upload-cloud" class="w-5 h-5 text-green-600"></i>
+                            <h3 class="font-medium text-slate-900">Upload File</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">POST /files/upload - Upload a file with scope</p>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Select File</label>
+                                <input
+                                    type="file"
+                                    @change="handleFileSelect($event)"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                >
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Scope</label>
+                                <select
+                                    x-model="tests.uploadFile.scope"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                >
+                                    <option value="temporary">Temporary (10 min)</option>
+                                    <option value="session">Session (24h)</option>
+                                    <option value="agent">Agent (7 days)</option>
+                                    <option value="team">Team (30 days)</option>
+                                    <option value="company">Company (Permanent)</option>
+                                </select>
+                            </div>
+
+                            <div x-show="tests.uploadFile.scope === 'agent' || tests.uploadFile.scope === 'session'">
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Owner ID (optional)</label>
+                                <input
+                                    type="text"
+                                    x-model="tests.uploadFile.ownerId"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    placeholder="Agent ID or Session ID"
+                                >
+                            </div>
+                        </div>
+
+                        <button
+                            @click="testUploadFile()"
+                            :disabled="loading.uploadFile || !tests.uploadFile.file"
+                            class="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.uploadFile" class="spinner"></div>
+                            <i x-show="!loading.uploadFile" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.uploadFile" class="mt-4" x-html="formatJson(responses.uploadFile)">
+                        </div>
+                    </div>
+
+                    <!-- Upload Base64 File -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="file-code" class="w-5 h-5 text-blue-600"></i>
+                            <h3 class="font-medium text-slate-900">Upload Base64 File</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">POST /files/upload/base64 - Upload base64 encoded file</p>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">File Content</label>
+                                <textarea
+                                    x-model="tests.uploadBase64.content"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    rows="3"
+                                    placeholder="Enter text content (will be base64 encoded)"
+                                ></textarea>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Filename</label>
+                                <input
+                                    type="text"
+                                    x-model="tests.uploadBase64.filename"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    placeholder="test.txt"
+                                >
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">MIME Type</label>
+                                <input
+                                    type="text"
+                                    x-model="tests.uploadBase64.mimeType"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    placeholder="text/plain"
+                                >
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Scope</label>
+                                <select
+                                    x-model="tests.uploadBase64.scope"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                >
+                                    <option value="temporary">Temporary (10 min)</option>
+                                    <option value="session">Session (24h)</option>
+                                    <option value="agent">Agent (7 days)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button
+                            @click="testUploadBase64()"
+                            :disabled="loading.uploadBase64"
+                            class="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.uploadBase64" class="spinner"></div>
+                            <i x-show="!loading.uploadBase64" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.uploadBase64" class="mt-4" x-html="formatJson(responses.uploadBase64)">
+                        </div>
+                    </div>
+
+                    <!-- List Files -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="list" class="w-5 h-5 text-purple-600"></i>
+                            <h3 class="font-medium text-slate-900">List Files</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">GET /files/list - List files by scope</p>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Scope</label>
+                                <select
+                                    x-model="tests.listFiles.scope"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                >
+                                    <option value="">All Scopes</option>
+                                    <option value="temporary">Temporary</option>
+                                    <option value="session">Session</option>
+                                    <option value="agent">Agent</option>
+                                    <option value="team">Team</option>
+                                    <option value="company">Company</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Limit</label>
+                                <input
+                                    type="number"
+                                    x-model="tests.listFiles.limit"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    placeholder="100"
+                                    min="1"
+                                >
+                            </div>
+                        </div>
+
+                        <button
+                            @click="testListFiles()"
+                            :disabled="loading.listFiles"
+                            class="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.listFiles" class="spinner"></div>
+                            <i x-show="!loading.listFiles" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.listFiles" class="mt-4" x-html="formatJson(responses.listFiles)">
+                        </div>
+                    </div>
+
+                    <!-- Get File Info -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="info" class="w-5 h-5 text-orange-600"></i>
+                            <h3 class="font-medium text-slate-900">Get File Info</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">GET /files/:id/info - Get file metadata</p>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">File ID</label>
+                            <input
+                                type="text"
+                                x-model="tests.getFileInfo.fileId"
+                                class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                placeholder="Enter file ID"
+                            >
+                        </div>
+
+                        <button
+                            @click="testGetFileInfo()"
+                            :disabled="loading.getFileInfo"
+                            class="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.getFileInfo" class="spinner"></div>
+                            <i x-show="!loading.getFileInfo" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.getFileInfo" class="mt-4" x-html="formatJson(responses.getFileInfo)">
+                        </div>
+                    </div>
+
+                    <!-- Delete File -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="trash-2" class="w-5 h-5 text-red-600"></i>
+                            <h3 class="font-medium text-slate-900">Delete File</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">DELETE /files/:id - Delete a file</p>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">File ID</label>
+                            <input
+                                type="text"
+                                x-model="tests.deleteFile.fileId"
+                                class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                placeholder="Enter file ID to delete"
+                            >
+                        </div>
+
+                        <button
+                            @click="testDeleteFile()"
+                            :disabled="loading.deleteFile"
+                            class="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.deleteFile" class="spinner"></div>
+                            <i x-show="!loading.deleteFile" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.deleteFile" class="mt-4" x-html="formatJson(responses.deleteFile)">
+                        </div>
+                    </div>
+
+                    <!-- Download File -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="download" class="w-5 h-5 text-teal-600"></i>
+                            <h3 class="font-medium text-slate-900">Download File</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">GET /files/:id/download - Download a file</p>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">File ID</label>
+                            <input
+                                type="text"
+                                x-model="tests.downloadFile.fileId"
+                                class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                placeholder="Enter file ID to download"
+                            >
+                        </div>
+
+                        <button
+                            @click="testDownloadFile()"
+                            :disabled="loading.downloadFile"
+                            class="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.downloadFile" class="spinner"></div>
+                            <i x-show="!loading.downloadFile" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.downloadFile" class="mt-4">
+                            <div x-show="responses.downloadFile?.url" class="mb-2">
+                                <a
+                                    :href="responses.downloadFile?.url"
+                                    target="_blank"
+                                    class="text-blue-600 hover:underline text-sm"
+                                >
+                                    Open download URL in new tab
+                                </a>
+                            </div>
+                            <div x-html="formatJson(responses.downloadFile)"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        function fileManagerTestingApp() {
+            return {
+                config: {
+                    apiUrl: 'http://localhost:3000',
+                    jwtToken: localStorage.getItem('jwtToken') || ''
+                },
+
+                tests: {
+                    uploadFile: {
+                        file: null,
+                        scope: 'temporary',
+                        ownerId: ''
+                    },
+                    uploadBase64: {
+                        content: 'Test file content at ' + new Date().toISOString(),
+                        filename: 'test.txt',
+                        mimeType: 'text/plain',
+                        scope: 'temporary'
+                    },
+                    listFiles: {
+                        scope: '',
+                        limit: 100
+                    },
+                    getFileInfo: {
+                        fileId: ''
+                    },
+                    deleteFile: {
+                        fileId: ''
+                    },
+                    downloadFile: {
+                        fileId: ''
+                    }
+                },
+
+                loading: {
+                    uploadFile: false,
+                    uploadBase64: false,
+                    listFiles: false,
+                    getFileInfo: false,
+                    deleteFile: false,
+                    downloadFile: false
+                },
+
+                responses: {
+                    uploadFile: null,
+                    uploadBase64: null,
+                    listFiles: null,
+                    getFileInfo: null,
+                    deleteFile: null,
+                    downloadFile: null
+                },
+
+                init() {
+                    this.$nextTick(() => lucide.createIcons());
+                    // Watch for JWT token changes and save to localStorage
+                    this.$watch('config.jwtToken', (value) => {
+                        if (value) {
+                            localStorage.setItem('jwtToken', value);
+                        }
+                    });
+                },
+
+                handleFileSelect(event) {
+                    this.tests.uploadFile.file = event.target.files[0];
+                },
+
+                async makeRequest(endpoint, options = {}) {
+                    const response = await fetch(`${this.config.apiUrl}${endpoint}`, {
+                        ...options,
+                        headers: {
+                            'Authorization': `Bearer ${this.config.jwtToken}`,
+                            ...options.headers
+                        }
+                    });
+
+                    const contentType = response.headers.get('content-type');
+                    let data;
+
+                    if (contentType && contentType.includes('application/json')) {
+                        data = await response.json();
+                    } else {
+                        data = { message: 'Non-JSON response', contentType };
+                    }
+
+                    return { status: response.status, data };
+                },
+
+                formatJson(response) {
+                    if (!response) return '';
+
+                    const statusClass = response.status >= 200 && response.status < 300 ? 'text-green-400' : 'text-red-400';
+                    const json = JSON.stringify(response.data, null, 2);
+
+                    const formatted = json
+                        .replace(/"([^"]+)":/g, '<span class="json-key">"$1"</span>:')
+                        .replace(/: "([^"]*)"/g, ': <span class="json-string">"$1"</span>')
+                        .replace(/: (\d+)/g, ': <span class="json-number">$1</span>')
+                        .replace(/: (true|false)/g, ': <span class="json-boolean">$1</span>')
+                        .replace(/: null/g, ': <span class="json-null">null</span>');
+
+                    return `
+                        <div class="mb-2 text-sm">
+                            Status: <span class="${statusClass} font-medium">${response.status}</span>
+                        </div>
+                        <pre class="json-container">${formatted}</pre>
+                    `;
+                },
+
+                async testUploadFile() {
+                    if (!this.tests.uploadFile.file) {
+                        alert('Please select a file first');
+                        return;
+                    }
+
+                    this.loading.uploadFile = true;
+                    try {
+                        const formData = new FormData();
+                        formData.append('file', this.tests.uploadFile.file);
+                        formData.append('scope', this.tests.uploadFile.scope);
+                        if (this.tests.uploadFile.ownerId) {
+                            formData.append('ownerId', this.tests.uploadFile.ownerId);
+                        }
+
+                        this.responses.uploadFile = await this.makeRequest('/files/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        // Save file ID for other tests
+                        if (this.responses.uploadFile.data.id) {
+                            this.tests.getFileInfo.fileId = this.responses.uploadFile.data.id;
+                            this.tests.deleteFile.fileId = this.responses.uploadFile.data.id;
+                            this.tests.downloadFile.fileId = this.responses.uploadFile.data.id;
+                        }
+                    } catch (error) {
+                        this.responses.uploadFile = { status: 500, data: { error: error.message } };
+                    } finally {
+                        this.loading.uploadFile = false;
+                    }
+                },
+
+                async testUploadBase64() {
+                    this.loading.uploadBase64 = true;
+                    try {
+                        const base64Content = btoa(this.tests.uploadBase64.content);
+
+                        this.responses.uploadBase64 = await this.makeRequest('/files/upload/base64', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                file: {
+                                    content: base64Content,
+                                    filename: this.tests.uploadBase64.filename,
+                                    mimeType: this.tests.uploadBase64.mimeType
+                                },
+                                scope: this.tests.uploadBase64.scope
+                            })
+                        });
+                    } catch (error) {
+                        this.responses.uploadBase64 = { status: 500, data: { error: error.message } };
+                    } finally {
+                        this.loading.uploadBase64 = false;
+                    }
+                },
+
+                async testListFiles() {
+                    this.loading.listFiles = true;
+                    try {
+                        const params = new URLSearchParams();
+                        if (this.tests.listFiles.scope) params.append('scope', this.tests.listFiles.scope);
+                        if (this.tests.listFiles.limit) params.append('limit', this.tests.listFiles.limit);
+
+                        this.responses.listFiles = await this.makeRequest(`/files/list?${params}`);
+                    } catch (error) {
+                        this.responses.listFiles = { status: 500, data: { error: error.message } };
+                    } finally {
+                        this.loading.listFiles = false;
+                    }
+                },
+
+                async testGetFileInfo() {
+                    this.loading.getFileInfo = true;
+                    try {
+                        this.responses.getFileInfo = await this.makeRequest(`/files/${this.tests.getFileInfo.fileId}/info`);
+                    } catch (error) {
+                        this.responses.getFileInfo = { status: 500, data: { error: error.message } };
+                    } finally {
+                        this.loading.getFileInfo = false;
+                    }
+                },
+
+                async testDeleteFile() {
+                    this.loading.deleteFile = true;
+                    try {
+                        this.responses.deleteFile = await this.makeRequest(`/files/${this.tests.deleteFile.fileId}`, {
+                            method: 'DELETE'
+                        });
+                    } catch (error) {
+                        this.responses.deleteFile = { status: 500, data: { error: error.message } };
+                    } finally {
+                        this.loading.deleteFile = false;
+                    }
+                },
+
+                async testDownloadFile() {
+                    this.loading.downloadFile = true;
+                    try {
+                        const downloadUrl = `${this.config.apiUrl}/files/${this.tests.downloadFile.fileId}/download`;
+                        this.responses.downloadFile = {
+                            status: 200,
+                            data: {
+                                message: 'Download URL generated',
+                                url: downloadUrl
+                            },
+                            url: downloadUrl
+                        };
+                    } catch (error) {
+                        this.responses.downloadFile = { status: 500, data: { error: error.message } };
+                    } finally {
+                        this.loading.downloadFile = false;
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

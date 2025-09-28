@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified Workspace Portal: Implementation Plan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .terminal {
+            background: #0f172a;
+            color: #94a3b8;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .terminal .prompt { color: #22d3ee; }
+        .terminal .comment { color: #475569; }
+        .terminal .success { color: #86efac; }
+
+        .code-block {
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+
+        .code-block .keyword { color: #c084fc; }
+        .code-block .string { color: #86efac; }
+        .code-block .comment { color: #64748b; }
+        .code-block .number { color: #fbbf24; }
+    </style>
+</head>
+<body class="bg-white text-slate-900">
+    <div class="max-w-6xl mx-auto px-6 py-12">
+
+        <!-- Header -->
+        <header class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 1.79 4 4 4h8c2.21 0 4-1.79 4-4V7c0-2.21-1.79-4-4-4H8c-2.21 0-4 1.79-4 4z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11l3 3 3-3"/>
+                </svg>
+                <h1 class="text-4xl font-light">Unified Workspace Portal Improvements</h1>
+            </div>
+            <p class="text-lg text-slate-600 ml-11">Implementation plan for scope-based storage architecture updates</p>
+            <div class="flex gap-2 mt-6 ml-11">
+                <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm">Architecture Update</span>
+                <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm">Storage Simplification</span>
+                <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm">TTL Support</span>
+            </div>
+        </header>
+
+        <!-- Executive Summary -->
+        <section class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <h2 class="text-2xl font-light">Executive Summary</h2>
+            </div>
+            <div class="ml-9 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h3 class="font-medium text-sm mb-2">Storage Architecture Simplified</h3>
+                    <p class="text-sm text-slate-600">All files now stored on disk at /tmp/workspace/ with MongoDB only storing references/metadata. Removed complex size-based routing logic.</p>
+                </div>
+                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h3 class="font-medium text-sm mb-2">Scope-Based Organization</h3>
+                    <p class="text-sm text-slate-600">Files organized by path prefixes: /company/, /session/, /agent/{id}/, /team/{name}/ with intelligent defaults.</p>
+                </div>
+                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h3 class="font-medium text-sm mb-2">TTL Support Added</h3>
+                    <p class="text-sm text-slate-600">Files are permanent by default with optional TTL via metadata parameter, independent of scope.</p>
+                </div>
+                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h3 class="font-medium text-sm mb-2">Portal Modernization</h3>
+                    <p class="text-sm text-slate-600">Update testing portal with scope-based examples, visual indicators, and TTL documentation using Shoelace components.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Requirements -->
+        <section class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <h2 class="text-2xl font-light">Requirements</h2>
+            </div>
+            <div class="ml-9 space-y-4">
+                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h3 class="font-medium text-sm mb-2">User Story 1: Scope-Based Testing</h3>
+                    <p class="text-sm text-slate-600 mb-3">As a developer, I want to test file operations with different scopes so I can understand how the new storage organization works.</p>
+                    <div class="text-xs text-slate-500">
+                        <strong>Acceptance Criteria:</strong>
+                        <ul class="list-disc list-inside mt-1 space-y-1">
+                            <li>Test page includes examples for all five scopes (temporary, session, agent, team, company)</li>
+                            <li>Visual indicators clearly distinguish between different scopes</li>
+                            <li>Default scope selection based on context</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h3 class="font-medium text-sm mb-2">User Story 2: TTL Configuration</h3>
+                    <p class="text-sm text-slate-600 mb-3">As a developer, I want to configure TTL for files independently of scope so I can control file lifecycle precisely.</p>
+                    <div class="text-xs text-slate-500">
+                        <strong>Acceptance Criteria:</strong>
+                        <ul class="list-disc list-inside mt-1 space-y-1">
+                            <li>TTL examples in test interface with common durations</li>
+                            <li>Clear documentation of TTL behavior and defaults</li>
+                            <li>Visual feedback for TTL-enabled vs permanent files</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h3 class="font-medium text-sm mb-2">User Story 3: Updated Documentation</h3>
+                    <p class="text-sm text-slate-600 mb-3">As a developer, I want accurate API documentation that reflects the new storage architecture so I can integrate correctly.</p>
+                    <div class="text-xs text-slate-500">
+                        <strong>Acceptance Criteria:</strong>
+                        <ul class="list-disc list-inside mt-1 space-y-1">
+                            <li>Remove all references to size-based routing (isLargeContent/isBinaryContent)</li>
+                            <li>Update API examples with scope-based paths</li>
+                            <li>Include TTL parameter documentation</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Technical Architecture -->
+        <section class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                </svg>
+                <h2 class="text-2xl font-light">Technical Architecture</h2>
+            </div>
+            <div class="ml-9 space-y-6">
+
+                <!-- Storage Architecture -->
+                <div class="bg-slate-50 rounded-lg border border-slate-200 p-4">
+                    <h3 class="font-medium mb-3">Simplified Storage Architecture</h3>
+                    <div class="terminal p-4 rounded-lg text-sm">
+                        <div class="comment text-xs mb-1"># New unified storage approach</div>
+                        <div class="prompt">ALL files → /tmp/workspace/ (disk storage)</div>
+                        <div class="prompt">MongoDB → references/metadata only</div>
+                        <div class="success text-xs mt-2">→ No more size-based routing complexity</div>
+                    </div>
+                </div>
+
+                <!-- Scope Organization -->
+                <div class="bg-slate-50 rounded-lg border border-slate-200 p-4">
+                    <h3 class="font-medium mb-3">Scope-Based Path Organization</h3>
+                    <div class="code-block p-4 rounded-lg text-sm">
+                        <div class="comment">// Path prefix structure</div>
+                        <div>/company/&lt;companyId&gt;/...      <span class="comment">// Company-wide files</span></div>
+                        <div>/session/&lt;sessionId&gt;/...      <span class="comment">// Session working files</span></div>
+                        <div>/agent/&lt;agentId&gt;/...          <span class="comment">// Agent-specific resources</span></div>
+                        <div>/team/&lt;teamName&gt;/...          <span class="comment">// Team shared resources</span></div>
+                        <div class="mt-2 comment">// Smart defaults:</div>
+                        <div>session level → uses active session</div>
+                        <div>company level → uses current user's company</div>
+                        <div>agent level → provide ID or use current agent</div>
+                    </div>
+                </div>
+
+                <!-- TTL Implementation -->
+                <div class="bg-slate-50 rounded-lg border border-slate-200 p-4">
+                    <h3 class="font-medium mb-3">TTL Support Implementation</h3>
+                    <div class="code-block p-4 rounded-lg text-sm">
+                        <div class="comment">// TTL via metadata parameter</div>
+                        <div>{</div>
+                        <div>  <span class="string">"path"</span>: <span class="string">"/session/abc123/temp.json"</span>,</div>
+                        <div>  <span class="string">"content"</span>: {...},</div>
+                        <div>  <span class="string">"metadata"</span>: {</div>
+                        <div>    <span class="string">"ttl"</span>: <span class="number">3600000</span>  <span class="comment">// 1 hour in ms</span></div>
+                        <div>  }</div>
+                        <div>}</div>
+                        <div class="mt-2 comment">// Default: permanent (no TTL)</div>
+                        <div class="comment">// TTL independent of scope</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- API Specifications -->
+        <section class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                </svg>
+                <h2 class="text-2xl font-light">API Specifications</h2>
+            </div>
+            <div class="ml-9 space-y-4">
+
+                <!-- Updated Store Content -->
+                <div class="bg-slate-50 rounded-lg border border-slate-200 p-4">
+                    <h3 class="font-medium mb-3">Updated Store Content Endpoint</h3>
+                    <div class="terminal p-4 rounded-lg text-sm">
+                        <div class="comment text-xs mb-1"># POST /api/workspace/set</div>
+                        <div class="prompt">curl -X POST /api/workspace/set \</div>
+                        <div class="prompt">  -H "Content-Type: application/json" \</div>
+                        <div class="prompt">  -d '{</div>
+                        <div class="prompt">    "path": "/company/docs/policy.json",</div>
+                        <div class="prompt">    "content": {"version": "2.0"},</div>
+                        <div class="prompt">    "metadata": {"ttl": 86400000}</div>
+                        <div class="prompt">  }'</div>
+                        <div class="success text-xs mt-2">→ Stored at /tmp/workspace/workspace/company/docs/policy.json</div>
+                    </div>
+                </div>
+
+                <!-- Scope-based File Upload -->
+                <div class="bg-slate-50 rounded-lg border border-slate-200 p-4">
+                    <h3 class="font-medium mb-3">Scope-based File Upload</h3>
+                    <div class="terminal p-4 rounded-lg text-sm">
+                        <div class="comment text-xs mb-1"># POST /files/upload</div>
+                        <div class="prompt">curl -X POST /files/upload \</div>
+                        <div class="prompt">  -F "file=@document.pdf" \</div>
+                        <div class="prompt">  -F "scope=team" \</div>
+                        <div class="prompt">  -F "metadata={'teamName':'engineering'}"</div>
+                        <div class="success text-xs mt-2">→ Creates /files/team/abc123.../document.pdf</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Infrastructure & Services -->
+        <section class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                </svg>
+                <h2 class="text-2xl font-light">Infrastructure & Services</h2>
+            </div>
+            <div class="ml-9 space-y-4">
+
+                <!-- Current Service Analysis -->
+                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h3 class="font-medium text-sm mb-2">Unified Workspace Service Status</h3>
+                    <div class="text-sm text-slate-600 space-y-2">
+                        <p><strong>Service Location:</strong> <code class="text-xs bg-white px-2 py-1 rounded">/src/services/unified-workspace.service.ts</code></p>
+                        <p><strong>Current Implementation:</strong> Functional composition with disk + MongoDB architecture</p>
+                        <p><strong>Storage Provider:</strong> Local storage at <code class="text-xs bg-white px-2 py-1 rounded">/tmp/workspace/</code></p>
+                        <p><strong>MongoDB Usage:</strong> References and metadata only (not full content)</p>
+                    </div>
+                </div>
+
+                <!-- Required Changes -->
+                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h3 class="font-medium text-sm mb-2">Required Service Changes</h3>
+                    <div class="text-sm text-slate-600">
+                        <p class="mb-2"><strong>✅ Already Implemented:</strong></p>
+                        <ul class="list-disc list-inside space-y-1 ml-4 text-xs">
+                            <li>Disk-based storage for all files</li>
+                            <li>MongoDB for references/metadata only</li>
+                            <li>TTL support via metadata parameter</li>
+                            <li>Scope-based file organization</li>
+                        </ul>
+                        <p class="mt-3 mb-2"><strong>🔄 Portal Updates Needed:</strong></p>
+                        <ul class="list-disc list-inside space-y-1 ml-4 text-xs">
+                            <li>Update test examples to use new architecture</li>
+                            <li>Remove size-based routing documentation</li>
+                            <li>Add visual scope indicators</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Implementation Timeline -->
+        <section class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <h2 class="text-2xl font-light">Implementation Timeline</h2>
+            </div>
+            <div class="ml-9 space-y-4">
+
+                <!-- Phase 1 -->
+                <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <h3 class="font-medium text-green-900 mb-2">Phase 1: Test Page Updates (1-2 hours)</h3>
+                    <ul class="text-sm text-green-800 space-y-1">
+                        <li>• Update test page with scope-based examples</li>
+                        <li>• Add visual indicators for different scopes (color coding)</li>
+                        <li>• Include TTL configuration options</li>
+                        <li>• Update default test data to use new paths</li>
+                    </ul>
+                </div>
+
+                <!-- Phase 2 -->
+                <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h3 class="font-medium text-blue-900 mb-2">Phase 2: API Documentation Updates (1 hour)</h3>
+                    <ul class="text-sm text-blue-800 space-y-1">
+                        <li>• Remove all size-based routing references</li>
+                        <li>• Update API examples with scope-based paths</li>
+                        <li>• Add TTL parameter documentation</li>
+                        <li>• Update response examples</li>
+                    </ul>
+                </div>
+
+                <!-- Phase 3 -->
+                <div class="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <h3 class="font-medium text-purple-900 mb-2">Phase 3: Enhanced UX Features (1-2 hours)</h3>
+                    <ul class="text-sm text-purple-800 space-y-1">
+                        <li>• Add scope selection dropdowns with descriptions</li>
+                        <li>• Implement TTL presets (1h, 1d, 1w, permanent)</li>
+                        <li>• Add file path validation and suggestions</li>
+                        <li>• Update troubleshooting documentation</li>
+                    </ul>
+                </div>
+
+                <!-- Phase 4 -->
+                <div class="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                    <h3 class="font-medium text-orange-900 mb-2">Phase 4: Testing & Validation (30 minutes)</h3>
+                    <ul class="text-sm text-orange-800 space-y-1">
+                        <li>• Comprehensive testing of all scope types</li>
+                        <li>• Validate TTL functionality</li>
+                        <li>• Cross-browser compatibility check</li>
+                        <li>• Update documentation screenshots</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Testing Strategy -->
+        <section class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <h2 class="text-2xl font-light">Testing Strategy</h2>
+            </div>
+            <div class="ml-9 space-y-4">
+
+                <!-- Scope Testing -->
+                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h3 class="font-medium text-sm mb-2">Scope-Based Testing</h3>
+                    <div class="text-sm text-slate-600 space-y-2">
+                        <p><strong>Test Coverage:</strong></p>
+                        <ul class="list-disc list-inside space-y-1 ml-4 text-xs">
+                            <li>File upload/download for each scope type</li>
+                            <li>Path validation for different scopes</li>
+                            <li>Scope-specific TTL behavior</li>
+                            <li>Permission isolation between scopes</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- TTL Testing -->
+                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h3 class="font-medium text-sm mb-2">TTL Functionality Testing</h3>
+                    <div class="text-sm text-slate-600 space-y-2">
+                        <p><strong>Test Scenarios:</strong></p>
+                        <ul class="list-disc list-inside space-y-1 ml-4 text-xs">
+                            <li>Files with custom TTL values</li>
+                            <li>Files without TTL (permanent)</li>
+                            <li>TTL override behavior</li>
+                            <li>Expiration validation</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Integration Testing -->
+                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h3 class="font-medium text-sm mb-2">Portal Integration Testing</h3>
+                    <div class="text-sm text-slate-600 space-y-2">
+                        <p><strong>Interface Testing:</strong></p>
+                        <ul class="list-disc list-inside space-y-1 ml-4 text-xs">
+                            <li>Shoelace component functionality</li>
+                            <li>Alpine.js state management</li>
+                            <li>Real-time test result updates</li>
+                            <li>Error handling and display</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="border-t border-slate-200 pt-8 text-center text-sm text-slate-500">
+            <p>Unified Workspace Portal Implementation Plan • Generated January 2025</p>
+            <p class="mt-2">Version 3.1.0 - Scope-Based Storage Architecture</p>
+        </footer>
+    </div>
+</body>
+</html>

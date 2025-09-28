@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified Workspace Integration Tester</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Shoelace -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/themes/light.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/shoelace-autoloader.js"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Monaco Editor for JSON -->
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .spinner {
+            border: 2px solid #f3f4f6;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .response-panel {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .json-editor {
+            height: 200px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            transition: all 0.2s;
+        }
+
+        .section-card:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-success { background-color: #10b981; }
+        .status-error { background-color: #ef4444; }
+        .status-pending { background-color: #f59e0b; }
+
+        .method-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .method-post { background-color: #059669; }
+        .method-get { background-color: #3b82f6; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900" x-data="integrationTestApp()">
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-6 py-8">
+            <div class="flex items-center gap-3 mb-4">
+                <i data-lucide="zap" class="w-8 h-8"></i>
+                <h1 class="text-4xl font-light">Unified Workspace Integration Tester</h1>
+            </div>
+            <p class="text-lg text-slate-600 ml-11">Test direct integration triggers and assistant execute endpoints with unified workspace actions</p>
+            <div class="flex gap-2 mt-6 ml-11">
+                <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm">Integration Testing</span>
+                <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">Agent Hub</span>
+                <span class="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm">Workspace API</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        <!-- Configuration Section -->
+        <section id="config" class="fade-in">
+            <div class="section-card p-6">
+                <div class="flex items-center gap-3 mb-6">
+                    <i data-lucide="settings" class="w-6 h-6"></i>
+                    <h2 class="text-2xl font-light">Configuration</h2>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Base URL</label>
+                        <input
+                            type="text"
+                            x-model="config.baseUrl"
+                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            placeholder="http://localhost:3000"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Auth Token</label>
+                        <input
+                            type="password"
+                            x-model="config.authToken"
+                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 mono"
+                            placeholder="Bearer token"
+                        >
+                    </div>
+                    <div class="flex items-end">
+                        <button
+                            @click="testConnection()"
+                            class="w-full px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
+                            :disabled="loading"
+                        >
+                            <div x-show="loading" class="flex items-center justify-center gap-2">
+                                <div class="spinner"></div>
+                                <span>Testing...</span>
+                            </div>
+                            <div x-show="!loading" class="flex items-center justify-center gap-2">
+                                <i data-lucide="wifi" class="w-4 h-4"></i>
+                                <span>Test Connection</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Integration Testing Modes -->
+        <section class="fade-in">
+            <div class="section-card p-6">
+                <div class="flex items-center gap-3 mb-4">
+                    <i data-lucide="info" class="w-6 h-6 text-blue-600"></i>
+                    <h3 class="text-lg font-medium text-slate-900">Testing Methods</h3>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 text-sm">
+                    <div>
+                        <h4 class="font-medium text-slate-900 mb-3">Direct Integration Trigger</h4>
+                        <ul class="space-y-2 text-slate-600">
+                            <li class="flex items-center gap-2">
+                                <span class="method-badge method-post">POST</span>
+                                <code class="mono bg-slate-100 px-2 py-1 rounded">/integrations/actions/unified_workspace/{action}</code>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                                Calls integration actions directly
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <i data-lucide="database" class="w-4 h-4"></i>
+                                Requires session creation and context
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-medium text-slate-900 mb-3">Assistant Execute</h4>
+                        <ul class="space-y-2 text-slate-600">
+                            <li class="flex items-center gap-2">
+                                <span class="method-badge method-post">POST</span>
+                                <code class="mono bg-slate-100 px-2 py-1 rounded">/assistant/{agentId}/execute</code>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                                Uses agent prompt with workspace actions
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <i data-lucide="brain" class="w-4 h-4"></i>
+                                JSON response format with prompt override
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Direct Integration Trigger Section -->
+        <section id="integration-trigger" class="fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="section-card p-6">
+                    <div class="flex items-center gap-3 mb-6">
+                        <i data-lucide="zap" class="w-6 h-6"></i>
+                        <h2 class="text-2xl font-light">Direct Integration Trigger</h2>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Workspace Action</label>
+                            <select x-model="triggerForm.action" @change="updateParametersForAction()" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500">
+                                <option value="storeContent">Store Content</option>
+                                <option value="retrieveContent">Retrieve Content</option>
+                                <option value="listContent">List Content</option>
+                                <option value="deleteContent">Delete Content</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Action Parameters (JSON)</label>
+                            <div id="triggerJsonEditor" class="json-editor"></div>
+                        </div>
+
+                        <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div class="flex items-center gap-2 text-blue-800 mb-2">
+                                <i data-lucide="info" class="w-4 h-4"></i>
+                                <span class="text-sm font-medium">Endpoint</span>
+                            </div>
+                            <p class="text-sm text-blue-700 mono">
+                                POST /integrations/actions/unified_workspace/<span x-text="triggerForm.action"></span>
+                            </p>
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button
+                                @click="triggerIntegration()"
+                                class="flex-1 px-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors font-medium"
+                                :disabled="loading"
+                            >
+                                <div x-show="loading" class="flex items-center justify-center gap-2">
+                                    <div class="spinner"></div>
+                                    <span>Triggering...</span>
+                                </div>
+                                <div x-show="!loading" class="flex items-center justify-center gap-2">
+                                    <i data-lucide="play" class="w-4 h-4"></i>
+                                    <span>Trigger Integration</span>
+                                </div>
+                            </button>
+                            <button
+                                @click="copyCurlCommand('trigger')"
+                                class="px-4 py-3 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
+                                title="Copy curl command"
+                            >
+                                <i data-lucide="copy" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-card p-6">
+                    <div class="flex items-center gap-3 mb-6">
+                        <i data-lucide="terminal" class="w-6 h-6"></i>
+                        <h3 class="text-xl font-light">Integration Response</h3>
+                    </div>
+                    <div class="response-panel">
+                        <div x-show="!lastResponse.trigger" class="text-center py-12">
+                            <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 text-slate-400"></i>
+                            <p class="text-slate-500">No integration triggered yet.</p>
+                        </div>
+                        <div x-show="lastResponse.trigger" class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <span class="font-medium text-slate-700">Response Time:</span>
+                                    <span x-text="lastResponse.trigger?.responseTime + 'ms'" class="mono font-medium"></span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <span class="font-medium text-slate-700">Status:</span>
+                                    <span :class="lastResponse.trigger?.success ? 'text-green-600' : 'text-red-600'" class="font-medium">
+                                        <span class="status-indicator" :class="lastResponse.trigger?.success ? 'status-success' : 'status-error'"></span>
+                                        <span x-text="lastResponse.trigger?.success ? 'Success' : 'Error'"></span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Response Data:</label>
+                                <div class="p-4 bg-slate-50 border rounded-lg max-h-64 overflow-y-auto">
+                                    <pre class="text-xs mono whitespace-pre-wrap break-words" x-text="JSON.stringify(lastResponse.trigger?.data, null, 2)"></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Assistant Execute Section -->
+        <section id="assistant-execute" class="fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="section-card p-6">
+                    <div class="flex items-center gap-3 mb-6">
+                        <i data-lucide="brain" class="w-6 h-6"></i>
+                        <h2 class="text-2xl font-light">Assistant Execute</h2>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Agent Identifier</label>
+                            <input
+                                type="text"
+                                x-model="executeForm.agentId"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg mono focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                placeholder="workspace-agent or agent ID or URL"
+                                list="agent-suggestions"
+                            >
+                            <datalist id="agent-suggestions">
+                                <option value="workspace-agent" />
+                                <option value="unified-workspace" />
+                                <option value="https://sb.ai/agent/workspace-agent" />
+                            </datalist>
+                            <p class="text-xs text-slate-600 mt-1">Can be agent name, ID, or URL</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">User Input</label>
+                            <textarea
+                                x-model="executeForm.userInput"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                rows="4"
+                                placeholder="Store this content in agent scope at path 'test/example.json': {'test': 'data'}"
+                            ></textarea>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Response Format</label>
+                                <select x-model="executeForm.responseFormat" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500">
+                                    <option value="">Default</option>
+                                    <option value="json">JSON</option>
+                                    <option value="text">Text</option>
+                                </select>
+                            </div>
+                            <div class="flex items-end">
+                                <label class="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        x-model="executeForm.usePromptOverride"
+                                        class="w-4 h-4 text-slate-600 border-slate-300 rounded focus:ring-slate-500"
+                                    >
+                                    <span class="text-sm text-slate-700">Use Prompt Override</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div x-show="executeForm.usePromptOverride">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Prompt Override</label>
+                            <textarea
+                                x-model="executeForm.promptOverride"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 mono text-sm"
+                                rows="6"
+                                placeholder="You are a workspace management agent. Execute the user's request and return JSON with the result."
+                            ></textarea>
+                        </div>
+
+                        <div class="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                            <div class="flex items-center gap-2 text-purple-800 mb-2">
+                                <i data-lucide="info" class="w-4 h-4"></i>
+                                <span class="text-sm font-medium">Endpoint</span>
+                            </div>
+                            <p class="text-sm text-purple-700 mono">
+                                POST /assistant/<span x-text="executeForm.agentId || '{agentId}'"></span>/execute
+                            </p>
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button
+                                @click="executeAssistant()"
+                                class="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+                                :disabled="loading"
+                            >
+                                <div x-show="loading" class="flex items-center justify-center gap-2">
+                                    <div class="spinner"></div>
+                                    <span>Executing...</span>
+                                </div>
+                                <div x-show="!loading" class="flex items-center justify-center gap-2">
+                                    <i data-lucide="send" class="w-4 h-4"></i>
+                                    <span>Execute Assistant</span>
+                                </div>
+                            </button>
+                            <button
+                                @click="copyCurlCommand('execute')"
+                                class="px-4 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+                                title="Copy curl command"
+                            >
+                                <i data-lucide="copy" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-card p-6">
+                    <div class="flex items-center gap-3 mb-6">
+                        <i data-lucide="message-circle" class="w-6 h-6"></i>
+                        <h3 class="text-xl font-light">Assistant Response</h3>
+                    </div>
+                    <div class="response-panel">
+                        <div x-show="!lastResponse.execute" class="text-center py-12">
+                            <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 text-slate-400"></i>
+                            <p class="text-slate-500">No assistant executed yet.</p>
+                        </div>
+                        <div x-show="lastResponse.execute" class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <span class="font-medium text-slate-700">Response Time:</span>
+                                    <span x-text="lastResponse.execute?.responseTime + 'ms'" class="mono font-medium"></span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <span class="font-medium text-slate-700">Status:</span>
+                                    <span :class="lastResponse.execute?.success ? 'text-green-600' : 'text-red-600'" class="font-medium">
+                                        <span class="status-indicator" :class="lastResponse.execute?.success ? 'status-success' : 'status-error'"></span>
+                                        <span x-text="lastResponse.execute?.success ? 'Success' : 'Error'"></span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div x-show="lastResponse.execute?.success">
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Assistant Message:</label>
+                                <div class="p-4 bg-slate-50 border rounded-lg max-h-96 overflow-y-auto">
+                                    <pre class="text-xs mono whitespace-pre-wrap break-words" x-text="formatAssistantResponse(lastResponse.execute?.data)"></pre>
+                                </div>
+                            </div>
+                            <div x-show="!lastResponse.execute?.success">
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Error Details:</label>
+                                <div class="p-4 bg-red-50 border border-red-200 rounded-lg max-h-96 overflow-y-auto">
+                                    <pre class="text-xs mono whitespace-pre-wrap break-words" x-text="JSON.stringify(lastResponse.execute?.data, null, 2)"></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Toast Notifications -->
+    <div x-show="showToast"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 transform translate-y-2"
+         x-transition:enter-end="opacity-100 transform translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 transform translate-y-0"
+         x-transition:leave-end="opacity-0 transform translate-y-2"
+         class="fixed bottom-4 right-4 z-50">
+        <div :class="['p-4 rounded-lg shadow-lg', toastType === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white']">
+            <div class="flex items-center gap-2">
+                <i :data-lucide="toastType === 'success' ? 'check-circle' : 'x-circle'" class="w-5 h-5"></i>
+                <span x-text="toastMessage"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let triggerJsonEditor = null;
+
+        function integrationTestApp() {
+            return {
+                // Configuration
+                config: {
+                    baseUrl: 'http://localhost:3000',
+                    authToken: 'sk_live_e69dfeb21e6eb4c5b2d17e92b0ff0a4dad6170ee65ae1762c1c39459d8162964'
+                },
+
+                // UI State
+                loading: false,
+                showToast: false,
+                toastMessage: '',
+                toastType: 'success',
+
+                // Forms
+                triggerForm: {
+                    action: 'storeContent',
+                    parameters: {
+                        path: 'test/example.json',
+                        content: { test: 'data', timestamp: new Date().toISOString() },
+                        scope: 'agent',
+                        agentId: 'workspace-agent'
+                    }
+                },
+
+                executeForm: {
+                    agentId: 'workspace-agent',
+                    userInput: 'Store this content in agent scope at path "test/example.json": {"test": "data", "timestamp": "' + new Date().toISOString() + '"}',
+                    responseFormat: 'json',
+                    usePromptOverride: false,
+                    promptOverride: 'You are a workspace management agent. Execute the user\'s request using available workspace actions and return a structured JSON response with the operation result.'
+                },
+
+                // Responses
+                lastResponse: {
+                    trigger: null,
+                    execute: null
+                },
+
+                // Initialize
+                init() {
+                    this.$nextTick(() => {
+                        lucide.createIcons();
+                        this.initMonacoEditors();
+                    });
+                },
+
+                // Update parameters based on action selection
+                updateParametersForAction() {
+                    const timestamp = new Date().toISOString();
+                    const randomId = Math.random().toString(36).substring(7);
+
+                    switch(this.triggerForm.action) {
+                        case 'storeContent':
+                            this.triggerForm.parameters = {
+                                path: `test/example-${randomId}.json`,
+                                content: {
+                                    test: 'data',
+                                    timestamp: timestamp,
+                                    id: randomId
+                                },
+                                scope: 'agent',
+                                agentId: 'workspace-agent'
+                            };
+                            break;
+                        case 'retrieveContent':
+                            this.triggerForm.parameters = {
+                                path: 'test/example.json',
+                                scope: 'agent',
+                                agentId: 'workspace-agent'
+                            };
+                            break;
+                        case 'listContent':
+                            this.triggerForm.parameters = {
+                                scope: 'agent',
+                                agentId: 'workspace-agent',
+                                prefix: 'test/'
+                            };
+                            break;
+                        case 'deleteContent':
+                            this.triggerForm.parameters = {
+                                path: 'test/example.json',
+                                scope: 'agent',
+                                agentId: 'workspace-agent'
+                            };
+                            break;
+                    }
+                    if (triggerJsonEditor) {
+                        triggerJsonEditor.setValue(JSON.stringify(this.triggerForm.parameters, null, 2));
+                    }
+                },
+
+                // Initialize Monaco Editors
+                initMonacoEditors() {
+                    require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+                    require(['vs/editor/editor.main'], () => {
+                        // Trigger JSON Editor
+                        if (document.getElementById('triggerJsonEditor')) {
+                            triggerJsonEditor = monaco.editor.create(document.getElementById('triggerJsonEditor'), {
+                                value: JSON.stringify(this.triggerForm.parameters, null, 2),
+                                language: 'json',
+                                theme: 'vs',
+                                minimap: { enabled: false },
+                                fontSize: 12,
+                                lineNumbers: 'on',
+                                automaticLayout: true
+                            });
+
+                            triggerJsonEditor.onDidChangeModelContent(() => {
+                                try {
+                                    this.triggerForm.parameters = JSON.parse(triggerJsonEditor.getValue());
+                                } catch (e) {
+                                    // Invalid JSON, ignore
+                                }
+                            });
+                        }
+                    });
+                },
+
+                // Test connection
+                async testConnection() {
+                    this.loading = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const response = await fetch(`${this.config.baseUrl}/api/workspace/info`, {
+                            headers: {
+                                'Authorization': `Bearer ${this.config.authToken}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+
+                        const responseTime = Date.now() - startTime;
+
+                        if (response.ok) {
+                            this.showToastMessage('Connection successful! (' + responseTime + 'ms)', 'success');
+                        } else {
+                            this.showToastMessage('Connection failed: ' + response.status, 'error');
+                        }
+                    } catch (error) {
+                        this.showToastMessage('Connection failed: ' + error.message, 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                // Trigger integration action
+                async triggerIntegration() {
+                    this.loading = true;
+                    const startTime = Date.now();
+
+                    try {
+                        let parameters = this.triggerForm.parameters;
+
+                        // Get parameters from Monaco editor if available
+                        if (triggerJsonEditor) {
+                            parameters = JSON.parse(triggerJsonEditor.getValue());
+                        }
+
+                        const response = await fetch(`${this.config.baseUrl}/integrations/actions/unified_workspace/${this.triggerForm.action}`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${this.config.authToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ data: parameters })
+                        });
+
+                        const data = await response.json();
+                        const responseTime = Date.now() - startTime;
+
+                        this.lastResponse.trigger = {
+                            success: response.ok,
+                            data: data,
+                            responseTime: responseTime
+                        };
+
+                        if (response.ok) {
+                            this.showToastMessage('Integration triggered successfully!', 'success');
+                        } else {
+                            this.showToastMessage('Integration trigger failed', 'error');
+                        }
+
+                    } catch (error) {
+                        const responseTime = Date.now() - startTime;
+                        this.lastResponse.trigger = {
+                            success: false,
+                            data: { error: error.message },
+                            responseTime: responseTime
+                        };
+                        this.showToastMessage('Error: ' + error.message, 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                // Execute assistant
+                async executeAssistant() {
+                    this.loading = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const payload = {
+                            userInput: this.executeForm.userInput,
+                            ...(this.executeForm.responseFormat && { responseFormat: this.executeForm.responseFormat }),
+                            ...(this.executeForm.usePromptOverride && { promptOverride: this.executeForm.promptOverride })
+                        };
+
+                        const response = await fetch(`${this.config.baseUrl}/assistant/${this.executeForm.agentId}/execute`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${this.config.authToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(payload)
+                        });
+
+                        const data = await response.json();
+                        const responseTime = Date.now() - startTime;
+
+                        this.lastResponse.execute = {
+                            success: response.ok,
+                            data: data,
+                            responseTime: responseTime
+                        };
+
+                        if (response.ok) {
+                            this.showToastMessage('Assistant executed successfully!', 'success');
+                        } else {
+                            this.showToastMessage('Assistant execution failed', 'error');
+                        }
+
+                    } catch (error) {
+                        const responseTime = Date.now() - startTime;
+                        this.lastResponse.execute = {
+                            success: false,
+                            data: { error: error.message },
+                            responseTime: responseTime
+                        };
+                        this.showToastMessage('Error: ' + error.message, 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                // Copy curl command to clipboard
+                async copyCurlCommand(type = 'trigger') {
+                    let curlCommand = '';
+
+                    if (type === 'trigger') {
+                        const parameters = triggerJsonEditor ? JSON.parse(triggerJsonEditor.getValue()) : this.triggerForm.parameters;
+                        curlCommand = `curl -X POST '${this.config.baseUrl}/integrations/actions/unified_workspace/${this.triggerForm.action}' \\
+  -H 'Authorization: Bearer ${this.config.authToken}' \\
+  -H 'Content-Type: application/json' \\
+  -d '${JSON.stringify({ data: parameters })}'`;
+                    } else if (type === 'execute') {
+                        const payload = {
+                            userInput: this.executeForm.userInput,
+                            ...(this.executeForm.responseFormat && { responseFormat: this.executeForm.responseFormat }),
+                            ...(this.executeForm.usePromptOverride && { promptOverride: this.executeForm.promptOverride })
+                        };
+                        curlCommand = `curl -X POST '${this.config.baseUrl}/assistant/${this.executeForm.agentId}/execute' \\
+  -H 'Authorization: Bearer ${this.config.authToken}' \\
+  -H 'Content-Type: application/json' \\
+  -d '${JSON.stringify(payload)}'`;
+                    }
+
+                    try {
+                        await navigator.clipboard.writeText(curlCommand);
+                        this.showToastMessage('Curl command copied to clipboard!', 'success');
+                    } catch (err) {
+                        console.error('Failed to copy:', err);
+                        this.showToastMessage('Failed to copy to clipboard', 'error');
+                    }
+                },
+
+                // Utility functions
+                isJsonContent(content) {
+                    try {
+                        JSON.parse(content);
+                        return true;
+                    } catch {
+                        return false;
+                    }
+                },
+
+                formatJsonContent(content) {
+                    try {
+                        return JSON.stringify(JSON.parse(content), null, 2);
+                    } catch {
+                        return content;
+                    }
+                },
+
+                formatAssistantResponse(data) {
+                    if (!data) return 'No data';
+
+                    // Handle content array from assistant response
+                    if (data.content && Array.isArray(data.content)) {
+                        const textContent = data.content
+                            .filter(item => item.type === 'text')
+                            .map(item => item.text?.value || item.text)
+                            .join('\n');
+
+                        // Try to parse as JSON if it looks like JSON
+                        try {
+                            const parsed = JSON.parse(textContent);
+                            return JSON.stringify(parsed, null, 2);
+                        } catch {
+                            return textContent;
+                        }
+                    }
+
+                    // Handle plain content
+                    if (typeof data.content === 'string') {
+                        try {
+                            const parsed = JSON.parse(data.content);
+                            return JSON.stringify(parsed, null, 2);
+                        } catch {
+                            return data.content;
+                        }
+                    }
+
+                    // Fallback to showing the entire data object
+                    return JSON.stringify(data, null, 2);
+                },
+
+                // Toast notifications
+                showToastMessage(message, type = 'success') {
+                    this.toastMessage = message;
+                    this.toastType = type;
+                    this.showToast = true;
+
+                    setTimeout(() => {
+                        this.showToast = false;
+                    }, 3000);
+
+                    this.$nextTick(() => lucide.createIcons());
+                }
+            }
+        }
+    </script>
+</body>
+</html>

@@ -23,3 +23,9 @@ scripts/
 
 sb-api-services-404915-fc80ec518eae.json
 .aider*
+
+# Workspace persistent storage
+.workspace-data/
+*.db
+*.db-shm
+*.db-wal

@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Management Testing | AI Agent Hub</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Shoelace -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/themes/light.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/shoelace-autoloader.js"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Modal Styles */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9998;
+        }
+
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            z-index: 9999;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        /* Toast Notification Styles */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+
+        .toast {
+            min-width: 300px;
+            margin-bottom: 10px;
+            padding: 16px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .toast.success {
+            border-left: 4px solid #10b981;
+        }
+
+        .toast.error {
+            border-left: 4px solid #ef4444;
+        }
+
+        .toast.info {
+            border-left: 4px solid #3b82f6;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        .toast.removing {
+            animation: slideOut 0.3s ease-out;
+        }
+
+        /* Pretty JSON Formatting */
+        .json-container {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            margin: 0;
+        }
+
+        .json-container .json-line {
+            padding-left: calc(var(--indent, 0) * 20px);
+        }
+
+        .json-container .json-key {
+            color: #22d3ee;
+        }
+
+        .json-container .json-string {
+            color: #34d399;
+        }
+
+        .json-container .json-number {
+            color: #fbbf24;
+        }
+
+        .json-container .json-boolean {
+            color: #f472b6;
+        }
+
+        .json-container .json-null {
+            color: #94a3b8;
+        }
+
+        .json-container .json-brace {
+            color: #cbd5e1;
+        }
+
+        * { font-family: 'Inter', sans-serif; }
+        code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .spinner {
+            border: 2px solid #f3f4f6;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .terminal {
+            background: #0f172a;
+            color: #e2e8f0;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .json-key { color: #22d3ee; }
+        .json-string { color: #34d399; }
+        .json-number { color: #fbbf24; }
+        .json-boolean { color: #f472b6; }
+        .json-null { color: #94a3b8; }
+    </style>
+</head>
+<body class="bg-white text-slate-900" x-data="sessionTester()">
+    <!-- Configuration Modal -->
+    <div x-show="showConfigModal" x-cloak class="modal-backdrop" @click="showConfigModal = false">
+        <div class="modal" @click.stop>
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-medium">Configuration Settings</h3>
+                    <button @click="showConfigModal = false" class="text-slate-400 hover:text-slate-600">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">API Base URL</label>
+                        <input
+                            type="text"
+                            x-model="config.apiUrl"
+                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            placeholder="http://localhost:3000"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">JWT Token</label>
+                        <input
+                            type="password"
+                            x-model="config.jwtToken"
+                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            placeholder="Enter JWT token"
+                        >
+                    </div>
+                    <button
+                        @click="testConnection()"
+                        :disabled="loading.connection"
+                        class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                    >
+                        <div x-show="loading.connection" class="spinner"></div>
+                        <i x-show="!loading.connection" data-lucide="wifi" class="w-4 h-4"></i>
+                        Test Connection
+                    </button>
+                    <button
+                        @click="showConfigModal = false; showToast('Settings Saved', 'Configuration has been updated', 'success')"
+                        class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                        Save Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" x-show="toasts.length > 0">
+        <template x-for="toast in toasts" :key="toast.id">
+            <div :class="`toast ${toast.type} ${toast.removing ? 'removing' : ''}`">
+                <i :data-lucide="toast.icon" class="w-5 h-5"></i>
+                <div class="flex-1">
+                    <div class="font-medium" x-text="toast.title"></div>
+                    <div class="text-sm text-slate-600 mt-1" x-text="toast.message" x-show="toast.message"></div>
+                </div>
+                <button @click="removeToast(toast.id)" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </template>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-6 py-12">
+        <!-- Header -->
+        <header class="mb-16 fade-in">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="flex items-center gap-3 mb-4">
+                        <i data-lucide="settings-2" class="w-8 h-8"></i>
+                        <h1 class="text-4xl font-light">Session Management Testing</h1>
+                    </div>
+                    <p class="text-lg text-slate-600 ml-11">Comprehensive testing interface for AI Agent Hub session operations</p>
+                    <div class="flex gap-2 mt-6 ml-11">
+                        <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm">API Testing</span>
+                        <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm">Session Management</span>
+                        <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm">Real-time</span>
+                    </div>
+                </div>
+                <div class="flex flex-col items-end gap-2">
+                    <div class="text-sm text-slate-600">
+                        <span class="font-medium">API:</span> <span x-text="config.apiUrl" class="font-mono"></span>
+                    </div>
+                    <button
+                        @click="showConfigModal = true"
+                        class="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
+                    >
+                        <i data-lucide="settings" class="w-4 h-4"></i>
+                        Configuration
+                    </button>
+                </div>
+            </div>
+        </header>
+
+
+        <!-- Test Results Summary -->
+        <section class="mb-16 fade-in" x-show="testResults.length > 0">
+            <div class="flex items-center gap-3 mb-6">
+                <i data-lucide="bar-chart-3" class="w-6 h-6"></i>
+                <h2 class="text-2xl font-light">Test Results Summary</h2>
+            </div>
+            <div class="ml-9">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="check-circle" class="w-5 h-5 text-green-600"></i>
+                            <span class="font-medium text-green-900">Passed</span>
+                        </div>
+                        <div class="text-2xl font-light text-green-900 mt-2" x-text="testResults.filter(t => t.success).length"></div>
+                    </div>
+                    <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="x-circle" class="w-5 h-5 text-red-600"></i>
+                            <span class="font-medium text-red-900">Failed</span>
+                        </div>
+                        <div class="text-2xl font-light text-red-900 mt-2" x-text="testResults.filter(t => !t.success).length"></div>
+                    </div>
+                    <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="clock" class="w-5 h-5 text-slate-600"></i>
+                            <span class="font-medium text-slate-900">Total</span>
+                        </div>
+                        <div class="text-2xl font-light text-slate-900 mt-2" x-text="testResults.length"></div>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <template x-for="result in testResults" :key="result.timestamp">
+                        <div class="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg">
+                            <i :data-lucide="result.success ? 'check-circle' : 'x-circle'"
+                               :class="result.success ? 'w-4 h-4 text-green-600' : 'w-4 h-4 text-red-600'"></i>
+                            <span class="font-medium" x-text="result.test"></span>
+                            <span class="text-sm text-slate-600" x-text="result.duration + 'ms'"></span>
+                            <span class="text-xs text-slate-500 ml-auto" x-text="new Date(result.timestamp).toLocaleTimeString()"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </section>
+
+        <!-- Batch Test Runner -->
+        <section class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <i data-lucide="play-circle" class="w-6 h-6"></i>
+                <h2 class="text-2xl font-light">Batch Test Runner</h2>
+            </div>
+            <div class="ml-9">
+                <div class="p-6 bg-slate-50 rounded-lg border border-slate-200">
+                    <p class="text-sm text-slate-600 mb-4">Run all session management tests automatically</p>
+                    <button
+                        @click="runBatchTests()"
+                        :disabled="loading.batch"
+                        class="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    >
+                        <div x-show="loading.batch" class="spinner"></div>
+                        <i x-show="!loading.batch" data-lucide="play" class="w-4 h-4"></i>
+                        Run All Tests
+                    </button>
+                    <div x-show="loading.batch" class="mt-4 text-sm text-slate-600">
+                        <span x-text="batchProgress.current"></span> of <span x-text="batchProgress.total"></span> tests completed...
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Session Tests -->
+        <section class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <i data-lucide="user" class="w-6 h-6"></i>
+                <h2 class="text-2xl font-light">Session Operations</h2>
+            </div>
+            <div class="ml-9">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Create/Retrieve Session -->
+                    <div class="space-y-6">
+                        <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                            <div class="flex items-center gap-2 mb-4">
+                                <i data-lucide="plus-circle" class="w-5 h-5 text-blue-600"></i>
+                                <h3 class="font-medium text-slate-900">Create/Retrieve Session</h3>
+                            </div>
+                            <p class="text-sm text-slate-600 mb-4">POST /session - Creates new session or retrieves existing one</p>
+
+                            <div class="space-y-3 mb-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Assistant ID (optional)</label>
+                                    <input
+                                        type="text"
+                                        x-model="tests.createSession.assistantId"
+                                        class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                        placeholder="Leave empty for no assistant"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Language (optional)</label>
+                                    <select
+                                        x-model="tests.createSession.language"
+                                        class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    >
+                                        <option value="">Default (en)</option>
+                                        <option value="en">English</option>
+                                        <option value="he">Hebrew</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button
+                                @click="testCreateSession()"
+                                :disabled="loading.createSession"
+                                class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm"
+                            >
+                                <div x-show="loading.createSession" class="spinner"></div>
+                                <i x-show="!loading.createSession" data-lucide="send" class="w-4 h-4"></i>
+                                Execute Test
+                            </button>
+
+                            <div x-show="responses.createSession" class="mt-4" x-html="formatJson(responses.createSession)">
+                            </div>
+                        </div>
+
+                        <!-- Clear Session -->
+                        <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                            <div class="flex items-center gap-2 mb-4">
+                                <i data-lucide="trash-2" class="w-5 h-5 text-red-600"></i>
+                                <h3 class="font-medium text-slate-900">Clear Session</h3>
+                            </div>
+                            <p class="text-sm text-slate-600 mb-4">POST /session/clear - Clears all messages from current session</p>
+
+                            <button
+                                @click="testClearSession()"
+                                :disabled="loading.clearSession"
+                                class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 transition-colors text-sm"
+                            >
+                                <div x-show="loading.clearSession" class="spinner"></div>
+                                <i x-show="!loading.clearSession" data-lucide="send" class="w-4 h-4"></i>
+                                Execute Test
+                            </button>
+
+                            <div x-show="responses.clearSession" class="mt-4" x-html="formatJson(responses.clearSession)">
+                            </div>
+                        </div>
+
+                        <!-- Get Session Messages -->
+                        <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                            <div class="flex items-center gap-2 mb-4">
+                                <i data-lucide="message-circle" class="w-5 h-5 text-green-600"></i>
+                                <h3 class="font-medium text-slate-900">Get Session Messages</h3>
+                            </div>
+                            <p class="text-sm text-slate-600 mb-4">GET /session/messages - Retrieves all messages in current session</p>
+
+                            <button
+                                @click="testGetMessages()"
+                                :disabled="loading.getMessages"
+                                class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors text-sm"
+                            >
+                                <div x-show="loading.getMessages" class="spinner"></div>
+                                <i x-show="!loading.getMessages" data-lucide="send" class="w-4 h-4"></i>
+                                Execute Test
+                            </button>
+
+                            <div x-show="responses.getMessages" class="mt-4" x-html="formatJson(responses.getMessages)">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column -->
+                    <div class="space-y-6">
+                        <!-- Update Language -->
+                        <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                            <div class="flex items-center gap-2 mb-4">
+                                <i data-lucide="globe" class="w-5 h-5 text-purple-600"></i>
+                                <h3 class="font-medium text-slate-900">Update Language</h3>
+                            </div>
+                            <p class="text-sm text-slate-600 mb-4">PUT /session/language - Updates session language</p>
+
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Language</label>
+                                <select
+                                    x-model="tests.updateLanguage.language"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                >
+                                    <option value="en">English</option>
+                                    <option value="he">Hebrew</option>
+                                </select>
+                            </div>
+
+                            <button
+                                @click="testUpdateLanguage()"
+                                :disabled="loading.updateLanguage"
+                                class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 transition-colors text-sm"
+                            >
+                                <div x-show="loading.updateLanguage" class="spinner"></div>
+                                <i x-show="!loading.updateLanguage" data-lucide="send" class="w-4 h-4"></i>
+                                Execute Test
+                            </button>
+
+                            <div x-show="responses.updateLanguage" class="mt-4" x-html="formatJson(responses.updateLanguage)">
+                            </div>
+                        </div>
+
+                        <!-- Update Assistant -->
+                        <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                            <div class="flex items-center gap-2 mb-4">
+                                <i data-lucide="user-check" class="w-5 h-5 text-indigo-600"></i>
+                                <h3 class="font-medium text-slate-900">Update Assistant</h3>
+                            </div>
+                            <p class="text-sm text-slate-600 mb-4">PUT /session/:id/assistant - Updates session assistant</p>
+
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Assistant ID</label>
+                                <input
+                                    type="text"
+                                    x-model="tests.updateAssistant.assistantId"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    placeholder="Enter assistant ID"
+                                >
+                            </div>
+
+                            <button
+                                @click="testUpdateAssistant()"
+                                :disabled="loading.updateAssistant"
+                                class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 transition-colors text-sm"
+                            >
+                                <div x-show="loading.updateAssistant" class="spinner"></div>
+                                <i x-show="!loading.updateAssistant" data-lucide="send" class="w-4 h-4"></i>
+                                Execute Test
+                            </button>
+
+                            <div x-show="responses.updateAssistant" class="mt-4" x-html="formatJson(responses.updateAssistant)">
+                            </div>
+                        </div>
+
+                        <!-- Activate Session -->
+                        <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                            <div class="flex items-center gap-2 mb-4">
+                                <i data-lucide="rotate-ccw" class="w-5 h-5 text-amber-600"></i>
+                                <h3 class="font-medium text-slate-900">Activate Session</h3>
+                            </div>
+                            <p class="text-sm text-slate-600 mb-4">POST /session/:id/activate - Reactivates a previous session</p>
+
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Session ID</label>
+                                <input
+                                    type="text"
+                                    x-model="tests.activateSession.sessionId"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    placeholder="Enter session ID to activate"
+                                >
+                            </div>
+
+                            <button
+                                @click="testActivateSession()"
+                                :disabled="loading.activateSession"
+                                class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50 transition-colors text-sm"
+                            >
+                                <div x-show="loading.activateSession" class="spinner"></div>
+                                <i x-show="!loading.activateSession" data-lucide="send" class="w-4 h-4"></i>
+                                Execute Test
+                            </button>
+
+                            <div x-show="responses.activateSession" class="mt-4" x-html="formatJson(responses.activateSession)">
+                            </div>
+                        </div>
+
+                        <!-- Delete Session -->
+                        <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                            <div class="flex items-center gap-2 mb-4">
+                                <i data-lucide="user-x" class="w-5 h-5 text-red-600"></i>
+                                <h3 class="font-medium text-slate-900">Delete Session</h3>
+                            </div>
+                            <p class="text-sm text-slate-600 mb-4">DELETE /session/:id - Completely deletes a session</p>
+
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Session ID</label>
+                                <input
+                                    type="text"
+                                    x-model="tests.deleteSession.sessionId"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    placeholder="Enter session ID to delete"
+                                >
+                            </div>
+
+                            <button
+                                @click="testDeleteSession()"
+                                :disabled="loading.deleteSession"
+                                class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 transition-colors text-sm"
+                            >
+                                <div x-show="loading.deleteSession" class="spinner"></div>
+                                <i x-show="!loading.deleteSession" data-lucide="send" class="w-4 h-4"></i>
+                                Execute Test
+                            </button>
+
+                            <div x-show="responses.deleteSession" class="mt-4" x-html="formatJson(responses.deleteSession)">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Additional Session Tests -->
+        <section class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <i data-lucide="database" class="w-6 h-6"></i>
+                <h2 class="text-2xl font-light">Additional Session Endpoints</h2>
+            </div>
+            <div class="ml-9">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Get Current Session Language -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="globe-2" class="w-5 h-5 text-indigo-600"></i>
+                            <h3 class="font-medium text-slate-900">Get Current Session Language</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">GET /session/language - Gets the language of the current active session</p>
+
+                        <button
+                            @click="testGetLanguage()"
+                            :disabled="loading.getLanguage"
+                            class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.getLanguage" class="spinner"></div>
+                            <i x-show="!loading.getLanguage" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.getLanguage" class="mt-4" x-html="formatJson(responses.getLanguage)">
+                        </div>
+                    </div>
+
+                    <!-- Get Recent Sessions -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="users" class="w-5 h-5 text-orange-600"></i>
+                            <h3 class="font-medium text-slate-900">Get Recent Sessions</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">GET /session - Retrieves the latest sessions for your company (optional ?limit=)</p>
+
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Limit</label>
+                            <input
+                                type="number"
+                                min="1"
+                                x-model="tests.getAllSessions.limit"
+                                class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                placeholder="Defaults to 10"
+                            >
+                        </div>
+
+                        <button
+                            @click="testGetAllSessions()"
+                            :disabled="loading.getAllSessions"
+                            class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.getAllSessions" class="spinner"></div>
+                            <i x-show="!loading.getAllSessions" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.getAllSessions" class="mt-4" x-html="formatJson(responses.getAllSessions)">
+                        </div>
+                    </div>
+
+                    <!-- Get Session by ID -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="search" class="w-5 h-5 text-teal-600"></i>
+                            <h3 class="font-medium text-slate-900">Get Session by ID</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">GET /session/:id - Retrieves specific session details</p>
+
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Session ID</label>
+                            <input
+                                type="text"
+                                x-model="tests.getSessionById.sessionId"
+                                class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                placeholder="Enter session ID or leave empty for current"
+                            >
+                        </div>
+
+                        <button
+                            @click="testGetSessionById()"
+                            :disabled="loading.getSessionById"
+                            class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.getSessionById" class="spinner"></div>
+                            <i x-show="!loading.getSessionById" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.getSessionById" class="mt-4" x-html="formatJson(responses.getSessionById)">
+                        </div>
+                    </div>
+
+                    <!-- Get Session Messages by ID -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="message-square" class="w-5 h-5 text-cyan-600"></i>
+                            <h3 class="font-medium text-slate-900">Get Session Messages by ID</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">GET /session/:id/messages - Retrieves messages for specific session</p>
+
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Session ID</label>
+                            <input
+                                type="text"
+                                x-model="tests.getSessionMessagesById.sessionId"
+                                class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                placeholder="Enter session ID or leave empty for current"
+                            >
+                        </div>
+
+                        <button
+                            @click="testGetSessionMessagesById()"
+                            :disabled="loading.getSessionMessagesById"
+                            class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-cyan-600 text-white rounded hover:bg-cyan-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.getSessionMessagesById" class="spinner"></div>
+                            <i x-show="!loading.getSessionMessagesById" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.getSessionMessagesById" class="mt-4" x-html="formatJson(responses.getSessionMessagesById)">
+                        </div>
+                    </div>
+
+                    <!-- Get Friendly Sessions -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="heart" class="w-5 h-5 text-pink-600"></i>
+                            <h3 class="font-medium text-slate-900">Get Friendly Sessions</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">GET /session/friendly - Gets enriched sessions for your company</p>
+
+                        <button
+                            @click="testGetFriendlySessions()"
+                            :disabled="loading.getFriendlySessions"
+                            class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-pink-600 text-white rounded hover:bg-pink-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.getFriendlySessions" class="spinner"></div>
+                            <i x-show="!loading.getFriendlySessions" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.getFriendlySessions" class="mt-4" x-html="formatJson(responses.getFriendlySessions)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Message Testing -->
+        <section class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <i data-lucide="message-square" class="w-6 h-6"></i>
+                <h2 class="text-2xl font-light">Message Testing</h2>
+            </div>
+            <div class="ml-9">
+                <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                    <div class="flex items-center gap-2 mb-4">
+                        <i data-lucide="send" class="w-5 h-5 text-blue-600"></i>
+                        <h3 class="font-medium text-slate-900">Send Message with Streaming</h3>
+                    </div>
+                    <p class="text-sm text-slate-600 mb-4">POST /assistant/thread/user-input - Send message and receive streaming response</p>
+
+                    <div class="space-y-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Message</label>
+                            <textarea
+                                x-model="tests.sendMessage.message"
+                                rows="3"
+                                class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                placeholder="Enter your test message..."
+                            ></textarea>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" x-model="tests.sendMessage.streaming" class="rounded">
+                                <span class="text-sm text-slate-700">Enable Streaming</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button
+                        @click="testSendMessage()"
+                        :disabled="loading.sendMessage"
+                        class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm"
+                    >
+                        <div x-show="loading.sendMessage" class="spinner"></div>
+                        <i x-show="!loading.sendMessage" data-lucide="send" class="w-4 h-4"></i>
+                        Send Message
+                    </button>
+
+                    <div x-show="responses.sendMessage" class="mt-4">
+                        <h4 class="text-sm font-medium text-slate-700 mb-2">Response:</h4>
+                        <div x-html="formatJson(responses.sendMessage)"></div>
+                    </div>
+
+                    <div x-show="streamingContent" class="mt-4">
+                        <h4 class="text-sm font-medium text-slate-700 mb-2">Streaming Content:</h4>
+                        <div class="bg-slate-50 p-3 rounded border text-sm" x-text="streamingContent"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="pt-8 mt-16 border-t border-slate-200 text-center text-sm text-slate-500">
+            <p>AI Agent Hub Session Management Testing Interface</p>
+        </footer>
+    </div>
+
+    <script>
+        function sessionTester() {
+            return {
+                // Configuration
+                config: {
+                    apiUrl: 'http://localhost:3000',
+                    jwtToken: localStorage.getItem('jwtToken') || ''
+                },
+
+                // Loading states
+                loading: {
+                    connection: false,
+                    createSession: false,
+                    clearSession: false,
+                    getMessages: false,
+                    updateLanguage: false,
+                    updateAssistant: false,
+                    activateSession: false,
+                    deleteSession: false,
+                    sendMessage: false,
+                    batch: false,
+                    getLanguage: false,
+                    getAllSessions: false,
+                    getSessionById: false,
+                    getSessionMessagesById: false,
+                    getFriendlySessions: false
+                },
+
+                // Session state
+                sessionState: {
+                    sessionId: null,
+                    assistant: null,
+                    language: null,
+                    messageCount: 0
+                },
+
+                // Test parameters
+                tests: {
+                    createSession: {
+                        assistantId: '',
+                        language: ''
+                    },
+                    updateLanguage: {
+                        language: 'en'
+                    },
+                    updateAssistant: {
+                        assistantId: ''
+                    },
+                    activateSession: {
+                        sessionId: ''
+                    },
+                    deleteSession: {
+                        sessionId: ''
+                    },
+                    sendMessage: {
+                        message: 'Hello! This is a test message. Please respond with a brief acknowledgment.',
+                        streaming: true
+                    },
+                    getSessionById: {
+                        sessionId: ''
+                    },
+                    getSessionMessagesById: {
+                        sessionId: ''
+                    },
+                    getAllSessions: {
+                        limit: '10'
+                    },
+                    getFriendlySessions: {}
+                },
+
+                // Responses
+                responses: {
+                    createSession: null,
+                    clearSession: null,
+                    getMessages: null,
+                    updateLanguage: null,
+                    updateAssistant: null,
+                    activateSession: null,
+                    deleteSession: null,
+                    sendMessage: null,
+                    getLanguage: null,
+                    getAllSessions: null,
+                    getSessionById: null,
+                    getSessionMessagesById: null,
+                    getFriendlySessions: null
+                },
+
+                // Streaming
+                streamingContent: '',
+
+                // Test results
+                testResults: [],
+
+                // Batch testing
+                batchProgress: {
+                    current: 0,
+                    total: 0
+                },
+
+                // Toasts
+                toasts: [],
+                toastId: 0,
+
+                // Modal state
+                showConfigModal: false,
+
+                // Initialize
+                init() {
+                    this.$nextTick(() => lucide.createIcons());
+                    // Watch for JWT token changes and save to localStorage
+                    this.$watch('config.jwtToken', (value) => {
+                        if (value) {
+                            localStorage.setItem('jwtToken', value);
+                        }
+                    });
+                },
+
+                // Helper functions
+                getHeaders() {
+                    return {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.config.jwtToken}`
+                    };
+                },
+
+                async makeRequest(endpoint, options = {}) {
+                    const url = `${this.config.apiUrl}${endpoint}`;
+                    const config = {
+                        headers: this.getHeaders(),
+                        ...options
+                    };
+
+                    const response = await fetch(url, config);
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.message || `HTTP ${response.status}`);
+                    }
+
+                    return data;
+                },
+
+                addTestResult(testName, success, duration, error = null) {
+                    this.testResults.unshift({
+                        test: testName,
+                        success,
+                        duration,
+                        error,
+                        timestamp: Date.now()
+                    });
+
+                    // Keep only last 20 results
+                    if (this.testResults.length > 20) {
+                        this.testResults = this.testResults.slice(0, 20);
+                    }
+                },
+
+                formatJson(obj) {
+                    if (!obj) return '';
+
+                    const formatValue = (value, indent = 0) => {
+                        const spaces = '  '.repeat(indent);
+
+                        if (value === null) {
+                            return `<span class="json-null">null</span>`;
+                        }
+
+                        if (typeof value === 'boolean') {
+                            return `<span class="json-boolean">${value}</span>`;
+                        }
+
+                        if (typeof value === 'number') {
+                            return `<span class="json-number">${value}</span>`;
+                        }
+
+                        if (typeof value === 'string') {
+                            return `<span class="json-string">"${value.replace(/"/g, '\\"')}"</span>`;
+                        }
+
+                        if (Array.isArray(value)) {
+                            if (value.length === 0) return `<span class="json-brace">[]</span>`;
+
+                            let result = `<span class="json-brace">[</span><br>`;
+                            value.forEach((item, i) => {
+                                result += `${spaces}  ${formatValue(item, indent + 1)}`;
+                                if (i < value.length - 1) result += ',';
+                                result += '<br>';
+                            });
+                            result += `${spaces}<span class="json-brace">]</span>`;
+                            return result;
+                        }
+
+                        if (typeof value === 'object') {
+                            const keys = Object.keys(value);
+                            if (keys.length === 0) return `<span class="json-brace">{}</span>`;
+
+                            let result = `<span class="json-brace">{</span><br>`;
+                            keys.forEach((key, i) => {
+                                result += `<span style="margin-left: ${(indent + 1) * 20}px;"><span class="json-key">"${key}"</span>: ${formatValue(value[key], indent + 1)}</span>`;
+                                if (i < keys.length - 1) result += ',';
+                                result += '<br>';
+                            });
+                            result += `<span style="margin-left: ${indent * 20}px;"><span class="json-brace">}</span></span>`;
+                            return result;
+                        }
+
+                        return String(value);
+                    };
+
+                    return `<pre class="json-container">${formatValue(obj)}</pre>`;
+                },
+
+                showToast(title, message = '', type = 'info') {
+                    const id = ++this.toastId;
+                    const icons = {
+                        success: 'check-circle',
+                        error: 'alert-circle',
+                        info: 'info'
+                    };
+
+                    const toast = {
+                        id,
+                        title,
+                        message,
+                        type,
+                        icon: icons[type] || 'info',
+                        removing: false
+                    };
+
+                    this.toasts.push(toast);
+                    this.$nextTick(() => lucide.createIcons());
+
+                    // Auto remove after 5 seconds
+                    setTimeout(() => this.removeToast(id), 5000);
+                },
+
+                removeToast(id) {
+                    const toast = this.toasts.find(t => t.id === id);
+                    if (toast) {
+                        toast.removing = true;
+                        setTimeout(() => {
+                            this.toasts = this.toasts.filter(t => t.id !== id);
+                        }, 300);
+                    }
+                },
+
+                // Test functions
+                async testConnection() {
+                    this.loading.connection = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const response = await fetch(`${this.config.apiUrl}/health`, {
+                            headers: this.getHeaders()
+                        });
+
+                        if (response.ok) {
+                            this.addTestResult('Connection Test', true, Date.now() - startTime);
+                            this.showToast('Connection Successful', 'API is reachable and responding', 'success');
+                        } else {
+                            throw new Error(`HTTP ${response.status}`);
+                        }
+                    } catch (error) {
+                        this.addTestResult('Connection Test', false, Date.now() - startTime, error.message);
+                        this.showToast('Connection Failed', error.message, 'error');
+                    } finally {
+                        this.loading.connection = false;
+                    }
+                },
+
+                async testCreateSession() {
+                    this.loading.createSession = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const body = {};
+                        if (this.tests.createSession.assistantId) {
+                            body.assistantId = this.tests.createSession.assistantId;
+                        }
+                        if (this.tests.createSession.language) {
+                            body.language = this.tests.createSession.language;
+                        }
+
+                        const response = await this.makeRequest('/session', {
+                            method: 'POST',
+                            body: JSON.stringify(body)
+                        });
+
+                        this.responses.createSession = response;
+
+                        // Update session state
+                        const sessionId = response.sessionId || response._id || response.id;
+                        if (sessionId) {
+                            this.sessionState.sessionId = sessionId;
+                        }
+
+                        const assistantName = response.assistant?.name || response.assistantName || response.assistantId;
+                        if (assistantName) {
+                            this.sessionState.assistant = assistantName;
+                        }
+
+                        if (response.language) {
+                            this.sessionState.language = response.language;
+                        }
+
+                        if (typeof response.messageCount === 'number') {
+                            this.sessionState.messageCount = response.messageCount;
+                        }
+
+                        this.addTestResult('Create Session', true, Date.now() - startTime);
+                        this.$nextTick(() => lucide.createIcons());
+                    } catch (error) {
+                        this.responses.createSession = { error: error.message };
+                        this.addTestResult('Create Session', false, Date.now() - startTime, error.message);
+                    } finally {
+                        this.loading.createSession = false;
+                    }
+                },
+
+                async testClearSession() {
+                    this.loading.clearSession = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const response = await this.makeRequest('/session/clear', {
+                            method: 'POST'
+                        });
+
+                        this.responses.clearSession = response;
+
+                        const newSessionId = response.sessionId || response._id || response.id;
+                        if (newSessionId) {
+                            this.sessionState.sessionId = newSessionId;
+                        }
+
+                        const newAssistant = response.assistant?.name || response.assistantName || response.assistantId;
+                        if (newAssistant) {
+                            this.sessionState.assistant = newAssistant;
+                        }
+
+                        if (response.language) {
+                            this.sessionState.language = response.language;
+                        }
+
+                        this.sessionState.messageCount = typeof response.messageCount === 'number' ? response.messageCount : 0;
+
+                        this.addTestResult('Clear Session', true, Date.now() - startTime);
+                        this.$nextTick(() => lucide.createIcons());
+                    } catch (error) {
+                        this.responses.clearSession = { error: error.message };
+                        this.addTestResult('Clear Session', false, Date.now() - startTime, error.message);
+                    } finally {
+                        this.loading.clearSession = false;
+                    }
+                },
+
+                async testGetMessages() {
+                    this.loading.getMessages = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const response = await this.makeRequest('/session/messages');
+
+                        this.responses.getMessages = response;
+                        this.sessionState.messageCount = response.length || 0;
+
+                        this.addTestResult('Get Messages', true, Date.now() - startTime);
+                        this.$nextTick(() => lucide.createIcons());
+                    } catch (error) {
+                        this.responses.getMessages = { error: error.message };
+                        this.addTestResult('Get Messages', false, Date.now() - startTime, error.message);
+                    } finally {
+                        this.loading.getMessages = false;
+                    }
+                },
+
+                async testUpdateLanguage() {
+                    this.loading.updateLanguage = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const response = await this.makeRequest('/session/language', {
+                            method: 'PUT',
+                            body: JSON.stringify({ language: this.tests.updateLanguage.language })
+                        });
+
+                        this.responses.updateLanguage = response;
+                        this.sessionState.language = this.tests.updateLanguage.language;
+
+                        this.addTestResult('Update Language', true, Date.now() - startTime);
+                        this.$nextTick(() => lucide.createIcons());
+                    } catch (error) {
+                        this.responses.updateLanguage = { error: error.message };
+                        this.addTestResult('Update Language', false, Date.now() - startTime, error.message);
+                    } finally {
+                        this.loading.updateLanguage = false;
+                    }
+                },
+
+                async testUpdateAssistant() {
+                    this.loading.updateAssistant = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const response = await this.makeRequest(`/session/${this.sessionState.sessionId}/assistant`, {
+                            method: 'PUT',
+                            body: JSON.stringify({ assistantId: this.tests.updateAssistant.assistantId })
+                        });
+
+                        this.responses.updateAssistant = response;
+                        this.sessionState.assistant = response.assistant?.name || this.tests.updateAssistant.assistantId;
+
+                        this.addTestResult('Update Assistant', true, Date.now() - startTime);
+                        this.$nextTick(() => lucide.createIcons());
+                    } catch (error) {
+                        this.responses.updateAssistant = { error: error.message };
+                        this.addTestResult('Update Assistant', false, Date.now() - startTime, error.message);
+                    } finally {
+                        this.loading.updateAssistant = false;
+                    }
+                },
+
+                async testActivateSession() {
+                    this.loading.activateSession = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const sessionId = this.tests.activateSession.sessionId.trim() || this.sessionState.sessionId;
+                        if (!sessionId) {
+                            throw new Error('Session ID is required');
+                        }
+
+                        const response = await this.makeRequest(`/session/${sessionId}/activate`, {
+                            method: 'POST'
+                        });
+
+                        this.responses.activateSession = response;
+
+                        const activatedSession = response.session || response;
+                        const activatedId = activatedSession.sessionId || activatedSession._id || activatedSession.id;
+                        if (activatedId) {
+                            this.sessionState.sessionId = activatedId;
+                        }
+
+                        const activatedAssistant = activatedSession.assistant?.name || activatedSession.assistantName || activatedSession.assistantId;
+                        if (activatedAssistant) {
+                            this.sessionState.assistant = activatedAssistant;
+                        }
+
+                        if (activatedSession.language) {
+                            this.sessionState.language = activatedSession.language;
+                        }
+
+                        this.addTestResult('Activate Session', true, Date.now() - startTime);
+                        this.$nextTick(() => lucide.createIcons());
+                    } catch (error) {
+                        this.responses.activateSession = { error: error.message };
+                        this.addTestResult('Activate Session', false, Date.now() - startTime, error.message);
+                    } finally {
+                        this.loading.activateSession = false;
+                    }
+                },
+
+                async testDeleteSession() {
+                    this.loading.deleteSession = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const sessionId = this.tests.deleteSession.sessionId || this.sessionState.sessionId;
+                        const response = await this.makeRequest(`/session/${sessionId}`, {
+                            method: 'DELETE'
+                        });
+
+                        this.responses.deleteSession = response;
+
+                        // If we deleted the current session, clear state
+                        if (sessionId === this.sessionState.sessionId) {
+                            this.sessionState = {
+                                sessionId: null,
+                                assistant: null,
+                                language: null,
+                                messageCount: 0
+                            };
+                        }
+
+                        this.addTestResult('Delete Session', true, Date.now() - startTime);
+                        this.$nextTick(() => lucide.createIcons());
+                    } catch (error) {
+                        this.responses.deleteSession = { error: error.message };
+                        this.addTestResult('Delete Session', false, Date.now() - startTime, error.message);
+                    } finally {
+                        this.loading.deleteSession = false;
+                    }
+                },
+
+                async testSendMessage() {
+                    this.loading.sendMessage = true;
+                    this.streamingContent = '';
+                    const startTime = Date.now();
+
+                    try {
+                        const body = {
+                            userInput: this.tests.sendMessage.message,
+                            streaming: this.tests.sendMessage.streaming
+                        };
+
+                        if (this.tests.sendMessage.streaming) {
+                            // Handle streaming response
+                            const response = await fetch(`${this.config.apiUrl}/assistant/thread/user-input`, {
+                                method: 'POST',
+                                headers: this.getHeaders(),
+                                body: JSON.stringify(body)
+                            });
+
+                            if (!response.ok) {
+                                throw new Error(`HTTP ${response.status}`);
+                            }
+
+                            const reader = response.body.getReader();
+                            const decoder = new TextDecoder();
+                            let content = '';
+
+                            while (true) {
+                                const { done, value } = await reader.read();
+                                if (done) break;
+
+                                const chunk = decoder.decode(value);
+                                const lines = chunk.split('\n');
+
+                                for (const line of lines) {
+                                    if (line.startsWith('data: ')) {
+                                        const data = line.slice(6);
+                                        if (data === '[DONE]') {
+                                            break;
+                                        }
+                                        try {
+                                            const parsed = JSON.parse(data);
+                                            if (parsed.content) {
+                                                content += parsed.content;
+                                                this.streamingContent = content;
+                                            }
+                                        } catch (e) {
+                                            // Ignore parsing errors for non-JSON lines
+                                        }
+                                    }
+                                }
+                            }
+
+                            this.responses.sendMessage = { streaming: true, content };
+                            this.sessionState.messageCount += 2; // User + Assistant message
+                        } else {
+                            // Handle regular response
+                            const response = await this.makeRequest('/assistant/thread/user-input', {
+                                method: 'POST',
+                                body: JSON.stringify(body)
+                            });
+
+                            this.responses.sendMessage = response;
+                            this.sessionState.messageCount += 2; // User + Assistant message
+                        }
+
+                        this.addTestResult('Send Message', true, Date.now() - startTime);
+                        this.$nextTick(() => lucide.createIcons());
+                    } catch (error) {
+                        this.responses.sendMessage = { error: error.message };
+                        this.addTestResult('Send Message', false, Date.now() - startTime, error.message);
+                    } finally {
+                        this.loading.sendMessage = false;
+                    }
+                },
+
+                async testGetLanguage() {
+                    this.loading.getLanguage = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const response = await this.makeRequest('/session/language');
+                        this.responses.getLanguage = response;
+                        this.addTestResult('Get Language', true, Date.now() - startTime);
+                        this.$nextTick(() => lucide.createIcons());
+                    } catch (error) {
+                        this.responses.getLanguage = { error: error.message };
+                        this.addTestResult('Get Language', false, Date.now() - startTime, error.message);
+                    } finally {
+                        this.loading.getLanguage = false;
+                    }
+                },
+
+                async testGetAllSessions() {
+                    this.loading.getAllSessions = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const limitValue = parseInt(this.tests.getAllSessions.limit, 10);
+                        const limitQuery = Number.isFinite(limitValue) && limitValue > 0 ? `?limit=${encodeURIComponent(limitValue)}` : '';
+                        const response = await this.makeRequest(`/session${limitQuery}`);
+                        this.responses.getAllSessions = response;
+                        this.addTestResult('Get Recent Sessions', true, Date.now() - startTime);
+                        this.$nextTick(() => lucide.createIcons());
+                    } catch (error) {
+                        this.responses.getAllSessions = { error: error.message };
+                        this.addTestResult('Get Recent Sessions', false, Date.now() - startTime, error.message);
+                    } finally {
+                        this.loading.getAllSessions = false;
+                    }
+                },
+
+                async testGetSessionById() {
+                    this.loading.getSessionById = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const sessionId = this.tests.getSessionById.sessionId || this.sessionState.sessionId;
+                        if (!sessionId) {
+                            throw new Error('Session ID is required');
+                        }
+                        const response = await this.makeRequest(`/session/${sessionId}`);
+                        this.responses.getSessionById = response;
+                        this.addTestResult('Get Session by ID', true, Date.now() - startTime);
+                        this.$nextTick(() => lucide.createIcons());
+                    } catch (error) {
+                        this.responses.getSessionById = { error: error.message };
+                        this.addTestResult('Get Session by ID', false, Date.now() - startTime, error.message);
+                    } finally {
+                        this.loading.getSessionById = false;
+                    }
+                },
+
+                async testGetSessionMessagesById() {
+                    this.loading.getSessionMessagesById = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const sessionId = this.tests.getSessionMessagesById.sessionId || this.sessionState.sessionId;
+                        if (!sessionId) {
+                            throw new Error('Session ID is required');
+                        }
+                        const response = await this.makeRequest(`/session/${sessionId}/messages`);
+                        this.responses.getSessionMessagesById = response;
+                        this.addTestResult('Get Session Messages by ID', true, Date.now() - startTime);
+                        this.$nextTick(() => lucide.createIcons());
+                    } catch (error) {
+                        this.responses.getSessionMessagesById = { error: error.message };
+                        this.addTestResult('Get Session Messages by ID', false, Date.now() - startTime, error.message);
+                    } finally {
+                        this.loading.getSessionMessagesById = false;
+                    }
+                },
+
+                async testGetFriendlySessions() {
+                    this.loading.getFriendlySessions = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const response = await this.makeRequest('/session/friendly');
+                        this.responses.getFriendlySessions = response;
+                        this.addTestResult('Get Friendly Sessions', true, Date.now() - startTime);
+                        this.$nextTick(() => lucide.createIcons());
+                    } catch (error) {
+                        this.responses.getFriendlySessions = { error: error.message };
+                        this.addTestResult('Get Friendly Sessions', false, Date.now() - startTime, error.message);
+                    } finally {
+                        this.loading.getFriendlySessions = false;
+                    }
+                },
+
+                async runBatchTests() {
+                    this.loading.batch = true;
+                    this.batchProgress.current = 0;
+                    this.batchProgress.total = 12;
+
+                    const tests = [
+                        () => this.testCreateSession(),
+                        () => this.testGetLanguage(),
+                        () => this.testGetMessages(),
+                        () => this.testUpdateLanguage(),
+                        () => this.testSendMessage(),
+                        () => this.testGetSessionById(),
+                        () => this.testGetSessionMessagesById(),
+                        () => this.testGetAllSessions(),
+                        () => this.testUpdateAssistant(),
+                        () => this.testActivateSession(),
+                        () => this.testClearSession(),
+                        () => this.testGetMessages()
+                    ];
+
+                    for (let i = 0; i < tests.length; i++) {
+                        try {
+                            await tests[i]();
+                            this.batchProgress.current = i + 1;
+                            // Wait a bit between tests
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                        } catch (error) {
+                            console.error(`Batch test ${i + 1} failed:`, error);
+                        }
+                    }
+
+                    this.loading.batch = false;
+                    this.$nextTick(() => lucide.createIcons());
+                }
+            }
+        }
+    </script>
+</body>
+</html>

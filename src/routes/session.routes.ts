@@ -8,6 +8,7 @@ import {
   sessionFriendlyAggreationQuery,
   updateSessionAssistant,
   updateSessionLanguage,
+  activateSession,
 } from '../services/session.service';
 import mongoose from 'mongoose';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
@@ -230,17 +231,71 @@ sessionRouter.get(
   },
 );
 
-// Get all sessions (admin only) - Placed before parameterized routes like /:id
-sessionRouter.get('/', async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const sessions = await Session.find();
-    res.status(200).send(sessions);
-  } catch (error) {
-    res.status(500).send({ error: 'Error getting sessions' });
-  }
-});
+// Get recent sessions for the current company - Placed before parameterized routes like /:id
+sessionRouter.get(
+  '/',
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const companyId = req.user?.companyId?.toString();
+      if (!companyId) {
+        return next(new BadRequestError('Company ID not found in request.'));
+      }
+
+      const { limit: limitParam } = req.query as { limit?: string | string[] };
+      let limit = 10;
+      if (Array.isArray(limitParam)) {
+        limit = parseInt(limitParam[0] ?? '', 10);
+      } else if (typeof limitParam === 'string') {
+        limit = parseInt(limitParam, 10);
+      }
+      if (!Number.isFinite(limit) || limit <= 0) {
+        limit = 10;
+      }
+
+      const sessions = await Session.find({
+        companyId: new mongoose.Types.ObjectId(companyId),
+      })
+        .sort({ createdAt: -1 })
+        .limit(limit);
+
+      res.status(200).send(sessions);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 // Update session assistant (still requires :id as assistant is a property of a specific session)
+// Activate a previous session for the current user
+sessionRouter.post(
+  '/:id/activate',
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?._id?.toString();
+      const companyId = req.user?.companyId?.toString();
+
+      if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+        return next(new BadRequestError('Valid session ID is required.'));
+      }
+      if (!userId || !companyId) {
+        return next(
+          new BadRequestError('User or Company ID not found in request.'),
+        );
+      }
+
+      const session = await activateSession(id, userId, companyId);
+
+      res.status(200).send({
+        message: 'Session activated successfully',
+        session,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 sessionRouter.put(
   '/:id/assistant',
   validateApiKeys(['openai_api_key']),
@@ -292,17 +347,14 @@ sessionRouter.delete(
   },
 );
 
-// Get friendly sessions for a company
+// Get friendly sessions for the requester
 sessionRouter.get(
-  '/friendly/:companyId',
-  async (req: AuthenticatedRequest, res: Response) => {
+  '/friendly',
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      const { companyId } = req.params;
-      if (
-        req.user?.role !== 'Admin' &&
-        req.user?.companyId.toString() !== companyId
-      ) {
-        return res.status(403).send({ error: 'Access denied' });
+      const companyId = req.user?.companyId?.toString();
+      if (!companyId) {
+        return next(new BadRequestError('Company ID not found in request.'));
       }
 
       const sessions = await Session.aggregate([
@@ -317,7 +369,7 @@ sessionRouter.get(
 
       res.status(200).send(sessions);
     } catch (error) {
-      res.status(500).send({ error: 'Error getting sessions' });
+      next(error);
     }
   },
 );

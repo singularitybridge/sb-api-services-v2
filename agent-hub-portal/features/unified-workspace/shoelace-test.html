@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified Workspace API Tester</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Shoelace -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/themes/light.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/shoelace-autoloader.js"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Monaco Editor for JSON -->
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .spinner {
+            border: 2px solid #f3f4f6;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .scope-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .scope-temporary { background-color: #eab308; }
+        .scope-session { background-color: #3b82f6; }
+        .scope-agent { background-color: #8b5cf6; }
+        .scope-team { background-color: #10b981; }
+        .scope-company { background-color: #1f2937; }
+
+        .response-panel {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .json-editor {
+            height: 200px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+
+        .section-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            transition: all 0.2s;
+        }
+
+        .section-card:hover {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900" x-data="workspaceTestApp()">
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-6 py-8">
+            <div class="flex items-center gap-3 mb-4">
+                <i data-lucide="database" class="w-8 h-8"></i>
+                <h1 class="text-4xl font-light">Unified Workspace API Tester</h1>
+            </div>
+            <p class="text-lg text-slate-600 ml-11">Test and explore the unified workspace storage system with scoped file management</p>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        <!-- Configuration Section -->
+        <section id="config" class="fade-in">
+            <div class="section-card p-6">
+                <div class="flex items-center gap-3 mb-6">
+                    <i data-lucide="settings" class="w-6 h-6"></i>
+                    <h2 class="text-2xl font-light">Configuration</h2>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Base URL</label>
+                        <input
+                            type="text"
+                            x-model="config.baseUrl"
+                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            placeholder="http://localhost:3000"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Auth Token</label>
+                        <input
+                            type="password"
+                            x-model="config.authToken"
+                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 mono"
+                            placeholder="Bearer token"
+                        >
+                    </div>
+                    <div class="flex items-end">
+                        <button
+                            @click="testConnection()"
+                            class="w-full px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
+                            :disabled="loading"
+                        >
+                            <div x-show="loading" class="flex items-center justify-center gap-2">
+                                <div class="spinner"></div>
+                                <span>Testing...</span>
+                            </div>
+                            <div x-show="!loading" class="flex items-center justify-center gap-2">
+                                <i data-lucide="wifi" class="w-4 h-4"></i>
+                                <span>Test Connection</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Storage Architecture Info -->
+        <section class="fade-in">
+            <div class="section-card p-6">
+                <div class="flex items-center gap-3 mb-4">
+                    <i data-lucide="info" class="w-6 h-6 text-blue-600"></i>
+                    <h3 class="text-lg font-medium text-slate-900">Storage Architecture</h3>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 text-sm">
+                    <div>
+                        <h4 class="font-medium text-slate-900 mb-3">Storage Details</h4>
+                        <ul class="space-y-2 text-slate-600">
+                            <li class="flex items-center gap-2">
+                                <i data-lucide="hard-drive" class="w-4 h-4"></i>
+                                All files stored on disk at <code class="mono bg-slate-100 px-2 py-1 rounded">/tmp/workspace/</code>
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <i data-lucide="database" class="w-4 h-4"></i>
+                                MongoDB stores only metadata/references
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <i data-lucide="layers" class="w-4 h-4"></i>
+                                Scope-based isolation (company, session, agent, team)
+                            </li>
+                            <li class="flex items-center gap-2">
+                                <i data-lucide="cloud" class="w-4 h-4"></i>
+                                S3 ready for future implementation
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-medium text-slate-900 mb-3">Storage Scopes</h4>
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between p-2 bg-slate-50 rounded">
+                                <div class="flex items-center">
+                                    <span class="scope-indicator scope-company"></span>
+                                    <code class="mono text-sm">company</code>
+                                </div>
+                                <span class="text-xs text-slate-600">Permanent by default</span>
+                            </div>
+                            <div class="flex items-center justify-between p-2 bg-slate-50 rounded">
+                                <div class="flex items-center">
+                                    <span class="scope-indicator scope-session"></span>
+                                    <code class="mono text-sm">session</code>
+                                </div>
+                                <span class="text-xs text-slate-600">Optional TTL</span>
+                            </div>
+                            <div class="flex items-center justify-between p-2 bg-slate-50 rounded">
+                                <div class="flex items-center">
+                                    <span class="scope-indicator scope-agent"></span>
+                                    <code class="mono text-sm">agent</code>
+                                </div>
+                                <span class="text-xs text-slate-600">Optional TTL</span>
+                            </div>
+                            <div class="flex items-center justify-between p-2 bg-slate-50 rounded">
+                                <div class="flex items-center">
+                                    <span class="scope-indicator scope-team"></span>
+                                    <code class="mono text-sm">team</code>
+                                </div>
+                                <span class="text-xs text-slate-600">Optional TTL</span>
+                            </div>
+                        </div>
+                        <div class="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                            <p class="text-sm text-blue-700"><strong>Note:</strong> Paths are simple like <code>/docs/readme.txt</code> - scope is context, not part of the path.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Store Content Section -->
+        <section id="store" class="fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="section-card p-6">
+                    <div class="flex items-center gap-3 mb-6">
+                        <i data-lucide="upload" class="w-6 h-6"></i>
+                        <h2 class="text-2xl font-light">Store Content</h2>
+                    </div>
+
+                    <div class="space-y-6">
+                        <!-- Scope Selection -->
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Workspace Scope</label>
+                            <select x-model="scopeSelection" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500">
+                                <option value="company">⚫ Company</option>
+                                <option value="session">🔵 Session</option>
+                                <option value="agent">🟣 Agent/Assistant</option>
+                                <option value="team">🟢 Team</option>
+                            </select>
+                        </div>
+
+                        <!-- Context ID for scoped paths -->
+                        <div x-show="scopeSelection === 'agent'" class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Agent/Assistant Identifier</label>
+                            <input
+                                type="text"
+                                x-model="agentId"
+                                class="w-full px-4 py-2 border border-purple-300 rounded-lg mono text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                placeholder="e.g., validation-guru, 68cffd317e287e010a0ee8be, or URL"
+                            >
+                            <p class="text-xs text-purple-600 mt-2">Enter agent ID, name, or URL (e.g., agents/anat)</p>
+                        </div>
+
+                        <div x-show="scopeSelection === 'team'" class="bg-green-50 p-4 rounded-lg border border-green-200">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Team ID</label>
+                            <input
+                                type="text"
+                                x-model="teamId"
+                                class="w-full px-4 py-2 border border-green-300 rounded-lg mono text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                placeholder="68a1bc8a87bc32d88bbc9868"
+                            >
+                            <p class="text-xs text-green-600 mt-2">Enter team ID for scoped storage</p>
+                        </div>
+
+                        <div x-show="scopeSelection === 'session'" class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Session Context</label>
+                            <div class="p-3 bg-blue-100 rounded-lg">
+                                <p class="text-sm text-blue-800">
+                                    <i data-lucide="info" class="inline-block w-4 h-4 mr-1"></i>
+                                    Using your current active session automatically
+                                </p>
+                            </div>
+                        </div>
+
+                        <div x-show="scopeSelection === 'company'" class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Company Context</label>
+                            <p class="text-sm text-slate-600">Using current user's company</p>
+                            <div x-show="customPathEnabled" class="mt-2 p-2 bg-white rounded border border-slate-200">
+                                <p class="text-xs text-slate-500">Default path: <code class="mono">/company/test.json</code></p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Path</label>
+                            <div class="space-y-2">
+                                <input
+                                    type="text"
+                                    x-model="storeForm.path"
+                                    class="w-full px-4 py-2 border border-slate-300 rounded-lg mono focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    placeholder="docs/readme.txt (/ optional)"
+                                    list="store-path-suggestions"
+                                >
+                                <datalist id="store-path-suggestions">
+                                    <option value="agent/ui-agent/prompt.md" />
+                                    <option value="agent/api-agent/config.json" />
+                                    <option value="agent/data-agent/schema.yaml" />
+                                    <option value="docs/readme.md" />
+                                    <option value="config/settings.json" />
+                                    <option value="templates/email.html" />
+                                </datalist>
+                                <div x-show="scopeSelection !== 'custom'" class="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        x-model="customPathEnabled"
+                                        id="customPath"
+                                        class="w-4 h-4 text-slate-600 border-slate-300 rounded focus:ring-slate-500"
+                                    >
+                                    <label for="customPath" class="text-sm text-slate-600">Override auto-generated path</label>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-1">
+                                    💡 Paths work with or without leading slash: <code>docs/file.json</code> = <code>/docs/file.json</code>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Content Type</label>
+                            <select x-model="storeForm.contentType" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500">
+                                <option value="text">Text Content</option>
+                                <option value="json">JSON Data</option>
+                                <option value="file">File Upload</option>
+                                <option value="base64">Base64 Data</option>
+                            </select>
+                        </div>
+
+                        <div x-show="storeForm.contentType === 'text'">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Text Content</label>
+                            <textarea
+                                x-model="storeForm.content"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg mono focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                rows="6"
+                                placeholder="Enter your content here..."
+                            ></textarea>
+                        </div>
+
+                        <div x-show="storeForm.contentType === 'json'">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">JSON Content</label>
+                            <div id="jsonEditor" class="json-editor"></div>
+                        </div>
+
+                        <div x-show="storeForm.contentType === 'file'">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">File Upload</label>
+                            <input
+                                type="file"
+                                @change="handleFileUpload($event)"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            >
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">TTL (Time To Live) - Optional</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <select x-model="storeForm.ttlPreset" @change="updateTTL()" class="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500">
+                                    <option value="0">Permanent</option>
+                                    <option value="3600">1 hour</option>
+                                    <option value="86400">24 hours</option>
+                                    <option value="604800">7 days</option>
+                                    <option value="2592000">30 days</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                                <input
+                                    type="number"
+                                    x-model="storeForm.ttl"
+                                    class="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    placeholder="Seconds"
+                                    :disabled="storeForm.ttlPreset !== 'custom'"
+                                >
+                            </div>
+                            <p class="text-xs text-slate-600 mt-2">
+                                <span x-show="storeForm.ttl > 0" x-text="formatTTL(storeForm.ttl)"></span>
+                                <span x-show="storeForm.ttl == 0">Permanent storage (no TTL)</span>
+                            </p>
+                        </div>
+
+                        <button
+                            @click="storeContent()"
+                            class="w-full px-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors font-medium"
+                            :disabled="loading"
+                        >
+                            <div x-show="loading" class="flex items-center justify-center gap-2">
+                                <div class="spinner"></div>
+                                <span>Storing...</span>
+                            </div>
+                            <div x-show="!loading" class="flex items-center justify-center gap-2">
+                                <i data-lucide="save" class="w-4 h-4"></i>
+                                <span>Store Content</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="section-card p-6">
+                    <div class="flex items-center gap-3 mb-6">
+                        <i data-lucide="terminal" class="w-6 h-6"></i>
+                        <h3 class="text-xl font-light">Response</h3>
+                    </div>
+                    <div class="response-panel">
+                        <div x-show="!lastResponse.store" class="text-center py-12">
+                            <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 text-slate-400"></i>
+                            <p class="text-slate-500">No response yet. Try storing some content.</p>
+                        </div>
+                        <div x-show="lastResponse.store" class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <span class="font-medium text-slate-700">Response Time:</span>
+                                    <span x-text="lastResponse.store?.responseTime + 'ms'" class="mono font-medium"></span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <span class="font-medium text-slate-700">Status:</span>
+                                    <span :class="lastResponse.store?.success ? 'text-green-600' : 'text-red-600'" class="font-medium">
+                                        <span x-text="lastResponse.store?.success ? 'Success' : 'Error'"></span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Response Data:</label>
+                                <pre class="p-4 bg-slate-50 border rounded-lg text-xs mono overflow-x-auto max-h-64" x-text="JSON.stringify(lastResponse.store?.data, null, 2)"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Retrieve Content Section -->
+        <section id="retrieve" class="fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="section-card p-6">
+                    <div class="flex items-center gap-3 mb-6">
+                        <i data-lucide="download" class="w-6 h-6"></i>
+                        <h2 class="text-2xl font-light">Retrieve Content</h2>
+                    </div>
+
+                    <div class="space-y-6">
+                        <!-- Scope Selection -->
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Select Workspace Scope</label>
+                            <select x-model="retrieveScopeSelection" @change="updateRetrievePath()" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500">
+                                <option value="company">⚫ Company</option>
+                                <option value="session">🔵 Session</option>
+                                <option value="agent">🟣 Agent/Assistant</option>
+                                <option value="team">🟢 Team</option>
+                            </select>
+                        </div>
+
+                        <!-- Context inputs for scoped retrieval -->
+                        <div x-show="retrieveScopeSelection === 'agent'" class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Agent/Assistant Identifier</label>
+                            <input
+                                type="text"
+                                x-model="retrieveAgentId"
+                                @input="updateRetrievePath()"
+                                class="w-full px-4 py-2 border border-purple-300 rounded-lg mono text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                placeholder="e.g., validation-guru, 68cffd317e287e010a0ee8be, or URL"
+                            >
+                        </div>
+
+                        <div x-show="retrieveScopeSelection === 'team'" class="bg-green-50 p-4 rounded-lg border border-green-200">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Team ID</label>
+                            <input
+                                type="text"
+                                x-model="retrieveTeamId"
+                                @input="updateRetrievePath()"
+                                class="w-full px-4 py-2 border border-green-300 rounded-lg mono text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                :placeholder="teamId"
+                            >
+                        </div>
+
+                        <div x-show="retrieveScopeSelection === 'session'" class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Session Context</label>
+                            <div class="p-3 bg-blue-100 rounded-lg">
+                                <p class="text-sm text-blue-800">
+                                    <i data-lucide="info" class="inline-block w-4 h-4 mr-1"></i>
+                                    Using your current active session automatically
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Path input (no file name field needed) -->
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Full Path <span class="text-xs text-slate-500">(leading / optional)</span></label>
+                            <div class="space-y-2">
+                                <input
+                                    type="text"
+                                    x-model="retrieveForm.path"
+                                    class="w-full px-4 py-2 border border-slate-300 rounded-lg mono focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    placeholder="docs/readme.txt or /docs/readme.txt"
+                                    list="retrieve-path-suggestions"
+                                >
+                                <datalist id="retrieve-path-suggestions">
+                                    <option value="agent/ui-agent/prompt.md" />
+                                    <option value="agent/api-agent/config.json" />
+                                    <option value="agent/data-agent/schema.yaml" />
+                                    <option value="docs/readme.md" />
+                                    <option value="config/settings.json" />
+                                    <option value="templates/email.html" />
+                                </datalist>
+                                <div x-show="retrieveScopeSelection !== 'custom'" class="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        x-model="retrieveCustomPathEnabled"
+                                        id="retrieveCustomPath"
+                                        class="w-4 h-4 text-slate-600 border-slate-300 rounded focus:ring-slate-500"
+                                    >
+                                    <label for="retrieveCustomPath" class="text-sm text-slate-600">Override auto-generated path</label>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-1">
+                                    💡 Paths work with or without leading slash: <code>docs/file.json</code> = <code>/docs/file.json</code>
+                                </p>
+                            </div>
+                        </div>
+
+                        <button
+                            @click="retrieveContent()"
+                            class="w-full px-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors font-medium"
+                            :disabled="loading"
+                        >
+                            <div x-show="loading" class="flex items-center justify-center gap-2">
+                                <div class="spinner"></div>
+                                <span>Retrieving...</span>
+                            </div>
+                            <div x-show="!loading" class="flex items-center justify-center gap-2">
+                                <i data-lucide="search" class="w-4 h-4"></i>
+                                <span>Retrieve Content</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="section-card p-6">
+                    <div class="flex items-center gap-3 mb-6">
+                        <i data-lucide="file-text" class="w-6 h-6"></i>
+                        <h3 class="text-xl font-light">Retrieved Content</h3>
+                    </div>
+                    <div class="response-panel">
+                        <div x-show="!lastResponse.retrieve" class="text-center py-12">
+                            <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 text-slate-400"></i>
+                            <p class="text-slate-500">No content retrieved yet.</p>
+                        </div>
+                        <div x-show="lastResponse.retrieve" class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <span class="font-medium text-slate-700">Response Time:</span>
+                                    <span x-text="lastResponse.retrieve?.responseTime + 'ms'" class="mono font-medium"></span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <span class="font-medium text-slate-700">Status:</span>
+                                    <span :class="lastResponse.retrieve?.success ? 'text-green-600' : 'text-red-600'" class="font-medium">
+                                        <span x-text="lastResponse.retrieve?.success ? 'Success' : 'Error'"></span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div x-show="lastResponse.retrieve?.success">
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="block text-sm font-medium text-slate-700">Content:</label>
+                                    <button @click="downloadContent()" class="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1">
+                                        <i data-lucide="download" class="w-3 h-3"></i>
+                                        Download
+                                    </button>
+                                </div>
+                                <div x-show="isJsonContent(lastResponse.retrieve?.data?.content)">
+                                    <pre class="p-4 bg-slate-50 border rounded-lg text-xs mono whitespace-pre-wrap break-words max-h-64 overflow-y-auto" x-text="formatJsonContent(lastResponse.retrieve?.data?.content)"></pre>
+                                </div>
+                                <div x-show="!isJsonContent(lastResponse.retrieve?.data?.content)">
+                                    <pre class="p-4 bg-slate-50 border rounded-lg text-xs mono whitespace-pre-wrap break-words max-h-64 overflow-y-auto" x-text="lastResponse.retrieve?.data?.content"></pre>
+                                </div>
+                            </div>
+                            <div x-show="!lastResponse.retrieve?.success">
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Error Details:</label>
+                                <pre class="p-4 bg-red-50 border border-red-200 rounded-lg text-xs mono whitespace-pre-wrap break-words overflow-y-auto" x-text="JSON.stringify(lastResponse.retrieve?.data, null, 2)"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- List Files Section -->
+        <section id="list" class="fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="section-card p-6">
+                    <div class="flex items-center gap-3 mb-6">
+                        <i data-lucide="list" class="w-6 h-6"></i>
+                        <h2 class="text-2xl font-light">List Files</h2>
+                    </div>
+
+                    <div class="space-y-6">
+                        <!-- Scope Selection for Listing -->
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Select Scope</label>
+                            <select x-model="listScopeSelection" @change="updateListPrefix()" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500">
+                                <option value="all">📁 All Files</option>
+                                <option value="company">⚫ Company Files</option>
+                                <option value="session">🔵 Session Files</option>
+                                <option value="agent">🟣 Agent Files</option>
+                                <option value="team">🟢 Team Files</option>
+                            </select>
+                        </div>
+
+                        <!-- Context for scoped listing -->
+                        <div x-show="listScopeSelection === 'agent'" class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Agent Identifier</label>
+                            <input
+                                type="text"
+                                x-model="listAgentId"
+                                @input="updateListPrefix()"
+                                class="w-full px-4 py-2 border border-purple-300 rounded-lg mono text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                placeholder="e.g., validation-guru, 68cffd317e287e010a0ee8be, or URL"
+                            >
+                        </div>
+
+                        <div x-show="listScopeSelection === 'team'" class="bg-green-50 p-4 rounded-lg border border-green-200">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Team ID</label>
+                            <input
+                                type="text"
+                                x-model="listTeamId"
+                                @input="updateListPrefix()"
+                                class="w-full px-4 py-2 border border-green-300 rounded-lg mono text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                placeholder="engineering"
+                            >
+                        </div>
+
+                        <div x-show="listScopeSelection === 'session'" class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Session Context</label>
+                            <div class="p-3 bg-blue-100 rounded-lg">
+                                <p class="text-sm text-blue-800">
+                                    <i data-lucide="info" class="inline-block w-4 h-4 mr-1"></i>
+                                    Using your current active session automatically
+                                </p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Prefix</label>
+                            <input
+                                type="text"
+                                x-model="listForm.prefix"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg mono focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                placeholder="/ or /docs/"
+                                :readonly="listScopeSelection !== 'all'"
+                                :class="{ 'bg-slate-100': listScopeSelection !== 'all' }"
+                            >
+                        </div>
+
+                        <button
+                            @click="listFiles()"
+                            class="w-full px-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors font-medium"
+                            :disabled="loading"
+                        >
+                            <div x-show="loading" class="flex items-center justify-center gap-2">
+                                <div class="spinner"></div>
+                                <span>Listing...</span>
+                            </div>
+                            <div x-show="!loading" class="flex items-center justify-center gap-2">
+                                <i data-lucide="folder" class="w-4 h-4"></i>
+                                <span>List Files</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="section-card p-6">
+                    <div class="flex items-center gap-3 mb-6">
+                        <i data-lucide="files" class="w-6 h-6"></i>
+                        <h3 class="text-xl font-light">Files List</h3>
+                    </div>
+                    <div class="response-panel">
+                        <div x-show="!lastResponse.list" class="text-center py-12">
+                            <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 text-slate-400"></i>
+                            <p class="text-slate-500">No files listed yet.</p>
+                        </div>
+                        <div x-show="lastResponse.list" class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <span class="font-medium text-slate-700">Response Time:</span>
+                                    <span x-text="lastResponse.list?.responseTime + 'ms'" class="mono font-medium"></span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <span class="font-medium text-slate-700">Files Found:</span>
+                                    <span x-text="(lastResponse.list?.data?.paths?.length || lastResponse.list?.data?.files?.length || lastResponse.list?.data?.count || 0)" class="font-medium"></span>
+                                </div>
+                            </div>
+                            <div x-show="lastResponse.list?.success && (lastResponse.list?.data?.paths?.length > 0 || lastResponse.list?.data?.files?.length > 0)">
+                                <div class="space-y-2 max-h-80 overflow-y-auto">
+                                    <template x-for="(item, index) in (lastResponse.list?.data?.paths || lastResponse.list?.data?.files || [])" :key="index">
+                                        <div class="p-3 bg-slate-50 border rounded-lg">
+                                            <div class="flex items-center justify-between">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="scope-indicator" :class="getScopeClass(typeof item === 'string' ? item : item.path)"></span>
+                                                    <code class="text-sm mono" x-text="typeof item === 'string' ? item : item.path"></code>
+                                                </div>
+                                                <div class="flex gap-2">
+                                                    <button @click="retrieveForm.path = (typeof item === 'string' ? item : item.path); document.getElementById('retrieve').scrollIntoView({ behavior: 'smooth' })" class="text-blue-600 hover:text-blue-800 text-sm">
+                                                        <i data-lucide="eye" class="w-4 h-4"></i>
+                                                    </button>
+                                                    <button @click="deleteFile(typeof item === 'string' ? item : item.path)" class="text-red-600 hover:text-red-800 text-sm">
+                                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div x-show="typeof item === 'object'" class="text-xs text-slate-600 mt-2 flex gap-4">
+                                                <span x-show="item.size">Size: <span x-text="formatBytes(item.size)"></span></span>
+                                                <span x-show="item.ttl">TTL: <span x-text="formatTTL(item.ttl)"></span></span>
+                                                <span x-show="item.createdAt">Created: <span x-text="new Date(item.createdAt).toLocaleString()"></span></span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Delete File Section -->
+        <section id="delete" class="fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="section-card p-6">
+                    <div class="flex items-center gap-3 mb-6">
+                        <i data-lucide="trash-2" class="w-6 h-6 text-red-600"></i>
+                        <h2 class="text-2xl font-light">Delete File</h2>
+                    </div>
+
+                    <div class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Scope</label>
+                            <select x-model="deleteScopeSelection" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500">
+                                <option value="company">Company (Permanent)</option>
+                                <option value="session">Session (24h TTL)</option>
+                                <option value="agent">Agent (7d TTL)</option>
+                                <option value="team">Team (30d TTL)</option>
+                            </select>
+                        </div>
+
+                        <div x-show="deleteScopeSelection === 'session'">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Session ID</label>
+                            <input
+                                type="text"
+                                x-model="deleteSessionId"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg mono focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                placeholder="session-123"
+                            >
+                        </div>
+
+                        <div x-show="deleteScopeSelection === 'agent'">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Agent ID/Name</label>
+                            <input
+                                type="text"
+                                x-model="deleteAgentId"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg mono focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                placeholder="validation-guru, 68bf4b8c4c82fc93a5517432, or URL"
+                            >
+                        </div>
+
+                        <div x-show="deleteScopeSelection === 'team'">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Team ID</label>
+                            <input
+                                type="text"
+                                x-model="deleteTeamId"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg mono focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                placeholder="team-id"
+                            >
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Path</label>
+                            <input
+                                type="text"
+                                x-model="deleteForm.path"
+                                class="w-full px-4 py-2 border border-slate-300 rounded-lg mono focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                placeholder="/docs/readme.txt"
+                            >
+                        </div>
+
+                        <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
+                            <div class="flex items-center gap-2 text-red-800 mb-2">
+                                <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                                <span class="text-sm font-medium">Warning</span>
+                            </div>
+                            <p class="text-sm text-red-700">This action cannot be undone. The file will be permanently deleted.</p>
+                        </div>
+
+                        <button
+                            @click="deleteFile()"
+                            class="w-full px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                            :disabled="loading"
+                        >
+                            <div x-show="loading" class="flex items-center justify-center gap-2">
+                                <div class="spinner"></div>
+                                <span>Deleting...</span>
+                            </div>
+                            <div x-show="!loading" class="flex items-center justify-center gap-2">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                <span>Delete File</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="section-card p-6">
+                    <div class="flex items-center gap-3 mb-6">
+                        <i data-lucide="check-circle" class="w-6 h-6"></i>
+                        <h3 class="text-xl font-light">Delete Result</h3>
+                    </div>
+                    <div class="response-panel">
+                        <div x-show="!lastResponse.delete" class="text-center py-12">
+                            <i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 text-slate-400"></i>
+                            <p class="text-slate-500">No deletion performed yet.</p>
+                        </div>
+                        <div x-show="lastResponse.delete" class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <span class="font-medium text-slate-700">Response Time:</span>
+                                    <span x-text="lastResponse.delete?.responseTime + 'ms'" class="mono font-medium"></span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                    <span class="font-medium text-slate-700">Status:</span>
+                                    <span :class="lastResponse.delete?.success ? 'text-green-600' : 'text-red-600'" class="font-medium">
+                                        <span x-text="lastResponse.delete?.success ? 'Success' : 'Error'"></span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Response:</label>
+                                <pre class="p-4 bg-slate-50 border rounded-lg text-xs mono overflow-x-auto" x-text="JSON.stringify(lastResponse.delete?.data, null, 2)"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- Clear Scope Section -->
+        <section id="clear-scope" class="fade-in">
+            <div class="section-card p-6">
+                <div class="flex items-center gap-3 mb-6">
+                    <i data-lucide="trash-2" class="w-6 h-6 text-red-600"></i>
+                    <h2 class="text-2xl font-light">Clear Scope</h2>
+                </div>
+
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-start gap-2">
+                        <i data-lucide="alert-triangle" class="w-5 h-5 text-red-600 mt-0.5"></i>
+                        <div>
+                            <p class="text-sm font-medium text-red-900">Warning: This action cannot be undone</p>
+                            <p class="text-sm text-red-700">Clearing a scope will permanently delete all files in that scope.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid gap-6">
+                    <!-- Scope Selection -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-3">Select Scope to Clear</label>
+                        <div class="flex flex-wrap gap-2">
+                            <button
+                                @click="clearScopeSelection = 'company'"
+                                class="px-4 py-2 rounded-lg text-sm transition-colors"
+                                :class="clearScopeSelection === 'company' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'"
+                            >
+                                <span class="scope-indicator scope-company"></span>
+                                Company
+                            </button>
+                            <button
+                                @click="clearScopeSelection = 'session'"
+                                class="px-4 py-2 rounded-lg text-sm transition-colors"
+                                :class="clearScopeSelection === 'session' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'"
+                            >
+                                <span class="scope-indicator scope-session"></span>
+                                Session
+                            </button>
+                            <button
+                                @click="clearScopeSelection = 'agent'"
+                                class="px-4 py-2 rounded-lg text-sm transition-colors"
+                                :class="clearScopeSelection === 'agent' ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700 hover:bg-purple-200'"
+                            >
+                                <span class="scope-indicator scope-agent"></span>
+                                Agent
+                            </button>
+                            <button
+                                @click="clearScopeSelection = 'team'"
+                                class="px-4 py-2 rounded-lg text-sm transition-colors"
+                                :class="clearScopeSelection === 'team' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200'"
+                            >
+                                <span class="scope-indicator scope-team"></span>
+                                Team
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Scope-specific inputs -->
+                    <div>
+                        <!-- Session ID -->
+                        <div x-show="clearScopeSelection === 'session'" class="fade-in">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Session ID</label>
+                            <input
+                                type="text"
+                                x-model="clearSessionId"
+                                class="w-full px-4 py-2 border border-blue-300 rounded-lg mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="e.g., test-session-123"
+                            >
+                            <p class="text-xs text-blue-600 mt-2">Enter the session ID to clear</p>
+                        </div>
+
+                        <!-- Agent ID -->
+                        <div x-show="clearScopeSelection === 'agent'" class="fade-in">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Agent ID/Name</label>
+                            <input
+                                type="text"
+                                x-model="clearAgentId"
+                                class="w-full px-4 py-2 border border-purple-300 rounded-lg mono text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                placeholder="e.g., validation-guru, 68cffd317e287e010a0ee8be"
+                            >
+                            <p class="text-xs text-purple-600 mt-2">Enter agent ID or name to clear</p>
+                        </div>
+
+                        <!-- Team ID -->
+                        <div x-show="clearScopeSelection === 'team'" class="fade-in">
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Team ID</label>
+                            <input
+                                type="text"
+                                x-model="clearTeamId"
+                                class="w-full px-4 py-2 border border-green-300 rounded-lg mono text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                placeholder="e.g., 68a1bc8a87bc32d88bbc9868"
+                            >
+                            <p class="text-xs text-green-600 mt-2">Enter the team ID to clear</p>
+                        </div>
+                    </div>
+
+                    <!-- Confirmation -->
+                    <div>
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" x-model="clearConfirmation" class="rounded text-red-600 focus:ring-red-500">
+                            <span class="text-sm text-slate-700">I understand this action is permanent and cannot be undone</span>
+                        </label>
+                    </div>
+
+                    <!-- Clear Button -->
+                    <div class="flex gap-4">
+                        <button
+                            @click="clearScope()"
+                            :disabled="!clearConfirmation || isClearLoading"
+                            class="px-6 py-3 bg-red-600 text-white rounded-lg font-medium transition-all disabled:bg-slate-300 disabled:cursor-not-allowed hover:bg-red-700 flex items-center gap-2"
+                        >
+                            <template x-if="!isClearLoading">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </template>
+                            <div x-show="isClearLoading" class="spinner"></div>
+                            <span x-text="isClearLoading ? 'Clearing...' : 'Clear Scope'"></span>
+                        </button>
+                    </div>
+
+                    <!-- Response -->
+                    <div x-show="clearResponse" class="fade-in">
+                        <div class="p-4 rounded-lg" :class="clearResponse?.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'">
+                            <div class="flex items-start gap-2">
+                                <i data-lucide="check-circle" class="w-5 h-5 mt-0.5"
+                                   :class="clearResponse?.success ? 'text-green-600' : 'text-red-600'"></i>
+                                <div class="flex-1">
+                                    <p class="font-medium" :class="clearResponse?.success ? 'text-green-900' : 'text-red-900'"
+                                       x-text="clearResponse?.message || clearResponse?.error"></p>
+                                    <div x-show="clearResponse?.filesCleared !== undefined" class="mt-2">
+                                        <p class="text-sm" :class="clearResponse?.success ? 'text-green-700' : 'text-red-700'">
+                                            Files cleared: <span x-text="clearResponse?.filesCleared" class="font-mono"></span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div x-show="showToast"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 transform translate-y-2"
+         x-transition:enter-end="opacity-100 transform translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 transform translate-y-0"
+         x-transition:leave-end="opacity-0 transform translate-y-2"
+         class="fixed bottom-4 right-4 z-50">
+        <div :class="['p-4 rounded-lg shadow-lg', toastType === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white']">
+            <div class="flex items-center gap-2">
+                <i :data-lucide="toastType === 'success' ? 'check-circle' : 'x-circle'" class="w-5 h-5"></i>
+                <span x-text="toastMessage"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let jsonEditor = null;
+        let batchJsonEditor = null;
+
+        function workspaceTestApp() {
+            return {
+                // Configuration
+                config: {
+                    baseUrl: 'http://localhost:3000',
+                    authToken: 'sk_live_e69dfeb21e6eb4c5b2d17e92b0ff0a4dad6170ee65ae1762c1c39459d8162964'
+                },
+
+                // UI State
+                loading: false,
+                showToast: false,
+                toastMessage: '',
+                toastType: 'success',
+
+                // Scope Management
+                scopeSelection: 'company',
+                agentId: 'validation-guru', // Can be ID, name, or URL
+                sessionId: '',
+                teamId: '68a1bc8a87bc32d88bbc9868',
+                customPathEnabled: false,
+
+                // List Scope Management
+                listScopeSelection: 'company',
+                listAgentId: 'validation-guru', // Can be ID, name, or URL
+                listSessionId: '',
+                listTeamId: '68a1bc8a87bc32d88bbc9868',
+
+                // Retrieve Scope Management
+                retrieveScopeSelection: 'company',
+                retrieveAgentId: 'validation-guru', // Can be ID, name, or URL
+                retrieveSessionId: '',
+
+                // Clear Scope Management
+                clearScopeSelection: 'company',
+                clearAgentId: 'validation-guru',
+                clearSessionId: '',
+                clearTeamId: '68a1bc8a87bc32d88bbc9868',
+                clearConfirmation: false,
+                isClearLoading: false,
+                clearResponse: null,
+                retrieveTeamId: '68a1bc8a87bc32d88bbc9868',
+                // retrieveFileName removed - not needed
+                retrieveCustomPathEnabled: false,
+
+                // Forms
+                storeForm: {
+                    path: 'agent/ui-agent/prompt.md',  // Leading slash optional
+                    content: '{"message": "Hello World", "timestamp": "' + new Date().toISOString() + '"}',
+                    contentType: 'json',
+                    ttl: 0,
+                    ttlPreset: '0'
+                },
+
+                retrieveForm: {
+                    path: 'agent/ui-agent/prompt.md'  // Leading slash optional
+                },
+
+                listForm: {
+                    prefix: '/'
+                },
+
+                deleteForm: {
+                    path: ''
+                },
+
+                // Delete scope selections
+                deleteScopeSelection: 'company',
+                deleteSessionId: 'default',
+                deleteAgentId: '',
+                deleteTeamId: '',
+
+
+                // Responses
+                lastResponse: {
+                    store: null,
+                    retrieve: null,
+                    list: null,
+                    delete: null
+                },
+
+                // Initialize
+                init() {
+                    this.$nextTick(() => {
+                        lucide.createIcons();
+                        this.initMonacoEditors();
+                    });
+                },
+
+                // Update path based on selected scope
+                updatePathForScope() {
+                    // Removed automatic path updating - keep user's entered path
+                    return;
+                },
+
+                // Update list prefix based on selected scope
+                updateListPrefix() {
+                    // All scopes use simple paths, scope is context via API
+                    this.listForm.prefix = '/';
+                },
+
+                // Update retrieve path based on selected scope
+                updateRetrievePath() {
+                    // If custom path is enabled, don't auto-generate
+                    if (this.retrieveCustomPathEnabled) {
+                        return;
+                    }
+
+                    // Default example path - leading slash is optional
+                    this.retrieveForm.path = 'docs/sample.json';
+                },
+
+                // Initialize Monaco Editors
+                initMonacoEditors() {
+                    require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+                    require(['vs/editor/editor.main'], () => {
+                        // JSON Editor for store content
+                        if (document.getElementById('jsonEditor')) {
+                            jsonEditor = monaco.editor.create(document.getElementById('jsonEditor'), {
+                                value: this.storeForm.content,
+                                language: 'json',
+                                theme: 'vs',
+                                minimap: { enabled: false },
+                                fontSize: 12,
+                                lineNumbers: 'on',
+                                automaticLayout: true
+                            });
+
+                            jsonEditor.onDidChangeModelContent(() => {
+                                this.storeForm.content = jsonEditor.getValue();
+                            });
+                        }
+
+                        // Batch JSON Editor
+                        if (document.getElementById('batchJsonEditor')) {
+                            batchJsonEditor = monaco.editor.create(document.getElementById('batchJsonEditor'), {
+                                value: '{\n  "files": [\n    {\n      "path": "/example/file1.txt",\n      "content": "Example content 1",\n      "ttl": 3600\n    },\n    {\n      "path": "/example/file2.json",\n      "content": "{\\"key\\": \\"value\\"}",\n      "ttl": 7200\n    }\n  ]\n}',
+                                language: 'json',
+                                theme: 'vs',
+                                minimap: { enabled: false },
+                                fontSize: 12,
+                                lineNumbers: 'on',
+                                automaticLayout: true
+                            });
+
+                            batchJsonEditor.onDidChangeModelContent(() => {
+                                try {
+                                    this.batchForm.importData = JSON.parse(batchJsonEditor.getValue());
+                                } catch (e) {
+                                    // Invalid JSON, ignore
+                                }
+                            });
+                        }
+                    });
+                },
+
+                // Test connection
+                async testConnection() {
+                    this.loading = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const response = await fetch(`${this.config.baseUrl}/api/workspace/list?prefix=/`, {
+                            headers: {
+                                'Authorization': `Bearer ${this.config.authToken}`,
+                                'Content-Type': 'application/json',
+                                ...(this.scopeSelection === 'session' && { 'x-session-id': this.sessionId }),
+                                ...(this.scopeSelection === 'agent' && { 'x-agent-id': this.agentId }),
+                                ...(this.scopeSelection === 'team' && { 'x-team-id': this.teamId })
+                            }
+                        });
+
+                        const responseTime = Date.now() - startTime;
+
+                        if (response.ok) {
+                            this.showToastMessage('Connection successful! (' + responseTime + 'ms)', 'success');
+                        } else {
+                            this.showToastMessage('Connection failed: ' + response.status, 'error');
+                        }
+                    } catch (error) {
+                        this.showToastMessage('Connection failed: ' + error.message, 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                // Store content
+                async storeContent() {
+                    this.loading = true;
+                    const startTime = Date.now();
+
+                    try {
+                        let content = this.storeForm.content;
+
+                        // Get content from Monaco editor if JSON type
+                        if (this.storeForm.contentType === 'json' && jsonEditor) {
+                            content = jsonEditor.getValue();
+                        }
+
+                        const payload = {
+                            path: this.storeForm.path,
+                            content: content,
+                            metadata: {
+                                scope: this.scopeSelection,
+                                ...(this.scopeSelection === 'agent' && { agentId: this.agentId }),
+                                ...(this.scopeSelection === 'team' && { teamId: this.teamId }),
+                                ...(this.storeForm.ttl && this.storeForm.ttl > 0 && { ttl: parseInt(this.storeForm.ttl) })
+                            }
+                        }
+
+                        const response = await fetch(`${this.config.baseUrl}/api/workspace/set`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${this.config.authToken}`,
+                                'Content-Type': 'application/json',
+                                ...(this.scopeSelection === 'session' && { 'x-session-id': this.sessionId }),
+                                ...(this.scopeSelection === 'agent' && { 'x-agent-id': this.agentId }),
+                                ...(this.scopeSelection === 'team' && { 'x-team-id': this.teamId })
+                            },
+                            body: JSON.stringify(payload)
+                        });
+
+                        const data = await response.json();
+                        const responseTime = Date.now() - startTime;
+
+                        this.lastResponse.store = {
+                            success: response.ok,
+                            data: data,
+                            responseTime: responseTime
+                        };
+
+                        if (response.ok) {
+                            const operation = data.created ? 'created' : 'updated';
+                            const version = data.version ? ` (v${data.version})` : '';
+                            this.showToastMessage(`Content ${operation} successfully!${version}`, 'success');
+                        } else {
+                            this.showToastMessage('Failed to store content', 'error');
+                        }
+
+                    } catch (error) {
+                        const responseTime = Date.now() - startTime;
+                        this.lastResponse.store = {
+                            success: false,
+                            data: { error: error.message },
+                            responseTime: responseTime
+                        };
+                        this.showToastMessage('Error: ' + error.message, 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                // Retrieve content
+                async retrieveContent() {
+                    this.loading = true;
+                    const startTime = Date.now();
+
+                    try {
+                        let queryParams = `path=${encodeURIComponent(this.retrieveForm.path)}&scope=${this.retrieveScopeSelection}`;
+
+                        if (this.retrieveScopeSelection === 'agent') {
+                            queryParams += `&agentId=${this.retrieveAgentId}`;
+                        } else if (this.retrieveScopeSelection === 'team') {
+                            queryParams += `&teamId=${this.retrieveTeamId}`;
+                        }
+
+                        const response = await fetch(`${this.config.baseUrl}/api/workspace/get?${queryParams}`, {
+                            headers: {
+                                'Authorization': `Bearer ${this.config.authToken}`,
+                                'Content-Type': 'application/json',
+                                ...(this.retrieveScopeSelection === 'session' && { 'x-session-id': this.retrieveSessionId }),
+                                ...(this.retrieveScopeSelection === 'agent' && { 'x-agent-id': this.retrieveAgentId }),
+                                ...(this.retrieveScopeSelection === 'team' && { 'x-team-id': this.retrieveTeamId })
+                            }
+                        });
+
+                        const data = await response.json();
+                        const responseTime = Date.now() - startTime;
+
+                        this.lastResponse.retrieve = {
+                            success: response.ok,
+                            data: data,
+                            responseTime: responseTime
+                        };
+
+                        if (response.ok) {
+                            this.showToastMessage('Content retrieved successfully!', 'success');
+                        } else {
+                            this.showToastMessage('Failed to retrieve content', 'error');
+                        }
+
+                    } catch (error) {
+                        const responseTime = Date.now() - startTime;
+                        this.lastResponse.retrieve = {
+                            success: false,
+                            data: { error: error.message },
+                            responseTime: responseTime
+                        };
+                        this.showToastMessage('Error: ' + error.message, 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                // List files
+                async listFiles() {
+                    this.loading = true;
+                    const startTime = Date.now();
+
+                    try {
+                        let queryParams = `prefix=${encodeURIComponent(this.listForm.prefix)}&scope=${this.listScopeSelection}`;
+
+                        if (this.listScopeSelection === 'agent') {
+                            queryParams += `&agentId=${this.listAgentId}`;
+                        } else if (this.listScopeSelection === 'team') {
+                            queryParams += `&teamId=${this.listTeamId}`;
+                        }
+
+                        const response = await fetch(`${this.config.baseUrl}/api/workspace/list?${queryParams}`, {
+                            headers: {
+                                'Authorization': `Bearer ${this.config.authToken}`,
+                                'Content-Type': 'application/json',
+                                ...(this.listScopeSelection === 'session' && { 'x-session-id': this.listSessionId }),
+                                ...(this.listScopeSelection === 'agent' && { 'x-agent-id': this.listAgentId }),
+                                ...(this.listScopeSelection === 'team' && { 'x-team-id': this.listTeamId })
+                            }
+                        });
+
+                        const data = await response.json();
+                        const responseTime = Date.now() - startTime;
+
+                        this.lastResponse.list = {
+                            success: response.ok,
+                            data: data,
+                            responseTime: responseTime
+                        };
+
+                        if (response.ok) {
+                            const fileCount = data.paths?.length || data.files?.length || data.count || 0;
+                            this.showToastMessage(`Found ${fileCount} files`, 'success');
+                        } else {
+                            this.showToastMessage('Failed to list files', 'error');
+                        }
+
+                    } catch (error) {
+                        const responseTime = Date.now() - startTime;
+                        this.lastResponse.list = {
+                            success: false,
+                            data: { error: error.message },
+                            responseTime: responseTime
+                        };
+                        this.showToastMessage('Error: ' + error.message, 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                // Delete file
+                async deleteFile(path = null) {
+                    const filePath = path || this.deleteForm.path;
+                    if (!filePath) {
+                        this.showToastMessage('Please enter a file path', 'error');
+                        return;
+                    }
+
+                    this.loading = true;
+                    const startTime = Date.now();
+
+                    try {
+                        const response = await fetch(`${this.config.baseUrl}/api/workspace/delete`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Authorization': `Bearer ${this.config.authToken}`,
+                                'Content-Type': 'application/json',
+                                ...(this.deleteScopeSelection === 'session' && { 'x-session-id': this.deleteSessionId }),
+                                ...(this.deleteScopeSelection === 'agent' && { 'x-agent-id': this.deleteAgentId }),
+                                ...(this.deleteScopeSelection === 'team' && { 'x-team-id': this.deleteTeamId })
+                            },
+                            body: JSON.stringify({
+                                path: filePath,
+                                scope: this.deleteScopeSelection,
+                                ...(this.deleteScopeSelection === 'agent' && { agentId: this.deleteAgentId }),
+                                ...(this.deleteScopeSelection === 'team' && { teamId: this.deleteTeamId })
+                            })
+                        });
+
+                        const data = await response.json();
+                        const responseTime = Date.now() - startTime;
+
+                        this.lastResponse.delete = {
+                            success: response.ok,
+                            data: data,
+                            responseTime: responseTime
+                        };
+
+                        if (response.ok) {
+                            this.showToastMessage('File deleted successfully!', 'success');
+                            // Refresh list if files are currently listed
+                            if (this.lastResponse.list?.success) {
+                                this.listFiles();
+                            }
+                        } else {
+                            this.showToastMessage('Failed to delete file', 'error');
+                        }
+
+                    } catch (error) {
+                        const responseTime = Date.now() - startTime;
+                        this.lastResponse.delete = {
+                            success: false,
+                            data: { error: error.message },
+                            responseTime: responseTime
+                        };
+                        this.showToastMessage('Error: ' + error.message, 'error');
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+
+                // Handle file upload
+                handleFileUpload(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+                            // Convert to base64
+                            this.storeForm.content = e.target.result;
+                        } else {
+                            // Use as text
+                            this.storeForm.content = e.target.result;
+                        }
+
+                        // Update path with filename
+                        const pathParts = this.storeForm.path.split('/');
+                        pathParts[pathParts.length - 1] = file.name;
+                        this.storeForm.path = pathParts.join('/');
+                    };
+
+                    if (file.type.startsWith('image/') || file.type === 'application/pdf') {
+                        reader.readAsDataURL(file);
+                    } else {
+                        reader.readAsText(file);
+                    }
+                },
+
+                // Update TTL from preset
+                updateTTL() {
+                    if (this.storeForm.ttlPreset !== 'custom') {
+                        this.storeForm.ttl = parseInt(this.storeForm.ttlPreset);
+                    }
+                },
+
+                // Utility functions
+                formatTTL(seconds) {
+                    if (seconds === 0) return 'Permanent';
+                    if (seconds < 60) return `${seconds}s`;
+                    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+                    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+                    return `${Math.floor(seconds / 86400)}d`;
+                },
+
+                formatBytes(bytes) {
+                    if (bytes === 0) return '0 B';
+                    const k = 1024;
+                    const sizes = ['B', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                },
+
+                getScopeClass(path) {
+                    if (path.startsWith('/temporary/')) return 'scope-temporary';
+                    if (path.startsWith('/session/')) return 'scope-session';
+                    if (path.startsWith('/agent/')) return 'scope-agent';
+                    if (path.startsWith('/team/')) return 'scope-team';
+                    if (path.startsWith('/company/')) return 'scope-company';
+                    return 'scope-temporary';
+                },
+
+
+                isJsonContent(content) {
+                    // Check if content is already an object/array
+                    if (typeof content === 'object' && content !== null) {
+                        return true;
+                    }
+                    // Check if it's a JSON string
+                    if (typeof content === 'string') {
+                        try {
+                            JSON.parse(content);
+                            return true;
+                        } catch {
+                            return false;
+                        }
+                    }
+                    return false;
+                },
+
+                formatJsonContent(content) {
+                    // If content is already an object/array, stringify it
+                    if (typeof content === 'object' && content !== null) {
+                        return JSON.stringify(content, null, 2);
+                    }
+                    // If it's a string, try to parse and re-stringify with formatting
+                    if (typeof content === 'string') {
+                        try {
+                            return JSON.stringify(JSON.parse(content), null, 2);
+                        } catch {
+                            return content;
+                        }
+                    }
+                    return String(content);
+                },
+
+                // Download functions
+                downloadContent() {
+                    if (!this.lastResponse.retrieve?.data?.content) return;
+
+                    let content = this.lastResponse.retrieve.data.content;
+                    const path = this.retrieveForm.path;
+                    const filename = path.split('/').pop() || 'download.txt';
+
+                    // Convert object to string if necessary
+                    if (typeof content === 'object' && content !== null) {
+                        content = JSON.stringify(content, null, 2);
+                    }
+
+                    const blob = new Blob([content], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                },
+
+
+                // Clear Scope
+                async clearScope() {
+                    if (!this.clearConfirmation) {
+                        this.showToastMessage('Please confirm you want to clear the scope', 'error');
+                        return;
+                    }
+
+                    this.isClearLoading = true;
+                    this.clearResponse = null;
+
+                    try {
+                        const payload = {
+                            scope: this.clearScopeSelection,
+                            confirm: true
+                        };
+
+                        // Add scope-specific IDs
+                        if (this.clearScopeSelection === 'agent') {
+                            payload.agentId = this.clearAgentId;
+                        } else if (this.clearScopeSelection === 'team') {
+                            payload.teamId = this.clearTeamId;
+                        }
+
+                        const headers = {
+                            'Authorization': `Bearer ${this.config.authToken}`,
+                            'Content-Type': 'application/json',
+                            ...(this.clearScopeSelection === 'session' && { 'x-session-id': this.clearSessionId }),
+                            ...(this.clearScopeSelection === 'agent' && { 'x-agent-id': this.clearAgentId }),
+                            ...(this.clearScopeSelection === 'team' && { 'x-team-id': this.clearTeamId })
+                        };
+
+                        const response = await fetch(`${this.config.baseUrl}/api/workspace/clear-scope`, {
+                            method: 'DELETE',
+                            headers,
+                            body: JSON.stringify(payload)
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok) {
+                            this.clearResponse = data;
+                            this.showToastMessage(`Successfully cleared ${data.filesCleared} files from ${this.clearScopeSelection} scope`, 'success');
+
+                            // Reset confirmation
+                            this.clearConfirmation = false;
+
+                            // Refresh lists if needed
+                            if (this.fileList.length > 0) {
+                                this.loadFullList();
+                            }
+                        } else {
+                            this.clearResponse = { success: false, error: data.error || 'Failed to clear scope' };
+                            this.showToastMessage(data.error || 'Failed to clear scope', 'error');
+                        }
+                    } catch (error) {
+                        this.clearResponse = { success: false, error: error.message };
+                        this.showToastMessage('Failed to clear scope: ' + error.message, 'error');
+                    } finally {
+                        this.isClearLoading = false;
+                    }
+                },
+
+                // Toast notifications
+                showToastMessage(message, type = 'success') {
+                    this.toastMessage = message;
+                    this.toastType = type;
+                    this.showToast = true;
+
+                    setTimeout(() => {
+                        this.showToast = false;
+                    }, 3000);
+
+                    this.$nextTick(() => lucide.createIcons());
+                }
+            }
+        }
+    </script>
+</body>
+</html>

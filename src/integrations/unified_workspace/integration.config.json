@@ -1,0 +1,7 @@
+{
+  "name": "unified_workspace",
+  "icon": "database",
+  "apiKeyName": "workspace_api_key",
+  "actionCreator": "createWorkspaceActions",
+  "actionsFile": "unified_workspace.actions.ts"
+}

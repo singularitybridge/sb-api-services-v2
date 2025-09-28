@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified Workspace - Quick Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .result-box {
+            background: #1e293b;
+            color: #94a3b8;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-slate-100 min-h-screen p-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h1 class="text-2xl font-bold text-gray-900 mb-2">🚀 Unified Workspace - Quick Test</h1>
+            <p class="text-gray-600">Simple, fast testing for the new simplified storage architecture</p>
+
+            <!-- API Configuration -->
+            <div class="mt-4 p-4 bg-blue-50 rounded-lg">
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="font-semibold text-blue-900">API:</span>
+                    <span class="text-blue-700">http://localhost:3000</span>
+                    <span class="mx-2">|</span>
+                    <span class="font-semibold text-blue-900">Auth:</span>
+                    <span class="text-blue-700">Bearer sk_live_e69d...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Architecture Info -->
+        <div class="bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-3">✨ New Simplified Architecture</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div class="bg-white/20 backdrop-blur rounded-lg p-3">
+                    <div class="font-semibold">💾 All Files</div>
+                    <div class="text-xs opacity-90">→ Disk Storage</div>
+                </div>
+                <div class="bg-white/20 backdrop-blur rounded-lg p-3">
+                    <div class="font-semibold">📝 MongoDB</div>
+                    <div class="text-xs opacity-90">→ Metadata Only</div>
+                </div>
+                <div class="bg-white/20 backdrop-blur rounded-lg p-3">
+                    <div class="font-semibold">🚫 No Routing</div>
+                    <div class="text-xs opacity-90">→ Size Independent</div>
+                </div>
+                <div class="bg-white/20 backdrop-blur rounded-lg p-3">
+                    <div class="font-semibold">☁️ S3 Ready</div>
+                    <div class="text-xs opacity-90">→ Future Upgrade</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Controls -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Store Content -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">📥 Store Content</h3>
+
+                <!-- Scope Selection -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Scope:</label>
+                    <select id="scope" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" onchange="updatePath()">
+                        <option value="temporary">🟡 Temporary (10 min)</option>
+                        <option value="session">🔵 Session (24 hour)</option>
+                        <option value="agent">🟣 Agent (7 day)</option>
+                        <option value="team">🟢 Team (30 day)</option>
+                        <option value="company">⚫ Company (permanent)</option>
+                    </select>
+                </div>
+
+                <!-- Path -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Path:</label>
+                    <input type="text" id="path" value="/temporary/test.json"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm">
+                </div>
+
+                <!-- Content -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Content:</label>
+                    <textarea id="content" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm">{
+  "message": "Hello Workspace!",
+  "timestamp": "auto"
+}</textarea>
+                </div>
+
+                <!-- TTL Override -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <input type="checkbox" id="customTtl" onchange="toggleTtl()">
+                        <span class="ml-2">Custom TTL</span>
+                    </label>
+                    <div id="ttlSection" class="hidden mt-2 flex gap-2">
+                        <input type="number" id="ttlValue" value="1" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg">
+                        <select id="ttlUnit" class="px-3 py-2 border border-gray-300 rounded-lg">
+                            <option value="60000">Minutes</option>
+                            <option value="3600000">Hours</option>
+                            <option value="86400000">Days</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button onclick="storeContent()" id="storeBtn"
+                        class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                    Store Content
+                </button>
+            </div>
+
+            <!-- Retrieve Content -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">📤 Retrieve Content</h3>
+
+                <!-- Path -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Path to retrieve:</label>
+                    <input type="text" id="retrievePath" value="/temporary/test.json"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm">
+                </div>
+
+                <button onclick="retrieveContent()" id="retrieveBtn"
+                        class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium mb-4">
+                    Retrieve Content
+                </button>
+
+                <div class="border-t pt-4">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Other Operations:</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="listContent()" class="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
+                            List Files
+                        </button>
+                        <button onclick="deleteContent()" class="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">
+                            Delete File
+                        </button>
+                        <button onclick="exportContent()" class="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm">
+                            Export All
+                        </button>
+                        <button onclick="clearContent()" class="px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm">
+                            Clear Prefix
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mt-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">📊 Results</h3>
+            <div id="results" class="result-box">Ready for testing...</div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000';
+        const AUTH_TOKEN = 'Bearer sk_live_e69dfeb21e6eb4c5b2d17e92b0ff0a4dad6170ee65ae1762c1c39459d8162964';
+        const results = document.getElementById('results');
+
+        function log(message, data = null) {
+            const timestamp = new Date().toLocaleTimeString();
+            let output = `[${timestamp}] ${message}`;
+            if (data) {
+                output += '\n' + JSON.stringify(data, null, 2);
+            }
+            results.textContent = output + '\n\n' + results.textContent;
+        }
+
+        function updatePath() {
+            const scope = document.getElementById('scope').value;
+            const path = document.getElementById('path');
+            const retrievePath = document.getElementById('retrievePath');
+
+            const paths = {
+                'temporary': '/temporary/test.json',
+                'session': '/session/user-data.json',
+                'agent': '/agent/681b41850f470a9a746f280e/config.json',
+                'team': '/team/engineering/docs.md',
+                'company': '/company/settings.json'
+            };
+
+            path.value = paths[scope];
+            retrievePath.value = paths[scope];
+        }
+
+        function toggleTtl() {
+            const ttlSection = document.getElementById('ttlSection');
+            const customTtl = document.getElementById('customTtl');
+            ttlSection.classList.toggle('hidden', !customTtl.checked);
+        }
+
+        async function storeContent() {
+            const btn = document.getElementById('storeBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Storing...';
+
+            try {
+                const path = document.getElementById('path').value;
+                let content = document.getElementById('content').value;
+
+                // Try to parse as JSON, fallback to string
+                try {
+                    content = JSON.parse(content);
+                    if (content.timestamp === 'auto') {
+                        content.timestamp = Date.now();
+                    }
+                } catch {
+                    // Keep as string
+                }
+
+                const body = { path, content };
+
+                // Add TTL if custom
+                if (document.getElementById('customTtl').checked) {
+                    const ttlValue = parseInt(document.getElementById('ttlValue').value);
+                    const ttlUnit = parseInt(document.getElementById('ttlUnit').value);
+                    body.metadata = { ttl: ttlValue * ttlUnit };
+                }
+
+                const response = await fetch(`${API_URL}/api/workspace/set`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': AUTH_TOKEN
+                    },
+                    body: JSON.stringify(body)
+                });
+
+                const data = await response.json();
+                log(`✅ Store successful! Path: ${path}`, data);
+            } catch (error) {
+                log(`❌ Store failed: ${error.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Store Content';
+            }
+        }
+
+        async function retrieveContent() {
+            const btn = document.getElementById('retrieveBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Retrieving...';
+
+            try {
+                const path = document.getElementById('retrievePath').value;
+
+                const response = await fetch(`${API_URL}/api/workspace/get?path=${encodeURIComponent(path)}`, {
+                    headers: {
+                        'Authorization': AUTH_TOKEN
+                    }
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    log(`✅ Retrieved from ${path}:`, data.content);
+                } else {
+                    log(`⚠️ Not found: ${path}`, data);
+                }
+            } catch (error) {
+                log(`❌ Retrieve failed: ${error.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Retrieve Content';
+            }
+        }
+
+        async function listContent() {
+            try {
+                const path = document.getElementById('retrievePath').value;
+                const prefix = path.substring(0, path.lastIndexOf('/'));
+
+                const response = await fetch(`${API_URL}/api/workspace/list?prefix=${encodeURIComponent(prefix)}`, {
+                    headers: {
+                        'Authorization': AUTH_TOKEN
+                    }
+                });
+
+                const data = await response.json();
+                log(`📁 Files with prefix "${prefix}":`, data);
+            } catch (error) {
+                log(`❌ List failed: ${error.message}`);
+            }
+        }
+
+        async function deleteContent() {
+            try {
+                const path = document.getElementById('retrievePath').value;
+
+                const response = await fetch(`${API_URL}/api/workspace/delete`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': AUTH_TOKEN
+                    },
+                    body: JSON.stringify({ path })
+                });
+
+                const data = await response.json();
+                log(`🗑️ Delete ${path}:`, data);
+            } catch (error) {
+                log(`❌ Delete failed: ${error.message}`);
+            }
+        }
+
+        async function exportContent() {
+            try {
+                const response = await fetch(`${API_URL}/api/workspace/export`, {
+                    headers: {
+                        'Authorization': AUTH_TOKEN
+                    }
+                });
+
+                const data = await response.json();
+                log(`📦 Exported all content:`, data);
+            } catch (error) {
+                log(`❌ Export failed: ${error.message}`);
+            }
+        }
+
+        async function clearContent() {
+            const path = document.getElementById('retrievePath').value;
+            const prefix = path.substring(0, path.lastIndexOf('/'));
+
+            if (!confirm(`Clear all files with prefix "${prefix}"?`)) return;
+
+            try {
+                const response = await fetch(`${API_URL}/api/workspace/clear`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': AUTH_TOKEN
+                    },
+                    body: JSON.stringify({ prefix })
+                });
+
+                const data = await response.json();
+                log(`🧹 Cleared prefix "${prefix}":`, data);
+            } catch (error) {
+                log(`❌ Clear failed: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,127 +1,98 @@
-import { Pinecone } from '@pinecone-database/pinecone';
-import { generateEmbedding } from './content/utils';
-import { getApiKey } from './api.key.service';
+// Minimal vector search implementation for journal integration
+// This is a placeholder until journal is refactored to use unified workspace
 
-let pineconeClient: Pinecone | null = null;
-const INDEX_NAME = process.env.PINECONE_INDEX || 'journal';
+export interface VectorSearchOptions {
+  query: string;
+  limit?: number;
+  minScore?: number;
+  companyId?: string;
+  metadata?: Record<string, any>;
+  entity?: string[];
+  filter?: Record<string, any>;
+}
 
-const initPinecone = (): Pinecone | null => {
-  if (!process.env.PINECONE_API_KEY) {
-    // console.warn('PINECONE_API_KEY environment variable not found. Pinecone client not initialized.');
-    return null;
+export interface VectorSearchResult {
+  id: string;
+  score: number;
+  content: string;
+  metadata?: Record<string, any>;
+}
+
+// In-memory store for journal vectors (temporary until refactored)
+class SimpleVectorStore {
+  private entries: Map<string, { content: string; metadata?: Record<string, any> }> = new Map();
+
+  async add(id: string, content: string, metadata?: Record<string, any>): Promise<void> {
+    this.entries.set(id, { content, metadata });
   }
-  if (!pineconeClient) {
-    pineconeClient = new Pinecone({
-      apiKey: process.env.PINECONE_API_KEY,
-    });
-  }
-  return pineconeClient;
-};
 
-export const upsertVector = async (
+  delete(id: string): void {
+    this.entries.delete(id);
+  }
+
+  async hybridSearch(
+    query: string,
+    options: { limit?: number; filter?: Record<string, any> }
+  ): Promise<Array<{ id: string; score: number; content: string; metadata?: Record<string, any> }>> {
+    // Simple text matching for now
+    const results: Array<{ id: string; score: number; content: string; metadata?: Record<string, any> }> = [];
+
+    for (const [id, entry] of this.entries) {
+      // Apply filter if provided
+      if (options.filter) {
+        const filterMatch = Object.entries(options.filter).every(([key, value]) =>
+          entry.metadata?.[key] === value
+        );
+        if (!filterMatch) continue;
+      }
+
+      // Simple scoring based on query presence
+      const score = entry.content.toLowerCase().includes(query.toLowerCase()) ? 0.8 : 0.2;
+      results.push({ id, score, content: entry.content, metadata: entry.metadata });
+    }
+
+    // Sort by score and limit
+    return results
+      .sort((a, b) => b.score - a.score)
+      .slice(0, options.limit || 10);
+  }
+}
+
+const vectorStore = new SimpleVectorStore();
+
+/**
+ * Upsert a vector entry in the vector store
+ */
+export async function upsertVector(
   id: string,
   content: string,
-  metadata: Record<string, any>,
-  companyId: string,
-) => {
-  try {
-    const client = initPinecone();
-    if (!client) {
-      console.warn('Pinecone client not initialized. Skipping upsertVector.');
-      // Optionally, throw an error or return a specific status
-      return;
-    }
-    const index = client.index(INDEX_NAME);
+  metadata?: Record<string, any>,
+  companyId?: string,
+): Promise<void> {
+  const finalMetadata = {
+    ...metadata,
+    companyId: companyId || metadata?.companyId,
+  };
+  await vectorStore.add(id, content, finalMetadata);
+}
 
-    const openaiApiKey = await getApiKey(companyId, 'openai_api_key');
-    if (!openaiApiKey) {
-      throw new Error('OpenAI API key not found for company');
-    }
+/**
+ * Delete a vector entry from the vector store
+ */
+export async function deleteVector(id: string): Promise<void> {
+  vectorStore.delete(id);
+}
 
-    const embedding = await generateEmbedding(content, openaiApiKey);
+/**
+ * Run a vector search
+ */
+export async function runVectorSearch(
+  options: VectorSearchOptions,
+): Promise<VectorSearchResult[]> {
+  const results = await vectorStore.hybridSearch(options.query, {
+    limit: options.limit || 10,
+    filter: options.companyId ? { companyId: options.companyId } : undefined,
+  });
 
-    await index.upsert([
-      {
-        id,
-        values: embedding,
-        metadata: {
-          ...metadata,
-          entity: 'journal', // Tag this vector as a journal entry
-        },
-      },
-    ]);
-  } catch (error) {
-    console.error('Error upserting vector:', error);
-    throw error;
-  }
-};
-
-export const deleteVector = async (id: string) => {
-  try {
-    const client = initPinecone();
-    if (!client) {
-      console.warn('Pinecone client not initialized. Skipping deleteVector.');
-      // Optionally, throw an error or return a specific status
-      return;
-    }
-    const index = client.index(INDEX_NAME);
-
-    await index.deleteOne(id);
-  } catch (error) {
-    console.error('Error deleting vector:', error);
-    throw error;
-  }
-};
-
-export const runVectorSearch = async ({
-  query,
-  entity,
-  companyId,
-  limit = 4,
-  filter = {},
-}: {
-  query: string;
-  entity?: string[];
-  companyId: string;
-  limit?: number;
-  filter?: Record<string, any>;
-}) => {
-  try {
-    const client = initPinecone();
-    if (!client) {
-      console.warn(
-        'Pinecone client not initialized. Skipping runVectorSearch.',
-      );
-      // Optionally, throw an error or return a specific status like an empty array
-      return [];
-    }
-    const index = client.index(INDEX_NAME);
-
-    const openaiApiKey = await getApiKey(companyId, 'openai_api_key');
-    if (!openaiApiKey) {
-      throw new Error('OpenAI API key not found for company');
-    }
-
-    const queryEmbedding = await generateEmbedding(query, openaiApiKey);
-
-    // Combine entity and company filters with any additional filters
-    const searchFilter = {
-      ...filter,
-      companyId: { $eq: companyId },
-      ...(entity && entity.length > 0 ? { entity: { $in: entity } } : {}),
-    };
-
-    const searchResponse = await index.query({
-      topK: limit,
-      vector: queryEmbedding,
-      includeValues: true,
-      includeMetadata: true,
-      filter: searchFilter,
-    });
-
-    return searchResponse.matches || [];
-  } catch (error) {
-    console.error('Error running vector search:', error);
-    throw error;
-  }
-};
+  return results.filter(r => r.score >= (options.minScore || 0));
+}
