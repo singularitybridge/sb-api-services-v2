@@ -62,6 +62,58 @@ The `alfred-agent-manager` is equipped to:
 - **Chat Viewer**: HTML viewer at `chat-viewer.html` for browser viewing
 - **Recent Resolution**: Fixed image attachment format - requires `data:image/png;base64,` prefix
 
+### Prompt History System (January 2025)
+
+#### Overview
+Complete version control system for AI assistant prompts with automatic change tracking and AI-generated descriptions.
+
+#### Components
+- **MongoDB Model**: `PromptHistory` at `/src/models/PromptHistory.ts`
+- **Services**: 
+  - `prompt-history.service.ts` - Core CRUD operations and version management
+  - `prompt-change-description.service.ts` - OpenAI GPT-4o-mini integration for change descriptions
+- **Routes**: `/api/assistants/:id/prompt-history/*` endpoints
+- **Automatic Tracking**: Integrated in assistant POST and PUT routes
+
+#### API Endpoints
+```
+GET    /api/assistants/:id/prompt-history              - List all versions
+GET    /api/assistants/:id/prompt-history/:version     - Get specific version
+GET    /api/assistants/:id/prompt-history/compare      - Compare versions (?v1=X&v2=Y)
+POST   /api/assistants/:id/prompt-history/:version/rollback - Rollback to version
+GET    /api/assistants/:id/prompt-history/statistics   - Version statistics
+DELETE /api/assistants/:id/prompt-history/cleanup      - Delete old versions (admin only)
+```
+
+#### Test Utilities
+Located at `/tests/integration/ai-agent/testing-utils/test-prompt-history.js`
+
+Usage:
+```bash
+# List prompt history
+node test-prompt-history.js list <assistantId> [limit]
+
+# Get specific version
+node test-prompt-history.js get <assistantId> <version>
+
+# Compare versions
+node test-prompt-history.js compare <assistantId> <v1> <v2>
+
+# Rollback to version
+node test-prompt-history.js rollback <assistantId> <version>
+
+# Get statistics
+node test-prompt-history.js stats <assistantId>
+```
+
+#### Features
+- **Automatic Version Numbering**: Sequential per assistant
+- **AI Change Descriptions**: GPT-4o-mini analyzes and describes changes
+- **Metadata Tracking**: Character count, line count, token estimate
+- **Change Types**: initial, update, rollback
+- **Company Isolation**: Each company's prompts are isolated
+- **Fallback Handling**: Basic descriptions when OpenAI unavailable
+
 ### AI Assistants & Voice Integration
 
 #### Anat - Product Manager Agent
@@ -223,6 +275,79 @@ This bypasses the 403 Forbidden errors from Google APIs.
 - Monitor containers: `docker stats`
 - View logs: `docker logs [container-name] --tail 50`
 - Test build locally: `docker build -t sb-api-test .`
+
+## Code Execution Integration (January 2025)
+
+### Overview
+Integrated OpenAI Code Interpreter for Python-based file processing with unified file management system.
+
+### Core Components
+
+#### 1. File Manager Service (`file-manager.service.ts`)
+Unified file management with scope-based storage:
+
+| Scope | TTL | Storage | Use Case |
+|-------|-----|---------|----------|
+| **temporary** | 10 min | Memory | Code execution outputs |
+| **session** | 24 hours | Disk | Session working files |
+| **agent** | 7 days | Disk | Agent test files |
+| **team** | 30 days | GCP | Team resources |
+| **company** | Permanent | GCP | Long-term docs |
+
+#### 2. OpenAI Code Execution (`openai-code-execution.service.ts`)
+- Uses OpenAI Assistants API with code_interpreter tool
+- Default model: `gpt-4o-mini`
+- Supports file URLs and base64 content
+- Auto-cleanup of resources
+
+#### 3. API Endpoints
+```
+# File Management
+POST   /files/upload          - Upload with scope
+GET    /files/:id/download    - Download file (no auth)
+GET    /files/list            - List by scope
+GET    /files/agent/:agentId  - Agent files
+GET    /files/session/:id     - Session files
+DELETE /files/:id             - Delete file
+
+# Code Execution Actions
+- executeCode: Custom Python code on files
+- processFile: Predefined operations (analyze, transform, parse_excel)
+```
+
+### Usage Examples
+
+#### Process CSV with URL:
+```javascript
+{
+  userInput: "Process data from: http://example.com/data.csv
+              Use executeCode with fileUrl parameter",
+  // Agent will extract URL and use it
+}
+```
+
+#### Process Excel:
+```javascript
+{
+  userInput: "Parse Excel: http://example.com/data.xlsx
+              Use processFile with operation='parse_excel'",
+}
+```
+
+### Testing with Sub-Agent
+Use the `code-execution-expert` sub-agent:
+```javascript
+await Task({
+  subagent_type: 'code-execution-expert',
+  description: 'Test code execution',
+  prompt: 'Run comprehensive tests on CSV and Excel processing'
+});
+```
+
+### File Storage Architecture
+- **ContentFile**: Permanent GCP storage (existing)
+- **FileManager**: Unified ephemeral/permanent storage (new)
+- No duplication - different purposes
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.

@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified Workspace Documentation</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Highlight.js for code syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
+        [x-cloak] { display: none !important; }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Smooth scroll */
+        html { scroll-behavior: smooth; }
+
+        /* Code block styling */
+        .hljs {
+            background: #f8fafc !important;
+            padding: 1rem !important;
+            border-radius: 0.5rem !important;
+        }
+    </style>
+</head>
+<body class="bg-white text-gray-900" x-data="{ activeSection: 'overview', showToc: true }">
+    <!-- Header -->
+    <header class="sticky top-0 z-40 bg-white border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <button onclick="history.back()" class="p-2 hover:bg-gray-100 rounded-lg transition">
+                        <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                    </button>
+                    <div>
+                        <h1 class="text-2xl font-semibold">Unified Workspace</h1>
+                        <p class="text-sm text-gray-600 mt-1">Complete consolidation of workspace and file management</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">v2.0.0</span>
+                    <a href="tests/" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium flex items-center gap-2">
+                        <i data-lucide="flask-conical" class="w-4 h-4"></i>
+                        Run Tests
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-6 py-8 flex gap-8">
+        <!-- Table of Contents (Sidebar) -->
+        <aside class="w-64 flex-shrink-0 sticky top-20 h-fit">
+            <nav class="bg-gray-50 rounded-lg border border-gray-200 p-4">
+                <h2 class="font-semibold mb-3 flex items-center gap-2">
+                    <i data-lucide="list" class="w-4 h-4"></i>
+                    Table of Contents
+                </h2>
+                <ul class="space-y-2 text-sm">
+                    <li>
+                        <a href="#overview" @click="activeSection = 'overview'"
+                           :class="activeSection === 'overview' ? 'text-blue-600 font-medium' : 'text-gray-600 hover:text-gray-900'"
+                           class="block py-1">Overview</a>
+                    </li>
+                    <li>
+                        <a href="#architecture" @click="activeSection = 'architecture'"
+                           :class="activeSection === 'architecture' ? 'text-blue-600 font-medium' : 'text-gray-600 hover:text-gray-900'"
+                           class="block py-1">Architecture</a>
+                    </li>
+                    <li>
+                        <a href="#api" @click="activeSection = 'api'"
+                           :class="activeSection === 'api' ? 'text-blue-600 font-medium' : 'text-gray-600 hover:text-gray-900'"
+                           class="block py-1">API Reference</a>
+                    </li>
+                    <li>
+                        <a href="#storage" @click="activeSection = 'storage'"
+                           :class="activeSection === 'storage' ? 'text-blue-600 font-medium' : 'text-gray-600 hover:text-gray-900'"
+                           class="block py-1">Storage Types</a>
+                    </li>
+                    <li>
+                        <a href="#scopes" @click="activeSection = 'scopes'"
+                           :class="activeSection === 'scopes' ? 'text-blue-600 font-medium' : 'text-gray-600 hover:text-gray-900'"
+                           class="block py-1">File Scopes</a>
+                    </li>
+                    <li>
+                        <a href="#examples" @click="activeSection = 'examples'"
+                           :class="activeSection === 'examples' ? 'text-blue-600 font-medium' : 'text-gray-600 hover:text-gray-900'"
+                           class="block py-1">Examples</a>
+                    </li>
+                    <li>
+                        <a href="#migration" @click="activeSection = 'migration'"
+                           :class="activeSection === 'migration' ? 'text-blue-600 font-medium' : 'text-gray-600 hover:text-gray-900'"
+                           class="block py-1">Migration Guide</a>
+                    </li>
+                </ul>
+
+                <!-- Documentation Links Section -->
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    <h3 class="font-semibold mb-3 flex items-center gap-2 text-sm">
+                        <i data-lucide="book-open" class="w-4 h-4"></i>
+                        Documentation
+                    </h3>
+                    <ul class="space-y-2 text-sm">
+                        <li>
+                            <a href="testing-report.html" class="flex items-center gap-2 text-gray-600 hover:text-blue-600 py-1">
+                                <i data-lucide="file-check" class="w-4 h-4"></i>
+                                Testing Report
+                            </a>
+                        </li>
+                        <li>
+                            <a href="api-reference.html" class="flex items-center gap-2 text-gray-600 hover:text-blue-600 py-1">
+                                <i data-lucide="code-2" class="w-4 h-4"></i>
+                                API Reference
+                            </a>
+                        </li>
+                        <li>
+                            <a href="troubleshooting.html" class="flex items-center gap-2 text-gray-600 hover:text-blue-600 py-1">
+                                <i data-lucide="wrench" class="w-4 h-4"></i>
+                                Troubleshooting
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 min-w-0">
+            <!-- Overview Section -->
+            <section id="overview" class="mb-12">
+                <h2 class="text-3xl font-semibold mb-4 flex items-center gap-3">
+                    <i data-lucide="layers" class="w-7 h-7 text-blue-600"></i>
+                    Overview
+                </h2>
+
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-start gap-3">
+                        <i data-lucide="info" class="w-5 h-5 text-blue-600 mt-0.5"></i>
+                        <div>
+                            <h3 class="font-semibold text-blue-900 mb-1">Major Consolidation Achievement</h3>
+                            <p class="text-blue-800">Successfully consolidated 9 redundant services into a single unified workspace service, achieving an 88% code reduction while maintaining all functionality.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Production Release Update -->
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-start gap-3">
+                        <i data-lucide="rocket" class="w-5 h-5 text-green-600 mt-0.5"></i>
+                        <div>
+                            <h3 class="font-semibold text-green-900 mb-1">🚀 Production Release - September 28, 2025</h3>
+                            <p class="text-green-800 mb-2">The unified workspace integration is now production-ready with the following improvements:</p>
+                            <ul class="text-sm text-green-700 space-y-1">
+                                <li>• Direct service integration - no HTTP calls needed</li>
+                                <li>• Fixed all API endpoint paths and routing</li>
+                                <li>• Enhanced UI with proper JSON rendering</li>
+                                <li>• Security improvements - removed hardcoded credentials</li>
+                                <li>• Full build and lint validation passed</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="prose prose-gray max-w-none">
+                    <p class="text-lg leading-relaxed mb-4">
+                        The Unified Workspace Service is a complete consolidation of all workspace and file management functionality in the Agent Hub API. It provides intelligent content routing, multi-backend storage support, and seamless integration with existing features.
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i data-lucide="zap" class="w-5 h-5 text-green-600"></i>
+                                <h4 class="font-semibold text-green-900">88% Code Reduction</h4>
+                            </div>
+                            <p class="text-sm text-green-800">From 9 services to 1 unified service</p>
+                        </div>
+
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i data-lucide="folder-tree" class="w-5 h-5 text-purple-600"></i>
+                                <h4 class="font-semibold text-purple-900">Scope-Based Organization</h4>
+                            </div>
+                            <p class="text-sm text-purple-800">Structured paths with intelligent defaults</p>
+                        </div>
+
+                        <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i data-lucide="clock" class="w-5 h-5 text-orange-600"></i>
+                                <h4 class="font-semibold text-orange-900">Independent TTL</h4>
+                            </div>
+                            <p class="text-sm text-orange-800">TTL completely independent from scope</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Architecture Section -->
+            <section id="architecture" class="mb-12">
+                <h2 class="text-3xl font-semibold mb-4 flex items-center gap-3">
+                    <i data-lucide="cpu" class="w-7 h-7 text-purple-600"></i>
+                    Architecture
+                </h2>
+
+                <div class="bg-gray-50 rounded-lg border border-gray-200 p-6 mb-6">
+                    <h3 class="font-semibold mb-3">Service Consolidation</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <h4 class="text-sm font-medium text-red-600 mb-2">❌ Removed Services</h4>
+                            <ul class="space-y-1 text-sm text-gray-700">
+                                <li>• workspace.service.ts</li>
+                                <li>• agent-workspace.service.ts</li>
+                                <li>• file-manager.service.ts</li>
+                                <li>• content-file.service.ts</li>
+                                <li>• content-type.service.ts</li>
+                                <li>• content.service.ts</li>
+                                <li>• vector.search.service.ts</li>
+                                <li>• simple-vector-store.service.ts</li>
+                                <li>• storage-providers/</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-medium text-green-600 mb-2">✅ Unified Service</h4>
+                            <ul class="space-y-1 text-sm text-gray-700">
+                                <li>• unified-workspace.service.ts</li>
+                                <li class="text-xs text-gray-500 mt-2">All functionality consolidated into a single, efficient service using functional composition</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 rounded-lg border border-gray-200 p-6">
+                    <h3 class="font-semibold mb-3">Simplified Storage Architecture</h3>
+                    <pre><code class="language-typescript">// v2.0 Storage Architecture
+interface StorageArchitecture {
+  files: '/tmp/workspace/'          // ALL files stored on disk
+  mongodb: 'references only'        // Metadata and references
+  ttl: 'independent of scope'       // Optional TTL, default: permanent
+}
+
+// Simplified scope organization (4 scopes only):
+// /session/{id}/  - Session-scoped files
+// /agent/{id}/    - Agent-scoped files
+// /team/{name}/   - Team-scoped files
+// /company/       - Company-scoped files
+// Note: TTL is now completely independent from scope</code></pre>
+                </div>
+            </section>
+
+            <!-- API Reference Section -->
+            <section id="api" class="mb-12">
+                <h2 class="text-3xl font-semibold mb-4 flex items-center gap-3">
+                    <i data-lucide="code-2" class="w-7 h-7 text-green-600"></i>
+                    API Reference
+                </h2>
+
+                <div class="space-y-6">
+                    <!-- Content Operations -->
+                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                            <h3 class="font-semibold">Content Operations</h3>
+                        </div>
+                        <div class="p-4 space-y-4">
+                            <div class="border-l-4 border-green-500 pl-4">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded">POST</span>
+                                    <code class="text-sm">/api/workspace/content</code>
+                                </div>
+                                <p class="text-sm text-gray-600">Store content at specified path</p>
+                                <pre class="mt-2"><code class="language-json">{
+  "path": "/documents/report.json",
+  "content": { "title": "Q4 Report", "data": "..." }
+}</code></pre>
+                            </div>
+
+                            <div class="border-l-4 border-blue-500 pl-4">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">GET</span>
+                                    <code class="text-sm">/api/workspace/content?path=/documents/report.json</code>
+                                </div>
+                                <p class="text-sm text-gray-600">Retrieve content from path</p>
+                            </div>
+
+                            <div class="border-l-4 border-red-500 pl-4">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded">DELETE</span>
+                                    <code class="text-sm">/api/workspace/content?path=/documents/report.json</code>
+                                </div>
+                                <p class="text-sm text-gray-600">Delete content at path</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- File Operations -->
+                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                            <h3 class="font-semibold">File Operations</h3>
+                        </div>
+                        <div class="p-4 space-y-4">
+                            <div class="border-l-4 border-green-500 pl-4">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded">POST</span>
+                                    <code class="text-sm">/files/upload</code>
+                                </div>
+                                <p class="text-sm text-gray-600">Upload file with scope</p>
+                                <pre class="mt-2"><code class="language-javascript">// FormData
+file: File
+scope: "session" | "agent" | "team" | "company"
+purpose: string (optional)
+tags: string (optional, comma-separated)
+ttl: number (optional, seconds - default: permanent)</code></pre>
+                            </div>
+
+                            <div class="border-l-4 border-blue-500 pl-4">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">GET</span>
+                                    <code class="text-sm">/files/:fileId/download</code>
+                                </div>
+                                <p class="text-sm text-gray-600">Download file (no auth required)</p>
+                            </div>
+
+                            <div class="border-l-4 border-blue-500 pl-4">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">GET</span>
+                                    <code class="text-sm">/files/list?scope=temporary</code>
+                                </div>
+                                <p class="text-sm text-gray-600">List files by scope</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Workspace Operations -->
+                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <div class="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                            <h3 class="font-semibold">Workspace Operations</h3>
+                        </div>
+                        <div class="p-4 space-y-4">
+                            <div class="border-l-4 border-blue-500 pl-4">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">GET</span>
+                                    <code class="text-sm">/api/workspace/list?prefix=/documents</code>
+                                </div>
+                                <p class="text-sm text-gray-600">List all content with prefix</p>
+                            </div>
+
+                            <div class="border-l-4 border-purple-500 pl-4">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded">GET</span>
+                                    <code class="text-sm">/api/workspace/stats</code>
+                                </div>
+                                <p class="text-sm text-gray-600">Get workspace statistics</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Storage Types Section -->
+            <section id="storage" class="mb-12">
+                <h2 class="text-3xl font-semibold mb-4 flex items-center gap-3">
+                    <i data-lucide="hard-drive" class="w-7 h-7 text-orange-600"></i>
+                    Storage Types
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-white rounded-lg border border-gray-200 p-4">
+                        <div class="flex items-center gap-2 mb-3">
+                            <i data-lucide="hard-drive" class="w-5 h-5 text-blue-600"></i>
+                            <h3 class="font-semibold">Disk Storage (/tmp/workspace/)</h3>
+                        </div>
+                        <ul class="space-y-2 text-sm text-gray-700">
+                            <li class="flex items-start gap-2">
+                                <i data-lucide="check" class="w-4 h-4 text-green-600 mt-0.5"></i>
+                                <span>ALL file content stored on disk</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i data-lucide="check" class="w-4 h-4 text-green-600 mt-0.5"></i>
+                                <span>Reliable persistence</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i data-lucide="check" class="w-4 h-4 text-green-600 mt-0.5"></i>
+                                <span>No size limitations</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i data-lucide="check" class="w-4 h-4 text-green-600 mt-0.5"></i>
+                                <span>Scope-based organization</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-white rounded-lg border border-gray-200 p-4">
+                        <div class="flex items-center gap-2 mb-3">
+                            <i data-lucide="database" class="w-5 h-5 text-green-600"></i>
+                            <h3 class="font-semibold">MongoDB (References Only)</h3>
+                        </div>
+                        <ul class="space-y-2 text-sm text-gray-700">
+                            <li class="flex items-start gap-2">
+                                <i data-lucide="check" class="w-4 h-4 text-green-600 mt-0.5"></i>
+                                <span>File references & metadata</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i data-lucide="check" class="w-4 h-4 text-green-600 mt-0.5"></i>
+                                <span>TTL tracking & expiration</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i data-lucide="check" class="w-4 h-4 text-green-600 mt-0.5"></i>
+                                <span>Content type detection</span>
+                            </li>
+                            <li class="flex items-start gap-2">
+                                <i data-lucide="check" class="w-4 h-4 text-green-600 mt-0.5"></i>
+                                <span>Lightweight & fast queries</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- File Scopes Section -->
+            <section id="scopes" class="mb-12">
+                <h2 class="text-3xl font-semibold mb-4 flex items-center gap-3">
+                    <i data-lucide="folder-tree" class="w-7 h-7 text-blue-600"></i>
+                    File Scopes (v2.0)
+                </h2>
+
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-start gap-3">
+                        <i data-lucide="info" class="w-5 h-5 text-blue-600 mt-0.5"></i>
+                        <div>
+                            <h3 class="font-semibold text-blue-900 mb-1">Important: TTL Independence</h3>
+                            <p class="text-blue-800">In v2.0, TTL is completely independent from scope. All scopes default to permanent storage unless a TTL is explicitly specified. The scope is used purely for organizational purposes.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full bg-white rounded-lg border border-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-900 border-b">Scope</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-900 border-b">Default TTL</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-900 border-b">Storage</th>
+                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-900 border-b">Use Case</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <tr>
+                                <td class="px-4 py-3">
+                                    <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-sm font-medium">session</span>
+                                </td>
+                                <td class="px-4 py-3 text-sm">Permanent</td>
+                                <td class="px-4 py-3 text-sm">Disk</td>
+                                <td class="px-4 py-3 text-sm text-gray-600">User session files, working documents</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3">
+                                    <span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-sm font-medium">agent</span>
+                                </td>
+                                <td class="px-4 py-3 text-sm">Permanent</td>
+                                <td class="px-4 py-3 text-sm">Disk</td>
+                                <td class="px-4 py-3 text-sm text-gray-600">Agent-specific resources</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3">
+                                    <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-sm font-medium">team</span>
+                                </td>
+                                <td class="px-4 py-3 text-sm">Permanent</td>
+                                <td class="px-4 py-3 text-sm">Disk</td>
+                                <td class="px-4 py-3 text-sm text-gray-600">Team shared resources</td>
+                            </tr>
+                            <tr>
+                                <td class="px-4 py-3">
+                                    <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-sm font-medium">company</span>
+                                </td>
+                                <td class="px-4 py-3 text-sm">Permanent</td>
+                                <td class="px-4 py-3 text-sm">Disk</td>
+                                <td class="px-4 py-3 text-sm text-gray-600">Long-term documents, archives</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Examples Section -->
+            <section id="examples" class="mb-12">
+                <h2 class="text-3xl font-semibold mb-4 flex items-center gap-3">
+                    <i data-lucide="terminal" class="w-7 h-7 text-purple-600"></i>
+                    Examples
+                </h2>
+
+                <div class="space-y-6">
+                    <!-- Upload File with Scope Example -->
+                    <div class="bg-gray-50 rounded-lg border border-gray-200 p-4">
+                        <h3 class="font-semibold mb-3">Upload File with Scope Selection</h3>
+                        <pre><code class="language-javascript">// Upload to team scope with optional TTL
+const formData = new FormData();
+formData.append('file', fileBlob, 'team-document.pdf');
+formData.append('scope', 'team');  // Scope for organization
+formData.append('metadata', JSON.stringify({
+    teamName: 'engineering',
+    purpose: 'project-docs',
+    ttl: 604800  // Optional: 1 week in seconds (default: permanent)
+}));
+
+const response = await fetch('/files/upload', {
+    method: 'POST',
+    headers: { 'Authorization': token },
+    body: formData
+});
+
+const { id, path, url } = await response.json();
+console.log(`🟢 Team file: ${path}`);</code></pre>
+                    </div>
+
+                    <!-- Store JSON Content with TTL Example -->
+                    <div class="bg-gray-50 rounded-lg border border-gray-200 p-4">
+                        <h3 class="font-semibold mb-3">Store Content with TTL Override</h3>
+                        <pre><code class="language-javascript">// Store with custom TTL (v2.0: TTL in seconds)
+const response = await fetch('/api/workspace/set', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token
+    },
+    body: JSON.stringify({
+        path: '/config/user-settings.json',  // Simple path
+        content: {
+            theme: 'dark',
+            language: 'en'
+        },
+        metadata: {
+            scope: 'session',  // Context for organization
+            ttl: 3600,  // 1 hour in seconds (optional)
+            tags: ['config', 'user-preferences']
+        }
+    })
+});
+
+const result = await response.json();
+console.log('Content stored:', result.path);
+console.log('Version:', result.version);  // Tracks updates</code></pre>
+                    </div>
+
+                    <!-- List Files Example -->
+                    <div class="bg-gray-50 rounded-lg border border-gray-200 p-4">
+                        <h3 class="font-semibold mb-3">List Files by Scope</h3>
+                        <pre><code class="language-javascript">// List all session files
+const response = await fetch('/files/list?scope=session', {
+    headers: { 'Authorization': token }
+});
+
+const files = await response.json();
+files.forEach(file => {
+    console.log(`${file.filename} - ${file.size} bytes`);
+    console.log(`  Download: ${file.downloadUrl}`);
+    console.log(`  Expires: ${file.expiresAt || 'Never'}`);
+});</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Migration Guide Section -->
+            <section id="migration" class="mb-12">
+                <h2 class="text-3xl font-semibold mb-4 flex items-center gap-3">
+                    <i data-lucide="git-merge" class="w-7 h-7 text-red-600"></i>
+                    Migration Guide
+                </h2>
+
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-start gap-3">
+                        <i data-lucide="alert-triangle" class="w-5 h-5 text-red-600 mt-0.5"></i>
+                        <div>
+                            <h3 class="font-semibold text-red-900 mb-1">Breaking Changes</h3>
+                            <p class="text-red-800">This is a complete replacement of all workspace and file services. No backward compatibility is maintained. All old endpoints have been removed.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="bg-white rounded-lg border border-gray-200 p-4">
+                        <h3 class="font-semibold mb-2">Old Endpoints → New Endpoints</h3>
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b">
+                                    <th class="text-left py-2">Old</th>
+                                    <th class="text-left py-2">New</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y">
+                                <tr>
+                                    <td class="py-2 text-red-600"><s>/content/file</s></td>
+                                    <td class="py-2 text-green-600">/files/upload</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 text-red-600"><s>/content-type</s></td>
+                                    <td class="py-2 text-green-600">/api/workspace/content</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 text-red-600"><s>/workspace</s></td>
+                                    <td class="py-2 text-green-600">/api/workspace/*</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 text-red-600"><s>/agent-workspace</s></td>
+                                    <td class="py-2 text-green-600">/api/workspace/* (with agent prefix)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="bg-white rounded-lg border border-gray-200 p-4">
+                        <h3 class="font-semibold mb-2">Service Changes</h3>
+                        <pre><code class="language-javascript">// Old (multiple services)
+import { WorkspaceService } from './workspace.service';
+import { FileManagerService } from './file-manager.service';
+import { ContentFileService } from './content-file.service';
+
+// New (single unified service)
+import { getWorkspaceService } from './unified-workspace.service';
+const workspace = getWorkspaceService();</code></pre>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // Initialize syntax highlighting
+        document.addEventListener('DOMContentLoaded', () => {
+            hljs.highlightAll();
+            lucide.createIcons();
+        });
+
+        // Update active section on scroll
+        document.addEventListener('scroll', () => {
+            const sections = document.querySelectorAll('section[id]');
+            const scrollPosition = window.scrollY + 100;
+
+            sections.forEach(section => {
+                const top = section.offsetTop;
+                const height = section.offsetHeight;
+                const id = section.getAttribute('id');
+
+                if (scrollPosition >= top && scrollPosition < top + height) {
+                    Alpine.store('activeSection', id);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

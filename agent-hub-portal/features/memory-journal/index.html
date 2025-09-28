@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory/Journal - Documentation</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.12.0/cdn/themes/light.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-6 py-8 max-w-4xl">
+        <!-- Back Navigation -->
+        <a href="../../" class="inline-flex items-center text-blue-600 hover:text-blue-800 mb-6">
+            ← Back to Portal
+        </a>
+
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Memory/Journal</h1>
+            <p class="text-gray-600">Persistent memory storage and journal entries for AI assistants</p>
+
+            <div class="flex gap-4 mt-4">
+                <span class="text-sm text-gray-500">Version: 2.0.0</span>
+                <span class="text-sm text-gray-500">Status: Active</span>
+                <a href="tests/" class="text-sm text-blue-600 hover:text-blue-800">Run Tests →</a>
+            </div>
+        </div>
+
+        <!-- Overview -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Overview</h2>
+            <p class="text-gray-700 mb-4">
+                The Memory/Journal feature provides a sophisticated system for AI assistants to store and retrieve
+                contextual information across sessions. It enables persistent memory storage, journal entries for
+                tracking interactions, and intelligent retrieval mechanisms.
+            </p>
+        </div>
+
+        <!-- API Endpoints -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">API Endpoints</h2>
+            <div class="space-y-4">
+                <div class="border-l-4 border-blue-500 pl-4">
+                    <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">POST /memory/store</code>
+                    <p class="text-sm text-gray-600 mt-1">Store a new memory entry with tags and metadata</p>
+                </div>
+                <div class="border-l-4 border-blue-500 pl-4">
+                    <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">GET /memory/retrieve</code>
+                    <p class="text-sm text-gray-600 mt-1">Retrieve memories by context, tags, or date range</p>
+                </div>
+                <div class="border-l-4 border-blue-500 pl-4">
+                    <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">POST /journal/entry</code>
+                    <p class="text-sm text-gray-600 mt-1">Create a new journal entry for session tracking</p>
+                </div>
+                <div class="border-l-4 border-blue-500 pl-4">
+                    <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">GET /journal/history</code>
+                    <p class="text-sm text-gray-600 mt-1">Retrieve journal history with filtering options</p>
+                </div>
+                <div class="border-l-4 border-blue-500 pl-4">
+                    <code class="text-sm font-mono bg-gray-100 px-2 py-1 rounded">DELETE /memory/:id</code>
+                    <p class="text-sm text-gray-600 mt-1">Delete specific memory entries</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Features -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Key Features</h2>
+            <ul class="space-y-2">
+                <li class="flex items-start">
+                    <span class="text-green-600 mr-2">✓</span>
+                    <span>Vector-based semantic search for memory retrieval</span>
+                </li>
+                <li class="flex items-start">
+                    <span class="text-green-600 mr-2">✓</span>
+                    <span>Tag-based categorization system</span>
+                </li>
+                <li class="flex items-start">
+                    <span class="text-green-600 mr-2">✓</span>
+                    <span>Time-based memory decay and relevance scoring</span>
+                </li>
+                <li class="flex items-start">
+                    <span class="text-green-600 mr-2">✓</span>
+                    <span>Journal entries with rich metadata</span>
+                </li>
+                <li class="flex items-start">
+                    <span class="text-green-600 mr-2">✓</span>
+                    <span>Cross-session context preservation</span>
+                </li>
+                <li class="flex items-start">
+                    <span class="text-green-600 mr-2">✓</span>
+                    <span>Privacy-focused with user-scoped data</span>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Recent Changes -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">Recent Changes</h2>
+            <div class="space-y-3">
+                <div class="pb-3 border-b">
+                    <div class="flex justify-between items-start">
+                        <h3 class="font-medium">Vector Search Implementation</h3>
+                        <span class="text-xs text-gray-500">2025-09-27</span>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-1">Added semantic search capabilities using embeddings</p>
+                </div>
+                <div class="pb-3 border-b">
+                    <div class="flex justify-between items-start">
+                        <h3 class="font-medium">Memory Tagging System</h3>
+                        <span class="text-xs text-gray-500">2025-09-26</span>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-1">Implemented hierarchical tag system for memory organization</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

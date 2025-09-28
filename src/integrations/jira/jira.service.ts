@@ -1969,7 +1969,7 @@ export const getJiraTicketComments = async (
       comments.comments.forEach((comment) => {
         if (comment.body && typeof comment.body === 'object') {
           // Ensure body is ADF object
-          // @ts-ignore // Add bodyText if body is ADF
+          // @ts-expect-error bodyText is an augmentation we add for downstream consumers when Atlassian returns ADF content.
           comment.bodyText = adfToText(comment.body);
         }
       });

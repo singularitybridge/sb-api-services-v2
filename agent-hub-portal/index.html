@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Hub Portal - Development Intelligence Platform</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Shoelace -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/themes/light.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/shoelace-autoloader.js"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
+        [x-cloak] { display: none !important; }
+
+        .fade-in {
+            opacity: 0;
+            animation: fadeIn 0.6s ease-in-out forwards;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        /* Shoelace customizations */
+        sl-card::part(base) {
+            border: 1px solid rgb(226 232 240);
+            box-shadow: none;
+        }
+
+        sl-card::part(header) {
+            padding: 1.25rem 1.25rem 0.75rem 1.25rem;
+            border-bottom: none;
+        }
+
+        sl-card::part(body) {
+            padding: 0 1.25rem;
+        }
+
+        sl-card::part(footer) {
+            padding: 0.75rem 1.25rem 1.25rem 1.25rem;
+            border-top: 1px solid rgb(241 245 249);
+            margin-top: 0.75rem;
+        }
+
+        sl-button[variant="text"]::part(base) {
+            color: rgb(59 130 246);
+            padding: 0.25rem 0.5rem;
+        }
+
+        sl-button[variant="text"]:hover::part(base) {
+            background-color: rgb(239 246 255);
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-white text-slate-900">
+    <div x-data="portalApp" x-cloak class="min-h-screen">
+        <!-- Header -->
+        <header class="mb-16 fade-in">
+            <div class="max-w-6xl mx-auto px-6 py-12">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3 mb-4">
+                        <i data-lucide="layout-dashboard" class="w-8 h-8"></i>
+                        <h1 class="text-4xl font-light">Agent Hub Portal</h1>
+                    </div>
+
+                    <!-- API Config Button -->
+                    <sl-button variant="primary" @click="showApiConfig = true">
+                        <i data-lucide="settings" slot="prefix" class="w-4 h-4"></i>
+                        API Config
+                    </sl-button>
+                </div>
+                <p class="text-lg text-slate-600 ml-11">Development Intelligence Platform</p>
+                <div class="flex gap-2 mt-6 ml-11">
+                    <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm">Features</span>
+                    <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm">Sessions</span>
+                    <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm">Testing</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-6xl mx-auto px-6">
+            <!-- Features Section -->
+            <section class="mb-16 fade-in">
+                <div class="flex items-center gap-3 mb-6">
+                    <i data-lucide="layers" class="w-6 h-6"></i>
+                    <h2 class="text-2xl font-light">Features</h2>
+                </div>
+                <div class="ml-9">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <template x-for="feature in features" :key="feature.id">
+                            <sl-card class="feature-card">
+                                <div slot="header" class="flex items-start justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div :class="feature.color" class="p-2 rounded-lg">
+                                            <i :data-lucide="feature.icon" class="w-5 h-5 text-white"></i>
+                                        </div>
+                                        <div>
+                                            <h3 class="font-medium text-slate-900" x-text="feature.name"></h3>
+                                            <span class="text-xs text-slate-600" x-text="'v' + feature.version"></span>
+                                        </div>
+                                    </div>
+                                    <sl-badge :variant="feature.status === 'active' ? 'success' : 'warning'" x-text="feature.status"></sl-badge>
+                                </div>
+
+                                <p class="text-sm text-slate-600 mb-4" x-text="feature.description"></p>
+
+                                <div slot="footer" class="flex justify-between items-center">
+                                    <div class="flex gap-2">
+                                        <sl-button size="small" variant="text" :href="feature.docsPath">
+                                            <i data-lucide="book-open" slot="prefix" class="w-4 h-4"></i>
+                                            Docs
+                                        </sl-button>
+                                        <template x-if="feature.testPath">
+                                            <sl-button size="small" variant="text" :href="feature.testPath">
+                                                <i data-lucide="flask-conical" slot="prefix" class="w-4 h-4"></i>
+                                                Tests
+                                            </sl-button>
+                                        </template>
+                                    </div>
+                                    <span class="text-xs text-slate-500" x-text="feature.sessionCount + ' sessions'"></span>
+                                </div>
+                            </sl-card>
+                        </template>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sessions Section -->
+            <section class="mb-16 fade-in">
+                <div class="flex items-center gap-3 mb-6">
+                    <i data-lucide="clock" class="w-6 h-6"></i>
+                    <h2 class="text-2xl font-light">Sessions</h2>
+                </div>
+                <div class="ml-9">
+                    <div class="space-y-3">
+                        <template x-for="session in sessions" :key="session.id">
+                            <a :href="session.path" class="block group">
+                                <div class="bg-white rounded-lg p-5 hover:shadow-md transition-all duration-200 hover:translate-x-1">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex items-start gap-4">
+                                            <div :class="session.iconColor" class="p-2 rounded-lg">
+                                                <i :data-lucide="session.icon" class="w-5 h-5 text-white"></i>
+                                            </div>
+                                            <div class="flex-1">
+                                                <div class="flex items-center gap-3 mb-1">
+                                                    <h3 class="font-medium text-slate-900 group-hover:text-blue-600 transition-colors" x-text="session.title"></h3>
+                                                    <span class="px-2 py-0.5 text-xs font-medium rounded-full"
+                                                          :class="session.typeLabel === 'Security' ? 'bg-green-100 text-green-700' :
+                                                                  session.typeLabel === 'Feature' ? 'bg-blue-100 text-blue-700' :
+                                                                  'bg-orange-100 text-orange-700'"
+                                                          x-text="session.typeLabel"></span>
+                                                </div>
+                                                <p class="text-sm text-slate-500 mb-2" x-text="session.shortDate"></p>
+                                                <p class="text-sm text-slate-600 mb-3" x-text="session.summary"></p>
+                                                <div class="flex gap-2 flex-wrap">
+                                                    <template x-for="tag in session.tags" :key="tag">
+                                                        <span class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs" x-text="tag"></span>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <i data-lucide="arrow-right" class="w-5 h-5 text-slate-400"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </a>
+                        </template>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- API Config Dialog -->
+        <sl-dialog label="API Configuration" x-ref="apiDialog" @sl-after-hide="showApiConfig = false">
+            <div class="space-y-4">
+                <sl-input label="API URL" x-model="config.apiUrl" placeholder="http://localhost:3000" clearable>
+                    <i data-lucide="globe" slot="prefix" class="w-4 h-4"></i>
+                </sl-input>
+
+                <sl-textarea label="JWT Token" x-model="config.jwtToken" placeholder="Bearer token for authentication" rows="3" resize="none">
+                    <i data-lucide="key" slot="prefix" class="w-4 h-4"></i>
+                </sl-textarea>
+
+                <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div class="flex items-start gap-2">
+                        <i data-lucide="info" class="w-4 h-4 text-blue-600 mt-0.5"></i>
+                        <div class="text-sm text-blue-800">
+                            <p class="font-medium mb-1">Configuration Storage</p>
+                            <p>Settings are saved to your browser's local storage and will persist between sessions.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div slot="footer" class="flex justify-end gap-2">
+                <sl-button variant="default" @click="$refs.apiDialog.hide()">Cancel</sl-button>
+                <sl-button variant="primary" @click="saveConfig()">
+                    <i data-lucide="save" slot="prefix" class="w-4 h-4"></i>
+                    Save Configuration
+                </sl-button>
+            </div>
+        </sl-dialog>
+
+        <!-- Success Alert -->
+        <sl-alert variant="success" open x-show="showToast" x-ref="successAlert" closable
+                  class="fixed top-4 right-4 z-50 max-w-sm">
+            <i data-lucide="check-circle" slot="icon" class="w-4 h-4"></i>
+            <strong>Configuration saved!</strong>
+            Your API settings have been stored successfully.
+        </sl-alert>
+    </div>
+
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('portalApp', () => ({
+                features: [
+                    {
+                        id: 'unified-workspace',
+                        name: 'Unified Workspace',
+                        description: 'Consolidated workspace & file management with intelligent routing',
+                        icon: 'layers',
+                        color: 'bg-orange-600',
+                        status: 'active',
+                        version: '3.0.0',
+                        sessionCount: 1,
+                        docsPath: 'features/unified-workspace/',
+                        testPath: 'features/unified-workspace/tests/'
+                    },
+                    {
+                        id: 'session-management',
+                        name: 'Session Management',
+                        description: 'User session handling with activation and deactivation',
+                        icon: 'users',
+                        color: 'bg-blue-600',
+                        status: 'active',
+                        version: '1.2.0',
+                        sessionCount: 3,
+                        docsPath: 'features/session-management/',
+                        testPath: 'features/session-management/tests/'
+                    },
+                    {
+                        id: 'memory-journal',
+                        name: 'Memory & Journal',
+                        description: 'Store and retrieve memory entries with tagging',
+                        icon: 'book-open',
+                        color: 'bg-purple-600',
+                        status: 'active',
+                        version: '2.0.0',
+                        sessionCount: 2,
+                        docsPath: 'features/memory-journal/',
+                        testPath: 'features/memory-journal/tests/'
+                    }
+                ],
+
+                sessions: [
+                    {
+                        id: 'workspace-consolidation',
+                        title: 'Workspace Service Consolidation Analysis',
+                        date: 'September 27, 2025',
+                        shortDate: 'Sep 27, 2025',
+                        type: 'warning',
+                        typeLabel: 'Analysis',
+                        icon: 'layers',
+                        iconColor: 'bg-orange-600',
+                        summary: 'Identified triple redundancy in workspace/file services and proposed consolidation strategy',
+                        tags: ['Architecture', 'Refactoring', 'Code Quality'],
+                        path: 'sessions/workspace-consolidation-analysis.html'
+                    },
+                    {
+                        id: 'security-audit-2025',
+                        title: 'Security Audit & Authentication Fix',
+                        date: 'September 27, 2025',
+                        shortDate: 'Sep 27, 2025',
+                        type: 'success',
+                        typeLabel: 'Security',
+                        icon: 'shield-check',
+                        iconColor: 'bg-green-600',
+                        summary: 'Fixed critical authentication vulnerabilities in API endpoints',
+                        tags: ['Session Management', 'File Manager', 'Security'],
+                        path: 'sessions/security-audit-2025.html'
+                    },
+                    {
+                        id: 'testing-suite-creation',
+                        title: 'Testing Suite Development',
+                        date: 'September 27, 2025',
+                        shortDate: 'Sep 27, 2025',
+                        type: 'primary',
+                        typeLabel: 'Feature',
+                        icon: 'code',
+                        iconColor: 'bg-blue-600',
+                        summary: 'Built comprehensive testing suites for Memory/Journal and File Manager',
+                        tags: ['Memory Journal', 'File Manager', 'Testing'],
+                        path: 'sessions/testing-suite-creation.html'
+                    }
+                ],
+
+                showApiConfig: false,
+                showToast: false,
+
+                config: {
+                    apiUrl: localStorage.getItem('apiUrl') || 'http://localhost:3000',
+                    jwtToken: localStorage.getItem('jwtToken') || ''
+                },
+
+                saveConfig() {
+                    localStorage.setItem('apiUrl', this.config.apiUrl);
+                    localStorage.setItem('jwtToken', this.config.jwtToken);
+                    this.$refs.apiDialog.hide();
+
+                    // Show success alert
+                    this.showToast = true;
+                    this.$nextTick(() => {
+                        lucide.createIcons();
+                        setTimeout(() => {
+                            this.showToast = false;
+                        }, 3000);
+                    });
+                },
+
+                init() {
+                    // Initialize Lucide icons
+                    this.$nextTick(() => lucide.createIcons());
+                    console.log('Agent Hub Portal initialized');
+
+                    // Watch for showApiConfig changes to open/close dialog
+                    this.$watch('showApiConfig', (value) => {
+                        if (value) {
+                            this.$refs.apiDialog.show();
+                        }
+                    });
+                }
+            }));
+        });
+    </script>
+</body>
+</html>

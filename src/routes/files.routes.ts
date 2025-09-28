@@ -4,7 +4,10 @@ import {
   AuthenticatedRequest,
   verifyAccess,
 } from '../middleware/auth.middleware';
-import { getFileManager, FileScope } from '../services/file-manager.service';
+import {
+  getWorkspaceService,
+  FileScopeType,
+} from '../services/unified-workspace.service';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -18,41 +21,38 @@ router.post(
   upload.single('file'),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const fileManager = getFileManager();
-      const { scope = 'temporary', ttl, ownerId, purpose, tags } = req.body;
+      const workspace = getWorkspaceService();
+      const { scope = 'temporary', purpose, tags } = req.body;
 
       if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
-      const fileScope: FileScope = {
-        type: scope,
-        ttl: ttl ? parseInt(ttl) : undefined,
-        ownerId,
-      };
-
-      const managedFile = await fileManager.storeFile(
-        req.file.buffer,
+      const fileInfo = await workspace.uploadFile(
         req.file.originalname,
-        fileScope,
+        req.file.buffer,
         {
-          mimeType: req.file.mimetype,
-          purpose,
-          tags: tags ? tags.split(',') : [],
+          scope: scope as FileScopeType,
+          metadata: {
+            mimeType: req.file.mimetype,
+            purpose,
+            tags: tags ? tags.split(',') : [],
+          },
+          companyId: req.company._id.toString(),
+          userId: req.user?.id,
         },
-        req.company._id.toString(),
-        req.user?.id,
       );
 
-      const downloadUrl = fileManager.getDownloadUrl(
-        managedFile.id,
-        `${req.protocol}://${req.get('host')}`,
-      );
+      const downloadUrl = fileInfo.url;
 
       res.status(201).json({
-        ...managedFile,
+        id: fileInfo.id,
+        path: fileInfo.path,
         downloadUrl,
-        buffer: undefined, // Don't send buffer in response
+        filename: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+        scope,
       });
     } catch (error) {
       console.error('Error uploading file:', error);
@@ -72,16 +72,8 @@ router.post(
   verifyAccess(),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const fileManager = getFileManager();
-      const {
-        url,
-        filename,
-        scope = 'temporary',
-        ttl,
-        ownerId,
-        purpose,
-        tags,
-      } = req.body;
+      const workspace = getWorkspaceService();
+      const { url, filename, scope = 'temporary', purpose, tags } = req.body;
 
       if (!url || !filename) {
         return res.status(400).json({
@@ -89,33 +81,30 @@ router.post(
         });
       }
 
-      const fileScope: FileScope = {
-        type: scope,
-        ttl: ttl ? parseInt(ttl) : undefined,
-        ownerId,
-      };
+      // Fetch content from URL
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch from URL: ${response.statusText}`);
+      }
+      const buffer = Buffer.from(await response.arrayBuffer());
 
-      const managedFile = await fileManager.storeFile(
-        new URL(url),
-        filename,
-        fileScope,
-        {
+      const fileInfo = await workspace.uploadFile(filename, buffer, {
+        scope: scope as FileScopeType,
+        metadata: {
+          sourceUrl: url,
           purpose,
           tags: tags ? tags.split(',') : [],
         },
-        req.company._id.toString(),
-        req.user?.id,
-      );
-
-      const downloadUrl = fileManager.getDownloadUrl(
-        managedFile.id,
-        `${req.protocol}://${req.get('host')}`,
-      );
+        companyId: req.company._id.toString(),
+        userId: req.user?.id,
+      });
 
       res.status(201).json({
-        ...managedFile,
-        downloadUrl,
-        buffer: undefined,
+        id: fileInfo.id,
+        path: fileInfo.path,
+        downloadUrl: fileInfo.url,
+        filename,
+        scope,
       });
     } catch (error) {
       console.error('Error storing file from URL:', error);
@@ -132,39 +121,38 @@ router.post(
  */
 router.get('/:fileId/download', async (req, res) => {
   try {
-    const fileManager = getFileManager();
+    const workspace = getWorkspaceService();
     const { fileId } = req.params;
 
-    const file = await fileManager.getFile(fileId);
+    const buffer = await workspace.downloadFile(fileId);
 
-    if (!file) {
+    if (!buffer) {
       return res.status(404).json({
         error: 'File not found or has expired',
         message: 'File not found or has expired',
       });
     }
 
+    // Get file info for headers
+    const fileInfo = await workspace.getFileInfo(fileId);
+    const mimeType = fileInfo?.mimeType || 'application/octet-stream';
+    const filename = fileInfo?.originalName || fileInfo?.filename || 'download';
+
     // Set appropriate headers
-    res.setHeader('Content-Type', file.mimeType);
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${file.originalName}"`,
-    );
-    res.setHeader('Content-Length', file.size.toString());
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length.toString());
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
-    if (file.expiresAt) {
-      res.setHeader('X-File-Expires', file.expiresAt.toISOString());
+    if (fileInfo?.expiresAt) {
+      res.setHeader(
+        'X-File-Expires',
+        new Date(fileInfo.expiresAt).toISOString(),
+      );
     }
 
     // Send the file
-    if (file.buffer) {
-      res.send(file.buffer);
-    } else {
-      res.status(500).json({
-        error: 'File content not available',
-      });
-    }
+    res.send(buffer);
   } catch (error) {
     console.error('Error downloading file:', error);
     res.status(500).json({
@@ -182,30 +170,27 @@ router.get(
   verifyAccess(),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const fileManager = getFileManager();
+      const workspace = getWorkspaceService();
       const { fileId } = req.params;
 
-      const file = await fileManager.getFile(fileId);
+      const fileInfo = await workspace.getFileInfo(fileId);
 
-      if (!file) {
+      if (!fileInfo) {
         return res.status(404).json({
           error: 'File not found or has expired',
         });
       }
 
       res.json({
-        id: file.id,
-        filename: file.originalName,
-        size: file.size,
-        mimeType: file.mimeType,
-        scope: file.scope,
-        metadata: file.metadata,
-        createdAt: file.createdAt,
-        expiresAt: file.expiresAt,
-        downloadUrl: fileManager.getDownloadUrl(
-          file.id,
-          `${req.protocol}://${req.get('host')}`,
-        ),
+        id: fileId,
+        filename: fileInfo.originalName || fileInfo.filename,
+        size: fileInfo.size,
+        mimeType: fileInfo.mimeType,
+        scope: fileInfo.scope,
+        metadata: fileInfo,
+        createdAt: fileInfo.createdAt,
+        expiresAt: fileInfo.expiresAt,
+        downloadUrl: `/files/${fileId}/download`,
       });
     } catch (error) {
       console.error('Error getting file info:', error);
@@ -222,24 +207,16 @@ router.get(
  */
 router.get('/list', verifyAccess(), async (req: AuthenticatedRequest, res) => {
   try {
-    const fileManager = getFileManager();
-    const { scope, ownerId, limit = 100 } = req.query;
+    const workspace = getWorkspaceService();
+    const { scope } = req.query;
 
-    const fileScope: Partial<FileScope> = {};
-    if (scope) fileScope.type = scope as any;
-    if (ownerId) fileScope.ownerId = ownerId as string;
+    const files = await workspace.listFiles({
+      scope: scope as FileScopeType,
+    });
 
-    const files = await fileManager.listFiles(
-      fileScope,
-      req.company._id.toString(),
-      parseInt(limit as string),
-    );
-
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
     const filesWithUrls = files.map((file) => ({
       ...file,
-      downloadUrl: fileManager.getDownloadUrl(file.id, baseUrl),
-      buffer: undefined,
+      downloadUrl: `/files/${file.id}/download`,
     }));
 
     res.json(filesWithUrls);
@@ -260,19 +237,16 @@ router.get(
   verifyAccess(),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const fileManager = getFileManager();
+      const workspace = getWorkspaceService();
       const { agentId } = req.params;
 
-      const files = await fileManager.listFiles(
-        { type: 'agent', ownerId: agentId },
-        req.company._id.toString(),
-      );
+      const files = await workspace.listFiles({
+        prefix: `/files/agent/${agentId}`,
+      });
 
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
       const filesWithUrls = files.map((file) => ({
         ...file,
-        downloadUrl: fileManager.getDownloadUrl(file.id, baseUrl),
-        buffer: undefined,
+        downloadUrl: `/files/${file.id}/download`,
       }));
 
       res.json(filesWithUrls);
@@ -294,19 +268,16 @@ router.get(
   verifyAccess(),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const fileManager = getFileManager();
+      const workspace = getWorkspaceService();
       const { sessionId } = req.params;
 
-      const files = await fileManager.listFiles(
-        { type: 'session', ownerId: sessionId },
-        req.company._id.toString(),
-      );
+      const files = await workspace.listFiles({
+        prefix: `/files/session/${sessionId}`,
+      });
 
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
       const filesWithUrls = files.map((file) => ({
         ...file,
-        downloadUrl: fileManager.getDownloadUrl(file.id, baseUrl),
-        buffer: undefined,
+        downloadUrl: `/files/${file.id}/download`,
       }));
 
       res.json(filesWithUrls);
@@ -328,10 +299,10 @@ router.delete(
   verifyAccess(),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const fileManager = getFileManager();
+      const workspace = getWorkspaceService();
       const { fileId } = req.params;
 
-      const deleted = await fileManager.deleteFile(fileId);
+      const deleted = await workspace.deleteFile(fileId);
 
       if (!deleted) {
         return res.status(404).json({

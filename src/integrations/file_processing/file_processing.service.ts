@@ -1,8 +1,5 @@
 import { downloadFile } from '../../services/file-downloader.service';
-import { ContentFile } from '../../models/ContentFile';
-import { Storage } from '@google-cloud/storage';
-import path from 'path';
-import mongoose from 'mongoose';
+import { getWorkspaceService } from '../../services/unified-workspace.service';
 import xlsx from 'node-xlsx';
 
 export interface ProcessFileRequest {
@@ -59,19 +56,29 @@ export const processFile = async (
       // Remove leading slash if present
       searchFilename = searchFilename.replace(/^\//, '');
 
-      // Try to find the file by title/filename
-      const file = await ContentFile.findOne({
-        companyId: new mongoose.Types.ObjectId(companyId),
-        $or: [{ title: searchFilename }, { filename: searchFilename }],
-      });
+      // Try to find the file using unified workspace - search by filename
+      const workspace = getWorkspaceService();
+      const files = await workspace.listFiles();
+
+      const file = files.find(
+        (f) =>
+          f.originalName === searchFilename ||
+          f.filename === searchFilename ||
+          f.originalName?.includes(searchFilename),
+      );
 
       if (!file) {
         throw new Error(`File not found: ${searchFilename}`);
       }
 
-      // Download the file buffer from GCS
-      fileBuffer = await downloadContentFileBuffer(file, companyId);
-      filename = file.filename || file.title || searchFilename;
+      // Get file content from workspace
+      const fileContent = await workspace.downloadFile(file.id);
+      if (!fileContent) {
+        throw new Error(`Failed to get file content: ${searchFilename}`);
+      }
+
+      fileBuffer = fileContent;
+      filename = file.originalName || searchFilename;
     } else {
       // Download from HTTP/HTTPS URL
       fileBuffer = await downloadFile(request.url);
@@ -99,28 +106,7 @@ export const processFile = async (
   }
 };
 
-/**
- * Downloads the raw file buffer from Google Cloud Storage
- */
-async function downloadContentFileBuffer(
-  file: any,
-  companyId: string,
-): Promise<Buffer> {
-  const bucketName = process.env.GCP_STORAGE_BUCKET;
-  if (!bucketName) {
-    throw new Error('GCP_STORAGE_BUCKET not configured');
-  }
-
-  const storage = new Storage();
-  const bucket = storage.bucket(bucketName);
-
-  // Strip query parameters from gcpStorageUrl to get the blob name
-  const urlWithoutParams = file.gcpStorageUrl.split('?')[0];
-  const blobName = path.basename(urlWithoutParams);
-
-  const [fileBuffer] = await bucket.file(blobName).download();
-  return fileBuffer;
-}
+// Removed downloadContentFileBuffer - now using file-manager service directly
 
 /**
  * Processes an Excel file and converts it to text format

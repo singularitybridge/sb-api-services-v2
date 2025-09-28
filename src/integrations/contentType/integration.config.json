@@ -1,7 +1,0 @@
-{
-  "name": "content_type",
-  "icon": "list",
-  "apiKeyName": null,
-  "actionCreator": "createContentTypeActions",
-  "actionsFile": "contentType.actions.ts"
-}

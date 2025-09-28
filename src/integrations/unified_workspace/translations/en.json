@@ -1,0 +1,40 @@
+{
+  "serviceName": "Unified Workspace",
+  "storeContent": {
+    "actionTitle": "Store Content",
+    "description": "Store text or JSON content at session or agent scope",
+    "parameters": {
+      "path": "Path to store content (e.g., settings/config.json)",
+      "content": "Text or JSON content to store",
+      "scope": "Storage scope - session (session-specific) or agent (agent-specific)",
+      "agentId": "Agent ID (required when scope is agent)"
+    }
+  },
+  "retrieveContent": {
+    "actionTitle": "Retrieve Content",
+    "description": "Retrieve text or JSON content from session or agent scope",
+    "parameters": {
+      "path": "Path to retrieve content from",
+      "scope": "Storage scope - session or agent",
+      "agentId": "Agent ID (required when scope is agent)"
+    }
+  },
+  "listContent": {
+    "actionTitle": "List Content",
+    "description": "List all stored paths at session or agent scope",
+    "parameters": {
+      "prefix": "Optional prefix to filter paths (e.g., settings/)",
+      "scope": "Storage scope - session or agent",
+      "agentId": "Agent ID (required when scope is agent)"
+    }
+  },
+  "deleteContent": {
+    "actionTitle": "Delete Content",
+    "description": "Delete content at a specific path from session or agent scope",
+    "parameters": {
+      "path": "Path to delete content from",
+      "scope": "Storage scope - session or agent",
+      "agentId": "Agent ID, name, or URL (required when scope is agent)"
+    }
+  }
+}

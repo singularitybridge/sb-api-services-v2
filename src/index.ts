@@ -4,10 +4,10 @@ dotenv.config();
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import mongoose from 'mongoose';
-import { initializeTelegramBots } from './services/telegram.bot';
 import { initializeWebSocket } from './services/websocket';
 import http from 'http';
 import { logger } from './utils/logger';
+import { Assistant } from './models/Assistant';
 
 const initializeApp = async () => {
   try {
@@ -17,10 +17,28 @@ const initializeApp = async () => {
     await mongoose.connect(dbUri, { dbName });
     logger.info(`Successfully connected to MongoDB database: ${dbName}`);
 
+    // Create indexes for Assistant model
+    logger.info('Creating database indexes...');
+    try {
+      // Create compound unique index for companyId and name
+      await Assistant.collection.createIndex(
+        { companyId: 1, name: 1 },
+        { unique: true, sparse: true },
+      );
+      logger.info(
+        'Created unique compound index on Assistant (companyId, name)',
+      );
 
-    logger.info('Initializing Telegram bots...');
-    await initializeTelegramBots();
-    logger.info('Telegram bots initialized for all companies');
+      // Create index on name alone for faster lookups
+      await Assistant.collection.createIndex({ name: 1 });
+      logger.info('Created index on Assistant name field');
+    } catch (indexError: any) {
+      if (indexError.code === 11000 || indexError.code === 11001) {
+        logger.warn('Index already exists, skipping creation');
+      } else {
+        logger.error('Error creating indexes:', indexError);
+      }
+    }
   } catch (error: any) {
     logger.error('Error during initialization:', {
       error: error.message,
@@ -35,8 +53,6 @@ initializeApp();
 import express from 'express';
 import cors from 'cors';
 import policyRouter from './routes/policy.routes';
-import ttsRouter from './routes/tts.routes';
-import sttRouter from './routes/stt.routes';
 import { assistantRouter } from './routes/assistant.routes';
 import { sessionRouter } from './routes/session.routes';
 import { companyRouter } from './routes/company.routes';
@@ -52,11 +68,7 @@ import { apiKeyRateLimit } from './middleware/apiKeyRateLimit.middleware';
 import { onboardingRouter } from './routes/onboarding.routes';
 import { authRouter } from './routes/auth.routes';
 import { errorHandler } from './middleware/errorHandler.middleware';
-import { fileRouter } from './routes/file.routes';
-import { jsonbinRouter } from './routes/jsonbin.routes';
-import contentFileRouter from './routes/content-file.routes';
-import { contentRouter } from './routes/content.routes';
-import { contentTypeRouter } from './routes/content-type.routes';
+// Removed redundant file/content route imports - using unified workspace and file manager only
 import integrationRouter from './routes/integration.routes';
 import { teamRouter } from './routes/team.routes';
 import memoryRouter from './routes/memory.routes'; // Added import for memory router
@@ -64,6 +76,8 @@ import apiKeyRouter from './routes/apiKey.routes';
 import { costTrackingRouter } from './routes/cost-tracking.routes';
 import filesRouter from './routes/files.routes';
 import promptHistoryRouter from './routes/prompt-history.routes';
+// Removed legacy workspace routers - using unified workspace only
+import unifiedWorkspaceRouter from './routes/unified-workspace.routes';
 
 // Read package.json at startup
 let packageJson: { version: string; name: string };
@@ -129,35 +143,18 @@ app.use('/assistant/user-input', (req, res, next) => {
   return compression()(req, res, next);
 });
 
-// Routes that only require authentication
-app.use('/tts', verifyTokenMiddleware, ttsRouter);
-app.use('/stt', verifyTokenMiddleware, sttRouter);
-
 // Routes that require company-specific access
 app.use('/assistant', verifyTokenMiddleware, verifyAccess(), assistantRouter);
 app.use('/company', verifyTokenMiddleware, verifyAccess(), companyRouter);
 app.use('/user', verifyTokenMiddleware, verifyAccess(), userRouter);
-app.use('/file', verifyTokenMiddleware, verifyAccess(), fileRouter);
-app.use(
-  '/content-file',
-  verifyTokenMiddleware,
-  verifyAccess(),
-  contentFileRouter,
-);
+// Removed redundant file/content routes - using unified file manager only
 app.use('/inbox', verifyTokenMiddleware, verifyAccess(), inboxRouter);
 app.use('/action', verifyTokenMiddleware, verifyAccess(), actionRouter);
 app.use('/session', verifyTokenMiddleware, verifyAccess(), sessionRouter);
-app.use('/files', filesRouter); // Unified file management
+app.use('/files', verifyTokenMiddleware, verifyAccess(), filesRouter); // Unified file management
 app.use('/api', verifyTokenMiddleware, verifyAccess(), verificationRouter);
 app.use('/onboarding', verifyTokenMiddleware, verifyAccess(), onboardingRouter);
-app.use('/jsonbin', verifyTokenMiddleware, verifyAccess(), jsonbinRouter);
-app.use('/content', verifyTokenMiddleware, verifyAccess(), contentRouter);
-app.use(
-  '/content-type',
-  verifyTokenMiddleware,
-  verifyAccess(),
-  contentTypeRouter,
-);
+// Removed content and content-type routes - using unified workspace only
 app.use(
   '/integrations',
   verifyTokenMiddleware,
@@ -174,6 +171,12 @@ app.use(
   costTrackingRouter,
 ); // Cost tracking
 app.use('/api', verifyTokenMiddleware, verifyAccess(), promptHistoryRouter); // Prompt history
+app.use(
+  '/api/workspace',
+  verifyTokenMiddleware,
+  verifyAccess(),
+  unifiedWorkspaceRouter,
+); // Unified Workspace - single workspace solution
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);
@@ -206,16 +209,9 @@ if (process.env.NODE_ENV !== 'test') {
     //   logger.error('Error cleaning up OpenAI Code Executor:', error);
     // }
 
-    // Cleanup file manager
-    try {
-      const { getFileManager } = await import(
-        './services/file-manager.service'
-      );
-      await getFileManager().shutdown();
-      logger.info('File manager cleaned up');
-    } catch (error) {
-      logger.error('Error cleaning up file manager:', error);
-    }
+    // Note: Unified workspace service doesn't require explicit cleanup
+    // It uses in-memory Maps, MongoDB via Keyv (handles own connections),
+    // and S3/GCP (stateless connections)
 
     server.close(() => {
       logger.info('Server closed');

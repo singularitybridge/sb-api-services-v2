@@ -1,6 +1,0 @@
-{
-  "name": "content_file",
-  "icon": "file-text",
-  "actionCreator": "createContentFileActions",
-  "actionsFile": "content_file.actions.ts"
-}

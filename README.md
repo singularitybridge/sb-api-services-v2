@@ -46,10 +46,9 @@ The SB Agent Portal integrates with various third-party services. The following 
 7. Perplexity
 8. SendGrid
 9. PhotoRoom
-10. Telegram Bot
-11. Linear
-12. Code Indexer
-13. JIRA
+10. Linear
+11. Code Indexer
+12. JIRA
 
 Each integration requires an API key, which can be managed through the Company settings. These integrations collectively enhance the capabilities of the AI agents, allowing them to perform a wide range of tasks across different domains and communication channels.
 

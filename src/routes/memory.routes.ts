@@ -10,7 +10,6 @@ import {
 } from '../integrations/journal/journal.service';
 import { IJournal } from '../models/Journal';
 import { getApiKey } from '../services/api.key.service';
-import { ChannelType } from '../types/ChannelType';
 import mongoose from 'mongoose';
 import { AuthenticatedRequest } from '../middleware/auth.middleware'; // Added import
 
@@ -134,11 +133,7 @@ router.post(
         userId: new mongoose.Types.ObjectId(userId as string),
         companyId: new mongoose.Types.ObjectId(companyId as string),
       };
-      const entry = await createJournalEntryService(
-        journalData,
-        apiKey,
-        ChannelType.WEB,
-      ); // Changed ChannelType.API to ChannelType.WEB
+      const entry = await createJournalEntryService(journalData, apiKey);
       res.status(201).json(entry);
     } catch (error) {
       next(error);
@@ -152,21 +147,28 @@ router.get(
   validate(GetEntriesQuerySchema),
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      let { userId, companyId, sessionId, entryType, tags, limit, scope } =
-        req.query as any;
+      const {
+        userId: queryUserId,
+        companyId: queryCompanyId,
+        sessionId,
+        entryType,
+        tags,
+        limit,
+        scope,
+      } = req.query as any;
 
-      userId = userId || req.user?._id?.toString();
-      companyId = companyId || req.company?._id?.toString();
+      const resolvedUserId = queryUserId || req.user?._id?.toString();
+      const resolvedCompanyId = queryCompanyId || req.company?._id?.toString();
 
-      if (!userId || !companyId) {
+      if (!resolvedUserId || !resolvedCompanyId) {
         return res
           .status(400)
           .json({ message: 'User ID and Company ID are required.' });
       }
 
       const entries = await getJournalEntriesService(
-        userId,
-        companyId,
+        resolvedUserId,
+        resolvedCompanyId,
         sessionId,
         entryType,
         tags,
@@ -186,15 +188,23 @@ router.get(
   validate(SearchEntriesQuerySchema),
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      let { q, companyId, userId, entryType, tags, limit } = req.query as any;
+      const {
+        q,
+        companyId: queryCompanyId,
+        userId: queryUserId,
+        entryType,
+        tags,
+        limit,
+      } = req.query as any;
 
-      companyId = companyId || req.company?._id?.toString();
+      const resolvedCompanyId = queryCompanyId || req.company?._id?.toString();
+      const resolvedUserId = queryUserId || req.user?._id?.toString();
       // userId remains optional in query; if not provided, service handles company-wide search (or user-specific if req.user._id is used by service based on other logic)
       // For search, if userId is not in query, it's fine, service will search broader by default if its logic allows.
       // If userId *is* in query, it will be used. If not, req.user._id could be a fallback if desired for user-scoped search by default.
       // The current search service takes userId as optional.
 
-      if (!companyId) {
+      if (!resolvedCompanyId) {
         return res.status(400).json({ message: 'Company ID is required.' });
       }
       if (!q) {
@@ -206,8 +216,8 @@ router.get(
 
       const entries = await searchJournalEntriesService(
         q,
-        companyId,
-        userId,
+        resolvedCompanyId,
+        resolvedUserId,
         entryType,
         tags,
         limit,
@@ -225,21 +235,28 @@ router.get(
   validate(GetEntriesQuerySchema),
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      let { userId, companyId, sessionId, entryType, tags, limit, scope } =
-        req.query as any;
+      const {
+        userId: queryUserId,
+        companyId: queryCompanyId,
+        sessionId,
+        entryType,
+        tags,
+        limit,
+        scope,
+      } = req.query as any;
 
-      userId = userId || req.user?._id?.toString();
-      companyId = companyId || req.company?._id?.toString();
+      const resolvedUserId = queryUserId || req.user?._id?.toString();
+      const resolvedCompanyId = queryCompanyId || req.company?._id?.toString();
 
-      if (!userId || !companyId) {
+      if (!resolvedUserId || !resolvedCompanyId) {
         return res
           .status(400)
           .json({ message: 'User ID and Company ID are required.' });
       }
 
       const entries = await getFriendlyJournalEntriesService(
-        userId,
-        companyId,
+        resolvedUserId,
+        resolvedCompanyId,
         sessionId,
         entryType,
         tags,

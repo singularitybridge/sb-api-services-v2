@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified Workspace Testing | AI Agent Hub</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Shoelace -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/themes/light.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/shoelace-autoloader.js"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Modal Styles */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9998;
+        }
+
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            z-index: 9999;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        /* Toast Notification Styles */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+
+        .toast {
+            min-width: 300px;
+            margin-bottom: 10px;
+            padding: 16px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .toast.success {
+            border-left: 4px solid #10b981;
+        }
+
+        .toast.error {
+            border-left: 4px solid #ef4444;
+        }
+
+        .toast.info {
+            border-left: 4px solid #3b82f6;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        .toast.removing {
+            animation: slideOut 0.3s ease-out;
+        }
+
+        /* Pretty JSON Formatting */
+        .json-container {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            margin: 0;
+        }
+
+        * { font-family: 'Inter', sans-serif; }
+        code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .spinner {
+            border: 2px solid #f3f4f6;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .terminal {
+            background: #0f172a;
+            color: #e2e8f0;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .json-key { color: #22d3ee; }
+        .json-string { color: #34d399; }
+        .json-number { color: #fbbf24; }
+        .json-boolean { color: #f472b6; }
+        .json-null { color: #94a3b8; }
+    </style>
+</head>
+<body class="bg-white text-slate-900" x-data="workspaceTester()">
+    <!-- Configuration Modal -->
+    <div x-show="showConfigModal" x-cloak class="modal-backdrop" @click="showConfigModal = false">
+        <div class="modal" @click.stop>
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-medium">Configuration Settings</h3>
+                    <button @click="showConfigModal = false" class="text-slate-400 hover:text-slate-600">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">API Base URL</label>
+                        <input
+                            type="text"
+                            x-model="config.apiUrl"
+                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            placeholder="http://localhost:3000"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">JWT Token</label>
+                        <textarea
+                            x-model="config.jwtToken"
+                            class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-500 font-mono text-xs"
+                            placeholder="Enter JWT token"
+                            rows="3"
+                        ></textarea>
+                    </div>
+                    <button
+                        @click="testConnection()"
+                        :disabled="loading.connection"
+                        class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                    >
+                        <div x-show="loading.connection" class="spinner"></div>
+                        <i x-show="!loading.connection" data-lucide="wifi" class="w-4 h-4"></i>
+                        Test Connection
+                    </button>
+                    <button
+                        @click="saveConfig()"
+                        class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                        Save Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" x-show="toasts.length > 0">
+        <template x-for="toast in toasts" :key="toast.id">
+            <div :class="`toast ${toast.type} ${toast.removing ? 'removing' : ''}`">
+                <i :data-lucide="toast.icon" class="w-5 h-5"></i>
+                <div class="flex-1">
+                    <div class="font-medium" x-text="toast.title"></div>
+                    <div class="text-sm text-slate-600 mt-1" x-text="toast.message" x-show="toast.message"></div>
+                </div>
+                <button @click="removeToast(toast.id)" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </template>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-6 py-12">
+        <!-- Header -->
+        <header class="mb-16 fade-in">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="flex items-center gap-3 mb-4">
+                        <i data-lucide="layers" class="w-8 h-8"></i>
+                        <h1 class="text-4xl font-light">Unified Workspace Testing</h1>
+                    </div>
+                    <p class="text-lg text-slate-600 ml-11">Test content storage, file management, and intelligent routing</p>
+                    <div class="flex gap-2 mt-6 ml-11">
+                        <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm">API Testing</span>
+                        <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm">File Management</span>
+                        <span class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm">Storage Routing</span>
+                    </div>
+                </div>
+                <div class="flex flex-col items-end gap-2">
+                    <div class="text-sm text-slate-600">
+                        <span class="font-medium">API:</span> <span x-text="config.apiUrl" class="font-mono"></span>
+                    </div>
+                    <button
+                        @click="showConfigModal = true"
+                        class="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
+                    >
+                        <i data-lucide="settings" class="w-4 h-4"></i>
+                        Configuration
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Test Results Summary -->
+        <section class="mb-16 fade-in" x-show="testResults.length > 0">
+            <div class="flex items-center gap-3 mb-6">
+                <i data-lucide="bar-chart-3" class="w-6 h-6"></i>
+                <h2 class="text-2xl font-light">Test Results Summary</h2>
+            </div>
+            <div class="ml-9">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="check-circle" class="w-5 h-5 text-green-600"></i>
+                            <span class="font-medium text-green-900">Passed</span>
+                        </div>
+                        <div class="text-2xl font-light text-green-900 mt-2" x-text="testResults.filter(t => t.success).length"></div>
+                    </div>
+                    <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="x-circle" class="w-5 h-5 text-red-600"></i>
+                            <span class="font-medium text-red-900">Failed</span>
+                        </div>
+                        <div class="text-2xl font-light text-red-900 mt-2" x-text="testResults.filter(t => !t.success).length"></div>
+                    </div>
+                    <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="clock" class="w-5 h-5 text-slate-600"></i>
+                            <span class="font-medium text-slate-900">Total</span>
+                        </div>
+                        <div class="text-2xl font-light text-slate-900 mt-2" x-text="testResults.length"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Note: Updated API endpoints to match actual routes -->
+        <!-- Content Storage Tests -->
+        <section class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <i data-lucide="database" class="w-6 h-6"></i>
+                <h2 class="text-2xl font-light">Content Storage Tests</h2>
+            </div>
+            <div class="ml-9 space-y-4">
+                <!-- Store Content Test -->
+                <div class="bg-white p-6 rounded-lg border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-medium">Store Content</h3>
+                        <button @click="testStoreContent()" :disabled="loading.storeContent"
+                                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
+                            <div x-show="loading.storeContent" class="spinner"></div>
+                            <span>Run Test</span>
+                        </button>
+                    </div>
+                    <div class="space-y-3">
+                        <!-- Scope Selection -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-700 mb-1">Scope</label>
+                                <select x-model="testData.selectedScope" @change="updatePathForScope()" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                                    <option value="temporary">🟡 Temporary (10min)</option>
+                                    <option value="session">🔵 Session (24h)</option>
+                                    <option value="agent">🟣 Agent (7d)</option>
+                                    <option value="team">🟢 Team (30d)</option>
+                                    <option value="company">⚫ Company (permanent)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-700 mb-1">TTL Override</label>
+                                <div class="flex gap-1">
+                                    <input type="number" x-model="testData.ttlValue" placeholder="1" class="flex-1 px-2 py-2 border border-slate-300 rounded-lg text-sm">
+                                    <select x-model="testData.ttlUnit" class="px-2 py-2 border border-slate-300 rounded-lg text-sm">
+                                        <option value="minutes">min</option>
+                                        <option value="hours">hr</option>
+                                        <option value="days">day</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="text" x-model="testData.contentPath" placeholder="Path (auto-generated based on scope)"
+                               class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm">
+                        <textarea x-model="testData.contentData" placeholder='Content (JSON or text)'
+                                  class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm" rows="3"></textarea>
+                    </div>
+                </div>
+
+                <!-- Retrieve Content Test -->
+                <div class="bg-white p-6 rounded-lg border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-medium">Retrieve Content</h3>
+                        <button @click="testRetrieveContent()" :disabled="loading.retrieveContent"
+                                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
+                            <div x-show="loading.retrieveContent" class="spinner"></div>
+                            <span>Run Test</span>
+                        </button>
+                    </div>
+                    <input type="text" x-model="testData.retrievePath" placeholder="Path to retrieve (e.g., /test/data.json)"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm">
+                </div>
+
+                <!-- List Content Test -->
+                <div class="bg-white p-6 rounded-lg border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-medium">List Content</h3>
+                        <button @click="testListContent()" :disabled="loading.listContent"
+                                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
+                            <div x-show="loading.listContent" class="spinner"></div>
+                            <span>Run Test</span>
+                        </button>
+                    </div>
+                    <input type="text" x-model="testData.listPrefix" placeholder="Prefix to list (e.g., /test)"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm">
+                </div>
+            </div>
+        </section>
+
+        <!-- Advanced Workspace Operations -->
+        <section class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <i data-lucide="git-branch" class="w-6 h-6"></i>
+                <h2 class="text-2xl font-light">Advanced Workspace Operations</h2>
+            </div>
+            <div class="ml-9 space-y-4">
+                <!-- Check Exists Test -->
+                <div class="bg-white p-6 rounded-lg border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-medium">Check Path Exists</h3>
+                        <button @click="testExists()" :disabled="loading.exists"
+                                class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2">
+                            <div x-show="loading.exists" class="spinner"></div>
+                            <span>Run Test</span>
+                        </button>
+                    </div>
+                    <input type="text" x-model="testData.existsPath" placeholder="Path to check (e.g., /test/data.json)"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm">
+                </div>
+
+                <!-- Delete Content Test -->
+                <div class="bg-white p-6 rounded-lg border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-medium">Delete Content</h3>
+                        <button @click="testDelete()" :disabled="loading.delete"
+                                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2">
+                            <div x-show="loading.delete" class="spinner"></div>
+                            <span>Run Test</span>
+                        </button>
+                    </div>
+                    <input type="text" x-model="testData.deletePath" placeholder="Path to delete (e.g., /test/data.json)"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm">
+                </div>
+
+                <!-- Move/Rename Test -->
+                <div class="bg-white p-6 rounded-lg border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-medium">Move/Rename Path</h3>
+                        <button @click="testMove()" :disabled="loading.move"
+                                class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2">
+                            <div x-show="loading.move" class="spinner"></div>
+                            <span>Run Test</span>
+                        </button>
+                    </div>
+                    <div class="space-y-3">
+                        <input type="text" x-model="testData.moveFrom" placeholder="From path (e.g., /old/data.json)"
+                               class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm">
+                        <input type="text" x-model="testData.moveTo" placeholder="To path (e.g., /new/data.json)"
+                               class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm">
+                    </div>
+                </div>
+
+                <!-- Copy Test -->
+                <div class="bg-white p-6 rounded-lg border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-medium">Copy Path</h3>
+                        <button @click="testCopy()" :disabled="loading.copy"
+                                class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 flex items-center gap-2">
+                            <div x-show="loading.copy" class="spinner"></div>
+                            <span>Run Test</span>
+                        </button>
+                    </div>
+                    <div class="space-y-3">
+                        <input type="text" x-model="testData.copyFrom" placeholder="From path (e.g., /source/data.json)"
+                               class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm">
+                        <input type="text" x-model="testData.copyTo" placeholder="To path (e.g., /dest/data.json)"
+                               class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm">
+                    </div>
+                </div>
+
+                <!-- Export Workspace Test -->
+                <div class="bg-white p-6 rounded-lg border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-medium">Export Workspace</h3>
+                        <button @click="testExport()" :disabled="loading.export"
+                                class="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-50 flex items-center gap-2">
+                            <div x-show="loading.export" class="spinner"></div>
+                            <span>Run Test</span>
+                        </button>
+                    </div>
+                    <input type="text" x-model="testData.exportPrefix" placeholder="Prefix to export (leave empty for all)"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm">
+                </div>
+
+                <!-- Import Workspace Test -->
+                <div class="bg-white p-6 rounded-lg border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-medium">Import Workspace</h3>
+                        <button @click="testImport()" :disabled="loading.import"
+                                class="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 flex items-center gap-2">
+                            <div x-show="loading.import" class="spinner"></div>
+                            <span>Run Test</span>
+                        </button>
+                    </div>
+                    <textarea x-model="testData.importData" placeholder='JSON data to import (e.g., {"/path": "content"})'
+                              class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm" rows="3"></textarea>
+                </div>
+
+                <!-- Clear Workspace Test -->
+                <div class="bg-white p-6 rounded-lg border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-medium">Clear Workspace</h3>
+                        <button @click="testClear()" :disabled="loading.clear"
+                                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2">
+                            <div x-show="loading.clear" class="spinner"></div>
+                            <span>Run Test</span>
+                        </button>
+                    </div>
+                    <div class="space-y-3">
+                        <input type="text" x-model="testData.clearPrefix" placeholder="Prefix to clear (leave empty for ALL)"
+                               class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" x-model="testData.clearConfirm" id="clearConfirm" class="rounded">
+                            <label for="clearConfirm" class="text-sm text-slate-600">I understand this will delete data</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Workspace Info Test -->
+                <div class="bg-white p-6 rounded-lg border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-medium">Workspace Info</h3>
+                        <button @click="testInfo()" :disabled="loading.info"
+                                class="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50 flex items-center gap-2">
+                            <div x-show="loading.info" class="spinner"></div>
+                            <span>Run Test</span>
+                        </button>
+                    </div>
+                    <p class="text-sm text-slate-600">Get information about the workspace (entries, cache size, provider)</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- File Management Tests -->
+        <section class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <i data-lucide="folder" class="w-6 h-6"></i>
+                <h2 class="text-2xl font-light">File Management Tests</h2>
+            </div>
+            <div class="ml-9 space-y-4">
+                <!-- Upload File Test -->
+                <div class="bg-white p-6 rounded-lg border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-medium">Upload File</h3>
+                        <button @click="testUploadFile()" :disabled="loading.uploadFile"
+                                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2">
+                            <div x-show="loading.uploadFile" class="spinner"></div>
+                            <span>Run Test</span>
+                        </button>
+                    </div>
+                    <div class="space-y-3">
+                        <input type="text" x-model="testData.fileName" placeholder="File name (e.g., test.txt)"
+                               class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm">
+                        <textarea x-model="testData.fileContent" placeholder="File content"
+                                  class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm" rows="3"></textarea>
+                        <select x-model="testData.fileScope" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                            <option value="temporary">🟡 Temporary (10 min) - Quick processing</option>
+                            <option value="session">🔵 Session (24 hours) - Working files</option>
+                            <option value="agent">🟣 Agent (7 days) - Agent resources</option>
+                            <option value="team">🟢 Team (30 days) - Shared resources</option>
+                            <option value="company">⚫ Company (Permanent) - Long-term docs</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Download File Test -->
+                <div class="bg-white p-6 rounded-lg border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-medium">Download File</h3>
+                        <button @click="testDownloadFile()" :disabled="loading.downloadFile"
+                                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2">
+                            <div x-show="loading.downloadFile" class="spinner"></div>
+                            <span>Run Test</span>
+                        </button>
+                    </div>
+                    <input type="text" x-model="testData.downloadFileId" placeholder="File ID to download"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-sm">
+                </div>
+
+                <!-- List Files Test -->
+                <div class="bg-white p-6 rounded-lg border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-medium">List Files</h3>
+                        <button @click="testListFiles()" :disabled="loading.listFiles"
+                                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2">
+                            <div x-show="loading.listFiles" class="spinner"></div>
+                            <span>Run Test</span>
+                        </button>
+                    </div>
+                    <select x-model="testData.listFilesScope" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                        <option value="">🌐 All Scopes</option>
+                        <option value="temporary">🟡 Temporary (10min TTL)</option>
+                        <option value="session">🔵 Session (24h TTL)</option>
+                        <option value="agent">🟣 Agent (7d TTL)</option>
+                        <option value="team">🟢 Team (30d TTL)</option>
+                        <option value="company">⚫ Company (Permanent)</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- Test Results Details -->
+        <section class="mb-16 fade-in" x-show="testResults.length > 0">
+            <div class="flex items-center gap-3 mb-6">
+                <i data-lucide="file-text" class="w-6 h-6"></i>
+                <h2 class="text-2xl font-light">Test Results Details</h2>
+            </div>
+            <div class="ml-9 space-y-4">
+                <template x-for="result in testResults" :key="result.id">
+                    <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                        <div class="p-4 flex items-center justify-between" :class="result.success ? 'bg-green-50' : 'bg-red-50'">
+                            <div class="flex items-center gap-3">
+                                <i :data-lucide="result.success ? 'check-circle' : 'x-circle'"
+                                   :class="result.success ? 'text-green-600' : 'text-red-600'" class="w-5 h-5"></i>
+                                <div>
+                                    <h3 class="font-medium" x-text="result.testName"></h3>
+                                    <p class="text-sm text-slate-600" x-text="result.timestamp"></p>
+                                </div>
+                            </div>
+                            <span class="text-sm px-2 py-1 rounded"
+                                  :class="result.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                                  x-text="result.success ? 'Passed' : 'Failed'"></span>
+                        </div>
+                        <div class="p-4">
+                            <h4 class="font-medium mb-2">Response:</h4>
+                            <pre class="json-container" x-text="JSON.stringify(result.response, null, 2)"></pre>
+                            <template x-if="result.error">
+                                <div class="mt-4">
+                                    <h4 class="font-medium mb-2 text-red-600">Error:</h4>
+                                    <pre class="bg-red-50 p-3 rounded text-sm text-red-700" x-text="result.error"></pre>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        function workspaceTester() {
+            return {
+                config: {
+                    apiUrl: localStorage.getItem('apiUrl') || 'http://localhost:3000',
+                    jwtToken: (() => {
+                        const stored = localStorage.getItem('jwtToken') || '';
+                        let token = stored.trim();
+                        if (token && !token.startsWith('Bearer ')) {
+                            token = 'Bearer ' + token;
+                        }
+                        return token;
+                    })()
+                },
+                showConfigModal: false,
+                toasts: [],
+                testResults: [],
+                loading: {
+                    connection: false,
+                    storeContent: false,
+                    retrieveContent: false,
+                    listContent: false,
+                    uploadFile: false,
+                    downloadFile: false,
+                    listFiles: false,
+                    exists: false,
+                    delete: false,
+                    move: false,
+                    copy: false,
+                    export: false,
+                    import: false,
+                    clear: false,
+                    info: false
+                },
+                testData: {
+                    contentPath: '/session/current/sample.json',
+                    contentData: JSON.stringify({ test: true, timestamp: Date.now(), scope: 'session' }, null, 2),
+                    retrievePath: '/session/current/sample.json',
+                    listPrefix: '/session/current',
+                    fileName: 'test.txt',
+                    fileContent: 'This is a test file content for scope-based storage',
+                    fileScope: 'session',
+                    downloadFileId: '',
+                    listFilesScope: 'session',
+                    existsPath: '/session/current/sample.json',
+                    deletePath: '/temporary/old.json',
+                    moveFrom: '/temporary/old.json',
+                    moveTo: '/session/current/moved.json',
+                    copyFrom: '/session/current/source.json',
+                    copyTo: '/session/current/backup.json',
+                    exportPrefix: '/session/current',
+                    importData: JSON.stringify({ "/session/current/import1.json": "session data", "/company/shared/import2.json": "company data" }, null, 2),
+                    clearPrefix: '/temporary',
+                    clearConfirm: false,
+                    // New scope-based fields
+                    selectedScope: 'session',
+                    ttlValue: '',
+                    ttlUnit: 'hours'
+                },
+
+                init() {
+                    // Initialize Lucide icons safely once the component is mounted
+                    this.$nextTick(() => {
+                        this.refreshIcons();
+
+                        // Re-initialize icons whenever the DOM changes
+                        const observer = new MutationObserver(() => {
+                            this.refreshIcons();
+                        });
+                        observer.observe(document.body, { childList: true, subtree: true });
+                    });
+
+                    // Set initial path based on default scope
+                    this.updatePathForScope();
+                },
+
+                saveConfig() {
+                    // Ensure proper Bearer prefix for API keys
+                    let token = (this.config.jwtToken || '').trim();
+                    if (token && !token.startsWith('Bearer ')) {
+                        token = 'Bearer ' + token;
+                    }
+
+                    this.config.jwtToken = token;
+                    localStorage.setItem('apiUrl', this.config.apiUrl);
+                    localStorage.setItem('jwtToken', token);
+                    this.showConfigModal = false;
+                    this.showToast('Settings Saved', 'Configuration has been updated', 'success');
+                },
+
+                async testConnection() {
+                    this.loading.connection = true;
+                    try {
+                        const response = await fetch(`${this.config.apiUrl}/health`);
+                        if (response.ok) {
+                            this.showToast('Connection Success', 'API is reachable', 'success');
+                        } else {
+                            this.showToast('Connection Failed', 'API returned an error', 'error');
+                        }
+                    } catch (error) {
+                        this.showToast('Connection Failed', error.message, 'error');
+                    } finally {
+                        this.loading.connection = false;
+                    }
+                },
+
+                // Helper function to update path based on scope
+                updatePathForScope() {
+                    const scope = this.testData.selectedScope;
+                    const timestamp = Date.now().toString().slice(-6);
+
+                    switch(scope) {
+                        case 'temporary':
+                            this.testData.contentPath = `/temporary/test_${timestamp}.json`;
+                            break;
+                        case 'session':
+                            this.testData.contentPath = `/session/current/sample_${timestamp}.json`;
+                            break;
+                        case 'agent':
+                            this.testData.contentPath = `/agent/test-agent/resource_${timestamp}.json`;
+                            break;
+                        case 'team':
+                            this.testData.contentPath = `/team/engineering/shared_${timestamp}.json`;
+                            break;
+                        case 'company':
+                            this.testData.contentPath = `/company/docs/policy_${timestamp}.json`;
+                            break;
+                    }
+
+                    // Update content to reflect scope
+                    const contentObj = {
+                        test: true,
+                        timestamp: Date.now(),
+                        scope: scope,
+                        note: `Content stored in ${scope} scope`
+                    };
+                    this.testData.contentData = JSON.stringify(contentObj, null, 2);
+                },
+
+                async testStoreContent() {
+                    console.log('Starting testStoreContent...');
+                    console.log('Config:', this.config);
+                    console.log('Test data:', this.testData);
+
+                    this.loading.storeContent = true;
+
+                    try {
+                        let content;
+                        try {
+                            content = JSON.parse(this.testData.contentData);
+                        } catch {
+                            content = this.testData.contentData;
+                        }
+
+                        // Build request body with optional TTL
+                        const requestBody = {
+                            path: this.testData.contentPath,
+                            content: content
+                        };
+
+                        // Add TTL if specified
+                        if (this.testData.ttlValue && !isNaN(this.testData.ttlValue)) {
+                            const ttlMs = this.calculateTTL(this.testData.ttlValue, this.testData.ttlUnit);
+                            requestBody.metadata = { ttl: ttlMs };
+                        }
+
+                        console.log('Sending request to:', `${this.config.apiUrl}/api/workspace/set`);
+                        console.log('Body:', requestBody);
+
+                        console.log('About to send fetch request...');
+                        const response = await fetch(`${this.config.apiUrl}/api/workspace/set`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': this.getAuthHeader()
+                            },
+                            body: JSON.stringify(requestBody)
+                        });
+
+                        console.log('Got response, status:', response.status);
+
+                        const data = await response.json();
+                        console.log('Response data:', data);
+
+                        this.addTestResult('Store Content', response.ok, data);
+
+                        if (response.ok) {
+                            const scopeEmoji = this.getScopeEmoji(this.testData.selectedScope);
+                            this.showToast('Content Stored', `${scopeEmoji} Stored at ${this.testData.contentPath}`, 'success');
+                        } else {
+                            this.showToast('Store Failed', data.error || data.message || 'Failed to store content', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Test error:', error);
+
+                        if (error.name === 'AbortError') {
+                            this.addTestResult('Store Content', false, null, 'Request timed out after 10 seconds');
+                            this.showToast('Test Error', 'Request timed out', 'error');
+                        } else {
+                            this.addTestResult('Store Content', false, null, error.message);
+                            this.showToast('Test Error', error.message, 'error');
+                        }
+                    } finally {
+                        console.log('Resetting loading state');
+                        this.loading.storeContent = false;
+                    }
+                },
+
+                // Helper functions
+                getAuthHeader() {
+                    const raw = this.config.jwtToken || '';
+                    const token = raw.trim();
+                    if (!token) {
+                        return '';
+                    }
+
+                    // Always ensure Bearer prefix
+                    return token.startsWith('Bearer ') ? token : 'Bearer ' + token;
+                },
+
+                calculateTTL(value, unit) {
+                    const multipliers = {
+                        minutes: 60 * 1000,
+                        hours: 60 * 60 * 1000,
+                        days: 24 * 60 * 60 * 1000
+                    };
+                    return parseInt(value) * multipliers[unit];
+                },
+
+                getScopeEmoji(scope) {
+                    const emojis = {
+                        temporary: '🟡',
+                        session: '🔵',
+                        agent: '🟣',
+                        team: '🟢',
+                        company: '⚫'
+                    };
+                    return emojis[scope] || '📁';
+                },
+
+                async testRetrieveContent() {
+                    this.loading.retrieveContent = true;
+                    try {
+                        const response = await fetch(`${this.config.apiUrl}/api/workspace/get?path=${encodeURIComponent(this.testData.retrievePath)}`, {
+                            headers: {
+                                'Authorization': this.getAuthHeader()
+                            }
+                        });
+
+                        const data = await response.json();
+                        this.addTestResult('Retrieve Content', response.ok, data);
+
+                        if (response.ok) {
+                            this.showToast('Content Retrieved', `Retrieved from ${this.testData.retrievePath}`, 'success');
+                        } else {
+                            this.showToast('Retrieve Failed', data.error || 'Content not found', 'error');
+                        }
+                    } catch (error) {
+                        this.addTestResult('Retrieve Content', false, null, error.message);
+                        this.showToast('Test Error', error.message, 'error');
+                    } finally {
+                        this.loading.retrieveContent = false;
+                    }
+                },
+
+                async testListContent() {
+                    this.loading.listContent = true;
+                    try {
+                        const response = await fetch(`${this.config.apiUrl}/api/workspace/list?prefix=${encodeURIComponent(this.testData.listPrefix)}`, {
+                            headers: {
+                                'Authorization': this.getAuthHeader()
+                            }
+                        });
+
+                        const data = await response.json();
+                        this.addTestResult('List Content', response.ok, data);
+
+                        if (response.ok) {
+                            this.showToast('Content Listed', `Found ${data.length || 0} items`, 'success');
+                        } else {
+                            this.showToast('List Failed', data.error || 'Failed to list content', 'error');
+                        }
+                    } catch (error) {
+                        this.addTestResult('List Content', false, null, error.message);
+                        this.showToast('Test Error', error.message, 'error');
+                    } finally {
+                        this.loading.listContent = false;
+                    }
+                },
+
+                async testUploadFile() {
+                    this.loading.uploadFile = true;
+                    try {
+                        const formData = new FormData();
+                        const blob = new Blob([this.testData.fileContent], { type: 'text/plain' });
+                        formData.append('file', blob, this.testData.fileName);
+                        formData.append('scope', this.testData.fileScope);
+
+                        const response = await fetch(`${this.config.apiUrl}/files/upload`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': this.getAuthHeader()
+                            },
+                            body: formData
+                        });
+
+                        const data = await response.json();
+                        this.addTestResult('Upload File', response.ok, data);
+
+                        if (response.ok) {
+                            this.testData.downloadFileId = data.id; // Store for download test
+                            this.showToast('File Uploaded', `File ID: ${data.id}`, 'success');
+                        } else {
+                            this.showToast('Upload Failed', data.error || 'Failed to upload file', 'error');
+                        }
+                    } catch (error) {
+                        this.addTestResult('Upload File', false, null, error.message);
+                        this.showToast('Test Error', error.message, 'error');
+                    } finally {
+                        this.loading.uploadFile = false;
+                    }
+                },
+
+                async testDownloadFile() {
+                    this.loading.downloadFile = true;
+                    try {
+                        if (!this.testData.downloadFileId) {
+                            throw new Error('No file ID specified. Upload a file first.');
+                        }
+
+                        const response = await fetch(`${this.config.apiUrl}/files/${this.testData.downloadFileId}/download`);
+
+                        if (response.ok) {
+                            const text = await response.text();
+                            this.addTestResult('Download File', true, {
+                                fileId: this.testData.downloadFileId,
+                                content: text,
+                                size: text.length
+                            });
+                            this.showToast('File Downloaded', `Retrieved ${text.length} bytes`, 'success');
+                        } else {
+                            const data = await response.json();
+                            this.addTestResult('Download File', false, data);
+                            this.showToast('Download Failed', data.error || 'File not found', 'error');
+                        }
+                    } catch (error) {
+                        this.addTestResult('Download File', false, null, error.message);
+                        this.showToast('Test Error', error.message, 'error');
+                    } finally {
+                        this.loading.downloadFile = false;
+                    }
+                },
+
+                async testListFiles() {
+                    this.loading.listFiles = true;
+                    try {
+                        const url = this.testData.listFilesScope
+                            ? `${this.config.apiUrl}/files/list?scope=${this.testData.listFilesScope}`
+                            : `${this.config.apiUrl}/files/list`;
+
+                        const response = await fetch(url, {
+                            headers: {
+                                'Authorization': this.getAuthHeader()
+                            }
+                        });
+
+                        const data = await response.json();
+                        this.addTestResult('List Files', response.ok, data);
+
+                        if (response.ok) {
+                            this.showToast('Files Listed', `Found ${data.length || 0} files`, 'success');
+                        } else {
+                            this.showToast('List Failed', data.error || 'Failed to list files', 'error');
+                        }
+                    } catch (error) {
+                        this.addTestResult('List Files', false, null, error.message);
+                        this.showToast('Test Error', error.message, 'error');
+                    } finally {
+                        this.loading.listFiles = false;
+                    }
+                },
+
+                async testExists() {
+                    this.loading.exists = true;
+                    try {
+                        const response = await fetch(`${this.config.apiUrl}/api/workspace/exists?path=${encodeURIComponent(this.testData.existsPath)}`, {
+                            headers: {
+                                'Authorization': this.getAuthHeader()
+                            }
+                        });
+
+                        const data = await response.json();
+                        this.addTestResult('Check Exists', response.ok, data);
+
+                        if (response.ok) {
+                            this.showToast('Exists Check', `Path ${data.exists ? 'exists' : 'does not exist'}`, data.exists ? 'success' : 'info');
+                        } else {
+                            this.showToast('Check Failed', data.error || 'Failed to check path', 'error');
+                        }
+                    } catch (error) {
+                        this.addTestResult('Check Exists', false, null, error.message);
+                        this.showToast('Test Error', error.message, 'error');
+                    } finally {
+                        this.loading.exists = false;
+                    }
+                },
+
+                async testDelete() {
+                    this.loading.delete = true;
+                    try {
+                        const response = await fetch(`${this.config.apiUrl}/api/workspace/delete`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': this.getAuthHeader()
+                            },
+                            body: JSON.stringify({
+                                path: this.testData.deletePath
+                            })
+                        });
+
+                        const data = await response.json();
+                        this.addTestResult('Delete Content', response.ok, data);
+
+                        if (response.ok) {
+                            this.showToast('Content Deleted', `Deleted ${this.testData.deletePath}`, 'success');
+                        } else {
+                            this.showToast('Delete Failed', data.error || 'Failed to delete content', 'error');
+                        }
+                    } catch (error) {
+                        this.addTestResult('Delete Content', false, null, error.message);
+                        this.showToast('Test Error', error.message, 'error');
+                    } finally {
+                        this.loading.delete = false;
+                    }
+                },
+
+                async testMove() {
+                    this.loading.move = true;
+                    try {
+                        const response = await fetch(`${this.config.apiUrl}/api/workspace/move`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': this.getAuthHeader()
+                            },
+                            body: JSON.stringify({
+                                fromPath: this.testData.moveFrom,
+                                toPath: this.testData.moveTo
+                            })
+                        });
+
+                        const data = await response.json();
+                        this.addTestResult('Move Path', response.ok, data);
+
+                        if (response.ok) {
+                            this.showToast('Path Moved', `Moved from ${this.testData.moveFrom} to ${this.testData.moveTo}`, 'success');
+                        } else {
+                            this.showToast('Move Failed', data.error || 'Failed to move path', 'error');
+                        }
+                    } catch (error) {
+                        this.addTestResult('Move Path', false, null, error.message);
+                        this.showToast('Test Error', error.message, 'error');
+                    } finally {
+                        this.loading.move = false;
+                    }
+                },
+
+                async testCopy() {
+                    this.loading.copy = true;
+                    try {
+                        const response = await fetch(`${this.config.apiUrl}/api/workspace/copy`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': this.getAuthHeader()
+                            },
+                            body: JSON.stringify({
+                                fromPath: this.testData.copyFrom,
+                                toPath: this.testData.copyTo
+                            })
+                        });
+
+                        const data = await response.json();
+                        this.addTestResult('Copy Path', response.ok, data);
+
+                        if (response.ok) {
+                            this.showToast('Path Copied', `Copied from ${this.testData.copyFrom} to ${this.testData.copyTo}`, 'success');
+                        } else {
+                            this.showToast('Copy Failed', data.error || 'Failed to copy path', 'error');
+                        }
+                    } catch (error) {
+                        this.addTestResult('Copy Path', false, null, error.message);
+                        this.showToast('Test Error', error.message, 'error');
+                    } finally {
+                        this.loading.copy = false;
+                    }
+                },
+
+                async testExport() {
+                    this.loading.export = true;
+                    try {
+                        const response = await fetch(`${this.config.apiUrl}/api/workspace/export`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': this.getAuthHeader()
+                            },
+                            body: JSON.stringify({
+                                prefix: this.testData.exportPrefix
+                            })
+                        });
+
+                        const data = await response.json();
+                        this.addTestResult('Export Workspace', response.ok, data);
+
+                        if (response.ok) {
+                            this.showToast('Export Success', `Exported ${data.count || 0} entries`, 'success');
+                        } else {
+                            this.showToast('Export Failed', data.error || 'Failed to export workspace', 'error');
+                        }
+                    } catch (error) {
+                        this.addTestResult('Export Workspace', false, null, error.message);
+                        this.showToast('Test Error', error.message, 'error');
+                    } finally {
+                        this.loading.export = false;
+                    }
+                },
+
+                async testImport() {
+                    this.loading.import = true;
+                    try {
+                        let importData;
+                        try {
+                            importData = JSON.parse(this.testData.importData);
+                        } catch {
+                            throw new Error('Invalid JSON data for import');
+                        }
+
+                        const response = await fetch(`${this.config.apiUrl}/api/workspace/import`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': this.getAuthHeader()
+                            },
+                            body: JSON.stringify({
+                                data: importData
+                            })
+                        });
+
+                        const data = await response.json();
+                        this.addTestResult('Import Workspace', response.ok, data);
+
+                        if (response.ok) {
+                            this.showToast('Import Success', `Imported ${data.imported || 0} entries`, 'success');
+                        } else {
+                            this.showToast('Import Failed', data.error || 'Failed to import workspace', 'error');
+                        }
+                    } catch (error) {
+                        this.addTestResult('Import Workspace', false, null, error.message);
+                        this.showToast('Test Error', error.message, 'error');
+                    } finally {
+                        this.loading.import = false;
+                    }
+                },
+
+                async testClear() {
+                    this.loading.clear = true;
+                    try {
+                        if (!this.testData.clearConfirm) {
+                            throw new Error('Please confirm deletion by checking the checkbox');
+                        }
+
+                        const response = await fetch(`${this.config.apiUrl}/api/workspace/clear`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': this.getAuthHeader()
+                            },
+                            body: JSON.stringify({
+                                prefix: this.testData.clearPrefix,
+                                confirm: true
+                            })
+                        });
+
+                        const data = await response.json();
+                        this.addTestResult('Clear Workspace', response.ok, data);
+
+                        if (response.ok) {
+                            this.showToast('Workspace Cleared', data.message || 'Cleared successfully', 'success');
+                            this.testData.clearConfirm = false; // Reset confirmation
+                        } else {
+                            this.showToast('Clear Failed', data.error || 'Failed to clear workspace', 'error');
+                        }
+                    } catch (error) {
+                        this.addTestResult('Clear Workspace', false, null, error.message);
+                        this.showToast('Test Error', error.message, 'error');
+                    } finally {
+                        this.loading.clear = false;
+                    }
+                },
+
+                async testInfo() {
+                    this.loading.info = true;
+                    try {
+                        const response = await fetch(`${this.config.apiUrl}/api/workspace/info`, {
+                            headers: {
+                                'Authorization': this.getAuthHeader()
+                            }
+                        });
+
+                        const data = await response.json();
+                        this.addTestResult('Workspace Info', response.ok, data);
+
+                        if (response.ok) {
+                            this.showToast('Info Retrieved', `${data.entries || 0} entries, Cache: ${data.cacheSize || 0}`, 'success');
+                        } else {
+                            this.showToast('Info Failed', data.error || 'Failed to get workspace info', 'error');
+                        }
+                    } catch (error) {
+                        this.addTestResult('Workspace Info', false, null, error.message);
+                        this.showToast('Test Error', error.message, 'error');
+                    } finally {
+                        this.loading.info = false;
+                    }
+                },
+
+                addTestResult(testName, success, response, error = null) {
+                    this.testResults.unshift({
+                        id: Date.now(),
+                        testName,
+                        success,
+                        response,
+                        error,
+                        timestamp: new Date().toLocaleTimeString()
+                    });
+                },
+
+                showToast(title, message, type) {
+                    const toast = {
+                        id: Date.now(),
+                        title,
+                        message,
+                        type,
+                        icon: type === 'success' ? 'check-circle' : type === 'error' ? 'x-circle' : 'info',
+                        removing: false
+                    };
+                    this.toasts.push(toast);
+
+                    setTimeout(() => {
+                        this.removeToast(toast.id);
+                    }, 5000);
+                },
+
+                removeToast(id) {
+                    const index = this.toasts.findIndex(t => t.id === id);
+                    if (index > -1) {
+                        this.toasts[index].removing = true;
+                        setTimeout(() => {
+                            this.toasts = this.toasts.filter(t => t.id !== id);
+                        }, 300);
+                    }
+                    this.refreshIcons();
+                },
+
+                refreshIcons() {
+                    if (typeof window !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
+                        window.lucide.createIcons();
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>

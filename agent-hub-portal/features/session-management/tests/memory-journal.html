@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory/Journal API Testing | AI Agent Hub</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Shoelace -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/themes/light.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2/cdn/shoelace-autoloader.js"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Pretty JSON Formatting */
+        .json-container {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            margin: 0;
+        }
+
+        .json-container .json-key {
+            color: #22d3ee;
+        }
+
+        .json-container .json-string {
+            color: #34d399;
+        }
+
+        .json-container .json-number {
+            color: #fbbf24;
+        }
+
+        .json-container .json-boolean {
+            color: #f472b6;
+        }
+
+        .json-container .json-null {
+            color: #94a3b8;
+        }
+
+        * { font-family: 'Inter', sans-serif; }
+        code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff40;
+            border-top-color: #ffffff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50" x-data="journalTestingApp()">
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        <!-- Header -->
+        <header class="mb-12 fade-in">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <div class="flex items-center gap-3 mb-2">
+                        <i data-lucide="book-open" class="w-8 h-8"></i>
+                        <h1 class="text-3xl font-light">Memory/Journal API Testing</h1>
+                    </div>
+                    <p class="text-slate-600 ml-11">Test journal entry creation, retrieval, search, and filtering capabilities</p>
+                </div>
+                <sl-badge variant="success" pill>v2.0</sl-badge>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <i data-lucide="settings" class="w-5 h-5 text-slate-600"></i>
+                    <h2 class="font-medium">Configuration</h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">API URL</label>
+                        <input
+                            type="text"
+                            x-model="config.apiUrl"
+                            class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            placeholder="http://localhost:3000"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">JWT Token</label>
+                        <input
+                            type="password"
+                            x-model="config.jwtToken"
+                            class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                            placeholder="Your JWT authentication token"
+                        >
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Journal Entry CRUD Tests -->
+        <section class="mb-16 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <i data-lucide="file-text" class="w-6 h-6"></i>
+                <h2 class="text-2xl font-light">Journal Entry Management</h2>
+            </div>
+            <div class="ml-9">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Create Journal Entry -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="plus-circle" class="w-5 h-5 text-green-600"></i>
+                            <h3 class="font-medium text-slate-900">Create Journal Entry</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">POST /memory/entries - Creates a new journal entry</p>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Entry Text</label>
+                                <textarea
+                                    x-model="tests.createEntry.text"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    rows="3"
+                                    placeholder="Enter journal entry text"
+                                ></textarea>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Entry Type</label>
+                                <select
+                                    x-model="tests.createEntry.entryType"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                >
+                                    <option value="note">Note</option>
+                                    <option value="context">Context</option>
+                                    <option value="insight">Insight</option>
+                                    <option value="summary">Summary</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Tags (comma-separated)</label>
+                                <input
+                                    type="text"
+                                    x-model="tests.createEntry.tags"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    placeholder="tag1, tag2, tag3"
+                                >
+                            </div>
+                        </div>
+
+                        <button
+                            @click="testCreateEntry()"
+                            :disabled="loading.createEntry"
+                            class="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.createEntry" class="spinner"></div>
+                            <i x-show="!loading.createEntry" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.createEntry" class="mt-4" x-html="formatJson(responses.createEntry)">
+                        </div>
+                    </div>
+
+                    <!-- Get Journal Entries -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="list" class="w-5 h-5 text-blue-600"></i>
+                            <h3 class="font-medium text-slate-900">Get Journal Entries</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">GET /memory/entries - Retrieves journal entries with filters</p>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Limit</label>
+                                <input
+                                    type="number"
+                                    x-model="tests.getEntries.limit"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    placeholder="10"
+                                    min="1"
+                                >
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Entry Type (optional)</label>
+                                <select
+                                    x-model="tests.getEntries.entryType"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                >
+                                    <option value="">All Types</option>
+                                    <option value="note">Note</option>
+                                    <option value="context">Context</option>
+                                    <option value="insight">Insight</option>
+                                    <option value="summary">Summary</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Scope</label>
+                                <select
+                                    x-model="tests.getEntries.scope"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                >
+                                    <option value="user">User</option>
+                                    <option value="company">Company</option>
+                                    <option value="session">Session</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button
+                            @click="testGetEntries()"
+                            :disabled="loading.getEntries"
+                            class="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.getEntries" class="spinner"></div>
+                            <i x-show="!loading.getEntries" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.getEntries" class="mt-4" x-html="formatJson(responses.getEntries)">
+                        </div>
+                    </div>
+
+                    <!-- Search Journal Entries -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="search" class="w-5 h-5 text-purple-600"></i>
+                            <h3 class="font-medium text-slate-900">Search Journal Entries</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">GET /memory/entries/search - Search entries by query</p>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Search Query</label>
+                                <input
+                                    type="text"
+                                    x-model="tests.searchEntries.query"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    placeholder="Enter search query"
+                                >
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Limit</label>
+                                <input
+                                    type="number"
+                                    x-model="tests.searchEntries.limit"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    placeholder="10"
+                                    min="1"
+                                >
+                            </div>
+                        </div>
+
+                        <button
+                            @click="testSearchEntries()"
+                            :disabled="loading.searchEntries"
+                            class="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.searchEntries" class="spinner"></div>
+                            <i x-show="!loading.searchEntries" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.searchEntries" class="mt-4" x-html="formatJson(responses.searchEntries)">
+                        </div>
+                    </div>
+
+                    <!-- Update Journal Entry -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="edit" class="w-5 h-5 text-orange-600"></i>
+                            <h3 class="font-medium text-slate-900">Update Journal Entry</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">PUT /memory/entries/:id - Updates an existing entry</p>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Entry ID</label>
+                                <input
+                                    type="text"
+                                    x-model="tests.updateEntry.entryId"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    placeholder="Enter entry ID to update"
+                                >
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Updated Text</label>
+                                <textarea
+                                    x-model="tests.updateEntry.text"
+                                    class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                    rows="3"
+                                    placeholder="Updated entry text"
+                                ></textarea>
+                            </div>
+                        </div>
+
+                        <button
+                            @click="testUpdateEntry()"
+                            :disabled="loading.updateEntry"
+                            class="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.updateEntry" class="spinner"></div>
+                            <i x-show="!loading.updateEntry" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.updateEntry" class="mt-4" x-html="formatJson(responses.updateEntry)">
+                        </div>
+                    </div>
+
+                    <!-- Delete Journal Entry -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="trash-2" class="w-5 h-5 text-red-600"></i>
+                            <h3 class="font-medium text-slate-900">Delete Journal Entry</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">DELETE /memory/entries/:id - Deletes an entry</p>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Entry ID</label>
+                            <input
+                                type="text"
+                                x-model="tests.deleteEntry.entryId"
+                                class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                placeholder="Enter entry ID to delete"
+                            >
+                        </div>
+
+                        <button
+                            @click="testDeleteEntry()"
+                            :disabled="loading.deleteEntry"
+                            class="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.deleteEntry" class="spinner"></div>
+                            <i x-show="!loading.deleteEntry" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.deleteEntry" class="mt-4" x-html="formatJson(responses.deleteEntry)">
+                        </div>
+                    </div>
+
+                    <!-- Get Entry by ID -->
+                    <div class="p-6 bg-white border border-slate-200 rounded-lg">
+                        <div class="flex items-center gap-2 mb-4">
+                            <i data-lucide="file-search" class="w-5 h-5 text-teal-600"></i>
+                            <h3 class="font-medium text-slate-900">Get Entry by ID</h3>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">GET /memory/entries/:id - Retrieves a specific entry</p>
+
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Entry ID</label>
+                            <input
+                                type="text"
+                                x-model="tests.getEntryById.entryId"
+                                class="w-full px-3 py-2 border border-slate-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                                placeholder="Enter entry ID"
+                            >
+                        </div>
+
+                        <button
+                            @click="testGetEntryById()"
+                            :disabled="loading.getEntryById"
+                            class="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:opacity-50 transition-colors text-sm"
+                        >
+                            <div x-show="loading.getEntryById" class="spinner"></div>
+                            <i x-show="!loading.getEntryById" data-lucide="send" class="w-4 h-4"></i>
+                            Execute Test
+                        </button>
+
+                        <div x-show="responses.getEntryById" class="mt-4" x-html="formatJson(responses.getEntryById)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        function journalTestingApp() {
+            return {
+                config: {
+                    apiUrl: 'http://localhost:3000',
+                    jwtToken: localStorage.getItem('jwtToken') || ''
+                },
+
+                tests: {
+                    createEntry: {
+                        text: 'Test journal entry created at ' + new Date().toISOString(),
+                        entryType: 'note',
+                        tags: 'test, automated'
+                    },
+                    getEntries: {
+                        limit: 10,
+                        entryType: '',
+                        scope: 'user'
+                    },
+                    searchEntries: {
+                        query: 'test',
+                        limit: 10
+                    },
+                    updateEntry: {
+                        entryId: '',
+                        text: 'Updated journal entry at ' + new Date().toISOString()
+                    },
+                    deleteEntry: {
+                        entryId: ''
+                    },
+                    getEntryById: {
+                        entryId: ''
+                    }
+                },
+
+                loading: {
+                    createEntry: false,
+                    getEntries: false,
+                    searchEntries: false,
+                    updateEntry: false,
+                    deleteEntry: false,
+                    getEntryById: false
+                },
+
+                responses: {
+                    createEntry: null,
+                    getEntries: null,
+                    searchEntries: null,
+                    updateEntry: null,
+                    deleteEntry: null,
+                    getEntryById: null
+                },
+
+                init() {
+                    this.$nextTick(() => lucide.createIcons());
+                    // Watch for JWT token changes and save to localStorage
+                    this.$watch('config.jwtToken', (value) => {
+                        if (value) {
+                            localStorage.setItem('jwtToken', value);
+                        }
+                    });
+                },
+
+                async makeRequest(endpoint, options = {}) {
+                    const response = await fetch(`${this.config.apiUrl}${endpoint}`, {
+                        ...options,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${this.config.jwtToken}`,
+                            ...options.headers
+                        }
+                    });
+
+                    const data = await response.json();
+                    return { status: response.status, data };
+                },
+
+                formatJson(response) {
+                    if (!response) return '';
+
+                    const statusClass = response.status >= 200 && response.status < 300 ? 'text-green-400' : 'text-red-400';
+                    const json = JSON.stringify(response.data, null, 2);
+
+                    const formatted = json
+                        .replace(/"([^"]+)":/g, '<span class="json-key">"$1"</span>:')
+                        .replace(/: "([^"]*)"/g, ': <span class="json-string">"$1"</span>')
+                        .replace(/: (\d+)/g, ': <span class="json-number">$1</span>')
+                        .replace(/: (true|false)/g, ': <span class="json-boolean">$1</span>')
+                        .replace(/: null/g, ': <span class="json-null">null</span>');
+
+                    return `
+                        <div class="mb-2 text-sm">
+                            Status: <span class="${statusClass} font-medium">${response.status}</span>
+                        </div>
+                        <pre class="json-container">${formatted}</pre>
+                    `;
+                },
+
+                async testCreateEntry() {
+                    this.loading.createEntry = true;
+                    try {
+                        const tags = this.tests.createEntry.tags.split(',').map(t => t.trim()).filter(t => t);
+
+                        this.responses.createEntry = await this.makeRequest('/memory/entries', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                text: this.tests.createEntry.text,
+                                entryType: this.tests.createEntry.entryType,
+                                tags
+                            })
+                        });
+
+                        // Save created entry ID for other tests
+                        if (this.responses.createEntry.data._id) {
+                            this.tests.updateEntry.entryId = this.responses.createEntry.data._id;
+                            this.tests.deleteEntry.entryId = this.responses.createEntry.data._id;
+                            this.tests.getEntryById.entryId = this.responses.createEntry.data._id;
+                        }
+                    } catch (error) {
+                        this.responses.createEntry = { status: 500, data: { error: error.message } };
+                    } finally {
+                        this.loading.createEntry = false;
+                    }
+                },
+
+                async testGetEntries() {
+                    this.loading.getEntries = true;
+                    try {
+                        const params = new URLSearchParams();
+                        if (this.tests.getEntries.limit) params.append('limit', this.tests.getEntries.limit);
+                        if (this.tests.getEntries.entryType) params.append('entryType', this.tests.getEntries.entryType);
+                        if (this.tests.getEntries.scope) params.append('scope', this.tests.getEntries.scope);
+
+                        this.responses.getEntries = await this.makeRequest(`/memory/entries?${params}`);
+                    } catch (error) {
+                        this.responses.getEntries = { status: 500, data: { error: error.message } };
+                    } finally {
+                        this.loading.getEntries = false;
+                    }
+                },
+
+                async testSearchEntries() {
+                    this.loading.searchEntries = true;
+                    try {
+                        const params = new URLSearchParams({
+                            q: this.tests.searchEntries.query,
+                            limit: this.tests.searchEntries.limit
+                        });
+
+                        this.responses.searchEntries = await this.makeRequest(`/memory/entries/search?${params}`);
+                    } catch (error) {
+                        this.responses.searchEntries = { status: 500, data: { error: error.message } };
+                    } finally {
+                        this.loading.searchEntries = false;
+                    }
+                },
+
+                async testUpdateEntry() {
+                    this.loading.updateEntry = true;
+                    try {
+                        this.responses.updateEntry = await this.makeRequest(`/memory/entries/${this.tests.updateEntry.entryId}`, {
+                            method: 'PUT',
+                            body: JSON.stringify({
+                                text: this.tests.updateEntry.text
+                            })
+                        });
+                    } catch (error) {
+                        this.responses.updateEntry = { status: 500, data: { error: error.message } };
+                    } finally {
+                        this.loading.updateEntry = false;
+                    }
+                },
+
+                async testDeleteEntry() {
+                    this.loading.deleteEntry = true;
+                    try {
+                        this.responses.deleteEntry = await this.makeRequest(`/memory/entries/${this.tests.deleteEntry.entryId}`, {
+                            method: 'DELETE'
+                        });
+                    } catch (error) {
+                        this.responses.deleteEntry = { status: 500, data: { error: error.message } };
+                    } finally {
+                        this.loading.deleteEntry = false;
+                    }
+                },
+
+                async testGetEntryById() {
+                    this.loading.getEntryById = true;
+                    try {
+                        this.responses.getEntryById = await this.makeRequest(`/memory/entries/${this.tests.getEntryById.entryId}`);
+                    } catch (error) {
+                        this.responses.getEntryById = { status: 500, data: { error: error.message } };
+                    } finally {
+                        this.loading.getEntryById = false;
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

@@ -90,6 +90,43 @@ export const updateSessionLanguage = async (
   return session;
 };
 
+export const activateSession = async (
+  sessionId: string,
+  userId: string,
+  companyId: string,
+): Promise<ISession> => {
+  const sessionObjectId = new mongoose.Types.ObjectId(sessionId);
+  const userObjectId = new mongoose.Types.ObjectId(userId);
+  const companyObjectId = new mongoose.Types.ObjectId(companyId);
+
+  const targetSession = await Session.findOne({
+    _id: sessionObjectId,
+    userId: userObjectId,
+    companyId: companyObjectId,
+  });
+
+  if (!targetSession) {
+    throw new NotFoundError('Session not found');
+  }
+
+  if (!targetSession.active) {
+    await Session.updateMany(
+      {
+        userId: userObjectId,
+        companyId: companyObjectId,
+        active: true,
+        _id: { $ne: sessionObjectId },
+      },
+      { $set: { active: false } },
+    );
+
+    targetSession.active = true;
+    await targetSession.save();
+  }
+
+  return targetSession;
+};
+
 export const getSessionById = async (sessionId: string): Promise<ISession> => {
   const session = await Session.findById(sessionId);
   if (!session) {
