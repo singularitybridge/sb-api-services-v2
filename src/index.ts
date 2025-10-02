@@ -78,6 +78,8 @@ import filesRouter from './routes/files.routes';
 import promptHistoryRouter from './routes/prompt-history.routes';
 // Removed legacy workspace routers - using unified workspace only
 import unifiedWorkspaceRouter from './routes/unified-workspace.routes';
+import mcpRouter from './routes/mcp.routes';
+import oauthMcpRouter from './routes/oauth-mcp.routes';
 
 // Read package.json at startup
 let packageJson: { version: string; name: string };
@@ -127,6 +129,17 @@ import compression from 'compression'; // Added for SSE Step 2
 app.use('/auth', authRouter);
 app.use('/policy', policyRouter);
 
+// OAuth endpoints for MCP - public (no auth required)
+app.use('/', oauthMcpRouter);
+
+// MCP health check - public endpoint
+app.get('/api/mcp/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // SSE Step 2: Skip compression() when SSE is requested for /assistant/user-input
 // Note: The task card mentions /api/assistant/user-input.
 // Given assistantRouter is mounted at /assistant, this middleware targets /assistant/user-input.
@@ -144,6 +157,7 @@ app.use('/assistant/user-input', (req, res, next) => {
 });
 
 // Routes that require company-specific access
+// Note: Specific routes must come before generic /api route
 app.use('/assistant', verifyTokenMiddleware, verifyAccess(), assistantRouter);
 app.use('/company', verifyTokenMiddleware, verifyAccess(), companyRouter);
 app.use('/user', verifyTokenMiddleware, verifyAccess(), userRouter);
@@ -152,6 +166,42 @@ app.use('/inbox', verifyTokenMiddleware, verifyAccess(), inboxRouter);
 app.use('/action', verifyTokenMiddleware, verifyAccess(), actionRouter);
 app.use('/session', verifyTokenMiddleware, verifyAccess(), sessionRouter);
 app.use('/files', verifyTokenMiddleware, verifyAccess(), filesRouter); // Unified file management
+app.use('/api/keys', verifyTokenMiddleware, verifyAccess(), apiKeyRouter); // API key management (before generic /api)
+app.use(
+  '/api/costs',
+  verifyTokenMiddleware,
+  verifyAccess(),
+  costTrackingRouter,
+); // Cost tracking (before generic /api)
+app.use(
+  '/api/workspace',
+  verifyTokenMiddleware,
+  verifyAccess(),
+  unifiedWorkspaceRouter,
+); // Unified Workspace (before generic /api)
+// MCP Server - custom auth that allows initialize, tools/list, and notifications without auth
+app.use('/api/mcp', (req, res, next) => {
+  // Allow initialize, tools/list, and initialized notification without auth (required by MCP spec for capability discovery)
+  if (req.body?.method === 'initialize' ||
+      req.body?.method === 'tools/list' ||
+      req.body?.method === 'notifications/initialized') {
+    return next();
+  }
+
+  // For MCP, intercept 401 responses to add WWW-Authenticate header per RFC 9728
+  const originalJson = res.json;
+  res.json = function(body: any) {
+    if (res.statusCode === 401) {
+      res.header('WWW-Authenticate', 'Bearer realm="MCP", resource_metadata="http://localhost:3000/.well-known/oauth-protected-resource"');
+    }
+    return originalJson.call(this, body);
+  };
+
+  // All other methods require auth
+  return verifyTokenMiddleware(req, res, () => {
+    verifyAccess()(req, res, next);
+  });
+}, mcpRouter); // MCP Server (before generic /api)
 app.use('/api', verifyTokenMiddleware, verifyAccess(), verificationRouter);
 app.use('/onboarding', verifyTokenMiddleware, verifyAccess(), onboardingRouter);
 // Removed content and content-type routes - using unified workspace only
@@ -163,20 +213,7 @@ app.use(
 );
 app.use('/teams', verifyTokenMiddleware, verifyAccess(), teamRouter);
 app.use('/memory', verifyTokenMiddleware, verifyAccess(), memoryRouter); // Added memory router
-app.use('/api/keys', verifyTokenMiddleware, verifyAccess(), apiKeyRouter); // API key management
-app.use(
-  '/api/costs',
-  verifyTokenMiddleware,
-  verifyAccess(),
-  costTrackingRouter,
-); // Cost tracking
 app.use('/api', verifyTokenMiddleware, verifyAccess(), promptHistoryRouter); // Prompt history
-app.use(
-  '/api/workspace',
-  verifyTokenMiddleware,
-  verifyAccess(),
-  unifiedWorkspaceRouter,
-); // Unified Workspace - single workspace solution
 
 // Admin-only routes - to be added later
 //app.use('/admin', verifyTokenMiddleware, verifyAccess(true), adminRouter);
