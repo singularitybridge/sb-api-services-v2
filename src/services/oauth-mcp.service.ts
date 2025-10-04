@@ -21,7 +21,7 @@ export function getProtectedResourceMetadata() {
     scopes_supported: ['mcp:execute', 'mcp:read'],
     bearer_methods_supported: ['header'],
     resource_signing_alg_values_supported: [],
-    resource_documentation: `${BASE_URL}/docs/mcp`
+    resource_documentation: `${BASE_URL}/docs/mcp`,
   };
 }
 
@@ -41,7 +41,7 @@ export function getAuthorizationServerMetadata() {
     code_challenge_methods_supported: ['S256'],
     scopes_supported: ['mcp:execute', 'mcp:read'],
     service_documentation: `${BASE_URL}/docs/oauth`,
-    ui_locales_supported: ['en-US']
+    ui_locales_supported: ['en-US'],
   };
 }
 
@@ -63,7 +63,7 @@ export function registerClient(req: Request) {
     response_types: ['code'],
     token_endpoint_auth_method: 'none', // Public client (PKCE protects it)
     redirect_uris: req.body.redirect_uris || [],
-    scope: 'mcp:execute mcp:read'
+    scope: 'mcp:execute mcp:read',
   };
 }
 
@@ -78,14 +78,14 @@ export function handleAuthorization(req: Request, res: Response) {
     state,
     code_challenge,
     code_challenge_method,
-    scope
+    scope,
   } = req.query;
 
   // Validate required parameters
   if (!client_id || !redirect_uri || !code_challenge) {
     return res.status(400).json({
       error: 'invalid_request',
-      error_description: 'Missing required parameters'
+      error_description: 'Missing required parameters',
     });
   }
 
@@ -100,10 +100,12 @@ export function handleAuthorization(req: Request, res: Response) {
     method: code_challenge_method,
     client_id,
     redirect_uri,
-    expires: Date.now() + 60000 // 1 minute
+    expires: Date.now() + 60000, // 1 minute
   };
 
-  const encodedCode = Buffer.from(JSON.stringify(codeData)).toString('base64url');
+  const encodedCode = Buffer.from(JSON.stringify(codeData)).toString(
+    'base64url',
+  );
 
   // Redirect back with code
   const redirectUrl = new URL(redirect_uri as string);
@@ -134,7 +136,8 @@ export function handleTokenRequest(req: Request, res: Response) {
 
   return res.status(400).json({
     error: 'unsupported_grant_type',
-    error_description: 'Only authorization_code and client_credentials are supported'
+    error_description:
+      'Only authorization_code and client_credentials are supported',
   });
 }
 
@@ -145,19 +148,19 @@ function handleAuthorizationCodeGrant(
   req: Request,
   res: Response,
   code: string,
-  codeVerifier: string
+  codeVerifier: string,
 ) {
   try {
     // Decode the authorization code
     const codeData = JSON.parse(
-      Buffer.from(code, 'base64url').toString('utf-8')
+      Buffer.from(code, 'base64url').toString('utf-8'),
     );
 
     // Verify code hasn't expired
     if (Date.now() > codeData.expires) {
       return res.status(400).json({
         error: 'invalid_grant',
-        error_description: 'Authorization code expired'
+        error_description: 'Authorization code expired',
       });
     }
 
@@ -170,7 +173,7 @@ function handleAuthorizationCodeGrant(
     if (hash !== codeData.challenge) {
       return res.status(400).json({
         error: 'invalid_grant',
-        error_description: 'Invalid code verifier'
+        error_description: 'Invalid code verifier',
       });
     }
 
@@ -182,12 +185,12 @@ function handleAuthorizationCodeGrant(
       access_token: accessToken,
       token_type: 'Bearer',
       expires_in: 3600,
-      scope: 'mcp:execute mcp:read'
+      scope: 'mcp:execute mcp:read',
     });
   } catch (error) {
     return res.status(400).json({
       error: 'invalid_grant',
-      error_description: 'Invalid authorization code'
+      error_description: 'Invalid authorization code',
     });
   }
 }
@@ -203,7 +206,7 @@ function handleClientCredentialsGrant(req: Request, res: Response) {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({
       error: 'invalid_client',
-      error_description: 'API key required in Authorization header'
+      error_description: 'API key required in Authorization header',
     });
   }
 
@@ -215,7 +218,7 @@ function handleClientCredentialsGrant(req: Request, res: Response) {
     access_token: apiKey,
     token_type: 'Bearer',
     expires_in: 86400 * 30, // 30 days (API keys don't expire)
-    scope: 'mcp:execute mcp:read'
+    scope: 'mcp:execute mcp:read',
   });
 }
 

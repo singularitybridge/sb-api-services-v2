@@ -33,9 +33,9 @@ router.post('/', async (req: Request, res: Response) => {
       jsonrpc: '2.0',
       error: {
         code: -32603,
-        message: 'Internal server error'
+        message: 'Internal server error',
       },
-      id: null
+      id: null,
     });
   }
 });
@@ -48,18 +48,19 @@ router.get('/info', (req: Request, res: Response) => {
   res.json({
     name: 'singularity-bridge-mcp',
     version: '1.0.0',
-    description: 'Model Context Protocol server for Singularity Bridge AI Agent Hub',
+    description:
+      'Model Context Protocol server for Singularity Bridge AI Agent Hub',
     capabilities: {
       tools: true,
       resources: false,
-      prompts: false
+      prompts: false,
     },
     tools: [
       {
         name: 'execute_assistant',
-        description: 'Execute an AI assistant with a prompt'
-      }
-    ]
+        description: 'Execute an AI assistant with a prompt',
+      },
+    ],
   });
 });
 

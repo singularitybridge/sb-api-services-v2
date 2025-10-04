@@ -12,7 +12,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   McpError,
-  ErrorCode
+  ErrorCode,
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { loadConfig } from './config.js';
@@ -21,7 +21,7 @@ import {
   executeAssistantTool,
   executeAssistantSchema,
   executeAssistant,
-  type ExecuteAssistantInput
+  type ExecuteAssistantInput,
 } from './tools/execute-assistant.js';
 
 /**
@@ -40,13 +40,13 @@ class SingularityBridgeMCPServer {
     this.server = new Server(
       {
         name: 'singularity-bridge',
-        version: '1.0.0'
+        version: '1.0.0',
       },
       {
         capabilities: {
-          tools: {}
-        }
-      }
+          tools: {},
+        },
+      },
     );
 
     this.setupHandlers();
@@ -62,9 +62,9 @@ class SingularityBridgeMCPServer {
         {
           name: executeAssistantTool.name,
           description: executeAssistantTool.description,
-          inputSchema: executeAssistantSchema
-        }
-      ]
+          inputSchema: executeAssistantSchema,
+        },
+      ],
     }));
 
     // Handle tool calls
@@ -78,19 +78,19 @@ class SingularityBridgeMCPServer {
           if (!parseResult.success) {
             throw new McpError(
               ErrorCode.InvalidParams,
-              `Invalid parameters: ${parseResult.error.message}`
+              `Invalid parameters: ${parseResult.error.message}`,
             );
           }
 
           // Execute the tool
-          return executeAssistant(this.apiClient, parseResult.data as ExecuteAssistantInput);
+          return executeAssistant(
+            this.apiClient,
+            parseResult.data as ExecuteAssistantInput,
+          );
         }
 
         default:
-          throw new McpError(
-            ErrorCode.MethodNotFound,
-            `Unknown tool: ${name}`
-          );
+          throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
       }
     });
   }
@@ -104,7 +104,10 @@ class SingularityBridgeMCPServer {
 
     // Log to stderr (stdout is used for MCP protocol)
     console.error('Singularity Bridge MCP Server started');
-    console.error('API Base URL:', process.env.SB_API_BASE_URL || 'http://localhost:3000');
+    console.error(
+      'API Base URL:',
+      process.env.SB_API_BASE_URL || 'http://localhost:3000',
+    );
   }
 }
 

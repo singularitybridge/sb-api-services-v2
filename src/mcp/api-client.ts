@@ -32,7 +32,7 @@ export class APIClient {
     const url = `${this.baseUrl}/api/assistants/${params.assistantId}/execute`;
 
     const headers: any = {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
     };
 
     if (this.apiKey) {
@@ -46,13 +46,15 @@ export class APIClient {
         userInput: params.userInput,
         sessionId: params.sessionId,
         systemPromptOverride: params.systemPromptOverride,
-        attachments: params.attachments
-      })
+        attachments: params.attachments,
+      }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`API request failed: ${response.status} ${response.statusText}\n${errorText}`);
+      throw new Error(
+        `API request failed: ${response.status} ${response.statusText}\n${errorText}`,
+      );
     }
 
     return response.json();
@@ -71,12 +73,14 @@ export class APIClient {
 
     const response = await fetch(url, {
       method: 'GET',
-      headers
+      headers,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`API request failed: ${response.status} ${response.statusText}\n${errorText}`);
+      throw new Error(
+        `API request failed: ${response.status} ${response.statusText}\n${errorText}`,
+      );
     }
 
     return response.json();
@@ -95,12 +99,14 @@ export class APIClient {
 
     const response = await fetch(url, {
       method: 'GET',
-      headers
+      headers,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`API request failed: ${response.status} ${response.statusText}\n${errorText}`);
+      throw new Error(
+        `API request failed: ${response.status} ${response.statusText}\n${errorText}`,
+      );
     }
 
     return response.json();

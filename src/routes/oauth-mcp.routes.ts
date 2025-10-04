@@ -10,7 +10,7 @@ import {
   getAuthorizationServerMetadata,
   registerClient,
   handleAuthorization,
-  handleTokenRequest
+  handleTokenRequest,
 } from '../services/oauth-mcp.service';
 
 const router = Router();
@@ -21,18 +21,24 @@ const router = Router();
  * Required by MCP June 2025 specification
  * Public endpoint - no auth required
  */
-router.get('/.well-known/oauth-protected-resource', (req: Request, res: Response) => {
-  res.json(getProtectedResourceMetadata());
-});
+router.get(
+  '/.well-known/oauth-protected-resource',
+  (req: Request, res: Response) => {
+    res.json(getProtectedResourceMetadata());
+  },
+);
 
 /**
  * GET /.well-known/oauth-authorization-server
  * OAuth Authorization Server Metadata (RFC 8414)
  * Public endpoint - no auth required
  */
-router.get('/.well-known/oauth-authorization-server', (req: Request, res: Response) => {
-  res.json(getAuthorizationServerMetadata());
-});
+router.get(
+  '/.well-known/oauth-authorization-server',
+  (req: Request, res: Response) => {
+    res.json(getAuthorizationServerMetadata());
+  },
+);
 
 /**
  * POST /oauth/register
@@ -47,7 +53,8 @@ router.post('/oauth/register', (req: Request, res: Response) => {
     console.error('Client registration error:', error);
     res.status(400).json({
       error: 'invalid_client_metadata',
-      error_description: error instanceof Error ? error.message : 'Registration failed'
+      error_description:
+        error instanceof Error ? error.message : 'Registration failed',
     });
   }
 });

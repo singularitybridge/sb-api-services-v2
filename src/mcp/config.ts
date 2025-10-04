@@ -20,6 +20,6 @@ export function loadConfig(): MCPConfig {
   const apiBaseUrl = 'http://localhost:3000';
 
   return {
-    apiBaseUrl
+    apiBaseUrl,
   };
 }

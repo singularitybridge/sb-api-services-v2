@@ -136,7 +136,7 @@ app.use('/', oauthMcpRouter);
 app.get('/api/mcp/health', (req, res) => {
   res.json({
     status: 'healthy',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -180,28 +180,37 @@ app.use(
   unifiedWorkspaceRouter,
 ); // Unified Workspace (before generic /api)
 // MCP Server - custom auth that allows initialize, tools/list, and notifications without auth
-app.use('/api/mcp', (req, res, next) => {
-  // Allow initialize, tools/list, and initialized notification without auth (required by MCP spec for capability discovery)
-  if (req.body?.method === 'initialize' ||
+app.use(
+  '/api/mcp',
+  (req, res, next) => {
+    // Allow initialize, tools/list, and initialized notification without auth (required by MCP spec for capability discovery)
+    if (
+      req.body?.method === 'initialize' ||
       req.body?.method === 'tools/list' ||
-      req.body?.method === 'notifications/initialized') {
-    return next();
-  }
-
-  // For MCP, intercept 401 responses to add WWW-Authenticate header per RFC 9728
-  const originalJson = res.json;
-  res.json = function(body: any) {
-    if (res.statusCode === 401) {
-      res.header('WWW-Authenticate', 'Bearer realm="MCP", resource_metadata="http://localhost:3000/.well-known/oauth-protected-resource"');
+      req.body?.method === 'notifications/initialized'
+    ) {
+      return next();
     }
-    return originalJson.call(this, body);
-  };
 
-  // All other methods require auth
-  return verifyTokenMiddleware(req, res, () => {
-    verifyAccess()(req, res, next);
-  });
-}, mcpRouter); // MCP Server (before generic /api)
+    // For MCP, intercept 401 responses to add WWW-Authenticate header per RFC 9728
+    const originalJson = res.json;
+    res.json = function (body: any) {
+      if (res.statusCode === 401) {
+        res.header(
+          'WWW-Authenticate',
+          'Bearer realm="MCP", resource_metadata="http://localhost:3000/.well-known/oauth-protected-resource"',
+        );
+      }
+      return originalJson.call(this, body);
+    };
+
+    // All other methods require auth
+    return verifyTokenMiddleware(req, res, () => {
+      verifyAccess()(req, res, next);
+    });
+  },
+  mcpRouter,
+); // MCP Server (before generic /api)
 app.use('/api', verifyTokenMiddleware, verifyAccess(), verificationRouter);
 app.use('/onboarding', verifyTokenMiddleware, verifyAccess(), onboardingRouter);
 // Removed content and content-type routes - using unified workspace only

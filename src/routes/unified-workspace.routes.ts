@@ -230,38 +230,74 @@ router.get(
 
       const workspace = getWorkspaceService();
 
-      // Search for file in all scopes
-      const scopes = [
-        `/company/${req.company._id}/`,
-        `/session/${req.headers['x-session-id'] || 'default'}/`,
-        `/agent/`,
-        `/team/`,
-      ];
+      // Use pattern search to find the file efficiently (no N+1 queries)
+      // Search for keys that contain the fileId
+      const pattern = new RegExp(`/${fileId}/`);
+      const matchingPaths = await workspace.findByPattern(pattern);
 
-      for (const scopePrefix of scopes) {
-        const files = await workspace.list(scopePrefix);
+      if (matchingPaths.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'File not found',
+        });
+      }
 
-        for (const filePath of files) {
-          const fileInfo = await workspace.get(filePath);
-          if (fileInfo?.type === 'file-reference' && fileInfo?.id === fileId) {
-            // Check if file exists on disk
-            try {
-              await fs.access(fileInfo.storagePath);
-              // Send file directly from disk
-              return res.download(fileInfo.storagePath, fileInfo.filename);
-            } catch {
-              return res.status(404).json({
-                success: false,
-                error: 'File no longer exists on disk',
-              });
-            }
-          }
+      // Get the first matching file
+      const fileInfo = await workspace.get(matchingPaths[0]);
+
+      if (!fileInfo) {
+        return res.status(404).json({
+          success: false,
+          error: 'File not found',
+        });
+      }
+
+      // Check if it's a file-reference (old format)
+      if (fileInfo?.type === 'file-reference') {
+        try {
+          await fs.access(fileInfo.storagePath);
+          return res.download(fileInfo.storagePath, fileInfo.filename);
+        } catch {
+          return res.status(404).json({
+            success: false,
+            error: 'File no longer exists on disk',
+          });
         }
+      }
+
+      // New format: content embedded directly
+      if (fileInfo?.type === 'embedded' && fileInfo?.content) {
+        // Get metadata for filename and mimetype
+        const metadata = fileInfo.metadata || {};
+        const filename = metadata.filename || 'download';
+        const mimetype = metadata.contentType || 'application/octet-stream';
+
+        // Convert content to buffer
+        let buffer: Buffer;
+        if (
+          fileInfo.content.type === 'buffer' &&
+          fileInfo.content.encoding === 'base64'
+        ) {
+          buffer = Buffer.from(fileInfo.content.data, 'base64');
+        } else if (Buffer.isBuffer(fileInfo.content)) {
+          buffer = fileInfo.content;
+        } else if (typeof fileInfo.content === 'string') {
+          buffer = Buffer.from(fileInfo.content);
+        } else {
+          buffer = Buffer.from(JSON.stringify(fileInfo.content));
+        }
+
+        res.setHeader('Content-Type', mimetype);
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${filename}"`,
+        );
+        return res.send(buffer);
       }
 
       return res.status(404).json({
         success: false,
-        error: 'File not found',
+        error: 'File format not supported',
       });
     } catch (error: any) {
       logger.error('File download error:', error);
@@ -464,6 +500,7 @@ router.get('/get', async (req: AuthenticatedRequest, res: Response) => {
  */
 router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const startTime = Date.now();
     const { prefix, scope = 'company', agentId, teamId } = req.query;
 
     // Build scoped prefix based on scope
@@ -482,10 +519,12 @@ router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
           error: 'Agent ID is required for agent scope',
         });
       }
+      const t1 = Date.now();
       const resolvedAgentId = await resolveAgentId(
         agentIdentifier as string,
         req.company?._id?.toString(),
       );
+      logger.debug(`Resolve agent took ${Date.now() - t1}ms`);
       if (!resolvedAgentId) {
         return res.status(400).json({
           success: false,
@@ -505,7 +544,9 @@ router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
     }
 
     const workspace = getWorkspaceService();
+    const t2 = Date.now();
     const paths = await workspace.list(scopedPrefix);
+    logger.debug(`Workspace list took ${Date.now() - t2}ms`);
 
     // Strip the scope prefix from returned paths for cleaner display
     const cleanPaths = paths.map((p) => {
@@ -518,6 +559,7 @@ router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
       return p;
     });
 
+    logger.debug(`Total list request took ${Date.now() - startTime}ms`);
     res.json({
       success: true,
       scope: scope as string,
