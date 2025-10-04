@@ -57,6 +57,7 @@ export interface WorkspaceService {
   exists: (path: string) => Promise<boolean>;
   delete: (path: string) => Promise<boolean>;
   list: (prefix?: string) => Promise<string[]>;
+  findByPattern: (pattern: RegExp) => Promise<string[]>;
   clear: (prefix?: string) => Promise<void>;
   export: (prefix?: string) => Promise<Record<string, any>>;
   import: (data: Record<string, any>) => Promise<void>;
@@ -101,6 +102,30 @@ export const createWorkspaceService = (
         namespace: options.namespace || 'workspace',
         ttl: options.ttl,
       });
+
+      // Create indexes for optimal query performance
+      if (mongoose.connection.db) {
+        const collection = mongoose.connection.db.collection('keyv');
+
+        // Skip key index creation - Keyv MongoDB adapter already creates a unique index on 'key'
+        // Attempting to create a non-unique index with the same auto-generated name causes conflicts
+        logger.debug('Workspace: Using Keyv default unique index on key field');
+
+        // Ensure TTL index exists on expiresAt for auto-cleanup
+        // Keyv typically creates this, but we verify it exists
+        collection
+          .createIndex(
+            { expiresAt: 1 },
+            { expireAfterSeconds: 0, background: true },
+          )
+          .then(() => {
+            logger.info('Workspace: Verified TTL index on expiresAt field');
+          })
+          .catch((err) => {
+            // TTL index might already exist, that's fine
+            logger.debug('Workspace: TTL index exists or creation skipped');
+          });
+      }
     } catch (error) {
       logger.warn(
         'Workspace: MongoDB connection failed, using disk storage',
@@ -470,6 +495,56 @@ export const createWorkspaceService = (
     }
   };
 
+  const findByPattern = async (pattern: RegExp): Promise<string[]> => {
+    try {
+      const namespace = options.namespace || 'workspace';
+
+      // If using MongoDB, query the database directly
+      if (store && store instanceof KeyvMongo && mongoose.connection.db) {
+        try {
+          const db = mongoose.connection.db;
+          const collection = db.collection('keyv');
+
+          const namespacePrefix = `${namespace}:`;
+          const query = {
+            key: { $regex: pattern },
+          };
+
+          // Fetch only keys using projection (covered query)
+          const cursor = collection.find(query, {
+            projection: { key: 1, _id: 0 },
+          });
+          cursor.hint({ key: 1 }); // Ensure index is used
+          const docs = await cursor.toArray();
+
+          // Extract and clean keys
+          const keys = docs.map((doc: any) => {
+            let key = doc.key;
+            if (key.startsWith(namespacePrefix)) {
+              key = key.substring(namespacePrefix.length);
+            }
+            return key;
+          });
+
+          logger.debug(`Workspace: Found ${keys.length} keys matching pattern`);
+          return keys;
+        } catch (mongoError) {
+          logger.warn(
+            'Failed to query MongoDB by pattern, falling back to cache',
+            mongoError,
+          );
+        }
+      }
+
+      // Fallback: search cache
+      const cachedKeys = Array.from(cache.keys());
+      return cachedKeys.filter((key) => pattern.test(key));
+    } catch (error) {
+      logger.error('Workspace: Failed to find by pattern', error);
+      return [];
+    }
+  };
+
   const list = async (prefix?: string): Promise<string[]> => {
     try {
       const namespace = options.namespace || 'workspace';
@@ -489,23 +564,33 @@ export const createWorkspaceService = (
           if (prefix) {
             const sanitizedPrefix = sanitizePath(prefix);
             const fullPrefix = `${namespacePrefix}${sanitizedPrefix}`;
-            // Use a regex that matches the exact prefix
+            // Use range query for better index utilization
             query = {
               key: {
-                $regex: `^${fullPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+                $gte: fullPrefix,
+                $lt: fullPrefix + '\uffff',
               },
             };
           } else {
             // Match all keys with this namespace
             query = {
               key: {
-                $regex: `^${namespacePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+                $gte: namespacePrefix,
+                $lt: namespacePrefix + '\uffff',
               },
             };
           }
 
-          // Fetch matching documents
-          const docs = await collection.find(query).toArray();
+          // Fetch only keys using projection (much faster, doesn't load content)
+          // This creates a "covered query" - MongoDB can satisfy entirely from index
+          const cursor = collection.find(query, {
+            projection: { key: 1, _id: 0 },
+          });
+
+          // Add hint to ensure index is used
+          cursor.hint({ key: 1 });
+
+          const docs = await cursor.toArray();
 
           // Extract and clean keys
           const keys = docs.map((doc: any) => {
@@ -782,6 +867,7 @@ export const createWorkspaceService = (
     exists,
     delete: deleteItem,
     list,
+    findByPattern,
     clear,
     export: exportData,
     import: importData,

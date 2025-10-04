@@ -20,9 +20,16 @@ export interface VectorSearchResult {
 
 // In-memory store for journal vectors (temporary until refactored)
 class SimpleVectorStore {
-  private entries: Map<string, { content: string; metadata?: Record<string, any> }> = new Map();
+  private entries: Map<
+    string,
+    { content: string; metadata?: Record<string, any> }
+  > = new Map();
 
-  async add(id: string, content: string, metadata?: Record<string, any>): Promise<void> {
+  async add(
+    id: string,
+    content: string,
+    metadata?: Record<string, any>,
+  ): Promise<void> {
     this.entries.set(id, { content, metadata });
   }
 
@@ -32,23 +39,42 @@ class SimpleVectorStore {
 
   async hybridSearch(
     query: string,
-    options: { limit?: number; filter?: Record<string, any> }
-  ): Promise<Array<{ id: string; score: number; content: string; metadata?: Record<string, any> }>> {
+    options: { limit?: number; filter?: Record<string, any> },
+  ): Promise<
+    Array<{
+      id: string;
+      score: number;
+      content: string;
+      metadata?: Record<string, any>;
+    }>
+  > {
     // Simple text matching for now
-    const results: Array<{ id: string; score: number; content: string; metadata?: Record<string, any> }> = [];
+    const results: Array<{
+      id: string;
+      score: number;
+      content: string;
+      metadata?: Record<string, any>;
+    }> = [];
 
     for (const [id, entry] of this.entries) {
       // Apply filter if provided
       if (options.filter) {
-        const filterMatch = Object.entries(options.filter).every(([key, value]) =>
-          entry.metadata?.[key] === value
+        const filterMatch = Object.entries(options.filter).every(
+          ([key, value]) => entry.metadata?.[key] === value,
         );
         if (!filterMatch) continue;
       }
 
       // Simple scoring based on query presence
-      const score = entry.content.toLowerCase().includes(query.toLowerCase()) ? 0.8 : 0.2;
-      results.push({ id, score, content: entry.content, metadata: entry.metadata });
+      const score = entry.content.toLowerCase().includes(query.toLowerCase())
+        ? 0.8
+        : 0.2;
+      results.push({
+        id,
+        score,
+        content: entry.content,
+        metadata: entry.metadata,
+      });
     }
 
     // Sort by score and limit
@@ -94,5 +120,5 @@ export async function runVectorSearch(
     filter: options.companyId ? { companyId: options.companyId } : undefined,
   });
 
-  return results.filter(r => r.score >= (options.minScore || 0));
+  return results.filter((r) => r.score >= (options.minScore || 0));
 }

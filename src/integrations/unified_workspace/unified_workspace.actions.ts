@@ -69,7 +69,8 @@ export const createWorkspaceActions = (
         },
         agentId: {
           type: 'string',
-          description: 'Agent ID (required when scope is "agent")',
+          description:
+            'Agent ID (optional - will auto-use current assistant if omitted when scope is "agent")',
         },
       },
       required: ['path', 'content', 'scope'],
@@ -90,13 +91,24 @@ export const createWorkspaceActions = (
         // Validate and resolve agent ID when scope is agent
         let resolvedAgentId: string | undefined;
         if (scope === 'agent') {
-          if (!agentId) {
-            throw new Error('agentId is required when scope is "agent"');
+          // Auto-inject current assistant's ID if not provided
+          const agentIdentifier = agentId || context?.assistantId;
+
+          if (!agentIdentifier) {
+            throw new Error(
+              'agentId is required when scope is "agent" (or must be executing within an assistant context)',
+            );
           }
+
           // Resolve agent ID from name, URL, or ID
-          const resolved = await resolveAgentId(agentId, context?.companyId);
+          const resolved = await resolveAgentId(
+            agentIdentifier,
+            context?.companyId,
+          );
           if (!resolved) {
-            throw new Error(`Could not find agent with identifier: ${agentId}`);
+            throw new Error(
+              `Could not find agent with identifier: ${agentIdentifier}`,
+            );
           }
           resolvedAgentId = resolved;
         }
@@ -109,7 +121,7 @@ export const createWorkspaceActions = (
           content,
           {
             scope,
-            agentId: scope === 'agent' ? resolvedAgentId : undefined
+            agentId: scope === 'agent' ? resolvedAgentId : undefined,
           },
         );
 
@@ -160,7 +172,8 @@ export const createWorkspaceActions = (
         },
         agentId: {
           type: 'string',
-          description: 'Agent ID (required when scope is "agent")',
+          description:
+            'Agent ID (optional - will auto-use current assistant if omitted when scope is "agent")',
         },
       },
       required: ['path', 'scope'],
@@ -180,13 +193,24 @@ export const createWorkspaceActions = (
         // Validate and resolve agent ID when scope is agent
         let resolvedAgentId: string | undefined;
         if (scope === 'agent') {
-          if (!agentId) {
-            throw new Error('agentId is required when scope is "agent"');
+          // Auto-inject current assistant's ID if not provided
+          const agentIdentifier = agentId || context?.assistantId;
+
+          if (!agentIdentifier) {
+            throw new Error(
+              'agentId is required when scope is "agent" (or must be executing within an assistant context)',
+            );
           }
+
           // Resolve agent ID from name, URL, or ID
-          const resolved = await resolveAgentId(agentId, context?.companyId);
+          const resolved = await resolveAgentId(
+            agentIdentifier,
+            context?.companyId,
+          );
           if (!resolved) {
-            throw new Error(`Could not find agent with identifier: ${agentId}`);
+            throw new Error(
+              `Could not find agent with identifier: ${agentIdentifier}`,
+            );
           }
           resolvedAgentId = resolved;
         }
@@ -258,7 +282,8 @@ export const createWorkspaceActions = (
         },
         agentId: {
           type: 'string',
-          description: 'Agent ID (required when scope is "agent")',
+          description:
+            'Agent ID (optional - will auto-use current assistant if omitted when scope is "agent")',
         },
       },
       required: ['scope'],
@@ -278,13 +303,24 @@ export const createWorkspaceActions = (
         // Validate and resolve agent ID when scope is agent
         let resolvedAgentId: string | undefined;
         if (scope === 'agent') {
-          if (!agentId) {
-            throw new Error('agentId is required when scope is "agent"');
+          // Auto-inject current assistant's ID if not provided
+          const agentIdentifier = agentId || context?.assistantId;
+
+          if (!agentIdentifier) {
+            throw new Error(
+              'agentId is required when scope is "agent" (or must be executing within an assistant context)',
+            );
           }
+
           // Resolve agent ID from name, URL, or ID
-          const resolved = await resolveAgentId(agentId, context?.companyId);
+          const resolved = await resolveAgentId(
+            agentIdentifier,
+            context?.companyId,
+          );
           if (!resolved) {
-            throw new Error(`Could not find agent with identifier: ${agentId}`);
+            throw new Error(
+              `Could not find agent with identifier: ${agentIdentifier}`,
+            );
           }
           resolvedAgentId = resolved;
         }
@@ -369,13 +405,24 @@ export const createWorkspaceActions = (
         // Validate and resolve agent ID when scope is agent
         let resolvedAgentId: string | undefined;
         if (scope === 'agent') {
-          if (!agentId) {
-            throw new Error('agentId is required when scope is "agent"');
+          // Auto-inject current assistant's ID if not provided
+          const agentIdentifier = agentId || context?.assistantId;
+
+          if (!agentIdentifier) {
+            throw new Error(
+              'agentId is required when scope is "agent" (or must be executing within an assistant context)',
+            );
           }
+
           // Resolve agent ID from name, URL, or ID
-          const resolved = await resolveAgentId(agentId, context?.companyId);
+          const resolved = await resolveAgentId(
+            agentIdentifier,
+            context?.companyId,
+          );
           if (!resolved) {
-            throw new Error(`Could not find agent with identifier: ${agentId}`);
+            throw new Error(
+              `Could not find agent with identifier: ${agentIdentifier}`,
+            );
           }
           resolvedAgentId = resolved;
         }
