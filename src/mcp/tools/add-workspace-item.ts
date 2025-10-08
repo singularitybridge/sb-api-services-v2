@@ -5,6 +5,7 @@
  */
 
 import { z } from 'zod';
+import axios from 'axios';
 import { resolveAssistantIdentifier } from '../../services/assistant/assistant-resolver.service';
 import { getWorkspaceService } from '../../services/unified-workspace.service';
 
@@ -17,7 +18,13 @@ export const addWorkspaceItemSchema = z.object({
     .describe('Path for the workspace item (e.g., "/config/settings.json")'),
   content: z
     .any()
-    .describe('Content to store (can be string, object, array, etc.)'),
+    .optional()
+    .describe('Content to store (can be string, object, array, etc.). Not required if fileUrl is provided.'),
+  fileUrl: z
+    .string()
+    .url()
+    .optional()
+    .describe('URL to a file to download and store. Use this for large files (>50KB) to bypass MCP token limits. Mutually exclusive with content.'),
   scope: z
     .enum(['company', 'session', 'agent'])
     .optional()
@@ -50,11 +57,35 @@ export async function addWorkspaceItem(
   companyId: string,
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   try {
+    // Validate that either content or fileUrl is provided
+    if (!input.content && !input.fileUrl) {
+      throw new Error('Either content or fileUrl must be provided');
+    }
+
+    if (input.content && input.fileUrl) {
+      throw new Error('Cannot provide both content and fileUrl. Use fileUrl for large files.');
+    }
+
     const scope = input.scope || 'agent';
     const workspace = getWorkspaceService();
 
     let fullPath: string;
     const scopeInfo: any = { scope };
+
+    // Resolve agent ID if needed
+    let resolvedScopeId = input.scopeId;
+    if (scope === 'agent' && input.scopeId) {
+      const agent = await resolveAssistantIdentifier(
+        input.scopeId,
+        companyId,
+      );
+      if (!agent) {
+        throw new Error(`Agent not found: ${input.scopeId}`);
+      }
+      resolvedScopeId = agent._id.toString();
+      scopeInfo.agentId = resolvedScopeId;
+      scopeInfo.agentName = agent.name;
+    }
 
     // Build the full path based on scope
     switch (scope) {
@@ -73,25 +104,74 @@ export async function addWorkspaceItem(
 
       case 'agent':
       default:
-        if (!input.scopeId) {
+        if (!resolvedScopeId) {
           throw new Error(
             'scopeId (agentId or agent name) is required for agent scope',
           );
         }
-
-        // Resolve agent by ID or name
-        const agent = await resolveAssistantIdentifier(
-          input.scopeId,
-          companyId,
-        );
-        if (!agent) {
-          throw new Error(`Agent not found: ${input.scopeId}`);
-        }
-
-        fullPath = `/agent/${agent._id.toString()}${input.itemPath}`;
-        scopeInfo.agentId = agent._id.toString();
-        scopeInfo.agentName = agent.name;
+        fullPath = `/agent/${resolvedScopeId}${input.itemPath}`;
         break;
+    }
+
+    // If fileUrl is provided, download and store file reference
+    if (input.fileUrl) {
+      // Download file from URL
+      const response = await axios.get(input.fileUrl, {
+        responseType: 'arraybuffer',
+        timeout: 30000, // 30 second timeout
+      });
+
+      const filename = input.fileUrl.split('/').pop() || 'file';
+      const buffer = Buffer.from(response.data);
+
+      // Store file content as base64 with metadata
+      const fileReference = {
+        type: 'file',
+        filename,
+        mimeType: response.headers['content-type'] || 'application/octet-stream',
+        size: buffer.length,
+        content: buffer.toString('base64'),
+        sourceUrl: input.fileUrl,
+        uploadedAt: new Date(),
+      };
+
+      // Store in workspace
+      const metadata = {
+        ...input.metadata,
+        contentType: fileReference.mimeType,
+        fileSize: fileReference.size,
+        sourceUrl: input.fileUrl,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        scope,
+        companyId,
+      };
+
+      await workspace.set(fullPath, fileReference, metadata);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                success: true,
+                file: {
+                  path: input.itemPath,
+                  fullPath,
+                  filename,
+                  mimeType: fileReference.mimeType,
+                  size: fileReference.size,
+                  sourceUrl: input.fileUrl,
+                },
+                message: 'File downloaded and stored successfully via URL',
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      };
     }
 
     // Add metadata with timestamp
@@ -159,6 +239,6 @@ export async function addWorkspaceItem(
 export const addWorkspaceItemTool = {
   name: 'add_workspace_item',
   description:
-    'Add a new workspace item at company, session, or agent level. Default is agent level. Can store any JSON-serializable content (string, object, array, etc.).',
+    'Add a new workspace item at company, session, or agent level. Default is agent level. Can store any JSON-serializable content (string, object, array, etc.). For large files (>50KB), use the fileUrl parameter to provide a URL to download and upload the file, bypassing MCP token limits.',
   inputSchema: addWorkspaceItemSchema,
 };

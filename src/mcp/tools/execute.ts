@@ -115,12 +115,15 @@ export async function execute(
         const resultContent =
           typeof toolResult.result === 'string'
             ? toolResult.result
-            : JSON.stringify(toolResult.result);
+            : toolResult.result === undefined || toolResult.result === null
+              ? ''
+              : JSON.stringify(toolResult.result);
 
         // Detect error patterns in tool results
         if (
-          resultContent.startsWith('Error:') ||
-          resultContent.startsWith('Exception:')
+          resultContent &&
+          (resultContent.startsWith('Error:') ||
+            resultContent.startsWith('Exception:'))
         ) {
           toolErrors.push({
             toolName: toolResult.toolName,

@@ -12,6 +12,7 @@ import {
   discoverAllIntegrations as discoverAllIntegrationsService,
   discoverActionsByIntegration as discoverActionsByIntegrationService,
   searchActions as searchActionsService,
+  getActionImplementationGuide as getActionImplementationGuideService,
 } from './debug.service';
 import { SupportedLanguage } from '../../services/discovery.service'; // Integration type might not be needed directly in actions
 import { executeAction, ExecuteActionOptions } from '../actions/executor';
@@ -432,6 +433,50 @@ export const createDebugActions = (
         async () => {
           const res = await searchActionsService(
             params.searchTerm,
+            context.language,
+          );
+          return {
+            success: res.success,
+            data: res.data,
+            description: res.error,
+            error: res.error,
+          };
+        },
+        options,
+      );
+    },
+  },
+  getActionImplementationGuide: {
+    description:
+      'Get comprehensive implementation guide for developers/AI experts configuring AI agents. Returns action schema, example requests, AI agent configuration, error handling, and best practices. Use this for technical implementation details.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        actionId: {
+          type: 'string',
+          description:
+            'The action ID in format: integration.action (e.g., "sendgrid.sendEmail", "jira.createIssue")',
+        },
+      },
+      required: ['actionId'],
+      additionalProperties: false,
+    },
+    function: async (params: {
+      actionId: string;
+    }): Promise<StandardActionResult<any>> => {
+      if (!params.actionId) {
+        throw new ActionValidationError('actionId is a required parameter.');
+      }
+      const options: ExecuteActionOptions<any, any> = {
+        serviceName: SERVICE_NAME,
+        dataExtractor: (serviceResult) => ({ data: serviceResult.data }),
+      };
+      return executeAction<any, any>(
+        'getActionImplementationGuide',
+        async () => {
+          const res = await getActionImplementationGuideService(
+            params.actionId,
             context.language,
           );
           return {

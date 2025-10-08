@@ -361,6 +361,12 @@ router.get('/raw', async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
+    // Set cache-control headers to prevent caching of workspace content
+    // This ensures the browser always fetches the latest version
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     // Check if it's a file reference
     if (content?.type === 'file-reference') {
       try {
@@ -479,10 +485,36 @@ router.get('/get', async (req: AuthenticatedRequest, res: Response) => {
       };
       responseData.isFile = true;
     } else {
-      // For regular content, return as-is
-      responseData.content = content;
-      responseData.isFile = false;
+      // For regular content, handle binary data (images, etc.)
+      if (Buffer.isBuffer(content)) {
+        // Convert buffer to base64 for JSON transport
+        responseData.content = content.toString('base64');
+        responseData.isFile = false;
+        responseData.isBinary = true;
+      } else if (content?.type === 'file' && content?.content) {
+        // File object with base64 content - extract the base64 data
+        responseData.content = content.content;
+        responseData.isFile = false;
+        responseData.isBinary = true;
+        responseData.fileMetadata = {
+          filename: content.filename,
+          mimeType: content.mimeType,
+          size: content.size,
+          uploadedAt: content.uploadedAt,
+          sourceUrl: content.sourceUrl
+        };
+      } else {
+        // For text/JSON content, return as-is
+        responseData.content = content;
+        responseData.isFile = false;
+        responseData.isBinary = false;
+      }
     }
+
+    // Set cache-control headers to prevent caching of workspace content
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     res.json(responseData);
   } catch (error: any) {
@@ -569,6 +601,180 @@ router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
     });
   } catch (error: any) {
     logger.error('Workspace list error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * @route GET /api/workspace/search
+ * @desc Search workspace items across multiple scopes with metadata
+ * Supports searching across multiple agents, teams, or other scopes
+ * Returns items with metadata without loading full content (optimized for UI)
+ */
+router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const startTime = Date.now();
+    const {
+      prefix = '',
+      scopes, // comma-separated: 'agent,team,company'
+      agentIds, // comma-separated list of agent IDs/names
+      teamIds,  // comma-separated list of team IDs
+      includeCompany = 'false',
+      includeSession = 'false',
+    } = req.query;
+
+    const workspace = getWorkspaceService();
+    const results: Array<{
+      path: string;
+      metadata: any;
+      scope: string;
+      scopeId?: string;
+      scopeName?: string;
+    }> = [];
+
+    // Parse scope queries
+    const requestedScopes = scopes ? (scopes as string).split(',') : ['agent'];
+    const agentList = agentIds ? (agentIds as string).split(',') : [];
+    const teamList = teamIds ? (teamIds as string).split(',') : [];
+
+    // Search agent scopes
+    if (requestedScopes.includes('agent') && agentList.length > 0) {
+      const t1 = Date.now();
+      await Promise.all(
+        agentList.map(async (agentIdentifier) => {
+          try {
+            const resolvedAgentId = await resolveAgentId(
+              agentIdentifier.trim(),
+              req.company?._id?.toString(),
+            );
+
+            if (resolvedAgentId) {
+              const scopedPrefix = `/agent/${resolvedAgentId}/${prefix}`;
+              const items = await workspace.listWithMetadata(scopedPrefix);
+
+              items.forEach((item) => {
+                // Clean path by removing scope prefix
+                const cleanPath = item.path.replace(new RegExp(`^/agent/${resolvedAgentId}/`), '');
+
+                results.push({
+                  path: cleanPath,
+                  metadata: item.metadata || {},
+                  scope: 'agent',
+                  scopeId: resolvedAgentId,
+                  scopeName: agentIdentifier.trim(),
+                });
+              });
+            }
+          } catch (error) {
+            logger.warn(`Failed to search agent ${agentIdentifier}:`, error);
+          }
+        })
+      );
+      logger.debug(`Agent search took ${Date.now() - t1}ms`);
+    }
+
+    // Search team scopes
+    if (requestedScopes.includes('team') && teamList.length > 0) {
+      const t2 = Date.now();
+
+      // Validate that all requested teams belong to the user's company
+      const companyTeamIds = new Set(
+        req.company?.teams?.map((t: any) => t._id?.toString() || t.toString()) || []
+      );
+
+      await Promise.all(
+        teamList.map(async (teamId) => {
+          try {
+            const trimmedTeamId = teamId.trim();
+
+            // Security check: verify team belongs to user's company
+            if (!companyTeamIds.has(trimmedTeamId)) {
+              logger.warn(`User attempted to access team ${trimmedTeamId} outside their company`);
+              return;
+            }
+
+            const scopedPrefix = `/team/${trimmedTeamId}/${prefix}`;
+            const items = await workspace.listWithMetadata(scopedPrefix);
+
+            items.forEach((item) => {
+              const cleanPath = item.path.replace(new RegExp(`^/team/${trimmedTeamId}/`), '');
+
+              results.push({
+                path: cleanPath,
+                metadata: item.metadata || {},
+                scope: 'team',
+                scopeId: trimmedTeamId,
+              });
+            });
+          } catch (error) {
+            logger.warn(`Failed to search team ${teamId}:`, error);
+          }
+        })
+      );
+      logger.debug(`Team search took ${Date.now() - t2}ms`);
+    }
+
+    // Search company scope
+    if ((requestedScopes.includes('company') || includeCompany === 'true') && req.company?._id) {
+      const t3 = Date.now();
+      try {
+        const scopedPrefix = `/company/${req.company._id}/${prefix}`;
+        const items = await workspace.listWithMetadata(scopedPrefix);
+
+        items.forEach((item) => {
+          const cleanPath = item.path.replace(`/company/${req.company._id}/`, '');
+
+          results.push({
+            path: cleanPath,
+            metadata: item.metadata || {},
+            scope: 'company',
+            scopeId: req.company._id.toString(),
+          });
+        });
+      } catch (error) {
+        logger.warn('Failed to search company scope:', error);
+      }
+      logger.debug(`Company search took ${Date.now() - t3}ms`);
+    }
+
+    // Search session scope
+    if (requestedScopes.includes('session') || includeSession === 'true') {
+      const t4 = Date.now();
+      const sessionId = req.headers['x-session-id'] as string || 'default';
+      try {
+        const scopedPrefix = `/session/${sessionId}/${prefix}`;
+        const items = await workspace.listWithMetadata(scopedPrefix);
+
+        items.forEach((item) => {
+          const cleanPath = item.path.replace(new RegExp(`^/session/${sessionId}/`), '');
+
+          results.push({
+            path: cleanPath,
+            metadata: item.metadata || {},
+            scope: 'session',
+            scopeId: sessionId,
+          });
+        });
+      } catch (error) {
+        logger.warn('Failed to search session scope:', error);
+      }
+      logger.debug(`Session search took ${Date.now() - t4}ms`);
+    }
+
+    const totalTime = Date.now() - startTime;
+    logger.debug(`Total multi-scope search took ${totalTime}ms, found ${results.length} items`);
+
+    res.json({
+      success: true,
+      items: results,
+      count: results.length,
+      executionTimeMs: totalTime,
+    });
+  } catch (error: any) {
+    logger.error('Workspace search error:', error);
     res.status(500).json({
       success: false,
       error: error.message,
