@@ -15,12 +15,15 @@ interface PerplexitySearchArgs {
     | 'sonar-reasoning-pro'
     | 'sonar-deep-research';
   query: string;
-  // searchMode deprecated - removed to avoid API errors
+  search_mode?: 'academic' | 'sec' | 'web';
+  return_related_questions?: boolean;
+  reasoning_effort?: 'low' | 'medium' | 'high';
 }
 
 // R type for StandardActionResult<R>
 interface PerplexityResponseData {
   searchResult: string;
+  relatedQuestions?: string[];
 }
 
 // S type for serviceCall lambda's response
@@ -57,6 +60,20 @@ export const createPerplexityActions = (
           type: 'string',
           description: 'The search query',
         },
+        search_mode: {
+          type: 'string',
+          enum: ['academic', 'sec', 'web'],
+          description: 'Search mode: academic (academic sources), sec (SEC filings), web (general web). Default: web',
+        },
+        return_related_questions: {
+          type: 'boolean',
+          description: 'Return related follow-up questions. Default: false',
+        },
+        reasoning_effort: {
+          type: 'string',
+          enum: ['low', 'medium', 'high'],
+          description: 'Reasoning effort for sonar-deep-research model. Default: medium',
+        },
       },
       required: ['model', 'query'],
       additionalProperties: false,
@@ -64,7 +81,13 @@ export const createPerplexityActions = (
     function: async (
       args: PerplexitySearchArgs,
     ): Promise<StandardActionResult<PerplexityResponseData>> => {
-      const { model, query } = args;
+      const {
+        model,
+        query,
+        search_mode = 'web',
+        return_related_questions = false,
+        reasoning_effort = 'medium'
+      } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -79,7 +102,7 @@ export const createPerplexityActions = (
 
       // Check for additional properties manually if strict mode isn't fully relied upon for arg shape
       const argKeys = Object.keys(args);
-      const allowedProps = ['model', 'query'];
+      const allowedProps = ['model', 'query', 'search_mode', 'return_related_questions', 'reasoning_effort'];
       const extraProps = argKeys.filter((prop) => !allowedProps.includes(prop));
       if (extraProps.length > 0) {
         throw new ActionValidationError(
@@ -102,13 +125,16 @@ export const createPerplexityActions = (
       return executeAction<PerplexityResponseData, ServiceCallLambdaResponse>(
         'perplexitySearch',
         async (): Promise<ServiceCallLambdaResponse> => {
-          // performPerplexitySearchService throws on error or returns the search result string
-          const searchResultString = await performPerplexitySearchService(
+          // performPerplexitySearchService throws on error or returns the search result
+          const result = await performPerplexitySearchService(
             context.companyId!,
             model,
             query,
+            search_mode,
+            return_related_questions,
+            reasoning_effort,
           );
-          return { success: true, data: { searchResult: searchResultString } };
+          return { success: true, data: result };
         },
         {
           serviceName: SERVICE_NAME,

@@ -52,6 +52,13 @@ import {
 } from './tools/update-agent-prompt';
 
 import {
+  updateAgentTool,
+  updateAgentSchema,
+  updateAgent,
+  type UpdateAgentInput,
+} from './tools/update-agent';
+
+import {
   listWorkspaceItemsTool,
   listWorkspaceItemsSchema,
   listWorkspaceItems,
@@ -174,6 +181,11 @@ export class MCPHttpServer {
           name: updateAgentPromptTool.name,
           description: updateAgentPromptTool.description,
           inputSchema: updateAgentPromptSchema,
+        },
+        {
+          name: updateAgentTool.name,
+          description: updateAgentTool.description,
+          inputSchema: updateAgentSchema,
         },
         {
           name: listWorkspaceItemsTool.name,
@@ -325,6 +337,13 @@ export class MCPHttpServer {
             name: updateAgentPromptTool.name,
             description: updateAgentPromptTool.description,
             inputSchema: zodToJsonSchema(updateAgentPromptSchema, {
+              $refStrategy: 'none',
+            }),
+          },
+          {
+            name: updateAgentTool.name,
+            description: updateAgentTool.description,
+            inputSchema: zodToJsonSchema(updateAgentSchema, {
               $refStrategy: 'none',
             }),
           },
@@ -489,6 +508,20 @@ export class MCPHttpServer {
               }
               result = await updateAgentPrompt(
                 parseResult.data as UpdateAgentPromptInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'update_agent': {
+              const parseResult = updateAgentSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await updateAgent(
+                parseResult.data as UpdateAgentInput,
                 companyId,
               );
               break;

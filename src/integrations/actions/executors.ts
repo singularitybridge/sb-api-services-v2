@@ -116,6 +116,8 @@ export const executeFunctionCall = async (
     sessionId: activeSessionId,
     companyId,
     language: sessionLanguage,
+    assistantId: updatedSession.assistantId?.toString(),
+    userId: updatedSession.userId?.toString(),
   };
 
   let functionFactory: FunctionFactory;

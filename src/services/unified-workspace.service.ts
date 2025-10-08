@@ -57,6 +57,12 @@ export interface WorkspaceService {
   exists: (path: string) => Promise<boolean>;
   delete: (path: string) => Promise<boolean>;
   list: (prefix?: string) => Promise<string[]>;
+  listWithMetadata: (prefix?: string) => Promise<Array<{
+    path: string;
+    metadata?: any;
+    type?: 'embedded' | 'external';
+    size?: number;
+  }>>;
   findByPattern: (pattern: RegExp) => Promise<string[]>;
   clear: (prefix?: string) => Promise<void>;
   export: (prefix?: string) => Promise<Record<string, any>>;
@@ -234,8 +240,9 @@ export const createWorkspaceService = (
     const key = getCacheKey(sanitized);
 
     try {
-      // MongoDB document size limit is 16MB
-      const MAX_MONGODB_SIZE = 16 * 1024 * 1024; // 16MB
+      // Storage thresholds
+      const MAX_MONGODB_SIZE = 16 * 1024 * 1024; // 16MB (BSON limit)
+      const EXTERNAL_STORAGE_THRESHOLD = 1 * 1024 * 1024; // 1MB - use external storage for files larger than this
 
       // Convert content to Buffer for size check
       const contentBuffer = Buffer.isBuffer(content)
@@ -244,7 +251,7 @@ export const createWorkspaceService = (
           ? Buffer.from(content)
           : Buffer.from(JSON.stringify(content));
 
-      // Check size limit
+      // Check MongoDB hard limit
       if (contentBuffer.length > MAX_MONGODB_SIZE) {
         throw new Error(
           `Content size (${contentBuffer.length} bytes) exceeds MongoDB 16MB limit`,
@@ -255,33 +262,72 @@ export const createWorkspaceService = (
       const existingRef = await keyv.get(key);
       const isUpdate = !!existingRef;
 
-      // Store content directly in MongoDB
-      // For binary data, convert to base64 for storage
-      const storageContent = Buffer.isBuffer(content)
-        ? {
-            type: 'buffer',
-            data: content.toString('base64'),
-            encoding: 'base64',
-          }
-        : content;
+      let document;
 
-      // Create document with content embedded
-      const document = {
-        type: 'embedded',
-        content: storageContent,
-        metadata: {
-          ...metadata,
-          size: contentBuffer.length,
-          contentType:
-            metadata.contentType || detectContentType(sanitized, content),
-          createdAt: isUpdate ? existingRef?.metadata?.createdAt : new Date(),
-          updatedAt: new Date(),
-          version: isUpdate ? (existingRef?.metadata?.version || 0) + 1 : 1,
-          isBuffer: Buffer.isBuffer(content),
-        },
-      };
+      // Use external storage for large files (> 1MB)
+      if (contentBuffer.length > EXTERNAL_STORAGE_THRESHOLD) {
+        logger.info(
+          `Workspace: Large file detected (${contentBuffer.length} bytes), using external storage for ${sanitized}`,
+        );
 
-      // Store directly in MongoDB with timeout
+        // Store file externally (S3 or local disk)
+        // Note: Don't add 'workspace' prefix - storage provider already has it in baseDir
+        const externalPath = sanitized;
+        await fileStorage.upload(externalPath, contentBuffer);
+
+        // Store reference in MongoDB
+        document = {
+          type: 'external',
+          path: externalPath,
+          storageProvider: fileStorage.constructor.name,
+          metadata: {
+            ...metadata,
+            size: contentBuffer.length,
+            contentType:
+              metadata.contentType || detectContentType(sanitized, content),
+            createdAt: isUpdate ? existingRef?.metadata?.createdAt : new Date(),
+            updatedAt: new Date(),
+            version: isUpdate ? (existingRef?.metadata?.version || 0) + 1 : 1,
+            isBuffer: Buffer.isBuffer(content),
+          },
+        };
+
+        logger.debug(
+          `Workspace: ${isUpdate ? 'Updated' : 'Created'} ${sanitized} (${contentBuffer.length} bytes in external storage)`,
+        );
+      } else {
+        // Store small files directly in MongoDB (< 1MB)
+        // For binary data, convert to base64 for storage
+        const storageContent = Buffer.isBuffer(content)
+          ? {
+              type: 'buffer',
+              data: content.toString('base64'),
+              encoding: 'base64',
+            }
+          : content;
+
+        // Create document with content embedded
+        document = {
+          type: 'embedded',
+          content: storageContent,
+          metadata: {
+            ...metadata,
+            size: contentBuffer.length,
+            contentType:
+              metadata.contentType || detectContentType(sanitized, content),
+            createdAt: isUpdate ? existingRef?.metadata?.createdAt : new Date(),
+            updatedAt: new Date(),
+            version: isUpdate ? (existingRef?.metadata?.version || 0) + 1 : 1,
+            isBuffer: Buffer.isBuffer(content),
+          },
+        };
+
+        logger.debug(
+          `Workspace: ${isUpdate ? 'Updated' : 'Created'} ${sanitized} (${contentBuffer.length} bytes in MongoDB)`,
+        );
+      }
+
+      // Store document in MongoDB with timeout
       try {
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => reject(new Error('Database timeout')), 5000);
@@ -306,10 +352,6 @@ export const createWorkspaceService = (
         expiry: metadata.ttl ? Date.now() + metadata.ttl * 1000 : undefined,
       });
       pruneCache();
-
-      logger.debug(
-        `Workspace: ${isUpdate ? 'Updated' : 'Created'} ${sanitized} (${contentBuffer.length} bytes in MongoDB)`,
-      );
     } catch (error) {
       logger.error(`Workspace: Failed to set ${sanitized}`, error);
       throw error;
@@ -343,7 +385,16 @@ export const createWorkspaceService = (
         return undefined;
       }
 
-      // Content is embedded directly in the document
+      // Handle external storage (for large files > 1MB)
+      if (document.type === 'external' && document.path) {
+        logger.debug(
+          `Workspace: Retrieving large file from external storage: ${sanitized}`,
+        );
+        const buffer = await fileStorage.download(document.path);
+        return parseContent(buffer, sanitized, document.metadata?.contentType);
+      }
+
+      // Content is embedded directly in the document (for small files < 1MB)
       if (document.type === 'embedded' && document.content) {
         // Handle base64 encoded buffers
         if (
@@ -473,11 +524,14 @@ export const createWorkspaceService = (
     const key = getCacheKey(sanitized);
 
     try {
-      // Get entry to check if it's a file
+      // Get entry to check if it uses external storage
       const entry = await keyv.get(key);
 
-      if (entry?.type === 'file') {
-        // Delete from file storage
+      // Delete from external storage if applicable
+      if (entry?.type === 'external' || entry?.type === 'file') {
+        logger.debug(
+          `Workspace: Deleting external file for ${sanitized}: ${entry.path}`,
+        );
         await fileStorage.delete(entry.path);
       }
 
@@ -627,6 +681,112 @@ export const createWorkspaceService = (
       return cachedKeys;
     } catch (error) {
       logger.error('Workspace: Failed to list keys', error);
+      return [];
+    }
+  };
+
+  const listWithMetadata = async (prefix?: string): Promise<Array<{
+    path: string;
+    metadata?: any;
+    type?: 'embedded' | 'external';
+    size?: number;
+  }>> => {
+    try {
+      const namespace = options.namespace || 'workspace';
+
+      // If using MongoDB, query the database directly with metadata
+      if (store && store instanceof KeyvMongo && mongoose.connection.db) {
+        try {
+          const db = mongoose.connection.db;
+          const collection = db.collection('keyv');
+
+          const namespacePrefix = `${namespace}:`;
+          let query: any = {};
+
+          if (prefix) {
+            const sanitizedPrefix = sanitizePath(prefix);
+            const fullPrefix = `${namespacePrefix}${sanitizedPrefix}`;
+            query = {
+              key: {
+                $gte: fullPrefix,
+                $lt: fullPrefix + '\uffff',
+              },
+            };
+          } else {
+            query = {
+              key: {
+                $gte: namespacePrefix,
+                $lt: namespacePrefix + '\uffff',
+              },
+            };
+          }
+
+          // Fetch keys with metadata, but exclude large content field
+          // This is much more efficient than loading full documents
+          const cursor = collection.find(query, {
+            projection: {
+              key: 1,
+              'value.metadata': 1,
+              'value.type': 1,
+              _id: 0,
+            },
+          });
+
+          cursor.hint({ key: 1 });
+          const docs = await cursor.toArray();
+
+          // Extract and format results
+          const results = docs.map((doc: any) => {
+            let path = doc.key;
+            if (path.startsWith(namespacePrefix)) {
+              path = path.substring(namespacePrefix.length);
+            }
+
+            return {
+              path,
+              metadata: doc.value?.metadata || {},
+              type: doc.value?.type,
+              size: doc.value?.metadata?.size,
+            };
+          });
+
+          logger.debug(
+            `Workspace: Listed ${results.length} items with metadata from MongoDB with prefix: ${prefix || '/'}`,
+          );
+          return results;
+        } catch (mongoError) {
+          logger.warn(
+            'Failed to query MongoDB with metadata, falling back to cache',
+            mongoError,
+          );
+        }
+      }
+
+      // Fallback: use cache (less efficient but works)
+      const keys = await list(prefix);
+      const results = [];
+
+      for (const key of keys) {
+        const cached = cache.get(getCacheKey(key));
+        if (cached?.value) {
+          results.push({
+            path: key,
+            metadata: cached.value.metadata || {},
+            type: cached.value.type,
+            size: cached.value.metadata?.size,
+          });
+        } else {
+          // If not in cache, add without metadata
+          results.push({
+            path: key,
+            metadata: {},
+          });
+        }
+      }
+
+      return results;
+    } catch (error) {
+      logger.error('Workspace: Failed to list with metadata', error);
       return [];
     }
   };
@@ -867,6 +1027,7 @@ export const createWorkspaceService = (
     exists,
     delete: deleteItem,
     list,
+    listWithMetadata,
     findByPattern,
     clear,
     export: exportData,
@@ -929,7 +1090,15 @@ export class UnifiedWorkspaceService {
     sessionId: string,
     path: string,
     content: any,
-    options: { scope: string; agentId?: string } = { scope: 'session' },
+    options: {
+      scope: string;
+      agentId?: string;
+      creationContext?: {
+        content?: string;
+        messageId?: string;
+        timestamp?: Date;
+      };
+    } = { scope: 'session' },
   ): Promise<{ version: number }> {
     const scopePath = this.buildScopePath(
       options.scope,
@@ -938,12 +1107,15 @@ export class UnifiedWorkspaceService {
       options.agentId,
     );
 
-    // Get existing metadata to track version
+    // Get existing metadata to track version and preserve creation context
     let version = 1;
+    let existingCreationContext = null;
     try {
       const existing = await this.workspace.get(scopePath);
       if (existing && existing.metadata?.version) {
         version = existing.metadata.version + 1;
+        // Preserve original creation context on updates
+        existingCreationContext = existing.metadata?.creationContext;
       }
     } catch (error) {
       // Doesn't exist yet, version stays at 1
@@ -955,6 +1127,8 @@ export class UnifiedWorkspaceService {
       scope: options.scope,
       sessionId,
       agentId: options.agentId,
+      // Only set creation context on first create (version 1)
+      creationContext: version === 1 ? options.creationContext : existingCreationContext,
     });
 
     return { version };

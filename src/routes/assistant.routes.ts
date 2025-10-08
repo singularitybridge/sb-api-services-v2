@@ -3,6 +3,7 @@ import { threadRouter } from './assistant/thread.routes';
 import { assistantRouter } from './assistant/assistant.routes';
 import { completionRouter } from './assistant/completion.routes';
 import { executeHandler } from './assistant/execute.routes'; // Import the handler function
+import workspaceExecuteRouter from './assistant/workspace-execute.routes'; // Import workspace execute router
 import { validateApiKeys } from '../services/api.key.service';
 import { validateObjectId } from '../utils/validation';
 
@@ -22,6 +23,9 @@ router.post(
   validateApiKeys(['openai_api_key']),
   executeHandler,
 );
+
+// Workspace execute handler for bidirectional workspace communication
+router.use('/', workspaceExecuteRouter);
 
 // This should be last to avoid catching other routes
 router.use('/', assistantRouter); // Handles routes like /assistant, /assistant/:id

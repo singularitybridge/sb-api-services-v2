@@ -6,6 +6,8 @@ import {
 import { logger } from '../../utils/logger';
 import { resolveAssistantIdentifier } from '../../services/assistant/assistant-resolver.service';
 import { UnifiedWorkspaceService } from '../../services/unified-workspace.service';
+import { Message } from '../../models/Message';
+import mongoose from 'mongoose';
 
 /**
  * Unified Workspace Integration Actions
@@ -38,6 +40,45 @@ async function resolveAgentId(
     return null;
   } catch (error) {
     logger.error(`Error resolving agent ID: ${error}`);
+    return null;
+  }
+}
+
+// Helper function to get the last user message from a session
+async function getLastUserMessage(sessionId: string): Promise<{
+  content?: string;
+  messageId?: string;
+  timestamp?: Date;
+} | null> {
+  try {
+    // Skip if sessionId is not a valid ObjectId (e.g., "stateless_execution")
+    if (!mongoose.Types.ObjectId.isValid(sessionId)) {
+      logger.debug(`Session ID "${sessionId}" is not a valid ObjectId, skipping message lookup`);
+      return null;
+    }
+
+    // Find the last user message in this session
+    const lastUserMessage = await Message.findOne({
+      sessionId,
+      sender: 'user',
+    })
+      .sort({ timestamp: -1 }) // Most recent first
+      .limit(1)
+      .select('content _id timestamp')
+      .lean();
+
+    if (!lastUserMessage) {
+      logger.debug(`No user messages found for session ${sessionId}`);
+      return null;
+    }
+
+    return {
+      content: lastUserMessage.content,
+      messageId: lastUserMessage._id?.toString(),
+      timestamp: lastUserMessage.timestamp,
+    };
+  } catch (error) {
+    logger.error(`Error getting last user message for session ${sessionId}:`, error);
     return null;
   }
 }
@@ -113,8 +154,11 @@ export const createWorkspaceActions = (
           resolvedAgentId = resolved;
         }
 
-        // Use the workspace service directly
+        // Capture the creation context (last user message)
         const sessionId = context?.sessionId || 'default';
+        const creationContext = await getLastUserMessage(sessionId);
+
+        // Use the workspace service directly
         const result = await workspaceService.storeContent(
           sessionId,
           path,
@@ -122,6 +166,7 @@ export const createWorkspaceActions = (
           {
             scope,
             agentId: scope === 'agent' ? resolvedAgentId : undefined,
+            creationContext: creationContext || undefined,
           },
         );
 
