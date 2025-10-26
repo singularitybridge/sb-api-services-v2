@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getWorkspaceService } from '../services/unified-workspace.service';
+import { getVectorSearchService } from '../services/vector-search.service';
 import { logger } from '../utils/logger';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { singleUpload } from '../middleware/file-upload.middleware';
@@ -781,6 +782,147 @@ router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
     });
   }
 });
+
+/**
+ * @route POST /api/workspace/vector-search
+ * @desc Semantic search across workspace using vector embeddings
+ */
+router.post(
+  '/vector-search',
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { query, scopes, agentIds, limit = 10, minScore = 0.7 } = req.body;
+
+      if (!query) {
+        return res.status(400).json({
+          success: false,
+          message: 'Query is required',
+        });
+      }
+
+      const vectorSearch = getVectorSearchService();
+      const results: any[] = [];
+      const companyId = req.company._id.toString();
+
+      // Search agent scopes
+      if (scopes?.includes('agent') && agentIds?.length) {
+        for (const agentId of agentIds) {
+          const agentResults = await vectorSearch.search(query, {
+            scope: 'agent',
+            scopeId: agentId,
+            limit,
+            minScore,
+            companyId, // Pass company ID for API key lookup
+          });
+          results.push(...agentResults);
+        }
+      }
+
+      // Search company scope (auto-scoped by auth)
+      if (scopes?.includes('company')) {
+        const companyResults = await vectorSearch.search(query, {
+          scope: 'company',
+          scopeId: companyId,
+          limit,
+          minScore,
+          companyId, // Pass company ID for API key lookup
+        });
+        results.push(...companyResults);
+      }
+
+      // Deduplicate and sort
+      const uniqueResults = new Map();
+      for (const r of results) {
+        const key = `${r.scope}/${r.scopeId}/${r.path}`;
+        if (!uniqueResults.has(key) || r.score > uniqueResults.get(key).score) {
+          uniqueResults.set(key, r);
+        }
+      }
+
+      const topResults = Array.from(uniqueResults.values())
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
+
+      res.json({
+        success: true,
+        query,
+        results: topResults,
+        count: topResults.length,
+      });
+    } catch (error: any) {
+      logger.error('Vector search failed', { error });
+      res.status(500).json({
+        success: false,
+        message: 'Vector search failed',
+      });
+    }
+  },
+);
+
+/**
+ * @route POST /api/workspace/embed-documents
+ * @desc Trigger embedding for existing documents
+ */
+router.post(
+  '/embed-documents',
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { scope, scopeId, limit = 100 } = req.body;
+
+      if (!scope || !scopeId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Scope and scopeId are required',
+        });
+      }
+
+      const vectorSearch = getVectorSearchService();
+      const workspace = getWorkspaceService();
+      const companyId = req.company._id.toString();
+
+      // Get all documents for the scope
+      const prefix = `/${scope}/${scopeId}/`;
+      const paths = await workspace.list(prefix);
+
+      logger.info(`Found ${paths.length} documents to embed in ${prefix}`);
+
+      // Limit the number of documents to process
+      const pathsToEmbed = paths.slice(0, limit);
+
+      // Trigger embedding for each document (async, fire-and-forget)
+      const results: any[] = [];
+      for (const path of pathsToEmbed) {
+        try {
+          // Add unified-workspace namespace prefix
+          const fullKey = `unified-workspace:${path}`;
+          await vectorSearch.embedDocument(fullKey, companyId);
+          results.push({ path, status: 'queued' });
+        } catch (error: any) {
+          logger.error(`Failed to queue embedding for ${path}`, error);
+          results.push({ path, status: 'error', error: error.message });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Queued ${results.length} documents for embedding`,
+        scope,
+        scopeId,
+        totalDocuments: paths.length,
+        queued: results.filter((r) => r.status === 'queued').length,
+        errors: results.filter((r) => r.status === 'error').length,
+        results,
+      });
+    } catch (error: any) {
+      logger.error('Embed documents failed', { error });
+      res.status(500).json({
+        success: false,
+        message: 'Failed to embed documents',
+        error: error.message,
+      });
+    }
+  },
+);
 
 /**
  * @route DELETE /api/workspace/delete

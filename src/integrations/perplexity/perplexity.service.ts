@@ -156,3 +156,43 @@ export async function performPerplexitySearch(
     throw new Error(errorMessage);
   }
 }
+
+/**
+ * Verify Perplexity API key by making a minimal test request
+ */
+export async function verifyPerplexityKey(apiKey: string): Promise<boolean> {
+  try {
+    // Make a minimal request to verify the key
+    await axios.post(
+      'https://api.perplexity.ai/chat/completions',
+      {
+        model: 'sonar',
+        messages: [
+          {
+            role: 'user',
+            content: 'test',
+          },
+        ],
+        max_tokens: 1, // Minimal token usage for verification
+      },
+      {
+        headers: {
+          accept: 'application/json',
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+        },
+      },
+    );
+    return true;
+  } catch (error: any) {
+    // 401 or 403 means invalid/unauthorized key
+    const status = error.response?.status;
+    if (status === 401 || status === 403) {
+      return false;
+    }
+    // For other errors (network issues, server errors), return false but don't throw
+    // This is more user-friendly than throwing errors during key verification
+    console.error('Perplexity key verification error:', error.message, status);
+    return false;
+  }
+}

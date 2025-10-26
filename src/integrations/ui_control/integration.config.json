@@ -1,0 +1,7 @@
+{
+  "name": "ui_control",
+  "description": "Control Agent Hub UI via bidirectional WebSocket commands",
+  "actionsFile": "ui_control.actions.ts",
+  "actionCreator": "createUIControlActions",
+  "enabled": true
+}

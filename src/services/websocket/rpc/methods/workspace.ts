@@ -17,18 +17,16 @@ registerRpcMethod(
     }
 
     // Save to agent scope (7 days TTL)
-    await workspaceService.saveItem({
-      scope: 'agent',
-      scopeId: params.agentId || 'default',
-      companyId: companyId,
-      path: params.path,
-      content: params.content,
-      metadata: {
-        contentType: params.contentType || 'text/markdown',
-        description: params.description || 'AI search result',
-        tags: params.tags || ['search', 'ai-generated'],
+    // UnifiedWorkspaceService signature: storeContent(sessionId, path, content, options)
+    await workspaceService.storeContent(
+      socket.id, // Use socket ID as session ID
+      params.path,
+      params.content,
+      {
+        scope: 'agent',
+        agentId: params.agentId || 'default',
       },
-    });
+    );
 
     return {
       success: true,
@@ -52,18 +50,15 @@ registerRpcMethod(
     const { companyId } = socket.decodedToken!;
     const statePath = `/ui-state/${params.key}`;
 
-    await workspaceService.saveItem({
-      scope: 'temporary',
-      scopeId: socket.id, // Use socket ID for session-specific state
-      companyId: companyId,
-      path: statePath,
-      content: JSON.stringify(params.value),
-      metadata: {
-        contentType: 'application/json',
-        description: 'UI component state',
-        tags: ['ui-state', 'temporary'],
+    // UnifiedWorkspaceService signature: storeContent(sessionId, path, content, options)
+    await workspaceService.storeContent(
+      socket.id, // Use socket ID as session ID
+      statePath,
+      JSON.stringify(params.value),
+      {
+        scope: 'session', // Use session scope for UI state
       },
-    });
+    );
 
     return {
       success: true,
@@ -85,34 +80,19 @@ registerRpcMethod(
       throw new Error('path is required');
     }
 
-    // Try to load from different scopes
-    const scopes = ['agent', 'session', 'team', 'company'];
-    let content = null;
-    let metadata = null;
+    // UnifiedWorkspaceService signature: retrieveContent(sessionId, path, agentId?)
+    const result = await workspaceService.retrieveContent(
+      socket.id, // Use socket ID as session ID
+      params.path,
+      params.agentId, // Optional agent ID for agent scope
+    );
 
-    for (const scope of scopes) {
-      try {
-        const item = await workspaceService.getItem({
-          scope: scope as any,
-          scopeId: params.scopeId || 'default',
-          companyId: companyId,
-          path: params.path,
-        });
-
-        if (item) {
-          content = item.content;
-          metadata = item.metadata;
-          break;
-        }
-      } catch (error) {
-        // Try next scope
-        continue;
-      }
-    }
-
-    if (!content) {
+    if (!result.found) {
       throw new Error(`File not found: ${params.path}`);
     }
+
+    const content = result.content;
+    const metadata = result.metadata;
 
     return {
       success: true,
@@ -132,17 +112,17 @@ registerRpcMethod(
   async (socket: AuthenticatedSocket, params: any) => {
     const { companyId } = socket.decodedToken!;
 
-    const items = await workspaceService.listItems({
-      scope: params?.scope || 'agent',
-      scopeId: params?.scopeId || 'default',
-      companyId: companyId,
-      prefix: params?.prefix || '/',
-    });
+    // UnifiedWorkspaceService signature: listContent(sessionId, prefix?, agentId?)
+    const result = await workspaceService.listContent(
+      socket.id, // Use socket ID as session ID
+      params?.prefix || '/',
+      params?.agentId, // Optional agent ID for agent scope
+    );
 
     return {
       success: true,
-      items,
-      count: items.length,
+      items: result.paths,
+      count: result.count,
     };
   },
 );
@@ -230,18 +210,16 @@ registerRpcMethod(
                      finalContent.trim().startsWith('<html');
       const contentType = isHtml ? 'text/html' : 'text/markdown';
 
-      await workspaceService.saveItem({
-        scope: 'agent',
-        scopeId: params.assistantId,
-        companyId: companyId,
-        path: params.savePath,
-        content: finalContent,
-        metadata: {
-          contentType,
-          description: `AI response to: ${params.userInput.substring(0, 50)}...`,
-          tags: ['search', 'ai-response', assistant.name],
+      // UnifiedWorkspaceService signature: storeContent(sessionId, path, content, options)
+      await workspaceService.storeContent(
+        socket.id, // Use socket ID as session ID
+        params.savePath,
+        finalContent,
+        {
+          scope: 'agent',
+          agentId: params.assistantId,
         },
-      });
+      );
     }
 
     return {

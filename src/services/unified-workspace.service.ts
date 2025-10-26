@@ -7,6 +7,7 @@ import {
   StorageProvider,
 } from './storage-providers/local-storage.provider';
 import { createS3Provider } from './storage-providers/s3-storage.provider';
+import { getVectorSearchService } from './vector-search.service';
 import * as path from 'path';
 import * as fs from 'fs';
 import crypto from 'crypto';
@@ -1129,6 +1130,17 @@ export class UnifiedWorkspaceService {
       agentId: options.agentId,
       // Only set creation context on first create (version 1)
       creationContext: version === 1 ? options.creationContext : existingCreationContext,
+    });
+
+    // Trigger async embedding (fire-and-forget)
+    setImmediate(() => {
+      const vectorSearch = getVectorSearchService();
+      // Build full MongoDB key format: unified-workspace:/agent/id/path
+      const namespace = 'unified-workspace';
+      const fullKey = `${namespace}:/${scopePath}`;
+      vectorSearch.embedDocument(fullKey).catch((error) => {
+        logger.error('Async embedding failed', { fullKey, error: error.message });
+      });
     });
 
     return { version };
