@@ -115,20 +115,63 @@ export async function addWorkspaceItem(
 
     // If fileUrl is provided, download and store file reference
     if (input.fileUrl) {
-      // Download file from URL
-      const response = await axios.get(input.fileUrl, {
-        responseType: 'arraybuffer',
-        timeout: 30000, // 30 second timeout
-      });
+      let buffer: Buffer;
+      let filename: string;
+      let mimeType: string;
 
-      const filename = input.fileUrl.split('/').pop() || 'file';
-      const buffer = Buffer.from(response.data);
+      // Parse URL to check protocol
+      const urlObj = new URL(input.fileUrl);
+
+      if (urlObj.protocol === 'file:') {
+        // Handle local file:// URLs using Node.js fs
+        const fs = await import('fs/promises');
+        const path = await import('path');
+
+        // Convert file:// URL to local path
+        const filePath = urlObj.pathname;
+
+        // Read file from local filesystem
+        buffer = await fs.readFile(filePath);
+        filename = path.basename(filePath);
+
+        // Determine MIME type based on extension
+        const ext = path.extname(filePath).toLowerCase();
+        const mimeTypes: Record<string, string> = {
+          '.txt': 'text/plain',
+          '.md': 'text/markdown',
+          '.json': 'application/json',
+          '.pdf': 'application/pdf',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.gif': 'image/gif',
+          '.svg': 'image/svg+xml',
+          '.html': 'text/html',
+          '.xml': 'application/xml',
+          '.csv': 'text/csv',
+        };
+        mimeType = mimeTypes[ext] || 'application/octet-stream';
+
+      } else if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') {
+        // Download file from HTTP/HTTPS URL using axios
+        const response = await axios.get(input.fileUrl, {
+          responseType: 'arraybuffer',
+          timeout: 30000, // 30 second timeout
+        });
+
+        filename = input.fileUrl.split('/').pop() || 'file';
+        buffer = Buffer.from(response.data);
+        mimeType = response.headers['content-type'] || 'application/octet-stream';
+
+      } else {
+        throw new Error(`Unsupported protocol: ${urlObj.protocol}. Only file://, http://, and https:// are supported.`);
+      }
 
       // Store file content as base64 with metadata
       const fileReference = {
         type: 'file',
         filename,
-        mimeType: response.headers['content-type'] || 'application/octet-stream',
+        mimeType,
         size: buffer.length,
         content: buffer.toString('base64'),
         sourceUrl: input.fileUrl,

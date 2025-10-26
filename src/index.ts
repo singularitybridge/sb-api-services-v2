@@ -80,6 +80,7 @@ import promptHistoryRouter from './routes/prompt-history.routes';
 import unifiedWorkspaceRouter from './routes/unified-workspace.routes';
 import mcpRouter from './routes/mcp.routes';
 import oauthMcpRouter from './routes/oauth-mcp.routes';
+import uiStateRouter from './routes/ui-state.routes';
 
 // Read package.json at startup
 let packageJson: { version: string; name: string };
@@ -179,6 +180,12 @@ app.use(
   verifyAccess(),
   unifiedWorkspaceRouter,
 ); // Unified Workspace (before generic /api)
+app.use(
+  '/api/ui-state',
+  verifyTokenMiddleware,
+  verifyAccess(),
+  uiStateRouter,
+); // UI State tracking (before generic /api)
 // MCP Server - custom auth that allows initialize, tools/list, and notifications without auth
 app.use(
   '/api/mcp',

@@ -1,0 +1,6 @@
+{
+  "name": "agent_hub_ui_context",
+  "icon": "monitor",
+  "actionCreator": "createAgentHubUiContextActions",
+  "actionsFile": "agent_hub_ui_context.actions.ts"
+}

@@ -1,6 +1,7 @@
 import { verifyOpenAiKey } from './oai.assistant.service';
 // import { TwilioKeys, verifyTwilioKeys } from './twilio/voice.service'; // Removed - Twilio dependency removed
 import { verifyElevenLabsKey } from '../integrations/elevenlabs/elevenlabs.service';
+import { verifyPerplexityKey } from '../integrations/perplexity/perplexity.service';
 
 export type ApiKey = string;
 
@@ -11,6 +12,7 @@ const services: Record<string, VerificationFunction> = {
   openai_api_key: verifyOpenAiKey,
   // twilio_auth_token: verifyTwilioKeys, // Removed - Twilio dependency removed
   labs11_api_key: verifyElevenLabsKey,
+  perplexity_api_key: verifyPerplexityKey,
 };
 
 export async function verifyApiKey(

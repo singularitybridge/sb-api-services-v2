@@ -114,6 +114,48 @@ import {
   type DeleteWorkspaceItemInput,
 } from './tools/delete-workspace-item';
 
+import {
+  moveWorkspaceItemTool,
+  moveWorkspaceItemSchema,
+  moveWorkspaceItem,
+  type MoveWorkspaceItemInput,
+} from './tools/move-workspace-item';
+
+import {
+  vectorSearchWorkspaceTool,
+  vectorSearchWorkspaceSchema,
+  vectorSearchWorkspace,
+  type VectorSearchWorkspaceInput,
+} from './tools/vector-search-workspace';
+
+import {
+  getUiContextTool,
+  getUiContextSchema,
+  getUiContext,
+  type GetUiContextInput,
+} from './tools/get-ui-context';
+
+import {
+  navigateToPageTool,
+  navigateToPageSchema,
+  navigateToPage,
+  type NavigateToPageInput,
+} from './tools/navigate-to-page';
+
+import {
+  openWorkspaceFileTool,
+  openWorkspaceFileSchema,
+  openWorkspaceFile,
+  type OpenWorkspaceFileInput,
+} from './tools/open-workspace-file';
+
+import {
+  showNotificationTool,
+  showNotificationSchema,
+  showNotification,
+  type ShowNotificationInput,
+} from './tools/show-notification';
+
 /**
  * MCP Server for HTTP transport
  */
@@ -226,6 +268,31 @@ export class MCPHttpServer {
           name: deleteWorkspaceItemTool.name,
           description: deleteWorkspaceItemTool.description,
           inputSchema: deleteWorkspaceItemSchema,
+        },
+        {
+          name: vectorSearchWorkspaceTool.name,
+          description: vectorSearchWorkspaceTool.description,
+          inputSchema: vectorSearchWorkspaceSchema,
+        },
+        {
+          name: getUiContextTool.name,
+          description: getUiContextTool.description,
+          inputSchema: getUiContextSchema,
+        },
+        {
+          name: navigateToPageTool.name,
+          description: navigateToPageTool.description,
+          inputSchema: navigateToPageSchema,
+        },
+        {
+          name: openWorkspaceFileTool.name,
+          description: openWorkspaceFileTool.description,
+          inputSchema: openWorkspaceFileSchema,
+        },
+        {
+          name: showNotificationTool.name,
+          description: showNotificationTool.description,
+          inputSchema: showNotificationSchema,
         },
       ],
     }));
@@ -400,6 +467,48 @@ export class MCPHttpServer {
             name: deleteWorkspaceItemTool.name,
             description: deleteWorkspaceItemTool.description,
             inputSchema: zodToJsonSchema(deleteWorkspaceItemSchema, {
+              $refStrategy: 'none',
+            }),
+          },
+          {
+            name: moveWorkspaceItemTool.name,
+            description: moveWorkspaceItemTool.description,
+            inputSchema: zodToJsonSchema(moveWorkspaceItemSchema, {
+              $refStrategy: 'none',
+            }),
+          },
+          {
+            name: vectorSearchWorkspaceTool.name,
+            description: vectorSearchWorkspaceTool.description,
+            inputSchema: zodToJsonSchema(vectorSearchWorkspaceSchema, {
+              $refStrategy: 'none',
+            }),
+          },
+          {
+            name: getUiContextTool.name,
+            description: getUiContextTool.description,
+            inputSchema: zodToJsonSchema(getUiContextSchema, {
+              $refStrategy: 'none',
+            }),
+          },
+          {
+            name: navigateToPageTool.name,
+            description: navigateToPageTool.description,
+            inputSchema: zodToJsonSchema(navigateToPageSchema, {
+              $refStrategy: 'none',
+            }),
+          },
+          {
+            name: openWorkspaceFileTool.name,
+            description: openWorkspaceFileTool.description,
+            inputSchema: zodToJsonSchema(openWorkspaceFileSchema, {
+              $refStrategy: 'none',
+            }),
+          },
+          {
+            name: showNotificationTool.name,
+            description: showNotificationTool.description,
+            inputSchema: zodToJsonSchema(showNotificationSchema, {
               $refStrategy: 'none',
             }),
           },
@@ -634,6 +743,90 @@ export class MCPHttpServer {
               }
               result = await deleteWorkspaceItem(
                 parseResult.data as DeleteWorkspaceItemInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'move_workspace_item': {
+              const parseResult = moveWorkspaceItemSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await moveWorkspaceItem(
+                parseResult.data as MoveWorkspaceItemInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'vector_search_workspace': {
+              const parseResult = vectorSearchWorkspaceSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await vectorSearchWorkspace(
+                parseResult.data as VectorSearchWorkspaceInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'get_ui_context': {
+              const parseResult = getUiContextSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await getUiContext(
+                parseResult.data as GetUiContextInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'navigate_to_page': {
+              const parseResult = navigateToPageSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await navigateToPage(
+                parseResult.data as NavigateToPageInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'open_workspace_file': {
+              const parseResult = openWorkspaceFileSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await openWorkspaceFile(
+                parseResult.data as OpenWorkspaceFileInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'show_notification': {
+              const parseResult = showNotificationSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await showNotification(
+                parseResult.data as ShowNotificationInput,
                 companyId,
               );
               break;

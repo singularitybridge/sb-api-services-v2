@@ -6,6 +6,7 @@ import {
 import { logger } from '../../utils/logger';
 import { resolveAssistantIdentifier } from '../../services/assistant/assistant-resolver.service';
 import { UnifiedWorkspaceService } from '../../services/unified-workspace.service';
+import { getVectorSearchService } from '../../services/vector-search.service';
 import { Message } from '../../models/Message';
 import mongoose from 'mongoose';
 
@@ -503,6 +504,134 @@ export const createWorkspaceActions = (
         logger.error('Failed to delete content', {
           error: error.message,
           path,
+          scope,
+        });
+        throw error;
+      }
+    },
+  },
+
+  // Vector search across workspace
+  vectorSearch: {
+    description:
+      'Semantic search across workspace using vector embeddings for natural language queries',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description:
+            'Natural language search query (e.g., "implementation guides", "configuration files")',
+        },
+        scope: {
+          type: 'string',
+          enum: ['session', 'agent'],
+          description: 'Storage scope to search - session or agent',
+        },
+        agentId: {
+          type: 'string',
+          description:
+            'Agent ID (optional - will auto-use current assistant if omitted when scope is "agent")',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of results to return (default: 10)',
+        },
+        minScore: {
+          type: 'number',
+          description:
+            'Minimum similarity score 0-1 (default: 0.7, higher = more relevant)',
+        },
+      },
+      required: ['query', 'scope'],
+      additionalProperties: false,
+    },
+    function: async ({
+      query,
+      scope,
+      agentId,
+      limit = 10,
+      minScore = 0.7,
+    }: any): Promise<StandardActionResult> => {
+      try {
+        // Validate scope
+        if (scope !== 'session' && scope !== 'agent') {
+          throw new Error('Scope must be either "session" or "agent"');
+        }
+
+        // Validate and resolve agent ID when scope is agent
+        let resolvedAgentId: string | undefined;
+        if (scope === 'agent') {
+          const agentIdentifier = agentId || context?.assistantId;
+
+          if (!agentIdentifier) {
+            throw new Error(
+              'agentId is required when scope is "agent" (or must be executing within an assistant context)',
+            );
+          }
+
+          const resolved = await resolveAgentId(
+            agentIdentifier,
+            context?.companyId,
+          );
+          if (!resolved) {
+            throw new Error(
+              `Could not find agent with identifier: ${agentIdentifier}`,
+            );
+          }
+          resolvedAgentId = resolved;
+        }
+
+        // Perform vector search
+        const vectorSearch = getVectorSearchService();
+        const sessionId = context?.sessionId || 'default';
+
+        // Ensure companyId is available
+        if (!context?.companyId) {
+          throw new Error('Company ID is required for vector search');
+        }
+
+        const results = await vectorSearch.search(query, {
+          scope,
+          scopeId: scope === 'agent' ? resolvedAgentId : sessionId,
+          limit,
+          minScore,
+          companyId: context.companyId,
+        });
+
+        logger.info(
+          `Workspace: Vector search found ${results.length} results for query "${query}" in ${scope} scope`,
+          {
+            companyId: context?.companyId,
+            userId: context?.userId,
+            scope,
+            agentId: scope === 'agent' ? resolvedAgentId : undefined,
+            query,
+            resultsCount: results.length,
+          },
+        );
+
+        return {
+          success: true,
+          message: `Found ${results.length} results for "${query}"`,
+          data: {
+            query,
+            results: results.map((r) => ({
+              path: r.path,
+              score: r.score,
+              contentType: r.metadata.contentType,
+              size: r.metadata.size,
+              createdAt: r.metadata.createdAt,
+            })),
+            count: results.length,
+            scope,
+            agentId: scope === 'agent' ? resolvedAgentId : undefined,
+          },
+        };
+      } catch (error: any) {
+        logger.error('Failed to perform vector search', {
+          error: error.message,
+          query,
           scope,
         });
         throw error;

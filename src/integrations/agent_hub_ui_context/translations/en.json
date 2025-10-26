@@ -1,0 +1,4 @@
+{
+  "name": "Agent Hub UI Context",
+  "description": "Enables AI agents to access current UI state from the Agent Hub chat interface, including the page being viewed, workspace files, and ability to execute UI actions like navigation and notifications. Provides context-aware assistance based on what users are viewing."
+}
