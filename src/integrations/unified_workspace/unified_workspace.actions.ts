@@ -511,36 +511,57 @@ export const createWorkspaceActions = (
     },
   },
 
-  // Vector search across workspace
+  // Vector search across workspace (enhanced with multi-scope support)
   vectorSearch: {
     description:
-      'Semantic search across workspace using vector embeddings for natural language queries',
+      'Semantic search across workspace using vector embeddings. Supports single or multi-scope search across company, agents, teams, and session.',
     parameters: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
           description:
-            'Natural language search query (e.g., "implementation guides", "configuration files")',
+            'Natural language search query (e.g., "implementation guides", "authentication setup")',
         },
         scope: {
           type: 'string',
-          enum: ['session', 'agent'],
-          description: 'Storage scope to search - session or agent',
+          enum: ['session', 'agent', 'company', 'team', 'multi'],
+          description:
+            'Storage scope to search. Use "multi" for global search across multiple scopes.',
+        },
+        scopes: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['company', 'agent', 'team', 'session'],
+          },
+          description:
+            'Array of scopes for multi-scope search (only when scope="multi"). Example: ["company", "agent", "team"]',
         },
         agentId: {
           type: 'string',
           description:
-            'Agent ID (optional - will auto-use current assistant if omitted when scope is "agent")',
+            'Specific agent ID for single-scope agent search (optional - will auto-use current assistant if omitted)',
+        },
+        searchAllAgents: {
+          type: 'boolean',
+          description:
+            'Search all company agents when scope="multi" (default: false)',
+        },
+        searchAllTeams: {
+          type: 'boolean',
+          description:
+            'Search all user teams when scope="multi" (default: false)',
         },
         limit: {
           type: 'number',
-          description: 'Maximum number of results to return (default: 10)',
+          description:
+            'Maximum number of results to return (default: 10 for single-scope, 20 for multi-scope)',
         },
         minScore: {
           type: 'number',
           description:
-            'Minimum similarity score 0-1 (default: 0.7, higher = more relevant)',
+            'Minimum similarity score 0-1 (default: 0.5, higher = more relevant)',
         },
       },
       required: ['query', 'scope'],
@@ -549,52 +570,100 @@ export const createWorkspaceActions = (
     function: async ({
       query,
       scope,
+      scopes,
       agentId,
-      limit = 10,
-      minScore = 0.7,
+      searchAllAgents = false,
+      searchAllTeams = false,
+      limit,
+      minScore = 0.5,
     }: any): Promise<StandardActionResult> => {
       try {
-        // Validate scope
-        if (scope !== 'session' && scope !== 'agent') {
-          throw new Error('Scope must be either "session" or "agent"');
-        }
-
-        // Validate and resolve agent ID when scope is agent
-        let resolvedAgentId: string | undefined;
-        if (scope === 'agent') {
-          const agentIdentifier = agentId || context?.assistantId;
-
-          if (!agentIdentifier) {
-            throw new Error(
-              'agentId is required when scope is "agent" (or must be executing within an assistant context)',
-            );
-          }
-
-          const resolved = await resolveAgentId(
-            agentIdentifier,
-            context?.companyId,
-          );
-          if (!resolved) {
-            throw new Error(
-              `Could not find agent with identifier: ${agentIdentifier}`,
-            );
-          }
-          resolvedAgentId = resolved;
-        }
-
-        // Perform vector search
         const vectorSearch = getVectorSearchService();
-        const sessionId = context?.sessionId || 'default';
 
         // Ensure companyId is available
         if (!context?.companyId) {
           throw new Error('Company ID is required for vector search');
         }
 
+        // Multi-scope search
+        if (scope === 'multi') {
+          const defaultScopes = ['company', 'agent', 'team'];
+          const searchScopes = scopes || defaultScopes;
+          const searchLimit = limit || 20;
+
+          const results = await vectorSearch.searchMultiScope(query, {
+            scopes: searchScopes,
+            agentIds: searchAllAgents ? 'all' : undefined,
+            teamIds: searchAllTeams ? 'all' : undefined,
+            limit: searchLimit,
+            minScore,
+            companyId: context.companyId,
+            userId: context?.userId,
+          });
+
+          logger.info(
+            `Workspace: Multi-scope vector search found ${results.length} results for query "${query}"`,
+            {
+              companyId: context?.companyId,
+              userId: context?.userId,
+              scopes: searchScopes.join(','),
+              query,
+              resultsCount: results.length,
+            },
+          );
+
+          return {
+            success: true,
+            message: `Found ${results.length} results across ${searchScopes.join(', ')} scopes for "${query}"`,
+            data: {
+              query,
+              results: results.map((r) => ({
+                path: r.path,
+                score: r.score,
+                scope: r.scope,
+                scopeId: r.scopeId,
+                contentType: r.metadata.contentType,
+                size: r.metadata.size,
+                createdAt: r.metadata.createdAt,
+              })),
+              count: results.length,
+              scopes: searchScopes,
+            },
+          };
+        }
+
+        // Single-scope search (backward compatible)
+        if (scope !== 'session' && scope !== 'agent' && scope !== 'company' && scope !== 'team') {
+          throw new Error('Scope must be one of: session, agent, company, team, multi');
+        }
+
+        // Resolve scope ID based on scope type
+        let scopeId: string;
+        if (scope === 'agent') {
+          const agentIdentifier = agentId || context?.assistantId;
+          if (!agentIdentifier) {
+            throw new Error(
+              'agentId is required when scope is "agent" (or must be executing within an assistant context)',
+            );
+          }
+          const resolved = await resolveAgentId(agentIdentifier, context?.companyId);
+          if (!resolved) {
+            throw new Error(`Could not find agent with identifier: ${agentIdentifier}`);
+          }
+          scopeId = resolved;
+        } else if (scope === 'session') {
+          scopeId = context?.sessionId || 'default';
+        } else if (scope === 'company') {
+          scopeId = context.companyId;
+        } else {
+          throw new Error(`Team scope requires multi-scope search with scope="multi"`);
+        }
+
+        const searchLimit = limit || 10;
         const results = await vectorSearch.search(query, {
           scope,
-          scopeId: scope === 'agent' ? resolvedAgentId : sessionId,
-          limit,
+          scopeId,
+          limit: searchLimit,
           minScore,
           companyId: context.companyId,
         });
@@ -605,7 +674,7 @@ export const createWorkspaceActions = (
             companyId: context?.companyId,
             userId: context?.userId,
             scope,
-            agentId: scope === 'agent' ? resolvedAgentId : undefined,
+            scopeId,
             query,
             resultsCount: results.length,
           },
@@ -613,19 +682,21 @@ export const createWorkspaceActions = (
 
         return {
           success: true,
-          message: `Found ${results.length} results for "${query}"`,
+          message: `Found ${results.length} results in ${scope} scope for "${query}"`,
           data: {
             query,
             results: results.map((r) => ({
               path: r.path,
               score: r.score,
+              scope: r.scope,
+              scopeId: r.scopeId,
               contentType: r.metadata.contentType,
               size: r.metadata.size,
               createdAt: r.metadata.createdAt,
             })),
             count: results.length,
             scope,
-            agentId: scope === 'agent' ? resolvedAgentId : undefined,
+            scopeId,
           },
         };
       } catch (error: any) {

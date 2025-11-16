@@ -3,9 +3,23 @@ import mongoose from 'mongoose';
 import { logger } from '../utils/logger';
 import pLimit from 'p-limit';
 import { getApiKey } from './api.key.service';
+import crypto from 'crypto';
 
 // Rate limiter: 100 requests per minute (OpenAI tier 2 limit)
 const embeddingLimiter = pLimit(100);
+
+// Circuit breaker configuration
+interface CircuitBreakerState {
+  failures: number;
+  lastFailureTime: number;
+  state: 'closed' | 'open' | 'half-open';
+}
+
+// Embedding cache entry
+interface CachedEmbedding {
+  embedding: number[];
+  timestamp: number;
+}
 
 export interface VectorSearchOptions {
   scope?: 'company' | 'team' | 'agent' | 'session';
@@ -13,6 +27,16 @@ export interface VectorSearchOptions {
   limit?: number;
   minScore?: number;
   companyId: string; // Required for API key lookup
+}
+
+export interface MultiScopeSearchOptions {
+  scopes?: Array<'company' | 'team' | 'agent' | 'session'>;
+  agentIds?: string[] | 'all';
+  teamIds?: string[] | 'all';
+  limit?: number;
+  minScore?: number;
+  companyId: string;
+  userId?: string; // Required for team filtering
 }
 
 export interface VectorSearchResult {
@@ -30,6 +54,20 @@ export interface VectorSearchResult {
 class VectorSearchService {
   private readonly EMBEDDING_MODEL = 'text-embedding-3-small';
   private readonly MAX_TEXT_LENGTH = 8000; // OpenAI limit
+
+  // Embedding cache (1-hour TTL)
+  private embeddingCache = new Map<string, CachedEmbedding>();
+  private readonly CACHE_TTL = 3600000; // 1 hour in milliseconds
+
+  // Circuit breaker
+  private circuitBreaker: CircuitBreakerState = {
+    failures: 0,
+    lastFailureTime: 0,
+    state: 'closed',
+  };
+  private readonly CIRCUIT_BREAKER_THRESHOLD = 5; // Failures before opening
+  private readonly CIRCUIT_BREAKER_TIMEOUT = 60000; // 1 minute cooldown
+  private readonly CIRCUIT_BREAKER_HALF_OPEN_TIMEOUT = 30000; // 30s in half-open
 
   /**
    * Get OpenAI client for a specific company
@@ -97,19 +135,131 @@ class VectorSearchService {
   }
 
   /**
+   * Check circuit breaker state
+   */
+  private checkCircuitBreaker(): void {
+    const now = Date.now();
+
+    if (this.circuitBreaker.state === 'open') {
+      // Check if we should move to half-open
+      if (now - this.circuitBreaker.lastFailureTime > this.CIRCUIT_BREAKER_TIMEOUT) {
+        logger.info('Circuit breaker moving to half-open state');
+        this.circuitBreaker.state = 'half-open';
+        this.circuitBreaker.failures = 0;
+      } else {
+        throw new Error(
+          'Circuit breaker is open - OpenAI API temporarily unavailable',
+        );
+      }
+    }
+  }
+
+  /**
+   * Record circuit breaker success
+   */
+  private recordSuccess(): void {
+    if (this.circuitBreaker.state === 'half-open') {
+      logger.info('Circuit breaker moving to closed state');
+      this.circuitBreaker.state = 'closed';
+    }
+    this.circuitBreaker.failures = 0;
+  }
+
+  /**
+   * Record circuit breaker failure
+   */
+  private recordFailure(): void {
+    this.circuitBreaker.failures++;
+    this.circuitBreaker.lastFailureTime = Date.now();
+
+    if (this.circuitBreaker.failures >= this.CIRCUIT_BREAKER_THRESHOLD) {
+      logger.warn('Circuit breaker opened due to failures', {
+        failures: this.circuitBreaker.failures,
+      });
+      this.circuitBreaker.state = 'open';
+    }
+  }
+
+  /**
+   * Generate cache key for embedding
+   */
+  private getCacheKey(text: string): string {
+    return crypto
+      .createHash('sha256')
+      .update(`${text}:${this.EMBEDDING_MODEL}`)
+      .digest('hex');
+  }
+
+  /**
    * Generate embedding for text using company-specific API key
+   * With caching and circuit breaker
    */
   async generateEmbedding(text: string, companyId: string): Promise<number[]> {
     const truncated = text.slice(0, this.MAX_TEXT_LENGTH);
-    const openai = await this.getOpenAIClient(companyId);
 
-    const response = await openai.embeddings.create({
-      model: this.EMBEDDING_MODEL,
-      input: truncated,
-      encoding_format: 'float',
-    });
+    // Check cache first
+    const cacheKey = this.getCacheKey(truncated);
+    const cached = this.embeddingCache.get(cacheKey);
 
-    return response.data[0].embedding;
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      logger.debug('Embedding cache hit', { cacheKey: cacheKey.substring(0, 8) });
+      return cached.embedding;
+    }
+
+    // Check circuit breaker
+    this.checkCircuitBreaker();
+
+    try {
+      const openai = await this.getOpenAIClient(companyId);
+
+      const response = await openai.embeddings.create({
+        model: this.EMBEDDING_MODEL,
+        input: truncated,
+        encoding_format: 'float',
+      });
+
+      const embedding = response.data[0].embedding;
+
+      // Cache the result
+      this.embeddingCache.set(cacheKey, {
+        embedding,
+        timestamp: Date.now(),
+      });
+
+      // Clean up old cache entries periodically (every 100 embeddings)
+      if (this.embeddingCache.size > 1000) {
+        this.cleanupCache();
+      }
+
+      this.recordSuccess();
+      return embedding;
+    } catch (error: any) {
+      this.recordFailure();
+      logger.error('Embedding generation failed', {
+        error: error.message,
+        circuitState: this.circuitBreaker.state,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Clean up old cache entries
+   */
+  private cleanupCache(): void {
+    const now = Date.now();
+    let removed = 0;
+
+    for (const [key, value] of this.embeddingCache.entries()) {
+      if (now - value.timestamp > this.CACHE_TTL) {
+        this.embeddingCache.delete(key);
+        removed++;
+      }
+    }
+
+    if (removed > 0) {
+      logger.debug('Cleaned up embedding cache', { removed, remaining: this.embeddingCache.size });
+    }
   }
 
   /**
@@ -188,6 +338,246 @@ class VectorSearchService {
         },
       };
     });
+  }
+
+  /**
+   * Multi-scope vector search with parallel execution
+   */
+  async searchMultiScope(
+    query: string,
+    options: MultiScopeSearchOptions,
+  ): Promise<VectorSearchResult[]> {
+    const {
+      scopes = ['company', 'agent', 'team'],
+      agentIds,
+      teamIds,
+      limit = 20,
+      minScore = 0.7,
+      companyId,
+      userId,
+    } = options;
+
+    // Generate embedding once (reuse across all scope searches)
+    const queryEmbedding = await this.generateEmbedding(query, companyId);
+
+    // Build scope configurations
+    const scopeSearches: Promise<VectorSearchResult[]>[] = [];
+
+    // Company scope
+    if (scopes.includes('company')) {
+      scopeSearches.push(
+        this.executeVectorSearch(queryEmbedding, {
+          scope: 'company',
+          scopeId: companyId,
+          limit: limit * 2, // Request more to account for deduplication
+          minScore,
+        }),
+      );
+    }
+
+    // Agent scope
+    if (scopes.includes('agent') && agentIds) {
+      const resolvedAgentIds = await this.resolveAgentIds(agentIds, companyId);
+      for (const agentId of resolvedAgentIds) {
+        scopeSearches.push(
+          this.executeVectorSearch(queryEmbedding, {
+            scope: 'agent',
+            scopeId: agentId,
+            limit: limit * 2,
+            minScore,
+          }),
+        );
+      }
+    }
+
+    // Team scope
+    if (scopes.includes('team') && teamIds && userId) {
+      const resolvedTeamIds = await this.resolveTeamIds(teamIds, companyId, userId);
+      for (const teamId of resolvedTeamIds) {
+        scopeSearches.push(
+          this.executeVectorSearch(queryEmbedding, {
+            scope: 'team',
+            scopeId: teamId,
+            limit: limit * 2,
+            minScore,
+          }),
+        );
+      }
+    }
+
+    // Execute all searches in parallel
+    const allResults = await Promise.all(scopeSearches);
+
+    // Flatten and deduplicate by path (keep highest score)
+    const deduplicatedResults = this.deduplicateResults(allResults.flat(), limit);
+
+    logger.info('Multi-scope search completed', {
+      query,
+      scopes: scopes.join(','),
+      scopeCount: scopeSearches.length,
+      totalResults: deduplicatedResults.length,
+    });
+
+    return deduplicatedResults;
+  }
+
+  /**
+   * Execute vector search with pre-generated embedding
+   * (Used internally for multi-scope search to avoid regenerating embeddings)
+   */
+  private async executeVectorSearch(
+    queryEmbedding: number[],
+    options: {
+      scope: string;
+      scopeId: string;
+      limit: number;
+      minScore: number;
+    },
+  ): Promise<VectorSearchResult[]> {
+    const { scope, scopeId, limit, minScore } = options;
+
+    const pipeline: any[] = [
+      {
+        $vectorSearch: {
+          index: 'workspace_vector_index',
+          path: 'embedding',
+          queryVector: queryEmbedding,
+          numCandidates: limit * 10,
+          limit: limit * 2,
+        },
+      },
+      {
+        $addFields: {
+          score: { $meta: 'vectorSearchScore' },
+        },
+      },
+      {
+        $match: {
+          score: { $gte: minScore },
+          key: { $regex: new RegExp(`^unified-workspace:/${scope}/${scopeId}/`) },
+          $or: [
+            { expiresAt: { $exists: false } },
+            { expiresAt: null },
+            { expiresAt: { $gt: new Date() } },
+          ],
+        },
+      },
+      { $limit: limit },
+      {
+        $project: {
+          key: 1,
+          score: 1,
+          value: 1,
+        },
+      },
+    ];
+
+    try {
+      const results = await mongoose.connection.db
+        .collection('keyv')
+        .aggregate(pipeline)
+        .toArray();
+
+      return results.map((doc) => {
+        const value = typeof doc.value === 'string' ? JSON.parse(doc.value) : doc.value;
+
+        return {
+          path: this.stripScopePrefix(doc.key),
+          score: doc.score,
+          scope: this.extractScope(doc.key),
+          scopeId: this.extractScopeId(doc.key),
+          metadata: {
+            contentType: value.value.metadata.contentType,
+            size: value.value.metadata.size,
+            createdAt: value.value.metadata.createdAt,
+          },
+        };
+      });
+    } catch (error: any) {
+      logger.error('Vector search failed for scope', {
+        scope,
+        scopeId,
+        error: error.message,
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Deduplicate results by path, keeping highest score
+   */
+  private deduplicateResults(
+    results: VectorSearchResult[],
+    limit: number,
+  ): VectorSearchResult[] {
+    const seen = new Map<string, VectorSearchResult>();
+
+    for (const result of results) {
+      const existing = seen.get(result.path);
+
+      if (!existing || result.score > existing.score) {
+        seen.set(result.path, result);
+      }
+    }
+
+    return Array.from(seen.values())
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+  }
+
+  /**
+   * Resolve agent IDs (supports 'all' or specific IDs)
+   */
+  private async resolveAgentIds(
+    agentIds: string[] | 'all',
+    companyId: string,
+  ): Promise<string[]> {
+    if (agentIds === 'all') {
+      const Assistant = mongoose.connection.db.collection('assistants');
+      const agents = await Assistant.find({
+        companyId: new mongoose.Types.ObjectId(companyId),
+      })
+        .project({ _id: 1 })
+        .toArray();
+
+      return agents.map((a) => a._id.toString());
+    }
+
+    return agentIds;
+  }
+
+  /**
+   * Resolve team IDs (supports 'all' or specific IDs)
+   * Filters to only teams the user is a member of
+   */
+  private async resolveTeamIds(
+    teamIds: string[] | 'all',
+    companyId: string,
+    userId: string,
+  ): Promise<string[]> {
+    const Team = mongoose.connection.db.collection('teams');
+
+    if (teamIds === 'all') {
+      const teams = await Team.find({
+        companyId: new mongoose.Types.ObjectId(companyId),
+        members: { $elemMatch: { userId: new mongoose.Types.ObjectId(userId) } },
+      })
+        .project({ _id: 1 })
+        .toArray();
+
+      return teams.map((t) => t._id.toString());
+    }
+
+    // Verify user has access to specified teams
+    const teams = await Team.find({
+      _id: { $in: teamIds.map((id) => new mongoose.Types.ObjectId(id)) },
+      companyId: new mongoose.Types.ObjectId(companyId),
+      members: { $elemMatch: { userId: new mongoose.Types.ObjectId(userId) } },
+    })
+      .project({ _id: 1 })
+      .toArray();
+
+    return teams.map((t) => t._id.toString());
   }
 
   /**

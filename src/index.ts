@@ -71,6 +71,7 @@ import { errorHandler } from './middleware/errorHandler.middleware';
 // Removed redundant file/content route imports - using unified workspace and file manager only
 import integrationRouter from './routes/integration.routes';
 import { teamRouter } from './routes/team.routes';
+import { workspaceRouter } from './routes/workspace.routes';
 import memoryRouter from './routes/memory.routes'; // Added import for memory router
 import apiKeyRouter from './routes/apiKey.routes';
 import { costTrackingRouter } from './routes/cost-tracking.routes';
@@ -81,6 +82,7 @@ import unifiedWorkspaceRouter from './routes/unified-workspace.routes';
 import mcpRouter from './routes/mcp.routes';
 import oauthMcpRouter from './routes/oauth-mcp.routes';
 import uiStateRouter from './routes/ui-state.routes';
+import { inviteRouter } from './routes/invite.routes';
 
 // Read package.json at startup
 let packageJson: { version: string; name: string };
@@ -186,6 +188,12 @@ app.use(
   verifyAccess(),
   uiStateRouter,
 ); // UI State tracking (before generic /api)
+app.use(
+  '/api/invites',
+  verifyTokenMiddleware,
+  verifyAccess(),
+  inviteRouter,
+); // User invite system
 // MCP Server - custom auth that allows initialize, tools/list, and notifications without auth
 app.use(
   '/api/mcp',
@@ -228,6 +236,7 @@ app.use(
   integrationRouter,
 );
 app.use('/teams', verifyTokenMiddleware, verifyAccess(), teamRouter);
+app.use('/workspace', workspaceRouter); // Public access for workspace file serving (team avatars, etc.)
 app.use('/memory', verifyTokenMiddleware, verifyAccess(), memoryRouter); // Added memory router
 app.use('/api', verifyTokenMiddleware, verifyAccess(), promptHistoryRouter); // Prompt history
 
