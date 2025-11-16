@@ -60,21 +60,31 @@ userRouter.post(
   },
 );
 
-// Update a user (admin only)
+// Update a user (same company or admin)
 userRouter.put(
   '/:id',
-  verifyAccess(true),
+  verifyAccess(),
   async (req: AuthenticatedRequest, res) => {
     const { id } = req.params;
     const userData = req.body;
 
     try {
+      const user = await User.findById(id);
+      if (!user) {
+        return res.status(404).send({ message: 'User not found' });
+      }
+
+      // Check if user is from the same company or requester is admin
+      if (
+        req.user?.role !== 'Admin' &&
+        user.companyId.toString() !== req.user?.companyId.toString()
+      ) {
+        return res.status(403).send({ message: 'Access denied: Cannot update users from other companies' });
+      }
+
       const updatedUser = await User.findByIdAndUpdate(id, userData, {
         new: true,
       });
-      if (!updatedUser) {
-        return res.status(404).send({ message: 'User not found' });
-      }
       res.send(updatedUser);
     } catch (error) {
       res.status(500).send({ message: `Error updating user: ${error}` });
@@ -82,10 +92,10 @@ userRouter.put(
   },
 );
 
-// Delete a user (admin only)
+// Delete a user (same company or admin)
 userRouter.delete(
   '/:id',
-  verifyAccess(true),
+  verifyAccess(),
   async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
@@ -93,6 +103,15 @@ userRouter.delete(
       if (!user) {
         return res.status(404).send({ message: 'User not found' });
       }
+
+      // Check if user is from the same company or requester is admin
+      if (
+        req.user?.role !== 'Admin' &&
+        user.companyId.toString() !== req.user?.companyId.toString()
+      ) {
+        return res.status(403).send({ message: 'Access denied: Cannot delete users from other companies' });
+      }
+
       await User.findByIdAndDelete(id);
       res.send({ message: 'User deleted successfully' });
     } catch (error) {

@@ -1,0 +1,44 @@
+{
+  "id": "sys-team-avatar-generator",
+  "name": "Team Avatar Generator",
+  "description": "Generates professional team avatars using DALL-E based on team name and purpose",
+  "version": "1.0.0",
+  "type": "image-generation",
+  "provider": "openai",
+  "model": "dall-e-3",
+  "config": {
+    "model": "dall-e-3",
+    "size": "1024x1024",
+    "quality": "standard",
+    "n": 1,
+    "response_format": "url"
+  },
+  "parameters": {
+    "teamName": {
+      "type": "string",
+      "required": true,
+      "description": "Name of the team"
+    },
+    "teamPurpose": {
+      "type": "string",
+      "required": true,
+      "description": "What the team focuses on or does"
+    },
+    "styleIndex": {
+      "type": "number",
+      "required": false,
+      "description": "Style variation index (0-8) for diverse avatar generation",
+      "default": 0
+    }
+  },
+  "metadata": {
+    "createdAt": "2025-01-30",
+    "category": "system",
+    "tags": ["image-generation", "team", "avatar", "dall-e"],
+    "cost": {
+      "perRequest": 0.04,
+      "currency": "USD",
+      "model": "dall-e-3-1024"
+    }
+  }
+}

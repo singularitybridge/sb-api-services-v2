@@ -786,74 +786,73 @@ router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
 /**
  * @route POST /api/workspace/vector-search
  * @desc Semantic search across workspace using vector embeddings
+ * @body {
+ *   query: string,                           // Required: search query
+ *   scopes?: ['company', 'agent', 'team'],  // Optional: scopes to search (default: all)
+ *   agentIds?: string[] | 'all',            // Optional: specific agents or 'all'
+ *   teamIds?: string[] | 'all',             // Optional: specific teams or 'all'
+ *   limit?: number,                          // Optional: max results (default: 20)
+ *   minScore?: number                        // Optional: similarity threshold (default: 0.7)
+ * }
  */
 router.post(
   '/vector-search',
   async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { query, scopes, agentIds, limit = 10, minScore = 0.7 } = req.body;
+      const {
+        query,
+        scopes = ['company', 'agent', 'team'],
+        agentIds = 'all',
+        teamIds = 'all',
+        limit = 20,
+        minScore = 0.7,
+      } = req.body;
 
-      if (!query) {
+      if (!query || typeof query !== 'string') {
         return res.status(400).json({
           success: false,
-          message: 'Query is required',
+          message: 'Query string is required',
         });
       }
 
       const vectorSearch = getVectorSearchService();
-      const results: any[] = [];
       const companyId = req.company._id.toString();
+      const userId = req.user?._id?.toString();
 
-      // Search agent scopes
-      if (scopes?.includes('agent') && agentIds?.length) {
-        for (const agentId of agentIds) {
-          const agentResults = await vectorSearch.search(query, {
-            scope: 'agent',
-            scopeId: agentId,
-            limit,
-            minScore,
-            companyId, // Pass company ID for API key lookup
-          });
-          results.push(...agentResults);
-        }
-      }
-
-      // Search company scope (auto-scoped by auth)
-      if (scopes?.includes('company')) {
-        const companyResults = await vectorSearch.search(query, {
-          scope: 'company',
-          scopeId: companyId,
-          limit,
-          minScore,
-          companyId, // Pass company ID for API key lookup
-        });
-        results.push(...companyResults);
-      }
-
-      // Deduplicate and sort
-      const uniqueResults = new Map();
-      for (const r of results) {
-        const key = `${r.scope}/${r.scopeId}/${r.path}`;
-        if (!uniqueResults.has(key) || r.score > uniqueResults.get(key).score) {
-          uniqueResults.set(key, r);
-        }
-      }
-
-      const topResults = Array.from(uniqueResults.values())
-        .sort((a, b) => b.score - a.score)
-        .slice(0, limit);
+      // Use new multi-scope search method (with parallel execution)
+      const results = await vectorSearch.searchMultiScope(query, {
+        scopes,
+        agentIds,
+        teamIds,
+        limit,
+        minScore,
+        companyId,
+        userId,
+      });
 
       res.json({
         success: true,
         query,
-        results: topResults,
-        count: topResults.length,
+        results,
+        count: results.length,
+        scopes: scopes.join(','),
       });
     } catch (error: any) {
-      logger.error('Vector search failed', { error });
+      logger.error('Vector search failed', { error: error.message, stack: error.stack });
+
+      // Check for circuit breaker error
+      if (error.message?.includes('Circuit breaker is open')) {
+        return res.status(503).json({
+          success: false,
+          message: 'Search service temporarily unavailable. Please try again in a moment.',
+          error: 'CIRCUIT_BREAKER_OPEN',
+        });
+      }
+
       res.status(500).json({
         success: false,
         message: 'Vector search failed',
+        error: error.message,
       });
     }
   },
