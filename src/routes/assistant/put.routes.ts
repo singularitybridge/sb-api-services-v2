@@ -74,7 +74,7 @@ router.put(
           .send({ message: 'Assistant not found or access denied' });
       }
 
-      if (allowedActions) {
+      if (allowedActions !== undefined) {
         await updateAllowedActions(
           currentAssistant._id.toString(),
           allowedActions,
