@@ -495,8 +495,8 @@ export const fetchJiraTickets = async (
         };
       }
 
-      // Use enhanced search endpoint (/rest/api/3/search/jql) instead of deprecated /rest/api/3/search
-      const response = await jiraClient.issueSearch.searchForIssuesUsingJqlEnhancedSearch({
+      // Use POST search endpoint instead of deprecated GET /rest/api/3/search
+      const response = await jiraClient.issueSearch.searchForIssuesUsingJqlPost({
         jql: params.jql,
         fields: fieldsToRequest,
         startAt,
