@@ -1,0 +1,20 @@
+{
+  "serviceName": "UI State",
+  "serviceDescription": "Query real-time UI state from the Agent Hub web interface",
+  "getUIState": {
+    "actionTitle": "Get UI State",
+    "description": "Get current UI state including route, open documents, and context for a session"
+  },
+  "getActiveWorkspaceDocument": {
+    "actionTitle": "Get Active Workspace Document",
+    "description": "Get the content of the currently open workspace document"
+  },
+  "getCurrentPageContext": {
+    "actionTitle": "Get Current Page Context",
+    "description": "Get current page context including route, UI state, and available actions"
+  },
+  "getUIStateStats": {
+    "actionTitle": "Get UI State Statistics",
+    "description": "Get statistics about tracked UI sessions (active users, sessions, etc.)"
+  }
+}

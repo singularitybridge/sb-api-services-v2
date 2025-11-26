@@ -1,0 +1,16 @@
+{
+  "serviceName": "UI Control",
+  "serviceDescription": "Control Agent Hub UI via bidirectional WebSocket commands",
+  "navigateToPage": {
+    "actionTitle": "Navigate to Page",
+    "description": "Navigate the user to a specific page or route in the UI"
+  },
+  "openWorkspaceFile": {
+    "actionTitle": "Open Workspace File",
+    "description": "Open a specific file in the workspace view"
+  },
+  "showNotification": {
+    "actionTitle": "Show Notification",
+    "description": "Display a notification message to the user in the UI"
+  }
+}

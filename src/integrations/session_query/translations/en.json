@@ -1,0 +1,20 @@
+{
+  "serviceName": "Session Query",
+  "serviceDescription": "Query session messages, state, and context for testing and debugging",
+  "getSessionMessages": {
+    "actionTitle": "Get Session Messages",
+    "description": "Retrieve messages from a session with optional filtering and pagination"
+  },
+  "getSessionState": {
+    "actionTitle": "Get Session State",
+    "description": "Get session state, metadata, and configuration"
+  },
+  "getSessionContext": {
+    "actionTitle": "Get Session Context",
+    "description": "Get full session context including assistant details, user info, and workspace state"
+  },
+  "getLastMessagesWithActions": {
+    "actionTitle": "Get Last Messages With Actions",
+    "description": "Get the last N messages with detailed action execution information"
+  }
+}

@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "tsx src/index.ts",
-    "build": "NODE_OPTIONS='--max-old-space-size=2048' tsc",
+    "build": "NODE_OPTIONS='--max-old-space-size=2048' tsc && node scripts/copy-integration-assets.js",
     "build:transpile": "node build-transpile.js",
     "build:check": "NODE_OPTIONS='--max-old-space-size=4096' tsc --noEmit",
     "build:mcp": "tsc -p tsconfig.mcp.json",
