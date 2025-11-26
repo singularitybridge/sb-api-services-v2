@@ -56,10 +56,13 @@ const processIntegrationFolder = async (
 
     if (!config) return {};
 
-    const actionFilePath = join(
+    let actionFilePath = join(
       integrationPath,
       (config.actionsFile as string) || `${folder}.actions.ts`,
     );
+    // Convert .ts to .js for runtime (compiled code)
+    actionFilePath = actionFilePath.replace(/\.ts$/, '.js');
+
     const actionObj = await loadActionModule(actionFilePath, config, context);
     const integrationName = (config.name as string) || folder;
 

@@ -56,10 +56,13 @@ export const discoveryService = {
         continue;
       }
 
-      const actionFilePath = join(
+      let actionFilePath = join(
         integrationPath,
         config.actionsFile || `${folder}.actions.ts`,
       );
+
+      // Convert .ts to .js for runtime (compiled code)
+      actionFilePath = actionFilePath.replace(/\.ts$/, '.js');
 
       if (!existsSync(actionFilePath)) {
         console.log(`Action file not found for ${folder}. Skipping.`);
