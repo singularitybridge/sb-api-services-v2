@@ -13,24 +13,48 @@ export type ApiKeyType =
   | 'perplexity_api_key'
   | 'sendgrid_api_key'
   | 'photoroom_api_key'
+  | 'telegram_bot_api_key'
   | 'linear_api_key'
   | 'replicate_api_key'
   | 'executor_agent_url'
   | 'executor_agent_token'
+  // Jira
   | 'jira_api_token'
   | 'jira_domain'
   | 'jira_email'
+  | 'jira_project_key' // Added for WhatsApp-Jira bridge
+  // Twilio
+  | 'twilio_account_sid' // Added for Twilio integration
+  | 'twilio_auth_token' // Added for Twilio integration
+  | 'twilio_phone_number' // Added for Twilio integration
+  // Gmail
+  | 'google_client_id'
+  | 'google_client_secret'
+  | 'google_refresh_token'
+  // IMAP
+  | 'imap_email'
+  | 'imap_password'
+  | 'imap_host'
+  | 'imap_port'
+  | 'imap_tls'
+  // AI Context Service
   | 'ai_context_service_base_url'
   | 'ai_context_service_auth_token'
+  // Fly.io
   | 'FLY_API_TOKEN'
+  // Terminal Turtle
   | 'TERMINAL_TURTLE_API_KEY'
   | 'TERMINAL_TURTLE_URL'
+  // AWS
   | 'aws_access_key_id'
   | 'aws_secret_access_key'
   | 'aws_bedrock_kb_id'
   | 'aws_region'
+  // Nylas
   | 'nylas_api_key'
-  | 'nylas_grant_id';
+  | 'nylas_grant_id'
+  // JSONbin
+  | 'jsonbin_api_key';
 
 // Initialize cache with a 15-minute TTL (time to live)
 const apiKeyCache = new NodeCache({ stdTTL: 900 });
@@ -58,11 +82,25 @@ export const getApiKey = async (
     return null;
   }
 
-  const decryptedKey = decryptData({
-    value: apiKey.value,
-    iv: apiKey.iv,
-    tag: apiKey.tag,
-  });
+  let decryptedKey: string;
+  try {
+    decryptedKey = decryptData({
+      value: apiKey.value,
+      iv: apiKey.iv,
+      tag: apiKey.tag,
+    });
+  } catch (decryptError) {
+    // Try to fallback to environment variable
+    const envKeyName = keyType.toUpperCase().replace(/_API_KEY$/, '_API_KEY');
+    const envKey = process.env[envKeyName];
+    if (envKey) {
+      console.warn(`⚠️  [API KEY SERVICE] Could not decrypt API key '${keyType}' for company ${companyId}. Using environment variable ${envKeyName}.`);
+      apiKeyCache.set(cacheKey, envKey);
+      return envKey;
+    }
+    console.warn(`⚠️  [API KEY SERVICE] Could not decrypt API key '${keyType}' for company ${companyId} and no environment variable found. Using null.`);
+    return null;
+  }
 
   // Store in cache
   apiKeyCache.set(cacheKey, decryptedKey);
@@ -115,12 +153,24 @@ export const refreshApiKeyCache = async (companyId: string): Promise<void> => {
 
   for (const apiKey of company.api_keys) {
     const keyType = apiKey.key as ApiKeyType;
-    const decryptedKey = decryptData({
-      value: apiKey.value,
-      iv: apiKey.iv,
-      tag: apiKey.tag,
-    });
-    updateApiKeyCache(companyId, keyType, decryptedKey);
+    try {
+      const decryptedKey = decryptData({
+        value: apiKey.value,
+        iv: apiKey.iv,
+        tag: apiKey.tag,
+      });
+      updateApiKeyCache(companyId, keyType, decryptedKey);
+    } catch (decryptError) {
+      // Try to fallback to environment variable
+      const envKeyName = keyType.toUpperCase().replace(/_API_KEY$/, '_API_KEY');
+      const envKey = process.env[envKeyName];
+      if (envKey) {
+        console.warn(`⚠️  [API KEY SERVICE] Could not decrypt API key '${keyType}' for company ${companyId} during cache refresh. Using environment variable ${envKeyName}.`);
+        updateApiKeyCache(companyId, keyType, envKey);
+      } else {
+        console.warn(`⚠️  [API KEY SERVICE] Could not decrypt API key '${keyType}' for company ${companyId} during cache refresh and no environment variable found. Skipping.`);
+      }
+    }
   }
 };
 
