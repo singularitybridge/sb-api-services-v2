@@ -10,6 +10,14 @@ import {
   getCalendarEvents as getCalendarEventsService,
   createCalendarEvent as createCalendarEventService,
   getGrants as getGrantsService,
+  // Advanced calendar management
+  getEventById as getEventByIdService,
+  updateCalendarEvent as updateCalendarEventService,
+  deleteCalendarEvent as deleteCalendarEventService,
+  getFreeBusy as getFreeBusyService,
+  findAvailableSlots as findAvailableSlotsService,
+  createMultipleEvents as createMultipleEventsService,
+  checkEventConflicts as checkEventConflictsService,
 } from './nylas.service';
 import { executeAction } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
@@ -418,6 +426,590 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
         async () => {
           const grants = await getGrantsService(context.companyId!);
           return { success: true, data: grants };
+        },
+        { serviceName: SERVICE_NAME },
+      );
+    },
+  },
+
+  // ==========================================
+  // ADVANCED CALENDAR MANAGEMENT ACTIONS
+  // ==========================================
+
+  // Get specific event by ID
+  nylasGetEvent: {
+    description: 'Retrieve a specific calendar event by its ID with full details.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        eventId: {
+          type: 'string',
+          description: 'The ID of the calendar event to retrieve',
+        },
+      },
+      required: ['eventId'],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      eventId: string;
+    }): Promise<StandardActionResult<EventData>> => {
+      const { eventId } = args;
+
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      if (!eventId || typeof eventId !== 'string') {
+        throw new ActionValidationError('eventId is required');
+      }
+
+      return executeAction<EventData, ServiceCallLambdaResponse<EventData>>(
+        'nylasGetEvent',
+        async () => {
+          const event = await getEventByIdService(context.companyId!, eventId);
+          return {
+            success: true,
+            data: {
+              id: event.id,
+              title: event.title,
+              description: event.description,
+              location: event.location,
+              startTime: event.when.start_time,
+              endTime: event.when.end_time,
+              participants: event.participants,
+            },
+          };
+        },
+        { serviceName: SERVICE_NAME },
+      );
+    },
+  },
+
+  // Update existing event
+  nylasUpdateEvent: {
+    description: 'Update an existing calendar event (move, reschedule, or modify details).',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        eventId: {
+          type: 'string',
+          description: 'The ID of the event to update',
+        },
+        title: {
+          type: 'string',
+          description: 'New title for the event (optional)',
+        },
+        description: {
+          type: 'string',
+          description: 'New description (optional)',
+        },
+        location: {
+          type: 'string',
+          description: 'New location (optional)',
+        },
+        startTime: {
+          type: 'string',
+          description: 'New start time in ISO 8601 format (optional)',
+        },
+        endTime: {
+          type: 'string',
+          description: 'New end time in ISO 8601 format (optional)',
+        },
+        participants: {
+          type: 'string',
+          description: 'Comma-separated emails of new participants (optional)',
+        },
+      },
+      required: ['eventId'],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      eventId: string;
+      title?: string;
+      description?: string;
+      location?: string;
+      startTime?: string;
+      endTime?: string;
+      participants?: string;
+    }): Promise<StandardActionResult<EventData>> => {
+      const { eventId, title, description, location, startTime, endTime, participants } = args;
+
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      if (!eventId) {
+        throw new ActionValidationError('eventId is required');
+      }
+
+      return executeAction<EventData, ServiceCallLambdaResponse<EventData>>(
+        'nylasUpdateEvent',
+        async () => {
+          const event = await updateCalendarEventService(context.companyId!, eventId, {
+            title,
+            description,
+            location,
+            startTime,
+            endTime,
+            participants: participants ? participants.split(',').map((e) => e.trim()) : undefined,
+          });
+          return {
+            success: true,
+            data: {
+              id: event.id,
+              title: event.title,
+              description: event.description,
+              location: event.location,
+              startTime: event.when.start_time,
+              endTime: event.when.end_time,
+              participants: event.participants,
+            },
+          };
+        },
+        { serviceName: SERVICE_NAME },
+      );
+    },
+  },
+
+  // Delete event
+  nylasDeleteEvent: {
+    description: 'Delete a calendar event permanently.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        eventId: {
+          type: 'string',
+          description: 'The ID of the event to delete',
+        },
+      },
+      required: ['eventId'],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      eventId: string;
+    }): Promise<StandardActionResult<{ deleted: boolean }>> => {
+      const { eventId } = args;
+
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      if (!eventId) {
+        throw new ActionValidationError('eventId is required');
+      }
+
+      return executeAction<{ deleted: boolean }, ServiceCallLambdaResponse<{ deleted: boolean }>>(
+        'nylasDeleteEvent',
+        async () => {
+          await deleteCalendarEventService(context.companyId!, eventId);
+          return { success: true, data: { deleted: true } };
+        },
+        { serviceName: SERVICE_NAME },
+      );
+    },
+  },
+
+  // Find available time slots
+  nylasFindAvailableSlots: {
+    description:
+      'Intelligently find available time slots for a meeting. Returns ranked slots based on optimal scheduling (morning priority, good spacing, mid-week preference).',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        durationMinutes: {
+          type: 'number',
+          description: 'Meeting duration in minutes',
+        },
+        dateRangeStart: {
+          type: 'string',
+          description: 'Start date for search in ISO 8601 format (e.g., "2024-01-15T00:00:00Z")',
+        },
+        dateRangeEnd: {
+          type: 'string',
+          description: 'End date for search in ISO 8601 format',
+        },
+        preferredTimeStart: {
+          type: 'string',
+          description: 'Preferred start time of day in HH:MM format (default: "09:00")',
+        },
+        preferredTimeEnd: {
+          type: 'string',
+          description: 'Preferred end time of day in HH:MM format (default: "17:00")',
+        },
+        participants: {
+          type: 'string',
+          description: 'Comma-separated email addresses to check availability (optional)',
+        },
+        bufferMinutes: {
+          type: 'number',
+          description: 'Buffer time between meetings in minutes (default: 15)',
+        },
+      },
+      required: ['durationMinutes', 'dateRangeStart', 'dateRangeEnd'],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      durationMinutes: number;
+      dateRangeStart: string;
+      dateRangeEnd: string;
+      preferredTimeStart?: string;
+      preferredTimeEnd?: string;
+      participants?: string;
+      bufferMinutes?: number;
+    }): Promise<StandardActionResult<any[]>> => {
+      const {
+        durationMinutes,
+        dateRangeStart,
+        dateRangeEnd,
+        preferredTimeStart,
+        preferredTimeEnd,
+        participants,
+        bufferMinutes,
+      } = args;
+
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      if (!durationMinutes || durationMinutes <= 0) {
+        throw new ActionValidationError('durationMinutes must be positive');
+      }
+
+      return executeAction<any[], ServiceCallLambdaResponse<any[]>>(
+        'nylasFindAvailableSlots',
+        async () => {
+          const startTimestamp = Math.floor(new Date(dateRangeStart).getTime() / 1000);
+          const endTimestamp = Math.floor(new Date(dateRangeEnd).getTime() / 1000);
+
+          const slots = await findAvailableSlotsService(context.companyId!, {
+            durationMinutes,
+            dateRangeStart: startTimestamp,
+            dateRangeEnd: endTimestamp,
+            preferredTimeStart,
+            preferredTimeEnd,
+            participants: participants ? participants.split(',').map((e) => e.trim()) : undefined,
+            bufferMinutes,
+          });
+
+          // Convert timestamps back to ISO strings for better readability
+          const formattedSlots = slots.map((slot) => ({
+            startTime: new Date(slot.start_time * 1000).toISOString(),
+            endTime: new Date(slot.end_time * 1000).toISOString(),
+            score: slot.score,
+            reason: slot.reason,
+          }));
+
+          return { success: true, data: formattedSlots };
+        },
+        { serviceName: SERVICE_NAME },
+      );
+    },
+  },
+
+  // Get free/busy information
+  nylasGetFreeBusy: {
+    description:
+      'Check availability for one or more participants during a specific time range. Returns busy/free time slots.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        emails: {
+          type: 'string',
+          description: 'Comma-separated email addresses to check',
+        },
+        startTime: {
+          type: 'string',
+          description: 'Start time in ISO 8601 format',
+        },
+        endTime: {
+          type: 'string',
+          description: 'End time in ISO 8601 format',
+        },
+      },
+      required: ['emails', 'startTime', 'endTime'],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      emails: string;
+      startTime: string;
+      endTime: string;
+    }): Promise<StandardActionResult<any[]>> => {
+      const { emails, startTime, endTime } = args;
+
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      if (!emails) {
+        throw new ActionValidationError('emails is required');
+      }
+
+      return executeAction<any[], ServiceCallLambdaResponse<any[]>>(
+        'nylasGetFreeBusy',
+        async () => {
+          const emailList = emails.split(',').map((e) => e.trim());
+          const startTimestamp = Math.floor(new Date(startTime).getTime() / 1000);
+          const endTimestamp = Math.floor(new Date(endTime).getTime() / 1000);
+
+          const freeBusyData = await getFreeBusyService(
+            context.companyId!,
+            emailList,
+            startTimestamp,
+            endTimestamp,
+          );
+
+          // Format for readability
+          const formatted = freeBusyData.map((data) => ({
+            email: data.email,
+            timeSlots: data.timeSlots.map((slot) => ({
+              startTime: new Date(slot.start_time * 1000).toISOString(),
+              endTime: new Date(slot.end_time * 1000).toISOString(),
+              status: slot.status,
+            })),
+          }));
+
+          return { success: true, data: formatted };
+        },
+        { serviceName: SERVICE_NAME },
+      );
+    },
+  },
+
+  // Check for conflicts
+  nylasCheckConflicts: {
+    description:
+      'Check if a proposed meeting time conflicts with existing events. Suggests alternative times if conflicts are found.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        startTime: {
+          type: 'string',
+          description: 'Proposed start time in ISO 8601 format',
+        },
+        endTime: {
+          type: 'string',
+          description: 'Proposed end time in ISO 8601 format',
+        },
+        participants: {
+          type: 'string',
+          description: 'Comma-separated participant emails to check (optional)',
+        },
+      },
+      required: ['startTime', 'endTime'],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      startTime: string;
+      endTime: string;
+      participants?: string;
+    }): Promise<StandardActionResult<any>> => {
+      const { startTime, endTime, participants } = args;
+
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      return executeAction<any, ServiceCallLambdaResponse<any>>(
+        'nylasCheckConflicts',
+        async () => {
+          const startTimestamp = Math.floor(new Date(startTime).getTime() / 1000);
+          const endTimestamp = Math.floor(new Date(endTime).getTime() / 1000);
+
+          const result = await checkEventConflictsService(
+            context.companyId!,
+            startTimestamp,
+            endTimestamp,
+            participants ? participants.split(',').map((e) => e.trim()) : undefined,
+          );
+
+          // Format response
+          const formatted = {
+            hasConflict: result.hasConflict,
+            conflicts: result.conflicts.map((event) => ({
+              id: event.id,
+              title: event.title,
+              startTime: new Date(event.when.start_time * 1000).toISOString(),
+              endTime: new Date(event.when.end_time * 1000).toISOString(),
+            })),
+            alternatives: result.alternativeSlots?.map((slot) => ({
+              startTime: new Date(slot.start_time * 1000).toISOString(),
+              endTime: new Date(slot.end_time * 1000).toISOString(),
+              score: slot.score,
+              reason: slot.reason,
+            })),
+          };
+
+          return { success: true, data: formatted };
+        },
+        { serviceName: SERVICE_NAME },
+      );
+    },
+  },
+
+  // Batch create events
+  nylasBatchCreateEvents: {
+    description:
+      'Create multiple calendar events in one operation. Useful for recurring meetings or batch scheduling.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        events: {
+          type: 'string',
+          description:
+            'JSON array of event objects. Each object should have: title, startTime, endTime, and optionally description, location, participants',
+        },
+      },
+      required: ['events'],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      events: string;
+    }): Promise<StandardActionResult<any>> => {
+      const { events } = args;
+
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      if (!events) {
+        throw new ActionValidationError('events is required');
+      }
+
+      return executeAction<any, ServiceCallLambdaResponse<any>>(
+        'nylasBatchCreateEvents',
+        async () => {
+          const eventList = JSON.parse(events);
+
+          if (!Array.isArray(eventList)) {
+            throw new Error('events must be a JSON array');
+          }
+
+          const result = await createMultipleEventsService(context.companyId!, eventList);
+
+          // Format response
+          const formatted = {
+            success: result.success,
+            created: result.created.map((event) => ({
+              id: event.id,
+              title: event.title,
+              startTime: new Date(event.when.start_time * 1000).toISOString(),
+              endTime: new Date(event.when.end_time * 1000).toISOString(),
+            })),
+            failed: result.failed,
+            summary: `Created ${result.created.length}/${eventList.length} events. ${result.failed.length} failed.`,
+          };
+
+          return { success: true, data: formatted };
+        },
+        { serviceName: SERVICE_NAME },
+      );
+    },
+  },
+
+  // Move event (convenience wrapper)
+  nylasMoveEvent: {
+    description:
+      'Move a calendar event to a new time. Optionally checks for conflicts before moving.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        eventId: {
+          type: 'string',
+          description: 'The ID of the event to move',
+        },
+        newStartTime: {
+          type: 'string',
+          description: 'New start time in ISO 8601 format',
+        },
+        newEndTime: {
+          type: 'string',
+          description: 'New end time in ISO 8601 format',
+        },
+        checkConflicts: {
+          type: 'boolean',
+          description: 'Whether to check for conflicts before moving (default: true)',
+        },
+      },
+      required: ['eventId', 'newStartTime', 'newEndTime'],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      eventId: string;
+      newStartTime: string;
+      newEndTime: string;
+      checkConflicts?: boolean;
+    }): Promise<StandardActionResult<any>> => {
+      const { eventId, newStartTime, newEndTime, checkConflicts = true } = args;
+
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      if (!eventId) {
+        throw new ActionValidationError('eventId is required');
+      }
+
+      return executeAction<any, ServiceCallLambdaResponse<any>>(
+        'nylasMoveEvent',
+        async () => {
+          // Check for conflicts if requested
+          if (checkConflicts) {
+            const startTimestamp = Math.floor(new Date(newStartTime).getTime() / 1000);
+            const endTimestamp = Math.floor(new Date(newEndTime).getTime() / 1000);
+
+            const conflictCheck = await checkEventConflictsService(
+              context.companyId!,
+              startTimestamp,
+              endTimestamp,
+            );
+
+            if (conflictCheck.hasConflict) {
+              const conflictDetails = {
+                hasConflict: true,
+                conflicts: conflictCheck.conflicts.map((event) => ({
+                  id: event.id,
+                  title: event.title,
+                  startTime: new Date(event.when.start_time * 1000).toISOString(),
+                  endTime: new Date(event.when.end_time * 1000).toISOString(),
+                })),
+                alternatives: conflictCheck.alternativeSlots?.map((slot) => ({
+                  startTime: new Date(slot.start_time * 1000).toISOString(),
+                  endTime: new Date(slot.end_time * 1000).toISOString(),
+                  score: slot.score,
+                  reason: slot.reason,
+                })),
+                message: 'The proposed time conflicts with existing events. See alternatives.',
+              };
+              return { success: true, data: conflictDetails };
+            }
+          }
+
+          // No conflicts or check disabled, proceed with move
+          const event = await updateCalendarEventService(context.companyId!, eventId, {
+            startTime: newStartTime,
+            endTime: newEndTime,
+          });
+
+          return {
+            success: true,
+            data: {
+              moved: true,
+              event: {
+                id: event.id,
+                title: event.title,
+                startTime: new Date(event.when.start_time * 1000).toISOString(),
+                endTime: new Date(event.when.end_time * 1000).toISOString(),
+              },
+            },
+          };
         },
         { serviceName: SERVICE_NAME },
       );
