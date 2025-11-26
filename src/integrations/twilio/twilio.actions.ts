@@ -38,10 +38,7 @@ export const createTwilioActions = (context: ActionContext): FunctionFactory => 
         const result = await sendSMS(context.companyId, args.to, args.message);
 
         if (!result.success) {
-          return {
-            success: false,
-            error: result.error || 'Failed to send SMS',
-          };
+          throw new Error(result.error || 'Failed to send SMS');
         }
 
         return {
@@ -53,10 +50,7 @@ export const createTwilioActions = (context: ActionContext): FunctionFactory => 
         };
       } catch (error: any) {
         console.error('sendSMS: Unexpected error', error);
-        return {
-          success: false,
-          error: error.message || 'An unexpected error occurred while sending SMS',
-        };
+        throw new Error(error.message || 'An unexpected error occurred while sending SMS');
       }
     },
   },
@@ -84,10 +78,7 @@ export const createTwilioActions = (context: ActionContext): FunctionFactory => 
         const result = await getSMSHistory(context.companyId, limit);
 
         if (!result.success) {
-          return {
-            success: false,
-            error: result.error || 'Failed to get SMS history',
-          };
+          throw new Error(result.error || 'Failed to get SMS history');
         }
 
         return {
@@ -100,10 +91,7 @@ export const createTwilioActions = (context: ActionContext): FunctionFactory => 
         };
       } catch (error: any) {
         console.error('getSMSHistory: Unexpected error', error);
-        return {
-          success: false,
-          error: error.message || 'An unexpected error occurred while retrieving SMS history',
-        };
+        throw new Error(error.message || 'An unexpected error occurred while retrieving SMS history');
       }
     },
   },
@@ -133,10 +121,7 @@ export const createTwilioActions = (context: ActionContext): FunctionFactory => 
         const result = await makeCall(context.companyId, args.to, args.twimlUrl);
 
         if (!result.success) {
-          return {
-            success: false,
-            error: result.error || 'Failed to make call',
-          };
+          throw new Error(result.error || 'Failed to make call');
         }
 
         return {
@@ -148,10 +133,7 @@ export const createTwilioActions = (context: ActionContext): FunctionFactory => 
         };
       } catch (error: any) {
         console.error('makeCall: Unexpected error', error);
-        return {
-          success: false,
-          error: error.message || 'An unexpected error occurred while making call',
-        };
+        throw new Error(error.message || 'An unexpected error occurred while making call');
       }
     },
   },
@@ -179,10 +161,7 @@ export const createTwilioActions = (context: ActionContext): FunctionFactory => 
         const result = await getCallLogs(context.companyId, limit);
 
         if (!result.success) {
-          return {
-            success: false,
-            error: result.error || 'Failed to get call logs',
-          };
+          throw new Error(result.error || 'Failed to get call logs');
         }
 
         return {
@@ -195,10 +174,7 @@ export const createTwilioActions = (context: ActionContext): FunctionFactory => 
         };
       } catch (error: any) {
         console.error('getCallLogs: Unexpected error', error);
-        return {
-          success: false,
-          error: error.message || 'An unexpected error occurred while retrieving call logs',
-        };
+        throw new Error(error.message || 'An unexpected error occurred while retrieving call logs');
       }
     },
   },
@@ -228,10 +204,7 @@ export const createTwilioActions = (context: ActionContext): FunctionFactory => 
         const result = await sendWhatsApp(context.companyId, args.to, args.message);
 
         if (!result.success) {
-          return {
-            success: false,
-            error: result.error || 'Failed to send WhatsApp message',
-          };
+          throw new Error(result.error || 'Failed to send WhatsApp message');
         }
 
         return {
@@ -243,10 +216,7 @@ export const createTwilioActions = (context: ActionContext): FunctionFactory => 
         };
       } catch (error: any) {
         console.error('sendWhatsApp: Unexpected error', error);
-        return {
-          success: false,
-          error: error.message || 'An unexpected error occurred while sending WhatsApp message',
-        };
+        throw new Error(error.message || 'An unexpected error occurred while sending WhatsApp message');
       }
     },
   },

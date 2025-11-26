@@ -4,7 +4,7 @@ import { Assistant, IAssistant } from "../../models/Assistant";
 import { IUser, User } from "../../models/User";
 import { ISession, Session } from "../../models/Session";
 // import { createNewThread, deleteThread } from "../../services/oai.thread.service"; // Removed, OpenAI specific
-import { ChannelType } from "../../types/ChannelType"; // Added import
+// import { ChannelType } from "../../types/ChannelType"; // Removed - not used
 import mongoose from 'mongoose'; // Added for ObjectId generation
 
 import { file } from "googleapis/build/src/apis/file";
@@ -140,9 +140,8 @@ twilioMessagingRouter.post("/whatsapp/reply", async (req, res) => {
   }
 
   // ===== TEXT MESSAGE HANDLING (Regular chat) =====
-  // TODO: Determine appropriate ChannelType for Twilio WhatsApp. Using WEB as placeholder.
-  // Consider ChannelType.TELEGRAM if WhatsApp is handled similarly, or add ChannelType.WHATSAPP.
-  const response = await handleSessionMessage(Body, session.id, ChannelType.WEB);
+  // Note: handleSessionMessage in agent-mcp branch only takes (message, sessionId)
+  const response = await handleSessionMessage(Body, session.id);
 
   if (typeof response === 'string') {
     const limitedResponse = response.substring(0, 1600); // Limit response to 1600 characters
