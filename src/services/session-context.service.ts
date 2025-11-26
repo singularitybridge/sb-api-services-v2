@@ -17,6 +17,8 @@ export interface SessionContextData {
     name: string;
     // Add other assistant properties as needed
   };
+  currentDate: string; // Current date in ISO format
+  currentDateFormatted: string; // Human-readable format
 }
 
 export const getSessionContextData = async (
@@ -42,6 +44,8 @@ export const getSessionContextData = async (
     throw new Error('Assistant not found');
   }
 
+  const now = new Date();
+
   return {
     user: {
       name: user.name,
@@ -56,5 +60,12 @@ export const getSessionContextData = async (
       name: assistant.name,
       // Add other assistant properties as needed
     },
+    currentDate: now.toISOString().split('T')[0], // YYYY-MM-DD format
+    currentDateFormatted: now.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    }), // e.g., "Tuesday, November 26, 2025"
   };
 };
