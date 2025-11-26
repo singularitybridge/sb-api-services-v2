@@ -24,6 +24,7 @@ export type ApiKeyType =
   | 'jira_email'
   | 'jira_project_key' // Added for WhatsApp-Jira bridge
   // Twilio
+  | 'twilio_api_key'
   | 'twilio_account_sid' // Added for Twilio integration
   | 'twilio_auth_token' // Added for Twilio integration
   | 'twilio_phone_number' // Added for Twilio integration
@@ -37,6 +38,8 @@ export type ApiKeyType =
   | 'imap_host'
   | 'imap_port'
   | 'imap_tls'
+  // JSONbin
+  | 'jsonbin_api_key'
   // AI Context Service
   | 'ai_context_service_base_url'
   | 'ai_context_service_auth_token'
