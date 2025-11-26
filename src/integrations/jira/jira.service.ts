@@ -484,8 +484,8 @@ export const fetchJiraTickets = async (
       }
     }
 
-    let startAt = 0;
     let allSimplifiedTickets: any[] = [];
+    let nextPageToken: string | undefined = undefined;
 
     while (true) {
       if (!params.jql) {
@@ -495,11 +495,11 @@ export const fetchJiraTickets = async (
         };
       }
 
-      // Use enhanced search endpoint (/rest/api/3/search/jql) instead of deprecated /rest/api/3/search
+      // Use enhanced search endpoint (/rest/api/3/search/jql) - the only non-deprecated search endpoint
       const response = await jiraClient.issueSearch.searchForIssuesUsingJqlEnhancedSearch({
         jql: params.jql,
         fields: fieldsToRequest,
-        startAt,
+        nextPageToken,
         maxResults,
       });
 
@@ -587,8 +587,8 @@ export const fetchJiraTickets = async (
       });
 
       allSimplifiedTickets = allSimplifiedTickets.concat(simplifiedIssues);
-      startAt += maxResults;
 
+      // Check if we've reached the user's requested limit
       if (
         params.maxResults &&
         allSimplifiedTickets.length >= params.maxResults
@@ -596,6 +596,12 @@ export const fetchJiraTickets = async (
         allSimplifiedTickets = allSimplifiedTickets.slice(0, params.maxResults);
         break;
       }
+
+      // Enhanced search uses nextPageToken for pagination
+      if (!response.nextPageToken) {
+        break; // No more pages
+      }
+      nextPageToken = response.nextPageToken;
     }
 
     return { success: true, data: allSimplifiedTickets };
