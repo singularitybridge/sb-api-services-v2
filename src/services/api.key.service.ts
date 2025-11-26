@@ -28,7 +28,9 @@ export type ApiKeyType =
   | 'aws_access_key_id'
   | 'aws_secret_access_key'
   | 'aws_bedrock_kb_id'
-  | 'aws_region';
+  | 'aws_region'
+  | 'nylas_api_key'
+  | 'nylas_grant_id';
 
 // Initialize cache with a 15-minute TTL (time to live)
 const apiKeyCache = new NodeCache({ stdTTL: 900 });
