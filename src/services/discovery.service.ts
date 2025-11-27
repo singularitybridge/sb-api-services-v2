@@ -61,12 +61,14 @@ export const discoveryService = {
         config.actionsFile || `${folder}.actions.ts`,
       );
 
-      // Convert .ts to .js for runtime (compiled code)
-      actionFilePath = actionFilePath.replace(/\.ts$/, '.js');
-
+      // Check both .ts (source) and .js (compiled) versions
       if (!existsSync(actionFilePath)) {
-        console.log(`Action file not found for ${folder}. Skipping.`);
-        continue;
+        // Try .js version (compiled code)
+        actionFilePath = actionFilePath.replace(/\.ts$/, '.js');
+        if (!existsSync(actionFilePath)) {
+          console.log(`Action file not found for ${folder}. Skipping.`);
+          continue;
+        }
       }
 
       let actionObj;

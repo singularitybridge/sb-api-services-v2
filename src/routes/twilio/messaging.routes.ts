@@ -28,147 +28,206 @@ twilioMessagingRouter.get("/whatsapp", (req, res) => {
 });
 
 twilioMessagingRouter.post("/whatsapp/reply", async (req, res) => {
-  const {
-    CallSid,
-    CallStatus, // ringing/in-progress/completed
-    From, // +972526722216
-    To, // +97293762075
-    SpeechResult,
-    Confidence,
-    Body,
-  } = req.body;
+  // Debug: log raw request body
+  console.log('🔍 [Twilio WhatsApp] Raw request body:', JSON.stringify(req.body, null, 2));
 
-  const assistant = await Assistant.findOne({ "identifiers.value": To });
-  const user = await User.findOne({ "identifiers.value": From });
-  const apiKey = req.headers['openai-api-key'] as string;
+  // Extract and clean phone numbers from Twilio format
+  const From = req.body.From?.trim() || ''; // whatsapp:+972544429301
+  const To = req.body.To?.trim() || ''; // whatsapp:+14155238886
+  const Body = req.body.Body || '';
 
-  if (!assistant || !user) {
-    console.log(`Voice Call >> Assistant not found for To: ${To}`);
-    return res.status(500).send();
-  }
+  console.log(`📲 [Twilio WhatsApp Webhook] Incoming message from ${From}`);
+  console.log(`   To: ${To}`);
+  console.log(`   Message: "${Body}"`);
 
-  let session = await Session.findOne({
-    userId: user._id,
-    assistantId: assistant.assistantId,
-    active: true,
-  });
+  try {
+    // Extract phone number without whatsapp: prefix for user lookup
+    // Handle both "whatsapp:+123" and "whatsapp: +123" (with space)
+    const fromPhone = From.replace(/whatsapp:\s*/i, '').trim();
 
-  if (!session) {
-    const threadId = new mongoose.Types.ObjectId().toString(); // Generate local threadId
+    // Find or create user by phone number
+    let user = await User.findOne({ "identifiers.value": fromPhone });
 
-    session = new Session({
-      threadId: threadId, // Use locally generated threadId
+    if (!user) {
+      try {
+        // Create new user for this WhatsApp number
+        const companyId = new mongoose.Types.ObjectId('690b1940455d30f7a1c1002b'); // Aid Genomics
+        user = new User({
+          companyId: companyId,
+          name: req.body.ProfileName || fromPhone,
+          email: `whatsapp_${fromPhone.replace(/[^0-9]/g, '')}@temp.local`,
+          identifiers: [
+            {
+              type: 'phone',
+              value: fromPhone
+            }
+          ]
+        });
+        await user.save();
+        console.log(`📝 [Twilio WhatsApp] Created new user: ${user.name} (${fromPhone})`);
+      } catch (createError: any) {
+        // Handle duplicate key error - user might have been created by identifier but not found by phone
+        if (createError.code === 11000) {
+          console.log(`📝 [Twilio WhatsApp] User already exists, fetching: ${fromPhone}`);
+          user = await User.findOne({
+            email: `whatsapp_${fromPhone.replace(/[^0-9]/g, '')}@temp.local`
+          });
+          if (!user) {
+            throw new Error('User creation failed and could not find existing user');
+          }
+        } else {
+          throw createError;
+        }
+      }
+    }
+
+    // Find Administration Orchestrator
+    const assistant = await Assistant.findOne({
+      name: 'Administration Orchestrator',
+      companyId: user.companyId
+    });
+
+    if (!assistant) {
+      console.error('❌ [Twilio WhatsApp] Administration Orchestrator not found');
+      await twilioClient.messages.create({
+        body: '⚠️ System configuration error. Please contact support.',
+        from: To,
+        to: From
+      });
+      return res.status(200).send();
+    }
+
+    // Find or create session
+    let session = await Session.findOne({
       userId: user._id,
-      assistantId: assistant.assistantId,
+      assistantId: assistant._id,
       active: true,
     });
-    await session.save();
-    console.log(
-      `Voice Call >> Created new session for assistant: ${assistant.name}, user: ${user.name}, threadId: ${threadId}`
-    );
-  }
 
-  // print received message
-  console.log(req.body);
+    if (!session) {
+      const threadId = new mongoose.Types.ObjectId().toString();
+      session = new Session({
+        threadId: threadId,
+        userId: user._id,
+        assistantId: assistant._id,
+        companyId: user.companyId, // ← Add companyId!
+        active: true,
+      });
+      await session.save();
+      console.log(`📝 [Twilio WhatsApp] Created session for ${assistant.name}`);
+    }
 
-  // ===== AUDIO MESSAGE HANDLING (WhatsApp-Jira Bridge) =====
-  if (hasAudioMedia(req.body)) {
-    console.log(`🎤 [Twilio WhatsApp] Audio message detected!`);
+    // print received message
+    console.log(`🔄 [Twilio WhatsApp] Routing to ${assistant.name}`);
 
-    try {
-      const audioUrls = getAudioMediaUrls(req.body);
-      console.log(`📎 [Twilio WhatsApp] Found ${audioUrls.length} audio file(s)`);
+    // ===== AUDIO MESSAGE HANDLING (WhatsApp-Jira Bridge) =====
+    if (hasAudioMedia(req.body)) {
+      console.log(`🎤 [Twilio WhatsApp] Audio message detected!`);
 
-      // Process first audio file (usually only one per message)
-      if (audioUrls.length > 0) {
-        const audioUrl = audioUrls[0];
+      try {
+        const audioUrls = getAudioMediaUrls(req.body);
+        console.log(`📎 [Twilio WhatsApp] Found ${audioUrls.length} audio file(s)`);
 
-        // Prepare metadata
-        const metadata = {
-          sender: From,
-          senderName: req.body.ProfileName || From,
-          groupName: req.body.GroupName, // Only present for group messages
-          groupId: req.body.GroupId,
-          audioUrl: audioUrl,
-          timestamp: new Date(),
-          messageId: req.body.MessageSid || req.body.SmsMessageSid
-        };
+        // Process first audio file (usually only one per message)
+        if (audioUrls.length > 0) {
+          const audioUrl = audioUrls[0];
 
-        console.log(`🔄 [Twilio WhatsApp] Processing audio message...`);
-        console.log(`   From: ${metadata.senderName}`);
-        console.log(`   Group: ${metadata.groupName || 'Direct Message'}`);
+          // Prepare metadata
+          const metadata = {
+            sender: From,
+            senderName: req.body.ProfileName || From,
+            groupName: req.body.GroupName, // Only present for group messages
+            groupId: req.body.GroupId,
+            audioUrl: audioUrl,
+            timestamp: new Date(),
+            messageId: req.body.MessageSid || req.body.SmsMessageSid
+          };
 
-        // Process through WhatsApp-Jira Bridge
-        const result = await processWhatsAppAudioMessage(
-          audioUrl,
-          metadata,
-          assistant.companyId.toString()
-        );
+          console.log(`🔄 [Twilio WhatsApp] Processing audio message...`);
+          console.log(`   From: ${metadata.senderName}`);
+          console.log(`   Group: ${metadata.groupName || 'Direct Message'}`);
 
-        // Send confirmation back to WhatsApp
-        let confirmationMessage: string;
+          // Process through WhatsApp-Jira Bridge
+          const result = await processWhatsAppAudioMessage(
+            audioUrl,
+            metadata,
+            assistant.companyId.toString()
+          );
 
-        if (result.success) {
-          confirmationMessage = result.summary ||
-            `🎤 Audio processed!\n✅ Created ${result.tasksCreated || 0} Jira task(s)`;
-        } else {
-          confirmationMessage = `❌ Failed to process audio: ${result.error || 'Unknown error'}`;
+          // Send confirmation back to WhatsApp
+          let confirmationMessage: string;
+
+          if (result.success) {
+            confirmationMessage = result.summary ||
+              `🎤 Audio processed!\n✅ Created ${result.tasksCreated || 0} Jira task(s)`;
+          } else {
+            confirmationMessage = `❌ Failed to process audio: ${result.error || 'Unknown error'}`;
+          }
+
+          await twilioClient.messages.create({
+            body: confirmationMessage,
+            from: To,
+            to: From
+          });
+
+          console.log(`✅ [Twilio WhatsApp] Audio message processed and confirmation sent`);
+
+          return res.status(200).send(); // Acknowledge webhook
         }
+      } catch (error: any) {
+        console.error(`❌ [Twilio WhatsApp] Error processing audio:`, error);
 
+        // Send error message to user
         await twilioClient.messages.create({
-          body: confirmationMessage,
-          from: `whatsapp:${twilioPhoneNumber}`,
+          body: `⚠️ Error processing audio message: ${error.message}`,
+          from: To,
           to: From
         });
 
-        console.log(`✅ [Twilio WhatsApp] Audio message processed and confirmation sent`);
-
-        return res.status(200).send(); // Acknowledge webhook
+        return res.status(200).send(); // Still acknowledge webhook
       }
-    } catch (error: any) {
-      console.error(`❌ [Twilio WhatsApp] Error processing audio:`, error);
-
-      // Send error message to user
-      await twilioClient.messages.create({
-        body: `⚠️ Error processing audio message: ${error.message}`,
-        from: `whatsapp:${twilioPhoneNumber}`,
-        to: From
-      });
-
-      return res.status(200).send(); // Still acknowledge webhook
     }
-  }
 
-  // ===== TEXT MESSAGE HANDLING (Regular chat) =====
-  // Note: handleSessionMessage in agent-mcp branch only takes (message, sessionId)
-  const response = await handleSessionMessage(Body, session.id);
+    // ===== TEXT MESSAGE HANDLING (Regular chat via Administration Orchestrator) =====
+    console.log(`💬 [Twilio WhatsApp] Processing text message: "${Body}"`);
 
-  if (typeof response === 'string') {
-    const limitedResponse = response.substring(0, 1600); // Limit response to 1600 characters
+    const response = await handleSessionMessage(Body, session.id);
 
-    twilioClient.messages
-      .create({
+    if (typeof response === 'string') {
+      // Limit response to 1600 characters for WhatsApp
+      const limitedResponse = response.substring(0, 1600);
+
+      await twilioClient.messages.create({
         body: limitedResponse,
-        from: `whatsapp:${twilioPhoneNumber}`,
-        to: From,
-      })
-      .then((message) => {
-        console.log(`Twilio message sent: ${message.sid}`);
-      })
-      .catch((error) => {
-        console.error('Error sending Twilio message:', error);
-        // Potentially send an error response back to Twilio if appropriate, though res.send() is not used here.
+        from: To, // Twilio number with whatsapp: prefix
+        to: From, // User number with whatsapp: prefix
       });
-    // Twilio typically expects a quick response to the webhook.
-    // If we need to send something back to Twilio's HTTP request:
-    res.status(200).send(); // Acknowledge receipt of the webhook
-  } else {
-    // Handle cases where response is not a string (should not happen with non-streaming call)
-    console.error('handleSessionMessage did not return a string for Twilio WhatsApp reply.');
-    // Twilio expects a response. Send an empty 200 OK or an error message if appropriate.
-    // Depending on Twilio's error handling, sending nothing or an error status might be better.
-    // For now, sending an empty 200 to acknowledge the webhook.
-    res.status(200).send(); 
+
+      console.log(`✅ [Twilio WhatsApp] Response sent to ${From}`);
+      console.log(`   Response preview: ${limitedResponse.substring(0, 100)}...`);
+    } else {
+      console.error('❌ [Twilio WhatsApp] handleSessionMessage did not return a string');
+    }
+
+    return res.status(200).send(); // Always acknowledge webhook
+
+  } catch (error: any) {
+    console.error('❌ [Twilio WhatsApp] Unexpected error:', error);
+    console.error('   Error details:', error.message);
+    console.error('   Stack:', error.stack);
+
+    try {
+      // Try to send error message to user - use original From/To from request
+      await twilioClient.messages.create({
+        body: '⚠️ System error. Please try again later.',
+        from: To, // Use cleaned To variable
+        to: From  // Use cleaned From variable
+      });
+    } catch (sendError) {
+      console.error('❌ [Twilio WhatsApp] Failed to send error message:', sendError);
+    }
+
+    return res.status(200).send(); // Still acknowledge webhook to prevent retries
   }
 });
 

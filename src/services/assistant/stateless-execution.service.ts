@@ -7,6 +7,10 @@ import { FunctionCall } from '../../integrations/actions/types';
 import { getApiKey } from '../api.key.service';
 import { downloadFile } from '../file-downloader.service';
 import axios from 'axios';
+import { User } from '../../models/User';
+import { Company } from '../../models/Company';
+import { Team } from '../../models/Team';
+import Handlebars from 'handlebars';
 import {
   calculateCost,
   logCostTracking,
@@ -55,6 +59,124 @@ function logParse(
 // Helper function to generate unique message IDs
 const generateMessageId = (): string => {
   return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+};
+
+// Helper function to create template context for stateless execution
+const createStatelessTemplateContext = async (
+  assistant: IAssistant,
+  companyId: string,
+  userId: string,
+): Promise<any> => {
+  try {
+    const user = await User.findById(userId);
+    const company = await Company.findById(companyId);
+
+    if (!user || !company) {
+      // Return minimal context if user/company not found
+      const now = new Date();
+      return {
+        user: { name: 'User', email: '' },
+        company: { name: 'Company' },
+        assistant: { name: assistant.name },
+        currentDate: now.toISOString().split('T')[0],
+        currentDateFormatted: now.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        }),
+      };
+    }
+
+    const now = new Date();
+
+    // Fetch team information if assistant belongs to a team
+    let currentTeam: any;
+    if (assistant.teams && assistant.teams.length > 0) {
+      const teamId = assistant.teams[0];
+      const team = await Team.findById(teamId);
+
+      if (team) {
+        const { Assistant } = await import('../../models/Assistant');
+        const teamAssistants = await Assistant.find({
+          teams: teamId,
+          companyId: company._id,
+        }).select('_id name description');
+
+        const extractSpecialization = (
+          name: string,
+          description: string,
+        ): string => {
+          const nameLower = name.toLowerCase();
+          if (nameLower.includes('email')) return 'email management';
+          if (nameLower.includes('jira')) return 'project management';
+          if (nameLower.includes('twilio'))
+            return 'communications (SMS/WhatsApp/voice)';
+          if (nameLower.includes('calendar'))
+            return 'calendar and scheduling';
+          if (nameLower.includes('whatsapp')) return 'WhatsApp automation';
+          if (nameLower.includes('orchestrator'))
+            return 'task coordination';
+          const firstSentence = description.split('.')[0];
+          return firstSentence.length > 100
+            ? firstSentence.substring(0, 97) + '...'
+            : firstSentence;
+        };
+
+        currentTeam = {
+          id: team._id.toString(),
+          name: team.name,
+          description: team.description,
+          members: teamAssistants.map((member) => ({
+            id: member._id.toString(),
+            name: member.name,
+            description: member.description || '',
+            specialization: extractSpecialization(
+              member.name,
+              member.description || '',
+            ),
+          })),
+        };
+      }
+    }
+
+    return {
+      user: {
+        name: user.name,
+        email: user.email,
+      },
+      company: {
+        name: company.name,
+      },
+      assistant: {
+        name: assistant.name,
+      },
+      currentDate: now.toISOString().split('T')[0],
+      currentDateFormatted: now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }),
+      currentTeam,
+    };
+  } catch (error) {
+    console.error('[Stateless Template Context] Error:', error);
+    // Return minimal context on error
+    const now = new Date();
+    return {
+      user: { name: 'User', email: '' },
+      company: { name: 'Company' },
+      assistant: { name: assistant.name },
+      currentDate: now.toISOString().split('T')[0],
+      currentDateFormatted: now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }),
+    };
+  }
 };
 
 // Helper function to extract JSON string from potential markdown code blocks
@@ -569,11 +691,25 @@ export const executeAssistantStateless = async (
     (responseFormat.type === 'json_object' ||
       responseFormat.type === 'json_schema');
 
-  // For stateless execution, we'll use the prompt directly without template processing
-  // or provide basic context if needed
+  // Process template with context data
+  // Create template context for stateless execution
+  const templateContext = await createStatelessTemplateContext(
+    assistant,
+    companyId,
+    userId,
+  );
+
   // Use promptOverride if provided, otherwise use the assistant's default prompt
-  const systemPrompt =
+  const rawPrompt =
     promptOverride || assistant.llmPrompt || 'You are a helpful assistant.';
+
+  // Process Handlebars templates
+  const compiledTemplate = Handlebars.compile(rawPrompt);
+  const systemPrompt = compiledTemplate(templateContext);
+
+  console.log(
+    `[Stateless Execution] Processed template for ${assistant.name} with date: ${templateContext.currentDateFormatted}`,
+  );
 
   const userMessageForLlm: ModelMessage = {
     role: 'user',

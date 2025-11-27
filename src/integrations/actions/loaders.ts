@@ -1,4 +1,5 @@
 import { join } from 'path';
+import * as fs from 'fs';
 import { FunctionFactory, ActionContext } from './types';
 import {
   getIntegrationFolders,
@@ -60,8 +61,12 @@ const processIntegrationFolder = async (
       integrationPath,
       (config.actionsFile as string) || `${folder}.actions.ts`,
     );
-    // Convert .ts to .js for runtime (compiled code)
-    actionFilePath = actionFilePath.replace(/\.ts$/, '.js');
+
+    // Check both .ts (source) and .js (compiled) versions
+    if (!fs.existsSync(actionFilePath)) {
+      // Try .js version (compiled code)
+      actionFilePath = actionFilePath.replace(/\.ts$/, '.js');
+    }
 
     const actionObj = await loadActionModule(actionFilePath, config, context);
     const integrationName = (config.name as string) || folder;

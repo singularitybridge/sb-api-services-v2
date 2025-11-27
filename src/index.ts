@@ -83,6 +83,7 @@ import mcpRouter from './routes/mcp.routes';
 import oauthMcpRouter from './routes/oauth-mcp.routes';
 import uiStateRouter from './routes/ui-state.routes';
 import { inviteRouter } from './routes/invite.routes';
+import { twilioMessagingRouter } from './routes/twilio/messaging.routes';
 
 // Read package.json at startup
 let packageJson: { version: string; name: string };
@@ -131,6 +132,7 @@ import compression from 'compression'; // Added for SSE Step 2
 // Public routes
 app.use('/auth', authRouter);
 app.use('/policy', policyRouter);
+app.use('/twilio', twilioMessagingRouter); // Twilio webhook (no auth - verified by signature)
 
 // OAuth endpoints for MCP - public (no auth required)
 app.use('/', oauthMcpRouter);

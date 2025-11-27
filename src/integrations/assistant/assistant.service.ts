@@ -412,7 +412,8 @@ export const askAnotherAssistant = async (
 
     const requestBody = {
       userInput: task,
-      responseFormat: { type: 'json_object' },
+      // Removed responseFormat to allow specialists to return natural language
+      // They will format their own responses based on their prompts
     };
 
     console.log(
