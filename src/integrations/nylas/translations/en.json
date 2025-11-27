@@ -1,0 +1,119 @@
+{
+  "serviceName": "Nylas Integration",
+  "nylasGetCalendarEvents": {
+    "actionTitle": "Get Calendar Events",
+    "description": "Retrieves calendar events from Nylas within a specified time range",
+    "parameters": {
+      "start": "Start time (Unix timestamp)",
+      "end": "End time (Unix timestamp)",
+      "limit": "Maximum number of events to return"
+    }
+  },
+  "nylasCreateCalendarEvent": {
+    "actionTitle": "Create Calendar Event",
+    "description": "Creates a new calendar event in Nylas",
+    "parameters": {
+      "title": "Event title",
+      "description": "Event description",
+      "startTime": "Start time (Unix timestamp or ISO string)",
+      "endTime": "End time (Unix timestamp or ISO string)",
+      "participants": "List of participant email addresses",
+      "location": "Event location"
+    }
+  },
+  "nylasGetEmails": {
+    "actionTitle": "Get Emails",
+    "description": "Retrieves emails from Nylas inbox",
+    "parameters": {
+      "limit": "Maximum number of emails to return"
+    }
+  },
+  "nylasGetEmail": {
+    "actionTitle": "Get Email",
+    "description": "Retrieves a specific email by ID",
+    "parameters": {
+      "messageId": "Email message ID"
+    }
+  },
+  "nylasSendEmail": {
+    "actionTitle": "Send Email",
+    "description": "Sends an email via Nylas",
+    "parameters": {
+      "to": "Recipient email address",
+      "subject": "Email subject",
+      "body": "Email body content"
+    }
+  },
+  "nylasGetEvent": {
+    "actionTitle": "Get Event",
+    "description": "Retrieves a specific calendar event by ID",
+    "parameters": {
+      "eventId": "Event ID"
+    }
+  },
+  "nylasUpdateEvent": {
+    "actionTitle": "Update Event",
+    "description": "Updates an existing calendar event",
+    "parameters": {
+      "eventId": "Event ID",
+      "title": "Updated event title",
+      "description": "Updated description",
+      "startTime": "Updated start time",
+      "endTime": "Updated end time"
+    }
+  },
+  "nylasDeleteEvent": {
+    "actionTitle": "Delete Event",
+    "description": "Deletes a calendar event",
+    "parameters": {
+      "eventId": "Event ID to delete"
+    }
+  },
+  "nylasFindAvailableSlots": {
+    "actionTitle": "Find Available Slots",
+    "description": "Finds available time slots in calendar",
+    "parameters": {
+      "startTime": "Search start time",
+      "endTime": "Search end time",
+      "duration": "Required slot duration in minutes"
+    }
+  },
+  "nylasGetFreeBusy": {
+    "actionTitle": "Get Free/Busy Status",
+    "description": "Retrieves free/busy information for calendars",
+    "parameters": {
+      "emails": "List of email addresses to check",
+      "startTime": "Start time",
+      "endTime": "End time"
+    }
+  },
+  "nylasCheckConflicts": {
+    "actionTitle": "Check Conflicts",
+    "description": "Checks for calendar conflicts",
+    "parameters": {
+      "startTime": "Event start time",
+      "endTime": "Event end time"
+    }
+  },
+  "nylasBatchCreateEvents": {
+    "actionTitle": "Batch Create Events",
+    "description": "Creates multiple calendar events at once",
+    "parameters": {
+      "events": "Array of event objects to create"
+    }
+  },
+  "nylasMoveEvent": {
+    "actionTitle": "Move Event",
+    "description": "Moves an event to a new time slot",
+    "parameters": {
+      "eventId": "Event ID to move",
+      "newStartTime": "New start time",
+      "newEndTime": "New end time"
+    }
+  },
+  "nylasGetGrants": {
+    "actionTitle": "Get Grants",
+    "description": "Retrieves Nylas authentication grants",
+    "parameters": {}
+  }
+}
