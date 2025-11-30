@@ -442,14 +442,6 @@ export const createSessionQueryActions = (
           companyName: company?.name,
         });
 
-        // Get current server time
-        const now = new Date();
-        const serverTime = {
-          utc: now.toISOString(),
-          timestamp: now.getTime(),
-          formatted: now.toUTCString(),
-        };
-
         return {
           success: true,
           message: 'Current user information retrieved',
@@ -469,12 +461,6 @@ export const createSessionQueryActions = (
               : null,
             session: {
               language: context.language || 'en',
-            },
-            time: {
-              serverTime: serverTime.utc,
-              serverTimezone: 'UTC',
-              timestamp: serverTime.timestamp,
-              formattedUTC: serverTime.formatted,
             },
           },
         };
