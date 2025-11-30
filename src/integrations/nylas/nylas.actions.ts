@@ -19,6 +19,7 @@ import {
   createMultipleEvents as createMultipleEventsService,
   checkEventConflicts as checkEventConflictsService,
 } from './nylas.service';
+import { createContactActions } from './contacts/contacts.actions';
 import { executeAction } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
 
@@ -1015,4 +1016,9 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
       );
     },
   },
+
+  // ==========================================
+  // CONTACT MANAGEMENT ACTIONS
+  // ==========================================
+  ...createContactActions(context),
 });
