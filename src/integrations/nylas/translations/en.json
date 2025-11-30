@@ -115,5 +115,38 @@
     "actionTitle": "Get Grants",
     "description": "Retrieves Nylas authentication grants",
     "parameters": {}
+  },
+  "nylasGetContacts": {
+    "actionTitle": "Get Contacts",
+    "description": "Retrieves contacts from Google Contacts",
+    "parameters": {
+      "limit": "Maximum number of contacts to return",
+      "email": "Filter contacts by email address"
+    }
+  },
+  "nylasCreateContact": {
+    "actionTitle": "Create Contact",
+    "description": "Creates a new contact in Google Contacts",
+    "parameters": {
+      "email": "Email address (required)",
+      "givenName": "First name",
+      "surname": "Last name",
+      "phone": "Phone number",
+      "companyName": "Company name",
+      "notes": "Additional notes"
+    }
+  },
+  "nylasUpdateContact": {
+    "actionTitle": "Update Contact",
+    "description": "Updates an existing contact in Google Contacts",
+    "parameters": {
+      "contactId": "Contact ID to update (required)",
+      "email": "New email address",
+      "givenName": "New first name",
+      "surname": "New last name",
+      "phone": "New phone number",
+      "companyName": "New company name",
+      "notes": "New notes"
+    }
   }
 }
