@@ -14,7 +14,8 @@ import {
 import { logger } from '../../utils/logger';
 import { Message } from '../../models/Message';
 import { Session } from '../../models/Session';
-import { Assistant } from '../../models/Assistant';
+import { User } from '../../models/User';
+import { Company } from '../../models/Company';
 import mongoose from 'mongoose';
 
 export const createSessionQueryActions = (
@@ -396,6 +397,190 @@ export const createSessionQueryActions = (
         logger.error('Failed to get last messages with actions', {
           error: error.message,
           sessionId,
+        });
+        throw error;
+      }
+    },
+  },
+
+  /**
+   * Get current logged-in user information
+   */
+  getCurrentUser: {
+    description:
+      'Get information about the current logged-in user including name, email, role, organization, and session language',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    function: async (): Promise<StandardActionResult> => {
+      try {
+        const userId = context?.userId;
+
+        if (!userId) {
+          throw new Error('User ID not found in context');
+        }
+
+        // Validate ObjectId
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+          throw new Error(`Invalid user ID: ${userId}`);
+        }
+
+        // Get user
+        const user = await User.findById(userId).lean();
+
+        if (!user) {
+          throw new Error(`User not found: ${userId}`);
+        }
+
+        // Get company
+        const company = await Company.findById(user.companyId).lean();
+
+        logger.info(`Retrieved current user info for ${userId}`, {
+          userName: user.name,
+          companyName: company?.name,
+        });
+
+        // Get current server time
+        const now = new Date();
+        const serverTime = {
+          utc: now.toISOString(),
+          timestamp: now.getTime(),
+          formatted: now.toUTCString(),
+        };
+
+        return {
+          success: true,
+          message: 'Current user information retrieved',
+          data: {
+            user: {
+              id: user._id.toString(),
+              name: user.name,
+              email: user.email,
+              role: user.role,
+            },
+            organization: company
+              ? {
+                  id: company._id.toString(),
+                  name: company.name,
+                  description: company.description || '',
+                }
+              : null,
+            session: {
+              language: context.language || 'en',
+            },
+            time: {
+              serverTime: serverTime.utc,
+              serverTimezone: 'UTC',
+              timestamp: serverTime.timestamp,
+              formattedUTC: serverTime.formatted,
+            },
+          },
+        };
+      } catch (error: any) {
+        logger.error('Failed to get current user', {
+          error: error.message,
+          userId: context?.userId,
+        });
+        throw error;
+      }
+    },
+  },
+
+  /**
+   * Get current date and time with optional timezone conversion
+   */
+  getDateTime: {
+    description:
+      'Get current date and time. Optionally specify a timezone (IANA format like "Asia/Jerusalem", "America/New_York") to get time in that timezone. Defaults to UTC if no timezone specified.',
+    parameters: {
+      type: 'object',
+      properties: {
+        timezone: {
+          type: 'string',
+          description:
+            'Optional IANA timezone string (e.g., "Asia/Jerusalem", "America/New_York", "Europe/London"). If omitted, returns UTC time.',
+        },
+      },
+      required: [],
+    },
+    function: async ({ timezone }: any): Promise<StandardActionResult> => {
+      try {
+        const now = new Date();
+        const targetTimezone = timezone || 'UTC';
+
+        // Validate timezone
+        let isValidTimezone = true;
+        let localTimeFormatted = '';
+        let localDate = '';
+        let localTime = '';
+
+        try {
+          localTimeFormatted = now.toLocaleString('en-US', {
+            timeZone: targetTimezone,
+            dateStyle: 'full',
+            timeStyle: 'long',
+          });
+
+          localDate = now.toLocaleDateString('en-US', {
+            timeZone: targetTimezone,
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'long',
+          });
+
+          localTime = now.toLocaleTimeString('en-US', {
+            timeZone: targetTimezone,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true,
+          });
+        } catch (error) {
+          isValidTimezone = false;
+        }
+
+        if (!isValidTimezone) {
+          throw new Error(
+            `Invalid timezone: ${targetTimezone}. Please use IANA timezone format (e.g., "Asia/Jerusalem", "America/New_York")`,
+          );
+        }
+
+        // Get timezone offset
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: targetTimezone,
+          timeZoneName: 'short',
+        });
+        const parts = formatter.formatToParts(now);
+        const timezoneName =
+          parts.find((p) => p.type === 'timeZoneName')?.value || targetTimezone;
+
+        logger.info(`Retrieved date/time for timezone ${targetTimezone}`);
+
+        return {
+          success: true,
+          message: `Current date/time retrieved for timezone ${targetTimezone}`,
+          data: {
+            timezone: targetTimezone,
+            timezoneName: timezoneName,
+            timestamp: now.getTime(),
+            utc: {
+              iso: now.toISOString(),
+              formatted: now.toUTCString(),
+            },
+            local: {
+              formatted: localTimeFormatted,
+              date: localDate,
+              time: localTime,
+            },
+          },
+        };
+      } catch (error: any) {
+        logger.error('Failed to get date/time', {
+          error: error.message,
+          timezone,
         });
         throw error;
       }
