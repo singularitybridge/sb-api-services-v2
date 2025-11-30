@@ -25,6 +25,7 @@ import {
   transitionIssue as transitionIssueService,
   setStoryPoints as setStoryPointsService,
   getSprintsForBoard as getSprintsForBoardService,
+  deleteJiraTicket,
 
   // --- BEGIN NEW SERVICE IMPORTS ---
   resolveBoardForProject,
@@ -147,6 +148,10 @@ interface GetTicketCommentsArgs {
   maxResults?: number;
   orderBy?: string;
   expand?: string;
+}
+interface DeleteTicketArgs {
+  issueIdOrKey: string;
+  deleteSubtasks?: boolean;
 }
 // --- END EXISTING INTERFACES ---
 
@@ -450,9 +455,8 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
     },
   },
   searchUsers: {
-    /* ... existing definition ... */
     description:
-      'Searches for JIRA users by query (name, email) or retrieves a specific user by accountId.',
+      'Searches for real JIRA users (excludes bots/service accounts) by query (name, email) or retrieves a specific user by accountId. Returns up to 50 users with: accountId (user ID), displayName (user name), emailAddress (user email).',
     parameters: {
       type: 'object',
       properties: {
@@ -469,7 +473,7 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
         maxResults: {
           type: 'number',
           description:
-            'Optional: The maximum number of users to return. Defaults to 50.',
+            'Optional: The maximum number of users to return. Max and default is 50.',
         },
         accountId: {
           type: 'string',
@@ -901,6 +905,38 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
       if (result.success)
         return { success: true, data: result.data, message: result.message };
       throw new Error(result.error || 'Failed to get ticket comments');
+    },
+  },
+  deleteTicket: {
+    description:
+      'Permanently deletes a JIRA ticket by its ID or key. WARNING: This action cannot be undone. If the ticket has subtasks, you must set deleteSubtasks to true or the deletion will fail.',
+    parameters: {
+      type: 'object',
+      properties: {
+        issueIdOrKey: {
+          type: 'string',
+          description:
+            "The ID or key of the JIRA ticket to delete (e.g., 'PROJ-123' or '10001').",
+        },
+        deleteSubtasks: {
+          type: 'boolean',
+          description:
+            'Optional: If true, also deletes all subtasks of this ticket. Required if the ticket has subtasks. Defaults to false.',
+        },
+      },
+      required: ['issueIdOrKey'],
+    },
+    function: async (
+      params: DeleteTicketArgs,
+    ): Promise<StandardActionResult<any>> => {
+      const result = await deleteJiraTicket(
+        context.sessionId,
+        context.companyId,
+        params,
+      );
+      if (result.success)
+        return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to delete JIRA ticket');
     },
   },
   // --- END EXISTING ACTIONS ---

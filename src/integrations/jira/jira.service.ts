@@ -890,11 +890,33 @@ export const updateJiraTicket = async (
       },
     };
   } catch (error: any) {
+    // Extract detailed Jira error information
+    const errorDetails = error?.response?.data || error?.response || error;
+    const errorMessages = errorDetails?.errorMessages || [];
+    const fieldErrors = errorDetails?.errors || {};
+
+    console.error(`[updateJiraTicket] Error updating ${params.issueIdOrKey}:`, {
+      status: error?.response?.status,
+      statusText: error?.response?.statusText,
+      errorMessages,
+      fieldErrors,
+      fieldsAttempted: Object.keys(params.fields),
+    });
+
+    let errorMessage = error?.message || 'Unknown error';
+    if (errorMessages.length > 0) {
+      errorMessage = errorMessages.join(', ');
+    }
+    if (Object.keys(fieldErrors).length > 0) {
+      const fieldErrorStr = Object.entries(fieldErrors)
+        .map(([field, msg]) => `${field}: ${msg}`)
+        .join('; ');
+      errorMessage = fieldErrorStr || errorMessage;
+    }
+
     return {
       success: false,
-      error: `Failed to update JIRA ticket: ${
-        error?.message || 'Unknown error'
-      }`,
+      error: `Failed to update JIRA ticket: ${errorMessage}`,
     };
   }
 };
@@ -1660,36 +1682,74 @@ let storyPointsFieldIdCache: string | null = null;
 const findStoryPointsFieldId = async (
   companyId: string,
 ): Promise<string | null> => {
-  // Removed sessionId as it's not used
   if (storyPointsFieldIdCache) {
     return storyPointsFieldIdCache;
   }
   try {
-    // Use the internal helper to avoid direct export/import cycle if getJiraTicketFields was also modified
     const fieldsResult = await getJiraTicketFieldsInternal(companyId);
     if (fieldsResult.success && Array.isArray(fieldsResult.data)) {
+      // Common names for story points field across different Jira configurations
       const commonStoryPointsFieldNames = [
-        'Story Points',
-        'Story Point Estimate',
-        'Σ Story Points',
+        'story points',
+        'story point estimate',
+        'σ story points',
+        'storypoints',
+        'story point',
+        'sp',
+        'points',
       ];
-      const storyPointField = fieldsResult.data.find(
-        (field: any) =>
-          commonStoryPointsFieldNames.some(
-            (name) => field.name?.toLowerCase() === name.toLowerCase(),
-          ) &&
-          (field.schema?.type === 'number' ||
-            field.schema?.custom ===
-              'com.atlassian.jira.plugin.system.customfieldtypes:float'),
-      );
+
+      // First try: Match by name with lenient type checking
+      let storyPointField = fieldsResult.data.find((field: any) => {
+        const fieldNameLower = field.name?.toLowerCase() || '';
+        const matchesName = commonStoryPointsFieldNames.some(
+          (name) => fieldNameLower === name || fieldNameLower.includes('story point'),
+        );
+
+        if (!matchesName) return false;
+
+        // Accept various numeric field types
+        const schemaType = field.schema?.type;
+        const schemaCustom = field.schema?.custom?.toLowerCase() || '';
+
+        const isNumericType =
+          schemaType === 'number' ||
+          schemaCustom.includes('float') ||
+          schemaCustom.includes('number') ||
+          schemaCustom.includes('story-points') ||
+          schemaCustom.includes('storypoints') ||
+          schemaCustom.includes('gh-story-points'); // Greenhopper/Jira Software field
+
+        return isNumericType;
+      });
+
+      // Second try: Just match by name if type check failed (some Jira configs are unusual)
+      if (!storyPointField) {
+        storyPointField = fieldsResult.data.find((field: any) => {
+          const fieldNameLower = field.name?.toLowerCase() || '';
+          return fieldNameLower === 'story points' || fieldNameLower === 'story point estimate';
+        });
+        if (storyPointField) {
+          // Found story point field by name only
+        }
+      }
+
       if (storyPointField && storyPointField.id) {
         storyPointsFieldIdCache = storyPointField.id;
         return storyPointField.id;
       }
+
+      // Log available fields that might be story points for debugging
+      const potentialFields = fieldsResult.data.filter((f: any) =>
+        f.name?.toLowerCase().includes('point') ||
+        f.name?.toLowerCase().includes('story') ||
+        f.schema?.custom?.toLowerCase().includes('story')
+      );
+      // Debug: potential fields checked but not matched
     }
     return null;
   } catch (error) {
-    console.error('Error finding story points field ID:', error);
+    console.error('[findStoryPointsFieldId] Error:', error);
     return null;
   }
 };
@@ -1700,22 +1760,56 @@ export const setStoryPoints = async (
   params: {
     issueIdOrKey: string;
     storyPoints: number | null;
+    boardId?: string; // Optional board ID for Agile API
   },
 ): Promise<Result<{ id: string; message: string }>> => {
   try {
-    const storyPointsFieldId = await findStoryPointsFieldId(companyId); // Pass companyId
+    const storyPointsFieldId = await findStoryPointsFieldId(companyId);
     if (!storyPointsFieldId) {
       return {
         success: false,
         error:
-          'Could not automatically determine the Story Points field ID. Please ensure it is configured or check field names.',
+          'Could not automatically determine the Story Points field ID. Please ensure the Story Points field exists in your Jira instance.',
       };
     }
     const fieldsToUpdate = { [storyPointsFieldId]: params.storyPoints };
-    return await updateJiraTicket(sessionId, companyId, {
+
+    // First, try the standard update method
+    const result = await updateJiraTicket(sessionId, companyId, {
       issueIdOrKey: params.issueIdOrKey,
       fields: fieldsToUpdate,
     });
+
+    if (result.success) {
+      return {
+        success: true,
+        data: result.data,
+        message: `Story points for ${params.issueIdOrKey} set to ${params.storyPoints === null ? 'cleared' : params.storyPoints}.`,
+      };
+    }
+
+    // If standard update fails with "not on appropriate screen" error, try Agile API
+    if (result.error?.includes('not on the appropriate screen') || result.error?.includes('cannot be set')) {
+      const agileResult = await setStoryPointsViaAgileApi(
+        companyId,
+        params.issueIdOrKey,
+        params.storyPoints,
+        storyPointsFieldId,
+        params.boardId,
+      );
+
+      if (agileResult.success) {
+        return agileResult;
+      }
+
+      // If Agile API also fails, return the combined error info
+      return {
+        success: false,
+        error: `Failed to set story points. Standard API: ${result.error}. Agile API: ${agileResult.error}`,
+      };
+    }
+
+    return result;
   } catch (error: any) {
     const errorMessage =
       error.message ||
@@ -1723,6 +1817,89 @@ export const setStoryPoints = async (
     return {
       success: false,
       error: `Failed to set story points: ${errorMessage}`,
+    };
+  }
+};
+
+// Helper function to set story points via Jira Agile API
+const setStoryPointsViaAgileApi = async (
+  companyId: string,
+  issueIdOrKey: string,
+  storyPoints: number | null,
+  fieldId: string,
+  boardId?: string,
+): Promise<Result<{ id: string; message: string }>> => {
+  try {
+    const jiraClient = await initializeClient(companyId);
+
+    // If no boardId provided, try to find one from the issue's sprint or project
+    let resolvedBoardId = boardId;
+    if (!resolvedBoardId) {
+      // Try to get board from issue's project
+      const issueResponse = await jiraClient.issues.getIssue({
+        issueIdOrKey,
+        fields: ['project'],
+      });
+      const projectKey = issueResponse.fields?.project?.key;
+
+      if (projectKey) {
+        const boardsResult = await getBoardsForProject(companyId, projectKey);
+        if (boardsResult.success && boardsResult.data?.boards?.length) {
+          // Prefer scrum boards
+          const scrumBoard = boardsResult.data.boards.find(b => b.type === 'scrum');
+          resolvedBoardId = (scrumBoard?.id || boardsResult.data.boards[0].id).toString();
+        }
+      }
+    }
+
+    if (!resolvedBoardId) {
+      return {
+        success: false,
+        error: 'Could not determine board ID for Agile API. Story Points field may not be on the edit screen.',
+      };
+    }
+
+    // Use the Agile API estimation endpoint
+    // PUT /rest/agile/1.0/issue/{issueIdOrKey}/estimation?boardId={boardId}
+    await new Promise<void>((resolve, reject) => {
+      jiraClient.sendRequest(
+        {
+          method: 'PUT',
+          url: `/rest/agile/1.0/issue/${issueIdOrKey}/estimation`,
+          params: { boardId: resolvedBoardId },
+          data: {
+            value: storyPoints === null ? null : storyPoints.toString(),
+          },
+        },
+        (error: any, data: any) => {
+          if (error) {
+            const jiraError = error?.error || error;
+            let message = `Failed to set estimation for ${issueIdOrKey}`;
+            if (jiraError?.errorMessages && jiraError.errorMessages.length > 0) {
+              message = jiraError.errorMessages.join(' ');
+            } else if (jiraError?.message) {
+              message = jiraError.message;
+            }
+            reject(new Error(message));
+          } else {
+            resolve();
+          }
+        },
+      );
+    });
+
+    return {
+      success: true,
+      data: {
+        id: issueIdOrKey,
+        message: `Story points for ${issueIdOrKey} set to ${storyPoints === null ? 'cleared' : storyPoints} (via Agile API).`,
+      },
+    };
+  } catch (error: any) {
+    console.error(`[setStoryPointsViaAgileApi] Error:`, error.message);
+    return {
+      success: false,
+      error: error.message || 'Unknown error using Agile API',
     };
   }
 };
@@ -2008,16 +2185,19 @@ export const searchJiraUsers = async (
     const searchParams: any = {
       query: params.query || '',
       startAt: params.startAt || 0,
-      maxResults: params.maxResults || 50,
+      maxResults: Math.min(params.maxResults || 50, 50), // Max 50 users
     };
     const users: Version3Models.User[] =
       await jiraClient.userSearch.findUsers(searchParams);
-    const simplifiedUsers = users.map((user) => ({
+    // Filter to only real users (accountType: "atlassian"), exclude bots/apps (accountType: "app")
+    const realUsers = users.filter(
+      (user) => user.accountType === 'atlassian',
+    );
+    // Return only: user ID (accountId), user name (displayName), user Email (emailAddress)
+    const simplifiedUsers = realUsers.map((user) => ({
       accountId: user.accountId,
       displayName: user.displayName,
       emailAddress: user.emailAddress,
-      avatarUrls: user.avatarUrls,
-      active: user.active,
     }));
     return { success: true, data: simplifiedUsers };
   } catch (error: any) {
@@ -2052,6 +2232,42 @@ export const assignJiraTicket = async (
       error: `Failed to assign JIRA ticket: ${
         error?.message || 'Unknown error'
       }`,
+    };
+  }
+};
+
+export const deleteJiraTicket = async (
+  sessionId: string,
+  companyId: string,
+  params: {
+    issueIdOrKey: string;
+    deleteSubtasks?: boolean;
+  },
+): Promise<Result<{ message: string }>> => {
+  try {
+    const jiraClient = await initializeClient(companyId);
+
+    await jiraClient.issues.deleteIssue({
+      issueIdOrKey: params.issueIdOrKey,
+      deleteSubtasks: params.deleteSubtasks,
+    });
+
+    return {
+      success: true,
+      data: {
+        message: `Ticket ${params.issueIdOrKey} has been permanently deleted.`,
+      },
+    };
+  } catch (error: any) {
+    const errorDetails = error?.response?.data || error?.response || error;
+    const errorMessage =
+      errorDetails?.errorMessages?.join(', ') || errorDetails?.errors
+        ? JSON.stringify(errorDetails.errors)
+        : error?.message || 'Unknown error';
+
+    return {
+      success: false,
+      error: `Failed to delete JIRA ticket ${params.issueIdOrKey}: ${errorMessage}`,
     };
   }
 };
