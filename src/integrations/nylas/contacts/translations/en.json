@@ -31,5 +31,102 @@
       "companyName": "New company name",
       "notes": "New notes"
     }
+  },
+  "nylasGetContactById": {
+    "actionTitle": "Get Contact by ID",
+    "description": "Retrieves a single contact from Google Contacts by its ID",
+    "parameters": {
+      "contactId": "Contact ID to retrieve (required)"
+    }
+  },
+  "nylasDeleteContact": {
+    "actionTitle": "Delete Contact",
+    "description": "Safely deletes a contact with audit trail. Soft delete by default, hard delete optional.",
+    "parameters": {
+      "contactId": "Contact ID to delete (required)",
+      "deletionReason": "Optional reason for deletion (for audit trail)",
+      "confirmHardDelete": "Set to true to permanently delete from Google Contacts (default: false)"
+    }
+  },
+  "nylasSearchContacts": {
+    "actionTitle": "Search Contacts",
+    "description": "Search contacts by name, email, phone, or company",
+    "parameters": {
+      "name": "Search by first or last name (partial match)",
+      "email": "Search by email address (partial match)",
+      "phone": "Search by phone number (partial match)",
+      "companyName": "Search by company name (partial match)",
+      "limit": "Maximum number of results (default: 50)"
+    }
+  },
+  "nylasFindDuplicates": {
+    "actionTitle": "Find Duplicate Contacts",
+    "description": "Finds duplicate contacts based on email or name matching",
+    "parameters": {
+      "limit": "Maximum number of contacts to scan (default: 100)"
+    }
+  },
+  "nylasSearchContactsByTags": {
+    "actionTitle": "Search Contacts by Tags",
+    "description": "Search contacts that have specific tags in metadata",
+    "parameters": {
+      "tags": "Array of tags to search for (AND logic - must have all)",
+      "limit": "Maximum number of results (default: 50)"
+    }
+  },
+  "nylasSearchContactsByLifecycle": {
+    "actionTitle": "Search Contacts by Lifecycle",
+    "description": "Search contacts by lifecycle stage",
+    "parameters": {
+      "lifecycle": "Lifecycle stage (lead, prospect, customer, partner, inactive)",
+      "limit": "Maximum number of results (default: 50)"
+    }
+  },
+  "nylasCreateContactGroup": {
+    "actionTitle": "Create Contact Group",
+    "description": "Creates a new contact group for organizing contacts",
+    "parameters": {
+      "name": "Group name (required)",
+      "description": "Optional group description"
+    }
+  },
+  "nylasGetContactGroup": {
+    "actionTitle": "Get Contact Group",
+    "description": "Retrieves details of a specific contact group",
+    "parameters": {
+      "groupId": "Group ID (required)"
+    }
+  },
+  "nylasUpdateContactGroup": {
+    "actionTitle": "Update Contact Group",
+    "description": "Updates an existing contact group",
+    "parameters": {
+      "groupId": "Group ID (required)",
+      "name": "New group name",
+      "description": "New group description"
+    }
+  },
+  "nylasDeleteContactGroup": {
+    "actionTitle": "Delete Contact Group",
+    "description": "Deletes a contact group and removes it from all contacts",
+    "parameters": {
+      "groupId": "Group ID (required)"
+    }
+  },
+  "nylasAddContactToGroup": {
+    "actionTitle": "Add Contact to Group",
+    "description": "Adds a contact to a group",
+    "parameters": {
+      "groupId": "Group ID (required)",
+      "contactId": "Nylas contact ID (required)"
+    }
+  },
+  "nylasRemoveContactFromGroup": {
+    "actionTitle": "Remove Contact from Group",
+    "description": "Removes a contact from a group",
+    "parameters": {
+      "groupId": "Group ID (required)",
+      "contactId": "Nylas contact ID (required)"
+    }
   }
 }

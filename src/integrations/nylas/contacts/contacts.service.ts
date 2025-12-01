@@ -260,3 +260,227 @@ export async function updateContact(
 
   return contactData;
 }
+
+/**
+ * Get a single contact by ID
+ */
+export async function getContactById(
+  companyId: string,
+  contactId: string,
+): Promise<NylasContact> {
+  const apiKey = await getApiKey(companyId, 'nylas_api_key');
+  const grantId = await getApiKey(companyId, 'nylas_grant_id');
+
+  if (!apiKey) {
+    throw new Error('Nylas API key not found');
+  }
+  if (!grantId) {
+    throw new Error('Nylas Grant ID not found');
+  }
+
+  console.log('[NYLAS CONTACTS] Getting contact by ID:', contactId);
+
+  const endpoint = `/v3/grants/${grantId}/contacts/${contactId}`;
+  const response = await makeNylasRequest<{ data: NylasContact } | NylasContact>(
+    apiKey,
+    endpoint,
+  );
+
+  const contactData = 'data' in response ? response.data : response;
+
+  console.log('[NYLAS CONTACTS] Contact retrieved:', contactData.id);
+
+  return contactData;
+}
+
+/**
+ * Delete a contact (hard delete from Nylas)
+ */
+export async function deleteContact(
+  companyId: string,
+  contactId: string,
+): Promise<void> {
+  const apiKey = await getApiKey(companyId, 'nylas_api_key');
+  const grantId = await getApiKey(companyId, 'nylas_grant_id');
+
+  if (!apiKey) {
+    throw new Error('Nylas API key not found');
+  }
+  if (!grantId) {
+    throw new Error('Nylas Grant ID not found');
+  }
+
+  console.log('[NYLAS CONTACTS] Deleting contact:', contactId);
+
+  const endpoint = `/v3/grants/${grantId}/contacts/${contactId}`;
+  await makeNylasRequest(apiKey, endpoint, {
+    method: 'DELETE',
+  });
+
+  console.log('[NYLAS CONTACTS] Contact deleted:', contactId);
+}
+
+// ==========================================
+// Advanced Search & Filtering
+// ==========================================
+
+export interface SearchCriteria {
+  name?: string;           // Search in given_name + surname
+  email?: string;          // Search in emails
+  phone?: string;          // Search in phone_numbers
+  companyName?: string;    // Search in company_name
+  limit?: number;          // Max results (default: 50)
+}
+
+/**
+ * Search contacts with multiple criteria
+ * Note: Nylas API has limited search - we fetch and filter client-side
+ */
+export async function searchContacts(
+  companyId: string,
+  criteria: SearchCriteria,
+): Promise<NylasContact[]> {
+  const apiKey = await getApiKey(companyId, 'nylas_api_key');
+  const grantId = await getApiKey(companyId, 'nylas_grant_id');
+
+  if (!apiKey) {
+    throw new Error('Nylas API key not found');
+  }
+  if (!grantId) {
+    throw new Error('Nylas Grant ID not found');
+  }
+
+  const { limit = 50, name, email, phone, companyName } = criteria;
+
+  // Fetch contacts (Nylas API supports email filter, rest is client-side)
+  let endpoint = `/v3/grants/${grantId}/contacts?limit=${Math.max(limit, 100)}`;
+
+  if (email) {
+    endpoint += `&email=${encodeURIComponent(email)}`;
+  }
+
+  console.log('[NYLAS CONTACTS] Searching contacts:', criteria);
+
+  const response = await makeNylasRequest<{ data: NylasContact[] }>(
+    apiKey,
+    endpoint,
+  );
+
+  let contacts = response.data || [];
+
+  // Client-side filtering for criteria not supported by Nylas API
+  if (name) {
+    const lowerName = name.toLowerCase();
+    contacts = contacts.filter(c => {
+      const fullName = `${c.given_name || ''} ${c.surname || ''}`.toLowerCase();
+      return fullName.includes(lowerName);
+    });
+  }
+
+  if (phone) {
+    const cleanPhone = phone.replace(/\D/g, ''); // Remove non-digits
+    contacts = contacts.filter(c =>
+      c.phone_numbers?.some(p => p.number.replace(/\D/g, '').includes(cleanPhone))
+    );
+  }
+
+  if (companyName) {
+    const lowerCompany = companyName.toLowerCase();
+    contacts = contacts.filter(c =>
+      c.company_name?.toLowerCase().includes(lowerCompany)
+    );
+  }
+
+  // Trim to requested limit
+  const results = contacts.slice(0, limit);
+
+  console.log('[NYLAS CONTACTS] Search results:', results.length);
+
+  return results;
+}
+
+/**
+ * Find duplicate contacts based on email or name similarity
+ */
+export async function findDuplicates(
+  companyId: string,
+  options: { limit?: number } = {},
+): Promise<Array<{ contacts: NylasContact[]; reason: string }>> {
+  const apiKey = await getApiKey(companyId, 'nylas_api_key');
+  const grantId = await getApiKey(companyId, 'nylas_grant_id');
+
+  if (!apiKey) {
+    throw new Error('Nylas API key not found');
+  }
+  if (!grantId) {
+    throw new Error('Nylas Grant ID not found');
+  }
+
+  const { limit = 100 } = options;
+
+  console.log('[NYLAS CONTACTS] Finding duplicates...');
+
+  // Fetch all contacts
+  const endpoint = `/v3/grants/${grantId}/contacts?limit=${limit}`;
+  const response = await makeNylasRequest<{ data: NylasContact[] }>(
+    apiKey,
+    endpoint,
+  );
+
+  const contacts = response.data || [];
+  const duplicates: Array<{ contacts: NylasContact[]; reason: string }> = [];
+
+  // Find duplicates by email
+  const emailMap = new Map<string, NylasContact[]>();
+  contacts.forEach(contact => {
+    contact.emails?.forEach(emailObj => {
+      const email = emailObj.email.toLowerCase();
+      if (!emailMap.has(email)) {
+        emailMap.set(email, []);
+      }
+      emailMap.get(email)!.push(contact);
+    });
+  });
+
+  emailMap.forEach((contactList, email) => {
+    if (contactList.length > 1) {
+      duplicates.push({
+        contacts: contactList,
+        reason: `Duplicate email: ${email}`,
+      });
+    }
+  });
+
+  // Find duplicates by exact name match
+  const nameMap = new Map<string, NylasContact[]>();
+  contacts.forEach(contact => {
+    if (contact.given_name && contact.surname) {
+      const fullName = `${contact.given_name} ${contact.surname}`.toLowerCase();
+      if (!nameMap.has(fullName)) {
+        nameMap.set(fullName, []);
+      }
+      nameMap.get(fullName)!.push(contact);
+    }
+  });
+
+  nameMap.forEach((contactList, name) => {
+    if (contactList.length > 1) {
+      // Check if not already found by email
+      const ids = contactList.map(c => c.id).sort().join(',');
+      const alreadyFound = duplicates.some(dup =>
+        dup.contacts.map(c => c.id).sort().join(',') === ids
+      );
+
+      if (!alreadyFound) {
+        duplicates.push({
+          contacts: contactList,
+          reason: `Duplicate name: ${name}`,
+        });
+      }
+    }
+  });
+
+  console.log('[NYLAS CONTACTS] Found duplicates:', duplicates.length);
+
+  return duplicates;
+}
