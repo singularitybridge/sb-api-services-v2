@@ -35,6 +35,7 @@ import {
   buildAuditContext,
   shouldSkipAudit,
 } from '../../middleware/admin-audit.middleware';
+import { validateDateRange, validateEventDate, logDateValidation } from '../../utils/date-validation';
 
 const SERVICE_NAME = 'nylasService';
 
@@ -479,12 +480,12 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => {
         startTime: {
           type: 'string',
           description:
-            'Start time in ISO 8601 format (e.g., "2024-01-15T10:00:00Z")',
+            'Start time in ISO 8601 format with timezone. MUST be a FUTURE date. Use current year or later. Example: "2025-12-03T13:00:00+02:00"',
         },
         endTime: {
           type: 'string',
           description:
-            'End time in ISO 8601 format (e.g., "2024-01-15T11:00:00Z")',
+            'End time in ISO 8601 format with timezone. MUST be after startTime. Example: "2025-12-03T14:00:00+02:00"',
         },
         participants: {
           type: 'string',
@@ -525,6 +526,14 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => {
 
       if (!startTime || !endTime) {
         throw new ActionValidationError('Start time and end time are required');
+      }
+
+      // Validate dates to prevent AI from creating events with incorrect dates
+      const dateValidation = validateDateRange(startTime, endTime);
+      logDateValidation('nylasCreateCalendarEvent', startTime, dateValidation);
+
+      if (!dateValidation.isValid) {
+        throw new ActionValidationError(dateValidation.error!);
       }
 
       // Resolve target user grant (handles admin cross-user access)
@@ -762,6 +771,34 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => {
         throw new ActionValidationError('eventId is required');
       }
 
+      // Validate dates if being updated
+      if (startTime || endTime) {
+        // If only one is provided, we can't fully validate the range
+        // but we can still validate the individual date
+        if (startTime && endTime) {
+          const dateValidation = validateDateRange(startTime, endTime);
+          logDateValidation('nylasUpdateEvent', startTime, dateValidation);
+
+          if (!dateValidation.isValid) {
+            throw new ActionValidationError(dateValidation.error!);
+          }
+        } else if (startTime) {
+          const dateValidation = validateEventDate(startTime);
+          logDateValidation('nylasUpdateEvent (start only)', startTime, dateValidation);
+
+          if (!dateValidation.isValid) {
+            throw new ActionValidationError(dateValidation.error!);
+          }
+        } else if (endTime) {
+          const dateValidation = validateEventDate(endTime, { allowPastDates: true });
+          logDateValidation('nylasUpdateEvent (end only)', endTime, dateValidation);
+
+          if (!dateValidation.isValid) {
+            throw new ActionValidationError(dateValidation.error!);
+          }
+        }
+      }
+
       // Resolve target user grant (handles admin cross-user access)
       const { grantId, targetUserId, isAdminAccess } = await resolveTargetUserGrant(
         targetEmail,
@@ -963,6 +1000,14 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => {
 
       if (!durationMinutes || durationMinutes <= 0) {
         throw new ActionValidationError('durationMinutes must be positive');
+      }
+
+      // Validate the date range
+      const dateValidation = validateDateRange(dateRangeStart, dateRangeEnd, { allowPastDates: true });
+      logDateValidation('nylasFindAvailableSlots', dateRangeStart, dateValidation);
+
+      if (!dateValidation.isValid) {
+        throw new ActionValidationError(dateValidation.error!);
       }
 
       // Resolve target user grant (handles admin cross-user access)
@@ -1285,6 +1330,23 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => {
               throw new Error('events must be a JSON array');
             }
 
+            // Validate dates for all events before creating any
+            const validationErrors: string[] = [];
+            eventList.forEach((event, index) => {
+              if (event.startTime && event.endTime) {
+                const validation = validateDateRange(event.startTime, event.endTime);
+                if (!validation.isValid) {
+                  validationErrors.push(`Event ${index + 1} (${event.title || 'Untitled'}): ${validation.error}`);
+                }
+              }
+            });
+
+            if (validationErrors.length > 0) {
+              throw new ActionValidationError(
+                `Date validation failed for ${validationErrors.length} event(s):\n${validationErrors.join('\n')}`
+              );
+            }
+
             const result = await createMultipleEventsService(context.companyId!, eventList, grantId);
 
             // Format response
@@ -1372,6 +1434,14 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => {
 
       if (!eventId) {
         throw new ActionValidationError('eventId is required');
+      }
+
+      // Validate the new date range
+      const dateValidation = validateDateRange(newStartTime, newEndTime);
+      logDateValidation('nylasMoveEvent', newStartTime, dateValidation);
+
+      if (!dateValidation.isValid) {
+        throw new ActionValidationError(dateValidation.error!);
       }
 
       // Resolve target user grant (handles admin cross-user access)

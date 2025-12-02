@@ -1,7 +1,9 @@
-# Calendar Date Fix - Root Cause & Solution
+# Calendar Date Fix - Root Cause & Systemic Solution
 
 ## Problem
 Calendar events were being created in **2023** instead of **2025**, despite multiple attempts to inject the current date.
+
+**Example**: User says "Create meeting tomorrow 02/12/2025" → AI creates event for **February 12, 2025** instead of **December 3, 2025**.
 
 ## Root Cause Discovery
 
@@ -132,6 +134,186 @@ Processed: December 2, 2025
 ✅ AI receives actual dates ("December 2, 2025") not variables ("{{currentYear}}")
 ✅ Calendar events created in 2025, not 2023
 ✅ Debug logs confirm date injection working
+
+---
+
+## Part 2: Systemic Validation Solution (December 2, 2025)
+
+### The Remaining Problem
+
+Even after fixing the Handlebars template processing, the AI **still** created events with wrong dates:
+- User: "Create meeting tomorrow 02/12/2025 at 13 in tel aviv"
+- AI Generated: `startTime: "2025-02-12T13:00:00+02:00"` (February 12, 2025) ❌
+- Expected: `startTime: "2025-12-03T13:00:00+02:00"` (December 3, 2025) ✅
+
+**Why it Still Failed**:
+- Template processing worked correctly - AI received "Today's date: December 2, 2025"
+- But AI still misinterpreted the user input and generated wrong dates
+- No validation layer to catch these errors before creating events
+
+### Systemic Solution: Integration-Level Date Validation
+
+Instead of relying on the AI to get dates right, we added **validation at the integration layer** to catch and reject invalid dates before they reach the Nylas API.
+
+#### New Components:
+
+### 1. Date Validation Utility (`src/utils/date-validation.ts`)
+
+Centralized validation logic that checks:
+- ✅ Dates are in the future (not past)
+- ✅ Year is >= current year
+- ✅ Dates are reasonable (not >24 months in future)
+- ✅ End time is after start time
+- ✅ Duration is reasonable (not >7 days)
+- ✅ Detects suspicious patterns (e.g., month in past when current month expected)
+
+**Functions**:
+- `validateEventDate(dateString, options)` - Validates a single date
+- `validateDateRange(startDate, endDate, options)` - Validates date range
+- `logDateValidation(actionName, date, result)` - Logs validation for debugging
+
+#### 2. Updated Calendar Actions with Validation
+
+Added date validation to all calendar event actions:
+
+**`nylasCreateCalendarEvent`** (line 465):
+```typescript
+// Validate dates before creating event
+const dateValidation = validateDateRange(startTime, endTime);
+logDateValidation('nylasCreateCalendarEvent', startTime, dateValidation);
+
+if (!dateValidation.isValid) {
+  throw new ActionValidationError(dateValidation.error!);
+}
+```
+
+**`nylasBatchCreateEvents`** (line 1238):
+```typescript
+// Validate ALL events before creating any
+const validationErrors: string[] = [];
+eventList.forEach((event, index) => {
+  if (event.startTime && event.endTime) {
+    const validation = validateDateRange(event.startTime, event.endTime);
+    if (!validation.isValid) {
+      validationErrors.push(`Event ${index + 1}: ${validation.error}`);
+    }
+  }
+});
+
+if (validationErrors.length > 0) {
+  throw new ActionValidationError(validationErrors.join('\n'));
+}
+```
+
+**`nylasUpdateEvent`** (line 712):
+- Validates dates if being updated
+- Handles partial updates (only start or only end)
+
+**`nylasMoveEvent`** (line 1329):
+- Validates new date range before moving event
+
+**`nylasFindAvailableSlots`** (line 905):
+- Validates date range for availability search
+- Allows past dates (since searching past is valid)
+
+#### 3. Enhanced Parameter Descriptions
+
+Updated AI parameter descriptions to guide better:
+```typescript
+startTime: {
+  type: 'string',
+  description: 'Start time in ISO 8601 format with timezone. MUST be a FUTURE date. Use current year or later. Example: "2025-12-03T13:00:00+02:00"'
+}
+```
+
+### How It Works Now
+
+**Before Validation**:
+1. User: "Create meeting tomorrow 02/12/2025"
+2. AI generates: `startTime: "2025-02-12T13:00:00+02:00"`
+3. Event created for February 12, 2025 ❌
+
+**After Validation**:
+1. User: "Create meeting tomorrow 02/12/2025"
+2. AI generates: `startTime: "2025-02-12T13:00:00+02:00"`
+3. **Validation catches error**: "Event date 2025-02 is 10 month(s) ago. Current date: 2025-12-02"
+4. **AI receives error** and can retry with correct date
+5. AI retries: `startTime: "2025-12-03T13:00:00+02:00"` ✅
+6. Event created for December 3, 2025 ✅
+
+### Example Validation Error Messages
+
+The validation provides clear, AI-friendly error messages:
+
+```
+Event start time (2025-02-12T13:00:00+02:00) is 294 day(s) in the past.
+Current server date: 2025-12-02T11:30:00.000Z.
+Please use a future date.
+```
+
+```
+Event year 2023 is before current year 2025.
+Current date is 2025-12-02.
+Did you mean year 2025 or 2026?
+```
+
+```
+Event date 2025-02 is 10 month(s) ago.
+Current date: 2025-12-02.
+Did you mean month 12 or later?
+```
+
+### Validation Rules
+
+| Rule | Check | Action |
+|------|-------|--------|
+| **Past Date** | Event date < current date | Reject with days difference |
+| **Wrong Year** | Event year < current year | Reject with suggestion |
+| **Past Month** | Same year but month < current month | Reject (likely date parsing error) |
+| **Too Far Future** | Event > 24 months away | Reject (likely error) |
+| **Invalid Range** | End before start | Reject with dates |
+| **Long Duration** | Duration > 7 days | Reject (likely error) |
+
+### Debug Logging
+
+Validation results are logged for debugging:
+
+```
+[DATE VALIDATION] nylasCreateCalendarEvent
+  ✅ VALID
+  Requested: 2025-12-03T13:00:00+02:00
+  Parsed: 2025-12-03T11:00:00.000Z
+  Current server time: 2025-12-02T11:30:00.000Z
+```
+
+or
+
+```
+[DATE VALIDATION ERROR] nylasCreateCalendarEvent
+  Requested date: 2025-02-12T13:00:00+02:00
+  Parsed as: 2025-02-12T11:00:00.000Z
+  Current server time: 2025-12-02T11:30:00.000Z
+  Error: Event date 2025-02 is 10 month(s) ago. Current date: 2025-12-02
+```
+
+### Files Modified (Part 2)
+
+1. **NEW**: `src/utils/date-validation.ts` - Complete validation utility
+2. `src/integrations/nylas/nylas.actions.ts` - Added validation to 5 calendar actions
+3. `CALENDAR_DATE_FIX.md` - Updated with Part 2 solution
+
+### Complete Success Criteria
+
+✅ **Part 1 (Template Processing)**:
+- Template variables replaced correctly
+- AI receives actual current date
+
+✅ **Part 2 (Validation)**:
+- All calendar actions validate dates before API calls
+- Invalid dates rejected with clear error messages
+- AI can self-correct based on error messages
+- No events created with wrong dates
+- Validation logs show all checks
 
 ## Next Steps (if issue persists)
 
