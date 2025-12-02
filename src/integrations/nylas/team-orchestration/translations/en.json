@@ -1,0 +1,55 @@
+{
+  "nylasGetTeamAvailability": {
+    "actionName": "Get Team Availability",
+    "description": "Check availability for multiple teams within a date range. Returns time slots showing when team members are free or busy.",
+    "successMessage": "Successfully retrieved availability for {{teamCount}} teams across {{slotCount}} time slots",
+    "errorMessage": "Failed to retrieve team availability",
+    "parameters": {
+      "teamNames": "Team names to check (e.g., [\"Regulatory\", \"Design\"])",
+      "dateRange": "Date range to check (start and end dates in ISO format)",
+      "timeRange": "Optional time range to filter results within each day",
+      "slotDurationMinutes": "Duration of each time slot in minutes (default: 30)"
+    }
+  },
+  "nylasFindOptimalSlots": {
+    "actionName": "Find Optimal Meeting Slots",
+    "description": "Find the best meeting times when all or most team members are available.",
+    "successMessage": "Found {{slotCount}} optimal slots where {{availability}} are free",
+    "errorMessage": "Failed to find optimal meeting slots",
+    "parameters": {
+      "teamNames": "Team names to include in the search",
+      "dateRange": "Date range to search (start and end dates)",
+      "requireAllFree": "If true, only return slots where everyone is free (default: true)",
+      "limit": "Maximum number of slots to return (default: 10)"
+    }
+  },
+  "nylasCreateTeamMeeting": {
+    "actionName": "Create Team Meeting",
+    "description": "Schedule a meeting with multiple teams and external contacts. Supports recurring meetings.",
+    "successMessage": "Created meeting \"{{title}}\" with {{attendeeCount}} attendees{{recurrence}}",
+    "errorMessage": "Failed to create team meeting",
+    "parameters": {
+      "organizerProfile": "Label of email profile to use as organizer (e.g., \"Regulatory Team IL\")",
+      "teams": "Names of teams to invite (e.g., [\"Regulatory\", \"Design\"])",
+      "externalContacts": "External contacts to invite (array of {name, email} objects)",
+      "meetingDetails": "Meeting details (title, description, location, date, time, duration, timezone)",
+      "recurrence": "Optional recurrence configuration (frequency, occurrences)"
+    }
+  },
+  "nylasCreateWeeklyTeamSync": {
+    "actionName": "Create Weekly Team Sync",
+    "description": "Quickly create a recurring weekly sync for team(s). Simplified version of nylasCreateTeamMeeting.",
+    "successMessage": "Created weekly \"{{title}}\" on {{dayOfWeek}}s for {{weeks}} weeks",
+    "errorMessage": "Failed to create weekly team sync",
+    "parameters": {
+      "organizerProfile": "Email profile label for organizer",
+      "teams": "Team names to invite",
+      "title": "Meeting title",
+      "dayOfWeek": "Day of week for the meeting (Monday-Friday)",
+      "startTime": "Start time in HH:MM format (24-hour)",
+      "durationMinutes": "Meeting duration in minutes",
+      "weeks": "Number of weeks to repeat",
+      "timezone": "Timezone (e.g., \"Europe/Berlin\", \"America/New_York\")"
+    }
+  }
+}
