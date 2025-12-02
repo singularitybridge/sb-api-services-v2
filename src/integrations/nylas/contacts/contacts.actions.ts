@@ -553,6 +553,13 @@ export const createContactActions = (context: ActionContext): FunctionFactory =>
             let contactSnapshot: any = {};
             try {
               const contact = await getContactByIdService(companyId, contactId, grantId);
+
+              // DEBUG: Log contact emails type and value
+              console.log('[DEBUG] contact.emails type:', typeof contact.emails);
+              console.log('[DEBUG] contact.emails value:', contact.emails);
+              console.log('[DEBUG] contact.emails JSON:', JSON.stringify(contact.emails));
+              console.log('[DEBUG] Is Array:', Array.isArray(contact.emails));
+
               contactSnapshot = {
                 givenName: contact.given_name,
                 surname: contact.surname,
@@ -561,6 +568,11 @@ export const createContactActions = (context: ActionContext): FunctionFactory =>
                 companyName: contact.company_name,
                 notes: contact.notes,
               };
+
+              // DEBUG: Log contactSnapshot.emails after assignment
+              console.log('[DEBUG] contactSnapshot.emails type:', typeof contactSnapshot.emails);
+              console.log('[DEBUG] contactSnapshot.emails value:', contactSnapshot.emails);
+              console.log('[DEBUG] contactSnapshot.emails JSON:', JSON.stringify(contactSnapshot.emails));
             } catch (error) {
               console.warn('[Contact Delete] Could not retrieve contact for snapshot:', error);
             }
@@ -587,6 +599,11 @@ export const createContactActions = (context: ActionContext): FunctionFactory =>
             const hasActiveMeetings = metadata.meetingCount > 0;
 
             const deletionType = confirmHardDelete ? 'hard' : 'soft';
+
+            // DEBUG: Log what we're about to pass to ContactDeletionLog
+            console.log('[DEBUG] Before logDeletion - contactSnapshot:', JSON.stringify(contactSnapshot, null, 2));
+            console.log('[DEBUG] Before logDeletion - contactSnapshot.emails type:', typeof contactSnapshot.emails);
+            console.log('[DEBUG] Before logDeletion - contactSnapshot.emails value:', contactSnapshot.emails);
 
             // Log the deletion
             await ContactDeletionLog.logDeletion({

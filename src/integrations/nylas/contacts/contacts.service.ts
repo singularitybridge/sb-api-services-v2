@@ -305,6 +305,12 @@ export async function getContactById(
 
   console.log('[NYLAS CONTACTS] Contact retrieved:', contactData.id);
 
+  // DEBUG: Log emails field type and value
+  console.log('[DEBUG SERVICE] contactData.emails type:', typeof contactData.emails);
+  console.log('[DEBUG SERVICE] contactData.emails value:', contactData.emails);
+  console.log('[DEBUG SERVICE] contactData.emails JSON:', JSON.stringify(contactData.emails));
+  console.log('[DEBUG SERVICE] Is Array:', Array.isArray(contactData.emails));
+
   return contactData;
 }
 
