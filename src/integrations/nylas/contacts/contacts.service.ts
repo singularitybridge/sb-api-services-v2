@@ -10,6 +10,49 @@ import { getApiKey } from '../../../services/api.key.service';
 const NYLAS_API_URL = 'https://api.us.nylas.com';
 
 // ==========================================
+// Grant Resolution Helper
+// ==========================================
+
+/**
+ * Get API key and grant ID for Nylas requests
+ * Supports both legacy company-level grants and new per-user grants
+ * Falls back to environment variables for service account model
+ * @param companyId - Company ID for API key lookup
+ * @param grantId - Optional grantId (for per-user access). If not provided, uses company-level grant.
+ */
+async function getNylasCredentials(
+  companyId: string,
+  grantId?: string
+): Promise<{ apiKey: string; grantId: string }> {
+  // Try company API key first, fall back to environment variable
+  let apiKey = await getApiKey(companyId, 'nylas_api_key');
+  if (!apiKey) {
+    apiKey = process.env.NYLAS_API_KEY || null;
+    if (!apiKey) {
+      throw new Error('Nylas API key not found for company');
+    }
+    console.log('[CONTACTS SERVICE] Using Nylas API key from .env');
+  }
+
+  // If grantId provided (per-user), use it
+  if (grantId) {
+    return { apiKey, grantId };
+  }
+
+  // Try company-level grant, fall back to environment variable
+  let companyGrantId = await getApiKey(companyId, 'nylas_grant_id');
+  if (!companyGrantId) {
+    companyGrantId = process.env.NYLAS_GRANT_ID || null;
+    if (!companyGrantId) {
+      throw new Error('Nylas Grant ID not found for company. Please connect your email account.');
+    }
+    console.log('[CONTACTS SERVICE] Using Nylas Grant ID from .env (service account)');
+  }
+
+  return { apiKey, grantId: companyGrantId };
+}
+
+// ==========================================
 // Interfaces
 // ==========================================
 
@@ -92,19 +135,10 @@ async function makeNylasRequest<T>(
  */
 export async function getContacts(
   companyId: string,
-  options: { limit?: number; email?: string } = {},
+  options: { limit?: number; email?: string; grantId?: string } = {},
 ): Promise<NylasContact[]> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
-
-  const { limit = 50, email } = options;
+  const { limit = 50, email, grantId: userGrantId } = options;
+  const { apiKey, grantId } = await getNylasCredentials(companyId, userGrantId);
 
   let endpoint = `/v3/grants/${grantId}/contacts?limit=${limit}`;
 
@@ -136,17 +170,11 @@ export async function createContact(
     phone?: string;
     companyName?: string;
     notes?: string;
+    grantId?: string;
   },
 ): Promise<NylasContact> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
+  const { grantId: userGrantId } = contact;
+  const { apiKey, grantId } = await getNylasCredentials(companyId, userGrantId);
 
   const payload: any = {
     emails: [{ email: contact.email, type: 'work' }],
@@ -204,17 +232,11 @@ export async function updateContact(
     phone?: string;
     companyName?: string;
     notes?: string;
+    grantId?: string;
   },
 ): Promise<NylasContact> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
+  const { grantId: userGrantId } = updates;
+  const { apiKey, grantId } = await getNylasCredentials(companyId, userGrantId);
 
   const payload: any = {};
 
@@ -267,22 +289,15 @@ export async function updateContact(
 export async function getContactById(
   companyId: string,
   contactId: string,
+  grantId?: string,
 ): Promise<NylasContact> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
+  const credentials = await getNylasCredentials(companyId, grantId);
 
   console.log('[NYLAS CONTACTS] Getting contact by ID:', contactId);
 
-  const endpoint = `/v3/grants/${grantId}/contacts/${contactId}`;
+  const endpoint = `/v3/grants/${credentials.grantId}/contacts/${contactId}`;
   const response = await makeNylasRequest<{ data: NylasContact } | NylasContact>(
-    apiKey,
+    credentials.apiKey,
     endpoint,
   );
 
@@ -299,21 +314,14 @@ export async function getContactById(
 export async function deleteContact(
   companyId: string,
   contactId: string,
+  grantId?: string,
 ): Promise<void> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
+  const credentials = await getNylasCredentials(companyId, grantId);
 
   console.log('[NYLAS CONTACTS] Deleting contact:', contactId);
 
-  const endpoint = `/v3/grants/${grantId}/contacts/${contactId}`;
-  await makeNylasRequest(apiKey, endpoint, {
+  const endpoint = `/v3/grants/${credentials.grantId}/contacts/${contactId}`;
+  await makeNylasRequest(credentials.apiKey, endpoint, {
     method: 'DELETE',
   });
 
@@ -339,21 +347,13 @@ export interface SearchCriteria {
 export async function searchContacts(
   companyId: string,
   criteria: SearchCriteria,
+  grantId?: string,
 ): Promise<NylasContact[]> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
-
   const { limit = 50, name, email, phone, companyName } = criteria;
+  const credentials = await getNylasCredentials(companyId, grantId);
 
   // Fetch contacts (Nylas API supports email filter, rest is client-side)
-  let endpoint = `/v3/grants/${grantId}/contacts?limit=${Math.max(limit, 100)}`;
+  let endpoint = `/v3/grants/${credentials.grantId}/contacts?limit=${Math.max(limit, 100)}`;
 
   if (email) {
     endpoint += `&email=${encodeURIComponent(email)}`;
@@ -362,7 +362,7 @@ export async function searchContacts(
   console.log('[NYLAS CONTACTS] Searching contacts:', criteria);
 
   const response = await makeNylasRequest<{ data: NylasContact[] }>(
-    apiKey,
+    credentials.apiKey,
     endpoint,
   );
 
@@ -404,26 +404,17 @@ export async function searchContacts(
  */
 export async function findDuplicates(
   companyId: string,
-  options: { limit?: number } = {},
+  options: { limit?: number; grantId?: string } = {},
 ): Promise<Array<{ contacts: NylasContact[]; reason: string }>> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
-
-  const { limit = 100 } = options;
+  const { limit = 100, grantId: userGrantId } = options;
+  const credentials = await getNylasCredentials(companyId, userGrantId);
 
   console.log('[NYLAS CONTACTS] Finding duplicates...');
 
   // Fetch all contacts
-  const endpoint = `/v3/grants/${grantId}/contacts?limit=${limit}`;
+  const endpoint = `/v3/grants/${credentials.grantId}/contacts?limit=${limit}`;
   const response = await makeNylasRequest<{ data: NylasContact[] }>(
-    apiKey,
+    credentials.apiKey,
     endpoint,
   );
 
