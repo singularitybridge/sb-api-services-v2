@@ -655,6 +655,18 @@ export const handleSessionMessage = async (
     `[handleSessionMessage] System prompt processed for session ${sessionId}`,
   );
 
+  // DEBUG: Log date-related content from processed prompt to verify Handlebars replacement
+  const dateMatch = systemPrompt.match(/Today's date:([^\n]*)/);
+  if (dateMatch) {
+    console.log(`[DEBUG] Processed date in prompt: "Today's date:${dateMatch[1]}"`);
+  } else {
+    console.log('[DEBUG] No "Today\'s date:" found in processed prompt');
+  }
+
+  // Log first 300 chars of processed prompt to verify template processing
+  console.log(`[DEBUG] Processed prompt (first 300 chars): ${systemPrompt.substring(0, 300)}`);
+  console.log('[DEBUG] ---');
+
   // Construct user message content for LLM
   // The userMessageForLlm will now use the userMessageContentParts array
   const userMessageForLlm: ModelMessage = {
