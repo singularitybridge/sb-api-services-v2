@@ -8,7 +8,7 @@
  * deleted contacts.
  */
 
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 
 // ==========================================
 // TypeScript Interfaces
@@ -55,6 +55,55 @@ export interface IContactDeletionLog extends Document {
   // Audit Trail
   ipAddress?: string;             // IP address of deletion request
   userAgent?: string;             // User agent string
+}
+
+// Static methods interface
+export interface IContactDeletionLogModel extends Model<IContactDeletionLog> {
+  logDeletion(params: {
+    contactId: string;
+    grantId: string;
+    companyId: mongoose.Types.ObjectId;
+    ownerId: mongoose.Types.ObjectId;
+    deletedBy: mongoose.Types.ObjectId;
+    deletionType: DeletionType;
+    contactSnapshot: any;
+    deletionReason?: string;
+    metadata?: {
+      hasActiveEmails?: boolean;
+      hasActiveMeetings?: boolean;
+      interactionCount?: number;
+      lastInteractionAt?: Date;
+    };
+    audit?: {
+      ipAddress?: string;
+      userAgent?: string;
+    };
+  }): Promise<IContactDeletionLog>;
+
+  findByCompany(
+    companyId: mongoose.Types.ObjectId,
+    options?: {
+      status?: DeletionStatus;
+      deletionType?: DeletionType;
+      limit?: number;
+    }
+  ): Promise<IContactDeletionLog[]>;
+
+  findByUser(
+    userId: mongoose.Types.ObjectId,
+    options?: {
+      asOwner?: boolean;
+      asDeleter?: boolean;
+      limit?: number;
+    }
+  ): Promise<IContactDeletionLog[]>;
+
+  findRestorable(companyId: mongoose.Types.ObjectId, limit?: number): Promise<IContactDeletionLog[]>;
+
+  getStatistics(
+    companyId: mongoose.Types.ObjectId,
+    dateRange?: { start: Date; end: Date }
+  ): Promise<any>;
 }
 
 // ==========================================
@@ -413,7 +462,7 @@ ContactDeletionLogSchema.statics.getStatistics = async function(
 // Model Export
 // ==========================================
 
-export const ContactDeletionLog = mongoose.model<IContactDeletionLog>(
+export const ContactDeletionLog = mongoose.model<IContactDeletionLog, IContactDeletionLogModel>(
   'ContactDeletionLog',
   ContactDeletionLogSchema
 );

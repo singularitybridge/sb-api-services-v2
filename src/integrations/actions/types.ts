@@ -7,6 +7,8 @@ export interface ActionContext {
   userId?: string;
   assistantId?: string; // ID of the assistant executing the action
   isStateless?: boolean;
+  userEmail?: string; // Email of the user executing the action
+  userName?: string; // Name of the user executing the action
 }
 
 // New interface for a standardized successful action result

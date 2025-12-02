@@ -634,7 +634,7 @@ export const createContactActions = (context: ActionContext): FunctionFactory =>
 
               return {
                 success: true,
-                data: { deleted: true, type: 'hard' },
+                data: { deleted: true, type: 'hard' as const },
                 description: `Contact permanently deleted from Google Contacts. ` +
                   `Audit trail preserved. ${hasActiveEmails || hasActiveMeetings ? '⚠️ Contact had active interactions.' : ''}`,
               };
@@ -647,7 +647,7 @@ export const createContactActions = (context: ActionContext): FunctionFactory =>
 
               return {
                 success: true,
-                data: { deleted: true, type: 'soft' },
+                data: { deleted: true, type: 'soft' as const },
                 description: `Contact marked as deleted (soft delete). Contact still exists in Google Contacts. ` +
                   `Use confirmHardDelete=true to permanently delete. Can be restored.`,
               };
@@ -1188,7 +1188,7 @@ export const createContactActions = (context: ActionContext): FunctionFactory =>
           const createGroup = async () => {
             const group = await groupsService.createGroup(
               context.companyId!,
-              targetUserId, // Use target user as owner
+              targetUserId.toString(), // Use target user as owner
               name,
               description
             );

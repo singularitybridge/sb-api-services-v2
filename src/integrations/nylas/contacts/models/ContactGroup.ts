@@ -16,6 +16,9 @@ export interface IContactGroup extends Document {
   isDeleted: boolean;
   createdAt: Date;
   updatedAt: Date;
+
+  // Instance methods
+  updateMemberCount(): Promise<void>;
 }
 
 const ContactGroupSchema = new Schema<IContactGroup>(

@@ -7,7 +7,7 @@
  * This extends basic Nylas contact data with company-specific information.
  */
 
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 
 // ==========================================
 // TypeScript Interfaces
@@ -60,6 +60,27 @@ export interface IContactMetadata extends Document {
   interactionCount: number;       // Total interactions
   emailCount: number;             // Emails sent/received
   meetingCount: number;           // Meetings attended
+
+  // Instance methods
+  hasPermission(userId: string, action: 'view' | 'edit' | 'delete'): boolean;
+  softDelete(userId: mongoose.Types.ObjectId, reason?: string): void;
+  restore(): void;
+  addTag(tag: string): void;
+  removeTag(tag: string): void;
+  grantPermission(userId: string, action: 'view' | 'edit' | 'delete'): void;
+  revokePermission(userId: string, action: 'view' | 'edit' | 'delete'): void;
+  updateLifecycle(stage: ContactLifecycle): void;
+  logInteraction(type: 'email' | 'meeting' | 'call'): void;
+}
+
+// Static methods interface
+export interface IContactMetadataModel extends Model<IContactMetadata> {
+  findByContactId(contactId: string, grantId: string): Promise<IContactMetadata | null>;
+  findByOwner(ownerId: mongoose.Types.ObjectId, includeDeleted?: boolean): Promise<IContactMetadata[]>;
+  findByCompany(companyId: mongoose.Types.ObjectId, includeDeleted?: boolean): Promise<IContactMetadata[]>;
+  findByLifecycle(companyId: mongoose.Types.ObjectId, lifecycle: ContactLifecycle): Promise<IContactMetadata[]>;
+  findByTag(companyId: mongoose.Types.ObjectId, tag: string): Promise<IContactMetadata[]>;
+  findShared(companyId: mongoose.Types.ObjectId): Promise<IContactMetadata[]>;
 }
 
 // ==========================================
@@ -421,7 +442,7 @@ ContactMetadataSchema.pre('save', function(next) {
 // Model Export
 // ==========================================
 
-export const ContactMetadata = mongoose.model<IContactMetadata>(
+export const ContactMetadata = mongoose.model<IContactMetadata, IContactMetadataModel>(
   'ContactMetadata',
   ContactMetadataSchema
 );

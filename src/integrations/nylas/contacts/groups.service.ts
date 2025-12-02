@@ -159,8 +159,10 @@ export async function addContactToGroup(
     throw new Error('Contact not found');
   }
 
-  if (!metadata.groups.includes(group._id)) {
-    metadata.groups.push(group._id);
+  const groupIds = metadata.groups as mongoose.Types.ObjectId[];
+  if (!groupIds.includes(group._id as mongoose.Types.ObjectId)) {
+    groupIds.push(group._id as mongoose.Types.ObjectId);
+    metadata.groups = groupIds;
     await metadata.save();
 
     await group.updateMemberCount();
