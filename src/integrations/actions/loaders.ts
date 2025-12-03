@@ -1,4 +1,5 @@
 import { join } from 'path';
+import { pathToFileURL } from 'url';
 import { FunctionFactory, ActionContext } from './types';
 import {
   getIntegrationFolders,
@@ -13,7 +14,7 @@ const loadActionModule = async (
   context: ActionContext,
 ): Promise<FunctionFactory> => {
   try {
-    const module = await import(actionFilePath);
+    const module = await import(pathToFileURL(actionFilePath).href);
     const actionCreator = module[config.actionCreator as string];
 
     if (typeof actionCreator === 'function') {

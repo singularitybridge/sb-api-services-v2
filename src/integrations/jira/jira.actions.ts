@@ -26,6 +26,11 @@ import {
   setStoryPoints as setStoryPointsService,
   getSprintsForBoard as getSprintsForBoardService,
   deleteJiraTicket,
+  // Velocity and sprint progress
+  getBoardVelocity as getBoardVelocityService,
+  getSprintProgress as getSprintProgressService,
+  VelocityData,
+  SprintProgressData,
 
   // --- BEGIN NEW SERVICE IMPORTS ---
   resolveBoardForProject,
@@ -1310,6 +1315,84 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
           boardId: boardToUse.id,
           results: finalResults, // Array of individual move results
         },
+      };
+    },
+  },
+
+  // --- VELOCITY AND SPRINT PROGRESS ACTIONS ---
+  getBoardVelocity: {
+    description:
+      'Get team velocity data by analyzing story points completed in recent closed sprints. Returns average velocity, trend, and per-sprint breakdown.',
+    parameters: {
+      type: 'object',
+      properties: {
+        boardId: {
+          type: 'string',
+          description: 'The JIRA board ID to analyze velocity for',
+        },
+        sprintCount: {
+          type: 'number',
+          description:
+            'Number of closed sprints to analyze (default: 3). More sprints give more accurate average but may include older data.',
+        },
+      },
+      required: ['boardId'],
+      additionalProperties: false,
+    },
+    function: async (params: {
+      boardId: string;
+      sprintCount?: number;
+    }): Promise<StandardActionResult<VelocityData>> => {
+      const result = await getBoardVelocityService(
+        context.sessionId,
+        context.companyId,
+        params,
+      );
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Failed to get board velocity');
+      }
+
+      return {
+        success: true,
+        message: `Velocity for board ${params.boardId}: ${result.data.averageVelocity} SP/sprint (${result.data.sprintCount} sprints analyzed, trend: ${result.data.trend})`,
+        data: result.data,
+      };
+    },
+  },
+
+  getSprintProgress: {
+    description:
+      'Get current sprint progress including completion percentage, story points, issues by status, and at-risk items (no updates in 3+ days).',
+    parameters: {
+      type: 'object',
+      properties: {
+        sprintId: {
+          type: 'string',
+          description: 'The JIRA sprint ID to get progress for',
+        },
+      },
+      required: ['sprintId'],
+      additionalProperties: false,
+    },
+    function: async (params: {
+      sprintId: string;
+    }): Promise<StandardActionResult<SprintProgressData>> => {
+      const result = await getSprintProgressService(
+        context.sessionId,
+        context.companyId,
+        params,
+      );
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Failed to get sprint progress');
+      }
+
+      const data = result.data;
+      return {
+        success: true,
+        message: `Sprint progress: ${data.completedIssues}/${data.totalIssues} issues (${data.progressPercent}%), ${data.completedPoints}/${data.totalPoints} SP (${data.pointsProgressPercent}%). ${data.atRiskIssues.length} at-risk items.`,
+        data: result.data,
       };
     },
   },
