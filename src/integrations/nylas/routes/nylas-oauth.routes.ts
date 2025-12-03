@@ -27,6 +27,7 @@ import {
 } from '../services/nylas-oauth.service';
 import { User } from '../../../models/User';
 import { Company } from '../../../models/Company';
+import { NylasOAuthToken } from '../models/NylasOAuthToken';
 
 const router: Router = express.Router();
 
@@ -59,20 +60,26 @@ async function authenticateQueryToken(
 
     console.log('[OAUTH TOKEN AUTH] Attempting authentication via query token');
 
-    // Find user with matching auth token
-    const user = await User.findOne({
-      'authTokens.token': queryToken,
+    // Find OAuth token in Nylas-specific token store
+    const oauthToken = await NylasOAuthToken.findOne({
+      token: queryToken,
     }).lean();
 
-    if (!user) {
+    if (!oauthToken) {
       console.log('[OAUTH TOKEN AUTH] Invalid token provided');
       return next(); // Let regular auth middleware handle the error
     }
 
-    // Token found, validate it's not expired (optional - tokens don't have expiry by default)
-    const tokenObj = user.authTokens?.find(t => t.token === queryToken);
-    if (!tokenObj) {
-      console.log('[OAUTH TOKEN AUTH] Token not found in user tokens');
+    // Check if token has expired
+    if (oauthToken.expiresAt < new Date()) {
+      console.log('[OAUTH TOKEN AUTH] Token has expired');
+      return next();
+    }
+
+    // Get user associated with the token
+    const user = await User.findById(oauthToken.userId).lean();
+    if (!user) {
+      console.log('[OAUTH TOKEN AUTH] User not found for token');
       return next();
     }
 

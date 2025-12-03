@@ -12,7 +12,6 @@
  */
 
 import axios from 'axios';
-import { getApiKey } from '../../../services/api.key.service';
 import { NylasAccount, INylasAccount } from '../models/NylasAccount';
 import { User } from '../../../models/User';
 import { EmailProfile } from '../models/EmailProfile';
@@ -36,27 +35,18 @@ export interface NylasOAuthConfig {
 
 /**
  * Get OAuth configuration for a company
+ *
+ * NOTE: Uses environment variables only (no company-specific credentials).
+ * This keeps the integration self-contained without polluting shared services.
  */
 export async function getOAuthConfig(companyId: string): Promise<NylasOAuthConfig> {
-  // Try company-specific credentials first
-  let clientId = await getApiKey(companyId, 'nylas_client_id');
-  let clientSecret = await getApiKey(companyId, 'nylas_client_secret');
-
-  // Fall back to environment variables (service account credentials)
-  if (!clientId) {
-    clientId = process.env.NYLAS_CLIENT_ID;
-    console.log('[NYLAS OAUTH] Using service account NYLAS_CLIENT_ID from environment');
-  }
-
-  if (!clientSecret) {
-    clientSecret = process.env.NYLAS_API_SECRET || process.env.NYLAS_CLIENT_SECRET;
-    console.log('[NYLAS OAUTH] Using service account NYLAS_API_SECRET from environment');
-  }
-
+  // Use environment variables for OAuth credentials
+  const clientId = process.env.NYLAS_CLIENT_ID;
+  const clientSecret = process.env.NYLAS_API_SECRET || process.env.NYLAS_CLIENT_SECRET;
   const redirectUri = process.env.NYLAS_REDIRECT_URI || 'http://localhost:3000/api/nylas/oauth/callback';
 
   if (!clientId || !clientSecret) {
-    throw new Error('Nylas OAuth credentials not configured (neither company-specific nor environment variables found)');
+    throw new Error('Nylas OAuth credentials not configured. Set NYLAS_CLIENT_ID and NYLAS_CLIENT_SECRET environment variables.');
   }
 
   return {

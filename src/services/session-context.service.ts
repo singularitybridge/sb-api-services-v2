@@ -17,11 +17,6 @@ export interface SessionContextData {
     name: string;
     // Add other assistant properties as needed
   };
-  currentDate: string;
-  currentYear: number;
-  currentMonth: string;
-  currentDay: number;
-  currentDayPlusOne: number; // For "tomorrow" references
 }
 
 export const getSessionContextData = async (
@@ -47,11 +42,6 @@ export const getSessionContextData = async (
     throw new Error('Assistant not found');
   }
 
-  // Get current date information
-  const now = new Date();
-  const months = ['January', 'February', 'March', 'April', 'May', 'June',
-                  'July', 'August', 'September', 'October', 'November', 'December'];
-
   return {
     user: {
       name: user.name,
@@ -66,10 +56,5 @@ export const getSessionContextData = async (
       name: assistant.name,
       // Add other assistant properties as needed
     },
-    currentDate: now.toISOString().split('T')[0], // YYYY-MM-DD
-    currentYear: now.getFullYear(),
-    currentMonth: months[now.getMonth()],
-    currentDay: now.getDate(),
-    currentDayPlusOne: now.getDate() + 1, // Tomorrow
   };
 };

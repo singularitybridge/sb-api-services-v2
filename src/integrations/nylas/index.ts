@@ -20,6 +20,8 @@ export { NylasEventCache } from './models/NylasEventCache';
 export { TeamMember } from './models/TeamMember';
 export { AdminActionLog } from './models/AdminActionLog';
 export type { IAdminActionLog } from './models/AdminActionLog';
+export { NylasOAuthToken } from './models/NylasOAuthToken';
+export type { INylasOAuthToken } from './models/NylasOAuthToken';
 
 // Export contact models
 export { ContactMetadata } from './contacts/models/ContactMetadata';
