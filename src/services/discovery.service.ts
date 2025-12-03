@@ -1,6 +1,5 @@
 import { readdirSync, existsSync } from 'fs';
 import { join } from 'path';
-import { pathToFileURL } from 'url';
 import { getLeanResponse } from '../utils/leanResponse';
 
 export interface Integration {
@@ -69,7 +68,7 @@ export const discoveryService = {
 
       let actionObj;
       try {
-        const module = await import(pathToFileURL(actionFilePath).href);
+        const module = await import(actionFilePath);
         const actionCreator = module[config.actionCreator];
 
         if (typeof actionCreator === 'function') {
