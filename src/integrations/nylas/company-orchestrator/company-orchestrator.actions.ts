@@ -177,8 +177,8 @@ export const createCompanyOrchestratorActions = (
         throw new ActionValidationError('Company ID is missing from context');
       }
 
-      if (!context.userEmail) {
-        throw new ActionValidationError('User email is missing from context (organizer email required)');
+      if (!context.userId) {
+        throw new ActionValidationError('User ID is missing from context (organizer required)');
       }
 
       if (participantEmails.length === 0) {
@@ -203,11 +203,18 @@ export const createCompanyOrchestratorActions = (
       return executeAction(
         'nylasScheduleMeetingWithTeam',
         async () => {
+          // Get user information
+          const { User } = await import('../../../models/User');
+          const user = await User.findById(context.userId);
+          if (!user || !user.email) {
+            throw new ActionValidationError('User not found or missing email');
+          }
+
           const result = await scheduleMeetingSafe({
             companyId: context.companyId!,
             organizer: {
-              name: context.userName || 'Meeting Organizer',
-              email: context.userEmail!,
+              name: user.name || user.email.split('@')[0],
+              email: user.email,
             },
             participants: participantEmails.map((email) => ({
               name: email.split('@')[0], // Fallback name from email
@@ -322,18 +329,25 @@ export const createCompanyOrchestratorActions = (
         throw new ActionValidationError('Company ID is missing from context');
       }
 
-      if (!context.userEmail) {
-        throw new ActionValidationError('User email is missing from context');
+      if (!context.userId) {
+        throw new ActionValidationError('User ID is missing from context (organizer required)');
       }
 
       return executeAction(
         'nylasFindAvailabilityAndSchedule',
         async () => {
+          // Get user information
+          const { User } = await import('../../../models/User');
+          const user = await User.findById(context.userId);
+          if (!user || !user.email) {
+            throw new ActionValidationError('User not found or missing email');
+          }
+
           const result = await findAvailabilityAndScheduleSafe({
             companyId: context.companyId!,
             organizer: {
-              name: context.userName || 'Meeting Organizer',
-              email: context.userEmail!,
+              name: user.name || user.email.split('@')[0],
+              email: user.email,
             },
             participantEmails: args.participantEmails,
             duration_minutes: args.durationMinutes,
