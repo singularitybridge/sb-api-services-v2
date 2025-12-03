@@ -14,11 +14,11 @@ import {
   createTeamMeeting,
   createWeeklyTeamMeeting,
   CreateTeamMeetingOutput,
-} from '../../../services/team-meeting.service';
+} from '../services/team-meeting.service';
 import { executeAction } from '../../actions/executor';
 import { ActionValidationError } from '../../../utils/actionErrors';
 import { Team } from '../../../models/Team';
-import { EmailProfile } from '../../../models/EmailProfile';
+import { EmailProfile } from '../models/EmailProfile';
 import { Types } from 'mongoose';
 
 const SERVICE_NAME = 'teamOrchestrationService';

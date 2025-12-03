@@ -14,15 +14,15 @@
  */
 
 import { findUserGrantOrThrow } from './company-calendar.service';
-import { enrichParticipantsWithContacts } from '../integrations/nylas/agents/contacts-agent.service';
+import { enrichParticipantsWithContacts } from '../agents/contacts-agent.service';
 import {
   checkAvailabilityForUsers,
   createCalendarEventForUser,
   calculateDuration,
   type MeetingPayload,
   type TimeSlot,
-} from '../integrations/nylas/agents/calendar-agent.service';
-import { sendMeetingInviteForUser } from '../integrations/nylas/agents/email-agent.service';
+} from '../agents/calendar-agent.service';
+import { sendMeetingInviteForUser } from '../agents/email-agent.service';
 
 // ==========================================
 // Result Type for Functional Error Handling

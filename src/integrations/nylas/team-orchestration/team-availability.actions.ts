@@ -15,7 +15,7 @@ import {
   findOptimalSlots,
   groupSlotsByDate,
   GetTeamAvailabilityOutput,
-} from '../../../services/multi-user-availability.service';
+} from '../services/multi-user-availability.service';
 import { executeAction } from '../../actions/executor';
 import { ActionValidationError } from '../../../utils/actionErrors';
 import { Team } from '../../../models/Team';

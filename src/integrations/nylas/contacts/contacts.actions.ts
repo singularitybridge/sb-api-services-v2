@@ -26,12 +26,12 @@ import { ContactMetadata } from './models/ContactMetadata';
 import { ContactDeletionLog } from './models/ContactDeletionLog';
 import { getApiKey } from '../../../services/api.key.service';
 import mongoose from 'mongoose';
-import { resolveTargetUserGrant } from '../../../services/nylas-grant-resolution.service';
+import { resolveTargetUserGrant } from '../services/nylas-grant-resolution.service';
 import {
   withAdminAudit,
   buildAuditContext,
   shouldSkipAudit,
-} from '../../../middleware/admin-audit.middleware';
+} from '../middleware/admin-audit.middleware';
 
 const SERVICE_NAME = 'nylasService';
 

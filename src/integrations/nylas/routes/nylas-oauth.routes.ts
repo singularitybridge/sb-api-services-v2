@@ -11,7 +11,7 @@
  */
 
 import express, { Router, Request, Response, NextFunction } from 'express';
-import { verifyAccess, AuthenticatedRequest } from '../middleware/auth.middleware';
+import { verifyAccess, AuthenticatedRequest } from '../../../middleware/auth.middleware';
 import {
   getAuthorizationUrl,
   exchangeCodeForGrant,
@@ -25,8 +25,8 @@ import {
   rollbackDeletion,
   listBackups,
 } from '../services/nylas-oauth.service';
-import { User } from '../models/User';
-import { Company } from '../models/Company';
+import { User } from '../../../models/User';
+import { Company } from '../../../models/Company';
 
 const router: Router = express.Router();
 

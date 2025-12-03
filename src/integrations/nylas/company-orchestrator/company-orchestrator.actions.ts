@@ -21,13 +21,13 @@ import {
   scheduleMeetingSafe,
   findAvailabilityAndScheduleSafe,
   type Result,
-} from '../../../services/meeting-orchestrator.service';
+} from '../services/meeting-orchestrator.service';
 import {
   getCompanyScheduleSnapshot,
   getConnectionStats,
-} from '../../../services/company-calendar.service';
-import { checkAvailabilityForUsers } from '../../nylas/agents/calendar-agent.service';
-import type { MeetingPayload } from '../../nylas/agents/calendar-agent.service';
+} from '../services/company-calendar.service';
+import { checkAvailabilityForUsers } from '../agents/calendar-agent.service';
+import type { MeetingPayload } from '../agents/calendar-agent.service';
 
 const SERVICE_NAME = 'nylasCompanyOrchestrator';
 
@@ -472,7 +472,7 @@ export const createCompanyOrchestratorActions = (
         'nylasFindAvailableEmployees',
         async () => {
           // Get all company employees
-          const { NylasAccount } = await import('../../../models/NylasAccount');
+          const { NylasAccount } = await import('../models/NylasAccount');
           const accounts = await NylasAccount.find({
             companyId: context.companyId,
             status: 'active',

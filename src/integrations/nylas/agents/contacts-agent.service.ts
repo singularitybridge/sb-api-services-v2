@@ -16,8 +16,8 @@ import {
   findUserGrant,
   getAllCompanyGrants,
   batchQueryGrants,
-} from '../../../services/company-calendar.service';
-import { NylasEventCache } from '../../../models/NylasEventCache';
+} from '../services/company-calendar.service';
+import { NylasEventCache } from '../models/NylasEventCache';
 
 const NYLAS_API_URL = 'https://api.us.nylas.com';
 

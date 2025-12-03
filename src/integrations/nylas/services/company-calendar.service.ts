@@ -14,13 +14,13 @@
  */
 
 import { NylasAccount } from '../models/NylasAccount';
-import { User } from '../models/User';
+import { User } from '../../../models/User';
 import {
   getCalendarEventsForGrant,
   createCalendarEventForGrant,
   NylasEventMultiUser,
   CreateEventParams,
-} from '../integrations/nylas/nylas-multi-user.service';
+} from '../nylas-multi-user.service';
 
 // ==========================================
 // Core Grant Management

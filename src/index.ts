@@ -83,6 +83,7 @@ import mcpRouter from './routes/mcp.routes';
 import oauthMcpRouter from './routes/oauth-mcp.routes';
 import uiStateRouter from './routes/ui-state.routes';
 import { inviteRouter } from './routes/invite.routes';
+import { oauthRouter as nylasOAuthRouter, webhookRouter as nylasWebhookRouter } from './integrations/nylas';
 
 // Read package.json at startup
 let packageJson: { version: string; name: string };
@@ -194,6 +195,10 @@ app.use(
   verifyAccess(),
   inviteRouter,
 ); // User invite system
+// Nylas OAuth - per-user account connection
+app.use('/api/nylas/oauth', nylasOAuthRouter);
+// Nylas Webhooks - public endpoint (validated via webhook signature)
+app.use('/webhooks', nylasWebhookRouter);
 // MCP Server - custom auth that allows initialize, tools/list, and notifications without auth
 app.use(
   '/api/mcp',

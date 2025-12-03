@@ -21,7 +21,7 @@ import {
 import { NylasWebhook } from '../models/NylasWebhook';
 import { NylasEventCache } from '../models/NylasEventCache';
 import { NylasAccount } from '../models/NylasAccount';
-import { verifyTokenMiddleware } from '../middleware/auth.middleware';
+import { verifyTokenMiddleware } from '../../../middleware/auth.middleware';
 
 const router: Router = express.Router();
 

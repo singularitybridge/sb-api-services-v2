@@ -7,7 +7,7 @@
 
 import mongoose from 'mongoose';
 import { NylasAccount } from '../models/NylasAccount';
-import { User } from '../models/User';
+import { User } from '../../../models/User';
 
 // ==========================================
 // Grant Resolution Functions

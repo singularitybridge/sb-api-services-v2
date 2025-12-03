@@ -11,7 +11,7 @@
  * - Bulk sending for large groups (15+ participants)
  */
 
-import { findUserGrantOrThrow } from '../../../services/company-calendar.service';
+import { findUserGrantOrThrow } from '../services/company-calendar.service';
 import { sendEmailForGrant } from '../nylas-multi-user.service';
 import type { MeetingPayload } from './calendar-agent.service';
 import { calculateDuration, formatDateTime } from './calendar-agent.service';

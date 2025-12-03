@@ -6,11 +6,11 @@
  */
 
 import { Types } from 'mongoose';
-import { Team } from '../models/Team';
+import { Team } from '../../../models/Team';
 import { TeamMember } from '../models/TeamMember';
 import { EmailProfile } from '../models/EmailProfile';
 import { NylasAccount } from '../models/NylasAccount';
-import { createCalendarEventForGrant } from '../integrations/nylas/nylas-multi-user.service';
+import { createCalendarEventForGrant } from '../nylas-multi-user.service';
 
 // ==========================================
 // Types

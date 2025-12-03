@@ -6,14 +6,14 @@
  */
 
 import { Types } from 'mongoose';
-import { Team } from '../models/Team';
+import { Team } from '../../../models/Team';
 import { TeamMember } from '../models/TeamMember';
 import { EmailProfile } from '../models/EmailProfile';
 import { NylasAccount } from '../models/NylasAccount';
 import {
   getCalendarEventsForGrant,
   NylasEventMultiUser,
-} from '../integrations/nylas/nylas-multi-user.service';
+} from '../nylas-multi-user.service';
 
 // ==========================================
 // Types

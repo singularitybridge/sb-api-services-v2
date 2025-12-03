@@ -14,7 +14,7 @@
 import {
   getCompanyWideAvailability,
   findUserGrantOrThrow,
-} from '../../../services/company-calendar.service';
+} from '../services/company-calendar.service';
 import {
   createCalendarEventForGrant,
   updateCalendarEventForGrant,
@@ -22,7 +22,7 @@ import {
   NylasEventMultiUser,
   CreateEventParams,
 } from '../nylas-multi-user.service';
-import { NylasEventCache } from '../../../models/NylasEventCache';
+import { NylasEventCache } from '../models/NylasEventCache';
 
 // ==========================================
 // Types & Interfaces

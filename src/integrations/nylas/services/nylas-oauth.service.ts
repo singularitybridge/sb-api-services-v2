@@ -12,9 +12,9 @@
  */
 
 import axios from 'axios';
-import { getApiKey } from './api.key.service';
+import { getApiKey } from '../../../services/api.key.service';
 import { NylasAccount, INylasAccount } from '../models/NylasAccount';
-import { User } from '../models/User';
+import { User } from '../../../models/User';
 import { EmailProfile } from '../models/EmailProfile';
 import { NylasEventCache } from '../models/NylasEventCache';
 import mongoose, { Types } from 'mongoose';

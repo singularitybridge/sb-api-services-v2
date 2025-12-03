@@ -25,17 +25,17 @@ import {
   verifyDeletionSafety,
   rollbackDeletion,
   listBackups,
-} from '../../services/nylas-oauth.service';
+} from './services/nylas-oauth.service';
 import { createContactActions } from './contacts/contacts.actions';
 import { executeAction } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
-import { resolveTargetUserGrant } from '../../services/nylas-grant-resolution.service';
+import { resolveTargetUserGrant } from './services/nylas-grant-resolution.service';
 import {
   withAdminAudit,
   buildAuditContext,
   shouldSkipAudit,
-} from '../../middleware/admin-audit.middleware';
-import { validateDateRange, validateEventDate, logDateValidation } from '../../utils/date-validation';
+} from './middleware/admin-audit.middleware';
+import { validateDateRange, validateEventDate, logDateValidation } from './utils/date-validation';
 
 const SERVICE_NAME = 'nylasService';
 
@@ -1581,7 +1581,7 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => {
         'nylasSendTeamInvitation',
         async () => {
           const { InviteService } = await import('../../services/invite.service');
-          const { getAuthorizationUrl } = await import('../../services/nylas-oauth.service');
+          const { getAuthorizationUrl } = await import('./services/nylas-oauth.service');
           const { User } = await import('../../models/User');
           const { Company } = await import('../../models/Company');
           const { generateInviteEmailContent } = await import('./invitation/invitation-email-template');
