@@ -7,7 +7,6 @@ export interface IUser extends Document {
   companyId: mongoose.Types.ObjectId;
   role: 'Admin' | 'CompanyUser';
   identifiers: { key: string; value: string }[];
-  authTokens?: { token: string; createdAt: Date }[]; // For Nylas OAuth callback authentication
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,12 +27,6 @@ const UserSchema: Schema = new Schema(
       default: 'CompanyUser',
     },
     identifiers: [{ key: String, value: String }],
-    authTokens: [
-      {
-        token: { type: String, required: true },
-        createdAt: { type: Date, default: Date.now },
-      },
-    ],
   },
   { timestamps: true },
 );

@@ -28,8 +28,6 @@ export type ApiKeyType =
   | 'aws_access_key_id'
   | 'aws_secret_access_key'
   | 'aws_bedrock_kb_id'
-  | 'nylas_client_id' // Nylas OAuth credentials
-  | 'nylas_client_secret'
   | 'aws_region'
   | 'nylas_api_key'
   | 'nylas_grant_id';

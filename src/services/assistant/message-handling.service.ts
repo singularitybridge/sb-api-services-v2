@@ -2,7 +2,6 @@ import { Session } from '../../models/Session';
 import { Assistant } from '../../models/Assistant';
 import { Message, IMessage } from '../../models/Message'; // Added IMessage
 import { processTemplate } from '../template.service';
-import { getSessionContextData } from '../session-context.service';
 import { SupportedLanguage } from '../discovery.service'; // Added import
 import mongoose from 'mongoose';
 import { getMessagesBySessionId } from '../../services/message.service';
@@ -656,28 +655,6 @@ export const handleSessionMessage = async (
     `[handleSessionMessage] System prompt processed for session ${sessionId}`,
   );
 
-  // Global date injection for Nylas integration agents
-  let finalSystemPrompt = systemPrompt;
-  const hasNylasActions = assistant.allowedActions?.some(action =>
-    action.startsWith('nylas.')
-  );
-
-  if (hasNylasActions) {
-    const contextData = await getSessionContextData(sessionId.toString());
-    const dateContext = `\n\n## IMPORTANT: Current Date and Time\n\n**Today's date: ${contextData.currentMonth} ${contextData.currentDay}, ${contextData.currentYear}** (${contextData.currentDate})\n- Current year: ${contextData.currentYear}\n- Tomorrow is: ${contextData.currentMonth} ${contextData.currentDayPlusOne}, ${contextData.currentYear}\n- ALWAYS use ${contextData.currentYear} or later for all future events\n- Use ISO 8601 format: ${contextData.currentYear}-MM-DDTHH:MM:SS+TZ`;
-
-    finalSystemPrompt = systemPrompt + dateContext;
-    console.log(`[DATE INJECTION] Added current date context for Nylas agent: ${contextData.currentMonth} ${contextData.currentDay}, ${contextData.currentYear}`);
-  }
-
-  // DEBUG: Log date-related content from processed prompt
-  const dateMatch = finalSystemPrompt.match(/Today's date:([^\n]*)/);
-  if (dateMatch) {
-    console.log(`[DEBUG] Date found in final prompt: "Today's date:${dateMatch[1]}"`);
-  } else {
-    console.log('[DEBUG] No "Today\'s date:" in final prompt (this is only expected for non-Nylas agents)');
-  }
-
   // Construct user message content for LLM
   // The userMessageForLlm will now use the userMessageContentParts array
   const userMessageForLlm: ModelMessage = {
@@ -765,7 +742,7 @@ export const handleSessionMessage = async (
   if (providerKey === 'anthropic') {
     // console.log('Anthropic provider: Prepending system prompt to messages array as well.');
     trimmedMessages = [
-      { role: 'system', content: finalSystemPrompt },
+      { role: 'system', content: systemPrompt },
       ...trimmedMessages.filter((m) => m.role !== 'system'),
     ];
   }
@@ -801,8 +778,8 @@ export const handleSessionMessage = async (
         maxRetries: 2,
         stopWhen: stepCountIs(5), // Stop after 5 tool steps
       };
-      if (finalSystemPrompt !== undefined) {
-        streamCallOptions.system = finalSystemPrompt;
+      if (systemPrompt !== undefined) {
+        streamCallOptions.system = systemPrompt;
       }
 
       // Add provider-specific options from model config
@@ -1243,8 +1220,8 @@ export const handleSessionMessage = async (
         maxRetries: 2,
         stopWhen: stepCountIs(5), // Stop after 5 tool steps
       };
-      if (finalSystemPrompt !== undefined) {
-        generateCallOptions.system = finalSystemPrompt;
+      if (systemPrompt !== undefined) {
+        generateCallOptions.system = systemPrompt;
       }
 
       // Add provider-specific options from model config (non-streaming)
