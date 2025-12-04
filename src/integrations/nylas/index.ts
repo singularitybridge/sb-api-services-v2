@@ -35,3 +35,25 @@ export * from './services/nylas-grant-resolution.service';
 
 // Export types
 export type { NylasEventMultiUser, CreateEventParams } from './nylas-multi-user.service';
+
+/**
+ * Integration Registration Function
+ *
+ * Called by the integration loader to register Nylas routes dynamically.
+ * This keeps the main application agnostic to specific integrations.
+ *
+ * @param app Express application instance
+ */
+export async function register(app: any): Promise<void> {
+  // Dynamically import routes to avoid loading them at module load time
+  const { default: oauthRouter } = await import('./routes/nylas-oauth.routes');
+  const { default: webhookRouter } = await import('./routes/nylas-webhook.routes');
+
+  // Register OAuth routes
+  app.use('/api/nylas/oauth', oauthRouter);
+  console.log('[NYLAS] Registered OAuth routes at /api/nylas/oauth');
+
+  // Register webhook routes
+  app.use('/webhooks', webhookRouter);
+  console.log('[NYLAS] Registered webhook routes at /webhooks');
+}
