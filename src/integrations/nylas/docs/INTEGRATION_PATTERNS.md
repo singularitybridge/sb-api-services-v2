@@ -14,6 +14,121 @@ This document explains the architectural decisions made to keep the Nylas integr
 - Simpler to add/remove integrations
 - Reduced risk of breaking core services
 
+## Dynamic Plugin Loader Architecture
+
+**The Ultimate Pattern**: Zero imports in core application (`src/index.ts`)
+
+### Problem
+Even with self-contained integrations, requiring imports in `src/index.ts` creates coupling:
+```typescript
+// ❌ Core system depends on specific integration
+import { oauthRouter, webhookRouter } from './integrations/nylas';
+app.use('/api/nylas/oauth', oauthRouter);
+```
+
+**Issues**:
+- Core system knows about specific integrations
+- Violates "agnostic" architecture principle
+- Security risk: buggy integration code loads into main process
+- Requires code changes to add/remove integrations
+
+### Solution: Auto-Discovery Plugin System
+
+**Architecture**:
+```
+src/
+├── index.ts                    # ✅ NO integration imports
+├── integrations/
+│   ├── loader.ts               # Plugin auto-discovery system
+│   ├── nylas/
+│   │   ├── index.ts            # Exports register(app) function
+│   │   ├── routes/
+│   │   ├── services/
+│   │   └── ...
+│   ├── linear/
+│   └── sendgrid/
+```
+
+**Implementation**:
+
+```typescript
+// src/index.ts - Zero knowledge of specific integrations
+import { loadIntegrations } from './integrations/loader';
+
+(async () => {
+  await loadIntegrations(app);  // Auto-discovers and loads
+  server.listen(port);
+})();
+```
+
+```typescript
+// src/integrations/nylas/index.ts - Self-registering integration
+export async function register(app: Express): Promise<void> {
+  const { default: oauthRouter } = await import('./routes/nylas-oauth.routes');
+  const { default: webhookRouter } = await import('./routes/nylas-webhook.routes');
+
+  app.use('/api/nylas/oauth', oauthRouter);
+  app.use('/webhooks', webhookRouter);
+
+  console.log('[NYLAS] Registered routes');
+}
+```
+
+```typescript
+// src/integrations/loader.ts - Generic plugin loader
+export async function loadIntegrations(app: Express) {
+  const integrationDirs = fs.readdirSync(__dirname)
+    .filter(dir => fs.statSync(path.join(__dirname, dir)).isDirectory());
+
+  for (const dir of integrationDirs) {
+    const integration = await import(`./${dir}`);
+    if (integration.register) {
+      await integration.register(app);
+    }
+  }
+}
+```
+
+### Benefits
+
+✅ **Zero Core Dependencies**: `src/index.ts` has no integration-specific imports
+✅ **True Plugin Architecture**: Integrations are discovered and loaded dynamically
+✅ **Security Isolation**: Core system doesn't directly import integration code
+✅ **Configuration-Driven**: Enable/disable integrations via environment variables
+✅ **No Code Changes**: Add/remove integrations without modifying core code
+
+### Configuration
+
+```bash
+# .env
+# Enable specific integrations (comma-separated)
+ENABLED_INTEGRATIONS=nylas,linear,sendgrid
+
+# Or enable all integrations (default)
+ENABLED_INTEGRATIONS=
+```
+
+### Migration Path
+
+**From**: Direct import pattern
+```typescript
+// src/index.ts
+import { oauthRouter } from './integrations/nylas';
+app.use('/api/nylas/oauth', oauthRouter);
+```
+
+**To**: Plugin pattern
+```typescript
+// src/index.ts
+import { loadIntegrations } from './integrations/loader';
+await loadIntegrations(app);
+
+// src/integrations/nylas/index.ts
+export async function register(app: Express) {
+  // Register routes dynamically
+}
+```
+
 ## Patterns Used in Nylas Integration
 
 ### 1. OAuth Token Storage (Replacing User Model Pollution)
@@ -263,28 +378,66 @@ src/integrations/nylas/
     └── ...
 ```
 
-## Minimal External Changes
+## Zero External Changes Required
 
-Only **ONE** external change is required:
+Thanks to the Dynamic Plugin Loader pattern, **ZERO external changes** are required in core application files.
 
-### Required: Route Registration in Core App
+### Before: Manual Route Registration (Deprecated)
 
 ```typescript
 // Location: src/index.ts
+// ❌ OLD PATTERN: Direct import creates coupling
 
 import {
   oauthRouter as nylasOAuthRouter,
   webhookRouter as nylasWebhookRouter
 } from './integrations/nylas';
 
-// Register routes
 app.use('/api/nylas/oauth', nylasOAuthRouter);
 app.use('/api/nylas/webhook', nylasWebhookRouter);
 ```
 
-**Why Required**: Express routes must be registered in the main application.
+**Problems**:
+- Core system explicitly imports integration code
+- Every integration requires code changes in `index.ts`
+- Violates agnostic architecture principle
 
-**Pattern**: This is the same for ALL integrations (Linear, SendGrid, etc.).
+### After: Auto-Discovery Plugin System (Current)
+
+```typescript
+// Location: src/index.ts
+// ✅ NEW PATTERN: Generic loader, no integration knowledge
+
+import { loadIntegrations } from './integrations/loader';
+
+(async () => {
+  await loadIntegrations(app);  // Discovers and loads all integrations
+  server.listen(port);
+})();
+```
+
+**Benefits**:
+- Zero integration-specific code in core application
+- Integrations self-register via `register(app)` function
+- Add/remove integrations without touching `index.ts`
+- True plugin architecture
+
+### Integration Self-Registration
+
+Each integration with HTTP routes exports a `register` function:
+
+```typescript
+// Location: src/integrations/nylas/index.ts
+export async function register(app: Express): Promise<void> {
+  const { default: oauthRouter } = await import('./routes/nylas-oauth.routes');
+  const { default: webhookRouter } = await import('./routes/nylas-webhook.routes');
+
+  app.use('/api/nylas/oauth', oauthRouter);
+  app.use('/webhooks', webhookRouter);
+}
+```
+
+**Result**: Integration is completely self-contained. The core system has no knowledge of Nylas or any other integration.
 
 ## Migration Guide: Removing External Dependencies
 
@@ -342,18 +495,23 @@ git diff main src/services/
 ## Summary
 
 ✅ **DO**:
+- **Implement `register(app)` function** for HTTP route integrations
 - Create integration-specific models in `models/`
 - Use environment variables for configuration
 - Include context in prompts or action descriptions
 - Export everything through `index.ts`
 - Keep 100% of business logic in integration folder
+- Self-register routes without requiring core changes
 
 ❌ **DON'T**:
+- Add imports to `src/index.ts` (use plugin loader instead)
 - Add fields to core models (User, Company, etc.)
 - Add keys to shared ApiKeyService
 - Add integration logic to core services
 - Import deeply from core services
 - Create cross-integration dependencies
+
+🎯 **Ultimate Goal**: Integration can be deleted by removing its folder. Zero changes to core application files.
 
 ## Questions?
 

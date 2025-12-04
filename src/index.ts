@@ -83,7 +83,7 @@ import mcpRouter from './routes/mcp.routes';
 import oauthMcpRouter from './routes/oauth-mcp.routes';
 import uiStateRouter from './routes/ui-state.routes';
 import { inviteRouter } from './routes/invite.routes';
-import { oauthRouter as nylasOAuthRouter, webhookRouter as nylasWebhookRouter } from './integrations/nylas';
+import { loadIntegrations } from './integrations/loader';
 
 // Read package.json at startup
 let packageJson: { version: string; name: string };
@@ -195,10 +195,6 @@ app.use(
   verifyAccess(),
   inviteRouter,
 ); // User invite system
-// Nylas OAuth - per-user account connection
-app.use('/api/nylas/oauth', nylasOAuthRouter);
-// Nylas Webhooks - public endpoint (validated via webhook signature)
-app.use('/webhooks', nylasWebhookRouter);
 // MCP Server - custom auth that allows initialize, tools/list, and notifications without auth
 app.use(
   '/api/mcp',
@@ -254,13 +250,23 @@ app.use(errorHandler);
 export default app;
 
 if (process.env.NODE_ENV !== 'test') {
-  // Use the HTTP server instead of the Express app to listen
-  server.listen(port, () => {
-    logger.info(`Server is running on port ${port}`);
-    logger.info(
-      `WebSocket server is available at ws://localhost:${port}/realtime`,
-    );
-  });
+  // Load integrations dynamically before starting server
+  (async () => {
+    try {
+      await loadIntegrations(app);
+
+      // Use the HTTP server instead of the Express app to listen
+      server.listen(port, () => {
+        logger.info(`Server is running on port ${port}`);
+        logger.info(
+          `WebSocket server is available at ws://localhost:${port}/realtime`,
+        );
+      });
+    } catch (error) {
+      logger.error('Failed to load integrations:', error);
+      process.exit(1);
+    }
+  })();
 
   // Cleanup handlers for graceful shutdown
   const gracefulShutdown = async () => {
