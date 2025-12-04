@@ -1,0 +1,120 @@
+name: Deploy to Production
+
+# MANUAL DEPLOYMENT ONLY
+# This workflow requires manual approval and can only be triggered from the GitHub Actions UI
+#
+# Workflow:
+# 1. Merge PR to main branch in singularitybridge/nylas-service
+# 2. Go to Actions tab → Deploy to Production → Run workflow
+# 3. Select branch (usually 'main')
+# 4. Click "Run workflow"
+# 5. Deployment will execute with health checks
+#
+# Note: Deployment secrets are only available in the organization repository,
+# not in forks. This ensures secure, controlled deployments.
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to deploy'
+        required: true
+        default: 'main'
+        type: choice
+        options:
+          - main
+          - develop
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+jobs:
+  deploy:
+    name: Deploy to Hetzner (Coolify)
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || 'main' }}
+
+      - name: Show deployment info
+        run: |
+          echo "🚀 Deploying Nylas Microservices"
+          echo "Branch: ${{ github.event.inputs.branch || 'main' }}"
+          echo "Environment: ${{ github.event.inputs.environment || 'production' }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Repository: ${{ github.repository }}"
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.HETZNER_HOST }}
+          username: ${{ secrets.HETZNER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            echo "🚀 Starting deployment..."
+            
+            # Navigate to deployment directory
+            cd /var/lib/coolify/applications/nylas-service || exit 1
+            
+            # Pull latest code
+            echo "📥 Pulling latest code from main..."
+            git pull origin main || exit 1
+            
+            # Stop existing containers
+            echo "🛑 Stopping existing containers..."
+            docker-compose -f docker-compose.prod.yml down
+            
+            # Build and start new containers
+            echo "🔨 Building and starting new containers..."
+            docker-compose -f docker-compose.prod.yml up -d --build
+            
+            # Wait for services to start
+            echo "⏳ Waiting for services to start..."
+            sleep 15
+            
+            # Health checks
+            echo "🏥 Running health checks..."
+            
+            if ! curl -f http://127.0.0.1:3001/health; then
+              echo "❌ Nylas API health check failed"
+              docker-compose -f docker-compose.prod.yml logs nylas-api
+              exit 1
+            fi
+            
+            if ! curl -f http://127.0.0.1:3002/health; then
+              echo "❌ Nylas Webhooks health check failed"
+              docker-compose -f docker-compose.prod.yml logs nylas-webhooks
+              exit 1
+            fi
+            
+            echo "✅ Health checks passed"
+            
+            # Show container status
+            echo "📊 Container status:"
+            docker-compose -f docker-compose.prod.yml ps
+            
+            # Cleanup old images
+            echo "🧹 Cleaning up old Docker images..."
+            docker image prune -f
+            
+            echo "🎉 Deployment successful!"
+
+      - name: Notify on success
+        if: success()
+        run: echo "✅ Deployment to production completed successfully"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed - check the logs above"
+          echo "To rollback, SSH to server and run: cd /var/lib/coolify/applications/nylas-service && git checkout <previous-commit> && docker-compose -f docker-compose.prod.yml up -d --build"
