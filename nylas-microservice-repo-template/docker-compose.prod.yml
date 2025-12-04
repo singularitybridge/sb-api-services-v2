@@ -1,0 +1,69 @@
+# Docker Compose for Production Deployment
+version: '3.8'
+
+services:
+  nylas-api:
+    build:
+      context: ./services/nylas-api
+      dockerfile: Dockerfile
+    container_name: nylas-api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"  # Bind to localhost only for security
+    environment:
+      - NODE_ENV=production
+      - NYLAS_SERVICE_PORT=3001
+      - NYLAS_SERVICE_HOST=0.0.0.0
+      - NYLAS_CLIENT_ID=${NYLAS_CLIENT_ID}
+      - NYLAS_CLIENT_SECRET=${NYLAS_CLIENT_SECRET}
+      - NYLAS_API_URL=${NYLAS_API_URL:-https://api.us.nylas.com}
+      - NYLAS_REDIRECT_URI=${NYLAS_REDIRECT_URI}
+      - NYLAS_SUCCESS_REDIRECT=${NYLAS_SUCCESS_REDIRECT}
+      - NYLAS_ERROR_REDIRECT=${NYLAS_ERROR_REDIRECT}
+    networks:
+      - singularitybridge-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nylas-webhooks:
+    build:
+      context: ./services/nylas-webhooks
+      dockerfile: Dockerfile
+    container_name: nylas-webhooks
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3002:3002"  # Bind to localhost only for security
+    environment:
+      - NODE_ENV=production
+      - NYLAS_WEBHOOK_PORT=3002
+      - NYLAS_WEBHOOK_HOST=0.0.0.0
+      - NYLAS_WEBHOOK_SECRET=${NYLAS_WEBHOOK_SECRET}
+      - NYLAS_API_URL=${NYLAS_API_URL:-https://api.us.nylas.com}
+      - MONGODB_URI=${MONGODB_URI}
+    networks:
+      - singularitybridge-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  singularitybridge-network:
+    external: true  # Connect to main app's network
+    name: singularitybridge-network

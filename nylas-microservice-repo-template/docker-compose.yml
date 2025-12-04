@@ -1,0 +1,64 @@
+# Docker Compose for Local Development
+version: '3.8'
+
+services:
+  nylas-api:
+    build:
+      context: ./services/nylas-api
+      dockerfile: Dockerfile
+    container_name: nylas-api-dev
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - NYLAS_SERVICE_PORT=3001
+      - NYLAS_SERVICE_HOST=0.0.0.0
+      - NYLAS_CLIENT_ID=${NYLAS_CLIENT_ID}
+      - NYLAS_CLIENT_SECRET=${NYLAS_CLIENT_SECRET}
+      - NYLAS_API_URL=${NYLAS_API_URL:-https://api.us.nylas.com}
+      - NYLAS_REDIRECT_URI=${NYLAS_REDIRECT_URI:-http://localhost:3001/oauth/callback}
+      - NYLAS_SUCCESS_REDIRECT=${NYLAS_SUCCESS_REDIRECT:-http://localhost:5173/settings/integrations?connected=true}
+      - NYLAS_ERROR_REDIRECT=${NYLAS_ERROR_REDIRECT:-http://localhost:5173/settings/integrations?error=auth_failed}
+    volumes:
+      - ./services/nylas-api/src:/app/src  # Hot reload for development
+      - ./services/nylas-api/dist:/app/dist
+    networks:
+      - nylas-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  nylas-webhooks:
+    build:
+      context: ./services/nylas-webhooks
+      dockerfile: Dockerfile
+    container_name: nylas-webhooks-dev
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - NYLAS_WEBHOOK_PORT=3002
+      - NYLAS_WEBHOOK_HOST=0.0.0.0
+      - NYLAS_WEBHOOK_SECRET=${NYLAS_WEBHOOK_SECRET}
+      - NYLAS_API_URL=${NYLAS_API_URL:-https://api.us.nylas.com}
+    volumes:
+      - ./services/nylas-webhooks/src:/app/src  # Hot reload for development
+      - ./services/nylas-webhooks/dist:/app/dist
+    networks:
+      - nylas-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  nylas-network:
+    driver: bridge
+    name: nylas-network

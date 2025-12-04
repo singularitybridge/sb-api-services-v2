@@ -4,10 +4,11 @@
  * Provides CRUD operations for Google Contacts through Nylas API v3
  */
 
-import axios from 'axios';
+import { getNylasClient } from '../../../lib/nylas-client';
 import { getApiKey } from '../../../services/api.key.service';
 
-const NYLAS_API_URL = 'https://api.us.nylas.com';
+// Get singleton Nylas client instance
+const nylasClient = getNylasClient();
 
 // ==========================================
 // Grant Resolution Helper
@@ -77,56 +78,6 @@ export interface NylasContact {
 }
 
 // ==========================================
-// Utility Functions
-// ==========================================
-
-async function makeNylasRequest<T>(
-  apiKey: string,
-  endpoint: string,
-  options: {
-    method?: string;
-    body?: any;
-  } = {},
-): Promise<T> {
-  const url = `${NYLAS_API_URL}${endpoint}`;
-  const { method = 'GET', body } = options;
-
-  try {
-    const response = await axios({
-      url,
-      method,
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      data: body,
-    });
-
-    return response.data;
-  } catch (error: any) {
-    const status = error.response?.status;
-    const errorData = error.response?.data;
-
-    let errorMessage = `Nylas API request failed: ${status || error.message}`;
-
-    if (errorData?.error) {
-      errorMessage =
-        typeof errorData.error === 'string'
-          ? errorData.error
-          : JSON.stringify(errorData.error);
-    } else if (errorData?.message) {
-      errorMessage = errorData.message;
-    } else if (errorData?.error_description) {
-      errorMessage = errorData.error_description;
-    }
-
-    console.error(`[NYLAS CONTACTS ERROR] ${errorMessage}`);
-    throw new Error(errorMessage);
-  }
-}
-
-// ==========================================
 // Contact Management Functions
 // ==========================================
 
@@ -138,20 +89,23 @@ export async function getContacts(
   options: { limit?: number; email?: string; grantId?: string } = {},
 ): Promise<NylasContact[]> {
   const { limit = 50, email, grantId: userGrantId } = options;
-  const { apiKey, grantId } = await getNylasCredentials(companyId, userGrantId);
-
-  let endpoint = `/v3/grants/${grantId}/contacts?limit=${limit}`;
-
-  if (email) {
-    endpoint += `&email=${encodeURIComponent(email)}`;
-  }
+  const { grantId } = await getNylasCredentials(companyId, userGrantId);
 
   console.log('[NYLAS CONTACTS] Getting contacts:', { limit, email });
 
-  const response = await makeNylasRequest<{ data: NylasContact[] }>(
-    apiKey,
-    endpoint,
-  );
+  // Use microservice via NylasClient
+  let response;
+  if (email) {
+    // If filtering by email, use search endpoint
+    response = await nylasClient.searchContacts({
+      grantId,
+      email,
+      limit,
+    });
+  } else {
+    // Otherwise use list endpoint
+    response = await nylasClient.listContacts(grantId, { limit });
+  }
 
   console.log('[NYLAS CONTACTS] Got contacts:', response.data?.length || 0);
 
@@ -174,9 +128,10 @@ export async function createContact(
   },
 ): Promise<NylasContact> {
   const { grantId: userGrantId } = contact;
-  const { apiKey, grantId } = await getNylasCredentials(companyId, userGrantId);
+  const { grantId } = await getNylasCredentials(companyId, userGrantId);
 
   const payload: any = {
+    grantId,
     emails: [{ email: contact.email, type: 'work' }],
   };
 
@@ -202,21 +157,12 @@ export async function createContact(
 
   console.log('[NYLAS CONTACTS] Creating contact:', payload);
 
-  const endpoint = `/v3/grants/${grantId}/contacts`;
-  const response = await makeNylasRequest<{ data: NylasContact } | NylasContact>(
-    apiKey,
-    endpoint,
-    {
-      method: 'POST',
-      body: payload,
-    },
-  );
+  // Use microservice via NylasClient
+  const response = await nylasClient.createContact(payload);
 
-  const contactData = 'data' in response ? response.data : response;
+  console.log('[NYLAS CONTACTS] Contact created:', response.data.id);
 
-  console.log('[NYLAS CONTACTS] Contact created:', contactData.id);
-
-  return contactData;
+  return response.data;
 }
 
 /**
@@ -236,7 +182,7 @@ export async function updateContact(
   },
 ): Promise<NylasContact> {
   const { grantId: userGrantId } = updates;
-  const { apiKey, grantId } = await getNylasCredentials(companyId, userGrantId);
+  const { grantId } = await getNylasCredentials(companyId, userGrantId);
 
   const payload: any = {};
 
@@ -266,21 +212,12 @@ export async function updateContact(
 
   console.log('[NYLAS CONTACTS] Updating contact:', contactId, payload);
 
-  const endpoint = `/v3/grants/${grantId}/contacts/${contactId}`;
-  const response = await makeNylasRequest<{ data: NylasContact } | NylasContact>(
-    apiKey,
-    endpoint,
-    {
-      method: 'PUT',
-      body: payload,
-    },
-  );
+  // Use microservice via NylasClient
+  const response = await nylasClient.updateContact(grantId, contactId, payload);
 
-  const contactData = 'data' in response ? response.data : response;
+  console.log('[NYLAS CONTACTS] Contact updated:', response.data.id);
 
-  console.log('[NYLAS CONTACTS] Contact updated:', contactData.id);
-
-  return contactData;
+  return response.data;
 }
 
 /**
@@ -295,23 +232,18 @@ export async function getContactById(
 
   console.log('[NYLAS CONTACTS] Getting contact by ID:', contactId);
 
-  const endpoint = `/v3/grants/${credentials.grantId}/contacts/${contactId}`;
-  const response = await makeNylasRequest<{ data: NylasContact } | NylasContact>(
-    credentials.apiKey,
-    endpoint,
-  );
+  // Use microservice via NylasClient
+  const response = await nylasClient.getContact(credentials.grantId, contactId);
 
-  const contactData = 'data' in response ? response.data : response;
-
-  console.log('[NYLAS CONTACTS] Contact retrieved:', contactData.id);
+  console.log('[NYLAS CONTACTS] Contact retrieved:', response.data.id);
 
   // DEBUG: Log emails field type and value
-  console.log('[DEBUG SERVICE] contactData.emails type:', typeof contactData.emails);
-  console.log('[DEBUG SERVICE] contactData.emails value:', contactData.emails);
-  console.log('[DEBUG SERVICE] contactData.emails JSON:', JSON.stringify(contactData.emails));
-  console.log('[DEBUG SERVICE] Is Array:', Array.isArray(contactData.emails));
+  console.log('[DEBUG SERVICE] contactData.emails type:', typeof response.data.emails);
+  console.log('[DEBUG SERVICE] contactData.emails value:', response.data.emails);
+  console.log('[DEBUG SERVICE] contactData.emails JSON:', JSON.stringify(response.data.emails));
+  console.log('[DEBUG SERVICE] Is Array:', Array.isArray(response.data.emails));
 
-  return contactData;
+  return response.data;
 }
 
 /**
@@ -326,10 +258,8 @@ export async function deleteContact(
 
   console.log('[NYLAS CONTACTS] Deleting contact:', contactId);
 
-  const endpoint = `/v3/grants/${credentials.grantId}/contacts/${contactId}`;
-  await makeNylasRequest(credentials.apiKey, endpoint, {
-    method: 'DELETE',
-  });
+  // Use microservice via NylasClient
+  await nylasClient.deleteContact(credentials.grantId, contactId);
 
   console.log('[NYLAS CONTACTS] Contact deleted:', contactId);
 }
@@ -358,19 +288,15 @@ export async function searchContacts(
   const { limit = 50, name, email, phone, companyName } = criteria;
   const credentials = await getNylasCredentials(companyId, grantId);
 
-  // Fetch contacts (Nylas API supports email filter, rest is client-side)
-  let endpoint = `/v3/grants/${credentials.grantId}/contacts?limit=${Math.max(limit, 100)}`;
-
-  if (email) {
-    endpoint += `&email=${encodeURIComponent(email)}`;
-  }
-
   console.log('[NYLAS CONTACTS] Searching contacts:', criteria);
 
-  const response = await makeNylasRequest<{ data: NylasContact[] }>(
-    credentials.apiKey,
-    endpoint,
-  );
+  // Use microservice via NylasClient
+  const response = await nylasClient.searchContacts({
+    grantId: credentials.grantId,
+    email,
+    phone,
+    limit: Math.max(limit, 100),
+  });
 
   let contacts = response.data || [];
 
@@ -381,13 +307,6 @@ export async function searchContacts(
       const fullName = `${c.given_name || ''} ${c.surname || ''}`.toLowerCase();
       return fullName.includes(lowerName);
     });
-  }
-
-  if (phone) {
-    const cleanPhone = phone.replace(/\D/g, ''); // Remove non-digits
-    contacts = contacts.filter(c =>
-      c.phone_numbers?.some(p => p.number.replace(/\D/g, '').includes(cleanPhone))
-    );
   }
 
   if (companyName) {
@@ -417,12 +336,8 @@ export async function findDuplicates(
 
   console.log('[NYLAS CONTACTS] Finding duplicates...');
 
-  // Fetch all contacts
-  const endpoint = `/v3/grants/${credentials.grantId}/contacts?limit=${limit}`;
-  const response = await makeNylasRequest<{ data: NylasContact[] }>(
-    credentials.apiKey,
-    endpoint,
-  );
+  // Use microservice via NylasClient to fetch all contacts
+  const response = await nylasClient.listContacts(credentials.grantId, { limit });
 
   const contacts = response.data || [];
   const duplicates: Array<{ contacts: NylasContact[]; reason: string }> = [];

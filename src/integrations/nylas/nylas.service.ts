@@ -1,5 +1,48 @@
-import axios from 'axios';
+import { getNylasClient } from '../../lib/nylas-client';
 import { getApiKey } from '../../services/api.key.service';
+import axios from 'axios';
+
+// Get singleton Nylas client instance
+const nylasClient = getNylasClient();
+
+// Temporary: Direct API URL for legacy functions that don't have microservice endpoints yet
+const NYLAS_API_URL = 'https://api.us.nylas.com';
+
+// Temporary: Helper for legacy functions that don't have microservice endpoints yet
+// TODO: Remove this once all endpoints are migrated to microservice
+async function makeNylasRequestLegacy<T>(
+  apiKey: string,
+  endpoint: string,
+  options: { method?: string; body?: any } = {},
+): Promise<T> {
+  const url = `${NYLAS_API_URL}${endpoint}`;
+  const { method = 'GET', body } = options;
+
+  try {
+    const response = await axios({
+      url,
+      method,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      data: body,
+    });
+    return response.data;
+  } catch (error: any) {
+    const status = error.response?.status;
+    const errorData = error.response?.data;
+    let errorMessage = `Nylas API request failed: ${status || error.message}`;
+    if (errorData?.error) {
+      errorMessage = typeof errorData.error === 'string' ? errorData.error : JSON.stringify(errorData.error);
+    } else if (errorData?.message) {
+      errorMessage = errorData.message;
+    }
+    console.error('Nylas API Error:', { status, url, error: errorData });
+    throw new Error(errorMessage);
+  }
+}
 
 // ==========================================
 // Grant Resolution Helper
@@ -33,8 +76,6 @@ async function getNylasCredentials(
 
   return { apiKey, grantId: companyGrantId };
 }
-
-const NYLAS_API_URL = 'https://api.us.nylas.com';
 
 interface NylasEmailRecipient {
   email: string;
@@ -79,75 +120,21 @@ interface NylasGrant {
   email: string;
 }
 
-async function makeNylasRequest<T>(
-  apiKey: string,
-  endpoint: string,
-  options: {
-    method?: string;
-    body?: any;
-  } = {},
-): Promise<T> {
-  const url = `${NYLAS_API_URL}${endpoint}`;
-  const { method = 'GET', body } = options;
-
-  try {
-    const response = await axios({
-      url,
-      method,
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      data: body,
-    });
-
-    return response.data;
-  } catch (error: any) {
-    const status = error.response?.status;
-    const errorData = error.response?.data;
-
-    let errorMessage = `Nylas API request failed: ${status || error.message}`;
-
-    if (errorData?.error) {
-      errorMessage =
-        typeof errorData.error === 'string'
-          ? errorData.error
-          : JSON.stringify(errorData.error);
-    } else if (errorData?.message) {
-      errorMessage = errorData.message;
-    } else if (errorData?.error_description) {
-      errorMessage = errorData.error_description;
-    }
-
-    console.error('Nylas API Error:', {
-      status,
-      url,
-      error: errorData,
-    });
-
-    throw new Error(errorMessage);
-  }
-}
-
 // Email functions
 export async function getEmails(
   companyId: string,
   options: { limit?: number; unread?: boolean; grantId?: string } = {},
 ): Promise<NylasEmail[]> {
   const { limit = 10, unread, grantId: userGrantId } = options;
-  const { apiKey, grantId } = await getNylasCredentials(companyId, userGrantId);
+  const { grantId } = await getNylasCredentials(companyId, userGrantId);
 
-  let endpoint = `/v3/grants/${grantId}/messages?limit=${limit}`;
+  // Use microservice via NylasClient
+  const response = await nylasClient.searchEmails({
+    grantId,
+    limit,
+    unread,
+  });
 
-  if (unread) {
-    endpoint += '&unread=true';
-  }
-
-  const response = await makeNylasRequest<{ data: NylasEmail[] }>(
-    apiKey,
-    endpoint,
-  );
   return response.data || [];
 }
 
@@ -158,12 +145,9 @@ export async function getEmailById(
 ): Promise<NylasEmail> {
   const credentials = await getNylasCredentials(companyId, grantId);
 
-  const endpoint = `/v3/grants/${credentials.grantId}/messages/${messageId}`;
-  const response = await makeNylasRequest<{ data: NylasEmail } | NylasEmail>(
-    credentials.apiKey,
-    endpoint,
-  );
-  return 'data' in response ? response.data : response;
+  // Use microservice via NylasClient
+  const response = await nylasClient.getEmail(credentials.grantId, messageId);
+  return response.data;
 }
 
 export async function sendEmail(
@@ -178,32 +162,24 @@ export async function sendEmail(
   },
 ): Promise<{ id: string; thread_id: string }> {
   const { to, subject, body, cc, bcc, grantId: userGrantId } = params;
-  const { apiKey, grantId } = await getNylasCredentials(companyId, userGrantId);
+  const { grantId } = await getNylasCredentials(companyId, userGrantId);
 
-  const endpoint = `/v3/grants/${grantId}/messages/send`;
+  // Prepare participants in the format microservice expects
+  const toParticipants = Array.isArray(to) ? to.map((email) => ({ email })) : [{ email: to }];
+  const ccParticipants = cc ? (Array.isArray(cc) ? cc.map((email) => ({ email })) : [{ email: cc }]) : undefined;
+  const bccParticipants = bcc ? (Array.isArray(bcc) ? bcc.map((email) => ({ email })) : [{ email: bcc }]) : undefined;
 
-  const payload: any = {
-    to: Array.isArray(to) ? to.map((email) => ({ email })) : [{ email: to }],
+  // Use microservice via NylasClient
+  const response = await nylasClient.sendEmail({
+    grantId,
+    to: toParticipants,
     subject,
     body,
-  };
-
-  if (cc) {
-    payload.cc = Array.isArray(cc)
-      ? cc.map((email) => ({ email }))
-      : [{ email: cc }];
-  }
-
-  if (bcc) {
-    payload.bcc = Array.isArray(bcc)
-      ? bcc.map((email) => ({ email }))
-      : [{ email: bcc }];
-  }
-
-  return await makeNylasRequest(apiKey, endpoint, {
-    method: 'POST',
-    body: payload,
+    cc: ccParticipants,
+    bcc: bccParticipants,
   });
+
+  return response.data;
 }
 
 // Calendar functions
@@ -216,7 +192,8 @@ export async function getCalendars(companyId: string, grantId?: string): Promise
 
   const endpoint = `/v3/grants/${credentials.grantId}/calendars`;
   console.log('[NYLAS DEBUG] Calling:', endpoint);
-  const response = await makeNylasRequest<{ data: NylasCalendar[] }>(
+  // TODO: Migrate to microservice when /calendar/list endpoint is added
+  const response = await makeNylasRequestLegacy<{ data: NylasCalendar[] }>(
     credentials.apiKey,
     endpoint,
   );
@@ -229,18 +206,7 @@ export async function getCalendarEvents(
   options: { start?: number; end?: number; limit?: number; grantId?: string } = {},
 ): Promise<NylasEvent[]> {
   const { start, end, limit = 20, grantId: userGrantId } = options;
-  const { apiKey, grantId } = await getNylasCredentials(companyId, userGrantId);
-
-  // First, get the primary calendar
-  const calendars = await getCalendars(companyId, grantId);
-
-  if (calendars.length === 0) {
-    return [];
-  }
-
-  // Use the primary calendar or the first calendar
-  const primaryCalendar =
-    calendars.find((cal) => cal.is_primary) || calendars[0];
+  const { grantId } = await getNylasCredentials(companyId, userGrantId);
 
   // Default to past 7 days to next 30 days if no time range is specified
   let defaultStart = start;
@@ -253,26 +219,22 @@ export async function getCalendarEvents(
     defaultEnd = thirtyDaysLater;
   }
 
-  let endpoint = `/v3/grants/${grantId}/events?calendar_id=${primaryCalendar.id}&limit=${limit}`;
+  // Convert timestamps to ISO strings for microservice
+  const startTime = defaultStart ? new Date(defaultStart * 1000).toISOString() : undefined;
+  const endTime = defaultEnd ? new Date(defaultEnd * 1000).toISOString() : undefined;
 
-  if (defaultStart) {
-    endpoint += `&start=${defaultStart}`;
-  }
+  // Use microservice via NylasClient
+  const response = await nylasClient.listEvents(grantId, {
+    startTime,
+    endTime,
+    limit,
+  });
 
-  if (defaultEnd) {
-    endpoint += `&end=${defaultEnd}`;
-  }
-
-  const response = await makeNylasRequest<{ data: NylasEvent[] }>(
-    apiKey,
-    endpoint,
-  );
-
-  console.log('[NYLAS DEBUG] getCalendarEvents query:', { start: defaultStart, end: defaultEnd, limit, calendar: primaryCalendar.id });
+  console.log('[NYLAS DEBUG] getCalendarEvents query:', { start: defaultStart, end: defaultEnd, limit });
   console.log('[NYLAS DEBUG] getCalendarEvents returned:', response.data?.length || 0, 'events');
   if (response.data && response.data.length > 0) {
     console.log('[NYLAS DEBUG] First 3 events:');
-    response.data.slice(0, 3).forEach((event, i) => {
+    response.data.slice(0, 3).forEach((event: any, i: number) => {
       const startTime = event.when?.start_time ? new Date(event.when.start_time * 1000).toISOString() : 'NO TIME';
       console.log(`[NYLAS DEBUG]   ${i + 1}. "${event.title}" at ${startTime}`);
     });
@@ -348,7 +310,8 @@ export async function createCalendarEvent(
   }
 
   console.log('[NYLAS DEBUG] Creating event:', { title, calendar: primaryCalendar.id, start: startTimestamp, end: endTimestamp });
-  const response = await makeNylasRequest<{ data: NylasEvent } | NylasEvent>(
+  // TODO: Migrate to microservice when calendar creation is improved
+  const response = await makeNylasRequestLegacy<{ data: NylasEvent } | NylasEvent>(
     apiKey,
     endpoint,
     {
@@ -370,7 +333,8 @@ export async function getGrants(companyId: string): Promise<NylasGrant[]> {
   }
 
   const endpoint = '/v3/grants';
-  const response = await makeNylasRequest<{ data: NylasGrant[] }>(
+  // TODO: Migrate to microservice when /grants endpoint is added
+  const response = await makeNylasRequestLegacy<{ data: NylasGrant[] }>(
     apiKey,
     endpoint,
   );
@@ -418,12 +382,9 @@ export async function getEventById(
 ): Promise<NylasEvent> {
   const credentials = await getNylasCredentials(companyId, grantId);
 
-  const endpoint = `/v3/grants/${credentials.grantId}/events/${eventId}`;
-  const response = await makeNylasRequest<{ data: NylasEvent } | NylasEvent>(
-    credentials.apiKey,
-    endpoint,
-  );
-  return 'data' in response ? response.data : response;
+  // Use microservice via NylasClient
+  const response = await nylasClient.getEvent(credentials.grantId, eventId);
+  return response.data;
 }
 
 /**
@@ -443,66 +404,39 @@ export async function updateCalendarEvent(
     notifyParticipants?: boolean;
   },
 ): Promise<NylasEvent> {
-  const { title, description, startTime, endTime, participants, location, grantId: userGrantId, notifyParticipants = true } = params;
-  const { apiKey, grantId } = await getNylasCredentials(companyId, userGrantId);
+  const { title, description, startTime, endTime, participants, location, grantId: userGrantId } = params;
+  const { grantId } = await getNylasCredentials(companyId, userGrantId);
 
-  // Get the event first to determine calendar ID
-  const existingEvent = await getEventById(companyId, eventId, grantId);
-  const calendars = await getCalendars(companyId, grantId);
-  const primaryCalendar =
-    calendars.find((cal) => cal.is_primary) || calendars[0];
-
-  let endpoint = `/v3/grants/${grantId}/events/${eventId}?calendar_id=${primaryCalendar.id}`;
-  if (notifyParticipants && participants !== undefined) {
-    endpoint += '&notify_participants=true';
-  }
-  const payload: any = {};
+  const updates: any = {};
 
   // Only include fields that are being updated
   if (title !== undefined) {
-    payload.title = title;
+    updates.title = title;
   }
 
   if (description !== undefined) {
-    payload.description = description;
+    updates.description = description;
   }
 
   if (location !== undefined) {
-    payload.location = location;
+    updates.location = location;
   }
 
   if (startTime !== undefined && endTime !== undefined) {
-    const startTimestamp =
-      typeof startTime === 'string'
-        ? Math.floor(new Date(startTime).getTime() / 1000)
-        : startTime;
-    const endTimestamp =
-      typeof endTime === 'string'
-        ? Math.floor(new Date(endTime).getTime() / 1000)
-        : endTime;
-
-    payload.when = {
-      start_time: startTimestamp,
-      end_time: endTimestamp,
-    };
+    // Convert to ISO strings if needed
+    updates.startTime = typeof startTime === 'string' ? startTime : new Date(startTime * 1000).toISOString();
+    updates.endTime = typeof endTime === 'string' ? endTime : new Date(endTime * 1000).toISOString();
   }
 
   if (participants !== undefined) {
-    payload.participants = participants.map((email) => ({
+    updates.participants = participants.map((email) => ({
       email: typeof email === 'string' ? email : email,
-      status: 'noreply',
     }));
   }
 
-  const response = await makeNylasRequest<{ data: NylasEvent } | NylasEvent>(
-    apiKey,
-    endpoint,
-    {
-      method: 'PUT',
-      body: payload,
-    },
-  );
-  return 'data' in response ? response.data : response;
+  // Use microservice via NylasClient
+  const response = await nylasClient.updateEvent(grantId, eventId, updates);
+  return response.data;
 }
 
 /**
@@ -515,15 +449,8 @@ export async function deleteCalendarEvent(
 ): Promise<void> {
   const credentials = await getNylasCredentials(companyId, grantId);
 
-  // Get calendars to find primary calendar ID
-  const calendars = await getCalendars(companyId, credentials.grantId);
-  const primaryCalendar =
-    calendars.find((cal) => cal.is_primary) || calendars[0];
-
-  const endpoint = `/v3/grants/${credentials.grantId}/events/${eventId}?calendar_id=${primaryCalendar.id}`;
-  await makeNylasRequest(credentials.apiKey, endpoint, {
-    method: 'DELETE',
-  });
+  // Use microservice via NylasClient
+  await nylasClient.deleteEvent(credentials.grantId, eventId);
 }
 
 // ==========================================
@@ -560,26 +487,28 @@ export async function getFreeBusy(
 ): Promise<FreeBusyData[]> {
   const credentials = await getNylasCredentials(companyId, grantId);
 
-  const endpoint = `/v3/grants/${credentials.grantId}/calendars/free-busy`;
-  const payload = {
-    emails: emails,
-    start_time: startTime,
-    end_time: endTime,
-  };
+  // Convert timestamps to ISO strings for microservice
+  const startTimeISO = new Date(startTime * 1000).toISOString();
+  const endTimeISO = new Date(endTime * 1000).toISOString();
 
-  const response = await makeNylasRequest<any>(credentials.apiKey, endpoint, {
-    method: 'POST',
-    body: payload,
+  // Use microservice via NylasClient
+  const response = await nylasClient.checkAvailability({
+    grantId: credentials.grantId,
+    startTime: startTimeISO,
+    endTime: endTimeISO,
+    emails,
   });
 
   // Transform response to our format
   const freeBusyData: FreeBusyData[] = [];
 
   for (const email of emails) {
-    const emailData = response[email] || [];
+    const emailData = response.data || [];
+    const relevantSlots = emailData.filter((item: any) => item.email === email);
+
     freeBusyData.push({
       email,
-      timeSlots: emailData.map((slot: any) => ({
+      timeSlots: relevantSlots.map((slot: any) => ({
         start_time: slot.start_time,
         end_time: slot.end_time,
         status: slot.status || 'free',

@@ -56,4 +56,15 @@ export async function register(app: any): Promise<void> {
   // Register webhook routes
   app.use('/webhooks', webhookRouter);
   console.log('[NYLAS] Registered webhook routes at /webhooks');
+
+  // Register Agents API module (if enabled)
+  const enableAgentsApi = process.env.ENABLE_AGENTS_API !== 'false';
+  if (enableAgentsApi) {
+    console.log('[NYLAS] Agents API module enabled, registering...');
+    const { registerAgentsApiModule } = await import('./agents-api');
+    const { verifyAccess } = await import('../../middleware/auth.middleware');
+    await registerAgentsApiModule(app, verifyAccess);
+  } else {
+    console.log('[NYLAS] Agents API module disabled via ENABLE_AGENTS_API env var');
+  }
 }

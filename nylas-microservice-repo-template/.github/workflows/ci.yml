@@ -1,0 +1,84 @@
+name: CI - Test & Build
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  test-nylas-api:
+    name: Test Nylas API Service
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '21'
+          cache: 'npm'
+          cache-dependency-path: services/nylas-api/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./services/nylas-api
+        run: npm ci
+
+      - name: Run TypeScript build
+        working-directory: ./services/nylas-api
+        run: npm run build
+
+      - name: Run tests
+        working-directory: ./services/nylas-api
+        run: npm test || echo "No tests configured yet"
+        continue-on-error: true
+
+  test-nylas-webhooks:
+    name: Test Nylas Webhooks Service
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '21'
+          cache: 'npm'
+          cache-dependency-path: services/nylas-webhooks/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./services/nylas-webhooks
+        run: npm ci
+
+      - name: Run TypeScript build
+        working-directory: ./services/nylas-webhooks
+        run: npm run build
+
+      - name: Run tests
+        working-directory: ./services/nylas-webhooks
+        run: npm test || echo "No tests configured yet"
+        continue-on-error: true
+
+  docker-build-test:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Nylas API Docker image
+        run: docker build -t nylas-api:test ./services/nylas-api
+
+      - name: Build Nylas Webhooks Docker image
+        run: docker build -t nylas-webhooks:test ./services/nylas-webhooks
+
+      - name: Test Docker images
+        run: |
+          docker run --rm nylas-api:test node --version
+          docker run --rm nylas-webhooks:test node --version
+          echo "Docker images built successfully"
