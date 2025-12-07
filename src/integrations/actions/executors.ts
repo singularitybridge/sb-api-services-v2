@@ -71,6 +71,10 @@ const prepareActionExecution = async (
       if (typeof value === 'string') {
         return [key, await processTemplate(value, sessionId)];
       }
+      // Preserve arrays as-is (don't treat them as objects to recurse into)
+      if (Array.isArray(value)) {
+        return [key, value];
+      }
       if (typeof value === 'object' && value !== null) {
         // Recursively process nested objects
         const nestedProcessedArgs = await prepareActionExecution(

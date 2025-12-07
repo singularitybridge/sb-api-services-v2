@@ -31,6 +31,10 @@ import {
   getBoardsForProject as _getBoardsForProject,
   resolveBoardForProject as _resolveBoardForProject,
 
+  // Projects
+  getProject as _getProject,
+  listProjects as _listProjects,
+
   // Sprints
   getSprintsForBoard as _getSprintsForBoard,
   getSprintsForResolvedBoard as _getSprintsForResolvedBoard,
@@ -266,6 +270,26 @@ export const getIssuesForSprint = async (
 
 export { _getBoardsForProject as getBoardsForProject };
 export { _resolveBoardForProject as resolveBoardForProject };
+
+// --- Projects ---
+
+export const getJiraProject = async (
+  sessionId: string,
+  companyId: string,
+  params: { projectKeyOrId: string },
+) => _getProject(companyId, params.projectKeyOrId);
+
+export const listJiraProjects = async (
+  sessionId: string,
+  companyId: string,
+  params?: {
+    startAt?: number;
+    maxResults?: number;
+    orderBy?: string;
+    query?: string;
+    typeKey?: string;
+  },
+) => _listProjects(companyId, params);
 
 // --- Users ---
 
