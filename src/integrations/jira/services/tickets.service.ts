@@ -78,7 +78,9 @@ export const createTicket = async (
 /**
  * Process sprint field data into SprintInfo format
  */
-const processSprintField = (sprintFieldData: any): SprintInfo | SprintInfo[] | null => {
+const processSprintField = (
+  sprintFieldData: any,
+): SprintInfo | SprintInfo[] | null => {
   if (!sprintFieldData) return null;
 
   if (Array.isArray(sprintFieldData) && sprintFieldData.length > 0) {
@@ -130,26 +132,29 @@ export const fetchTickets = async (
 
     // Build fields list
     const defaultFields = ['summary', 'status', 'description', sprintFieldId];
-    let fieldsToRequest = params.fieldsToFetch?.length
+    const fieldsToRequest = params.fieldsToFetch?.length
       ? await resolveFieldAliases(companyId, params.fieldsToFetch)
       : [...defaultFields];
 
     // Ensure essential fields are included
-    if (!fieldsToRequest.includes('description')) fieldsToRequest.push('description');
+    if (!fieldsToRequest.includes('description'))
+      fieldsToRequest.push('description');
     if (!fieldsToRequest.includes('status')) fieldsToRequest.push('status');
-    if (!fieldsToRequest.includes(sprintFieldId)) fieldsToRequest.push(sprintFieldId);
+    if (!fieldsToRequest.includes(sprintFieldId))
+      fieldsToRequest.push(sprintFieldId);
 
     let allTickets: SimplifiedIssue[] = [];
     let nextPageToken: string | undefined;
 
     // Paginate through results
     while (true) {
-      const response = await client.issueSearch.searchForIssuesUsingJqlEnhancedSearch({
-        jql: params.jql,
-        fields: fieldsToRequest,
-        nextPageToken,
-        maxResults,
-      });
+      const response =
+        await client.issueSearch.searchForIssuesUsingJqlEnhancedSearch({
+          jql: params.jql,
+          fields: fieldsToRequest,
+          nextPageToken,
+          maxResults,
+        });
 
       const issues = response.issues || [];
       if (!issues.length) break;
@@ -188,7 +193,9 @@ const simplifyIssue = (
   fieldsRequested: string[],
 ): SimplifiedIssue => {
   const fields = issue.fields || {};
-  const descriptionText = fields.description ? adfToText(fields.description) : undefined;
+  const descriptionText = fields.description
+    ? adfToText(fields.description)
+    : undefined;
   const sprintInfo = processSprintField(fields[sprintFieldId]);
 
   const curated: Record<string, any> = {};
@@ -216,7 +223,8 @@ const simplifyIssue = (
     descriptionText: curated.descriptionText,
     ...Object.fromEntries(
       Object.entries(curated).filter(
-        ([key]) => !['summary', 'status', 'sprintInfo', 'descriptionText'].includes(key),
+        ([key]) =>
+          !['summary', 'status', 'sprintInfo', 'descriptionText'].includes(key),
       ),
     ),
   };
@@ -286,11 +294,16 @@ export const getTicketById = async (
 
         if (isDefaultRequest) {
           // Simplify nested objects for common fields
-          if (fieldName === 'status' && fieldValue?.name) fieldValue = fieldValue.name;
-          else if (fieldName === 'issuetype' && fieldValue?.name) fieldValue = fieldValue.name;
-          else if (fieldName === 'assignee' && fieldValue?.displayName) fieldValue = fieldValue.displayName;
-          else if (fieldName === 'reporter' && fieldValue?.displayName) fieldValue = fieldValue.displayName;
-          else if (fieldName === 'priority' && fieldValue?.name) fieldValue = fieldValue.name;
+          if (fieldName === 'status' && fieldValue?.name)
+            fieldValue = fieldValue.name;
+          else if (fieldName === 'issuetype' && fieldValue?.name)
+            fieldValue = fieldValue.name;
+          else if (fieldName === 'assignee' && fieldValue?.displayName)
+            fieldValue = fieldValue.displayName;
+          else if (fieldName === 'reporter' && fieldValue?.displayName)
+            fieldValue = fieldValue.displayName;
+          else if (fieldName === 'priority' && fieldValue?.name)
+            fieldValue = fieldValue.name;
           else if (fieldName === 'project' && fieldValue?.name) {
             fieldValue = { key: fieldValue.key, name: fieldValue.name };
           } else if (fieldName === 'labels' && Array.isArray(fieldValue)) {
@@ -308,7 +321,10 @@ export const getTicketById = async (
       }
 
       // Add description text
-      if (fieldsParameter.includes('description') && descriptionText !== undefined) {
+      if (
+        fieldsParameter.includes('description') &&
+        descriptionText !== undefined
+      ) {
         curatedFields.descriptionText = descriptionText;
         if (isDefaultRequest) delete curatedFields.description;
       }
@@ -353,7 +369,10 @@ export const updateTicket = async (
     const fieldsToUpdate = { ...fields };
 
     // Convert markdown description to ADF
-    if (fieldsToUpdate.description && typeof fieldsToUpdate.description === 'string') {
+    if (
+      fieldsToUpdate.description &&
+      typeof fieldsToUpdate.description === 'string'
+    ) {
       fieldsToUpdate.description = markdownToAdf(fieldsToUpdate.description);
     }
 
@@ -574,7 +593,10 @@ export const transitionTicket = async (
     });
 
     // Get updated transitions
-    const newTransitions = await getAvailableTransitions(companyId, issueIdOrKey);
+    const newTransitions = await getAvailableTransitions(
+      companyId,
+      issueIdOrKey,
+    );
 
     return {
       success: true,
@@ -616,7 +638,8 @@ export const setStoryPoints = async (
   if (!storyPointsFieldId) {
     return {
       success: false,
-      error: 'Could not determine the Story Points field ID. Please ensure the field exists.',
+      error:
+        'Could not determine the Story Points field ID. Please ensure the field exists.',
     };
   }
 
@@ -634,7 +657,10 @@ export const setStoryPoints = async (
   }
 
   // If standard update fails with screen error, try Agile API
-  if (result.error?.includes('not on the appropriate screen') || result.error?.includes('cannot be set')) {
+  if (
+    result.error?.includes('not on the appropriate screen') ||
+    result.error?.includes('cannot be set')
+  ) {
     const agileResult = await setStoryPointsViaAgileApi(
       companyId,
       issueIdOrKey,
@@ -679,8 +705,12 @@ const setStoryPointsViaAgileApi = async (
       if (projectKey) {
         const boardsResult = await getBoardsForProject(companyId, projectKey);
         if (boardsResult.success && boardsResult.data?.boards?.length) {
-          const scrumBoard = boardsResult.data.boards.find((b) => b.type === 'scrum');
-          resolvedBoardId = (scrumBoard?.id || boardsResult.data.boards[0].id).toString();
+          const scrumBoard = boardsResult.data.boards.find(
+            (b) => b.type === 'scrum',
+          );
+          resolvedBoardId = (
+            scrumBoard?.id || boardsResult.data.boards[0].id
+          ).toString();
         }
       }
     }
@@ -763,7 +793,8 @@ export const getIssuesForSprint = async (
     // Build JQL filter
     const jqlParts: string[] = [];
     if (options?.projectKey) jqlParts.push(`project = ${options.projectKey}`);
-    if (options?.assigneeAccountId) jqlParts.push(`assignee = "${options.assigneeAccountId}"`);
+    if (options?.assigneeAccountId)
+      jqlParts.push(`assignee = "${options.assigneeAccountId}"`);
     const jql = jqlParts.length > 0 ? jqlParts.join(' AND ') : undefined;
 
     const response = await executeJiraRequest<any>(
@@ -819,7 +850,9 @@ const simplifySprintIssue = (
   fieldsRequested: string[],
 ): SimplifiedIssue => {
   const fields = issue.fields || {};
-  const descriptionText = fields.description ? adfToText(fields.description) : undefined;
+  const descriptionText = fields.description
+    ? adfToText(fields.description)
+    : undefined;
 
   const curated: Record<string, any> = {};
   fieldsRequested.forEach((fieldName) => {

@@ -45,7 +45,8 @@ export const createUIStateActions = (
         }
 
         // Get UI state from service
-        const uiState = uiSessionStateService.getUIStateBySession(targetSessionId);
+        const uiState =
+          uiSessionStateService.getUIStateBySession(targetSessionId);
 
         if (!uiState) {
           return {
@@ -116,7 +117,8 @@ export const createUIStateActions = (
           throw new Error('Session ID is required');
         }
 
-        const uiState = uiSessionStateService.getUIStateBySession(targetSessionId);
+        const uiState =
+          uiSessionStateService.getUIStateBySession(targetSessionId);
 
         if (!uiState?.openWorkspaceDocument) {
           return {
@@ -184,7 +186,8 @@ export const createUIStateActions = (
           throw new Error('Session ID is required');
         }
 
-        const uiState = uiSessionStateService.getUIStateBySession(targetSessionId);
+        const uiState =
+          uiSessionStateService.getUIStateBySession(targetSessionId);
 
         if (!uiState) {
           return {

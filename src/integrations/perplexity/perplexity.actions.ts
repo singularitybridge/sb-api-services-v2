@@ -63,7 +63,8 @@ export const createPerplexityActions = (
         search_mode: {
           type: 'string',
           enum: ['academic', 'sec', 'web'],
-          description: 'Search mode: academic (academic sources), sec (SEC filings), web (general web). Default: web',
+          description:
+            'Search mode: academic (academic sources), sec (SEC filings), web (general web). Default: web',
         },
         return_related_questions: {
           type: 'boolean',
@@ -72,7 +73,8 @@ export const createPerplexityActions = (
         reasoning_effort: {
           type: 'string',
           enum: ['low', 'medium', 'high'],
-          description: 'Reasoning effort for sonar-deep-research model. Default: medium',
+          description:
+            'Reasoning effort for sonar-deep-research model. Default: medium',
         },
       },
       required: ['model', 'query'],
@@ -86,7 +88,7 @@ export const createPerplexityActions = (
         query,
         search_mode = 'web',
         return_related_questions = false,
-        reasoning_effort = 'medium'
+        reasoning_effort = 'medium',
       } = args;
 
       if (!context.companyId) {
@@ -102,7 +104,13 @@ export const createPerplexityActions = (
 
       // Check for additional properties manually if strict mode isn't fully relied upon for arg shape
       const argKeys = Object.keys(args);
-      const allowedProps = ['model', 'query', 'search_mode', 'return_related_questions', 'reasoning_effort'];
+      const allowedProps = [
+        'model',
+        'query',
+        'search_mode',
+        'return_related_questions',
+        'reasoning_effort',
+      ];
       const extraProps = argKeys.filter((prop) => !allowedProps.includes(prop));
       if (extraProps.length > 0) {
         throw new ActionValidationError(

@@ -5,9 +5,12 @@ const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 const TARGET_SIZE = 512; // Resize images to 512x512 for team avatars
 
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const downloadFile = async (url: string, retries = MAX_RETRIES): Promise<Buffer> => {
+export const downloadFile = async (
+  url: string,
+  retries = MAX_RETRIES,
+): Promise<Buffer> => {
   try {
     const response = await axios.get(url, {
       responseType: 'arraybuffer',
@@ -30,15 +33,17 @@ export const downloadFile = async (url: string, retries = MAX_RETRIES): Promise<
     return response.data;
   } catch (error) {
     // Check if it's a timeout or network error that can be retried
-    const isRetryable = error instanceof AxiosError && (
-      error.code === 'ETIMEDOUT' ||
-      error.code === 'ECONNRESET' ||
-      error.code === 'ENOTFOUND' ||
-      error.message?.includes('timeout')
-    );
+    const isRetryable =
+      error instanceof AxiosError &&
+      (error.code === 'ETIMEDOUT' ||
+        error.code === 'ECONNRESET' ||
+        error.code === 'ENOTFOUND' ||
+        error.message?.includes('timeout'));
 
     if (isRetryable && retries > 0) {
-      console.log(`Download timeout, retrying... (${MAX_RETRIES - retries + 1}/${MAX_RETRIES})`);
+      console.log(
+        `Download timeout, retrying... (${MAX_RETRIES - retries + 1}/${MAX_RETRIES})`,
+      );
       await sleep(RETRY_DELAY_MS);
       return downloadFile(url, retries - 1);
     }
@@ -62,12 +67,14 @@ export const downloadFile = async (url: string, retries = MAX_RETRIES): Promise<
 export const downloadAndCompressImage = async (
   url: string,
   targetSize: number = TARGET_SIZE,
-  quality: number = 85
+  quality: number = 85,
 ): Promise<Buffer> => {
   const originalBuffer = await downloadFile(url);
   const originalSize = originalBuffer.length;
 
-  console.log(`Compressing image from ${(originalSize / 1024 / 1024).toFixed(2)}MB...`);
+  console.log(
+    `Compressing image from ${(originalSize / 1024 / 1024).toFixed(2)}MB...`,
+  );
 
   // Resize and compress the image
   const compressedBuffer = await sharp(originalBuffer)
@@ -82,7 +89,7 @@ export const downloadAndCompressImage = async (
   const reduction = ((1 - compressedSize / originalSize) * 100).toFixed(1);
 
   console.log(
-    `Compressed to ${(compressedSize / 1024).toFixed(0)}KB (${reduction}% reduction)`
+    `Compressed to ${(compressedSize / 1024).toFixed(0)}KB (${reduction}% reduction)`,
   );
 
   return compressedBuffer;

@@ -65,7 +65,13 @@ import {
   getSprintProgress as _getSprintProgress,
 } from './services';
 
-import { JiraBoard, Result, JiraSprint, VelocityData, SprintProgressData } from './types';
+import {
+  JiraBoard,
+  Result,
+  JiraSprint,
+  VelocityData,
+  SprintProgressData,
+} from './types';
 
 // ============================================================================
 // Backwards Compatible Wrapper Functions
@@ -153,8 +159,10 @@ export const getJiraTicketComments = async (
 
 // --- Fields ---
 
-export const getJiraTicketFields = async (sessionId: string, companyId: string) =>
-  getJiraFields(companyId);
+export const getJiraTicketFields = async (
+  sessionId: string,
+  companyId: string,
+) => getJiraFields(companyId);
 
 export const findSprintFieldId = async (companyId: string) =>
   _findSprintFieldId(companyId);
@@ -218,7 +226,10 @@ export const moveIssueToSprint = async (
 
   // For backwards compatibility, try to get updated sprint list
   try {
-    const sprintsResult = await _getSprintsForBoard(companyId, params.targetSprintId);
+    const sprintsResult = await _getSprintsForBoard(
+      companyId,
+      params.targetSprintId,
+    );
     if (sprintsResult.success) {
       return {
         success: true,
@@ -322,7 +333,13 @@ export const setStoryPoints = async (
     storyPoints: number | null;
     boardId?: string;
   },
-) => _setStoryPoints(companyId, params.issueIdOrKey, params.storyPoints, params.boardId);
+) =>
+  _setStoryPoints(
+    companyId,
+    params.issueIdOrKey,
+    params.storyPoints,
+    params.boardId,
+  );
 
 // --- Velocity & Progress ---
 

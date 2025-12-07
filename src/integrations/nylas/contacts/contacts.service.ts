@@ -175,14 +175,12 @@ export async function createContact(
   console.log('[NYLAS CONTACTS] Creating contact:', payload);
 
   const endpoint = `/v3/grants/${grantId}/contacts`;
-  const response = await makeNylasRequest<{ data: NylasContact } | NylasContact>(
-    apiKey,
-    endpoint,
-    {
-      method: 'POST',
-      body: payload,
-    },
-  );
+  const response = await makeNylasRequest<
+    { data: NylasContact } | NylasContact
+  >(apiKey, endpoint, {
+    method: 'POST',
+    body: payload,
+  });
 
   const contactData = 'data' in response ? response.data : response;
 
@@ -245,14 +243,12 @@ export async function updateContact(
   console.log('[NYLAS CONTACTS] Updating contact:', contactId, payload);
 
   const endpoint = `/v3/grants/${grantId}/contacts/${contactId}`;
-  const response = await makeNylasRequest<{ data: NylasContact } | NylasContact>(
-    apiKey,
-    endpoint,
-    {
-      method: 'PUT',
-      body: payload,
-    },
-  );
+  const response = await makeNylasRequest<
+    { data: NylasContact } | NylasContact
+  >(apiKey, endpoint, {
+    method: 'PUT',
+    body: payload,
+  });
 
   const contactData = 'data' in response ? response.data : response;
 

@@ -142,7 +142,10 @@ class VectorSearchService {
 
     if (this.circuitBreaker.state === 'open') {
       // Check if we should move to half-open
-      if (now - this.circuitBreaker.lastFailureTime > this.CIRCUIT_BREAKER_TIMEOUT) {
+      if (
+        now - this.circuitBreaker.lastFailureTime >
+        this.CIRCUIT_BREAKER_TIMEOUT
+      ) {
         logger.info('Circuit breaker moving to half-open state');
         this.circuitBreaker.state = 'half-open';
         this.circuitBreaker.failures = 0;
@@ -202,7 +205,9 @@ class VectorSearchService {
     const cached = this.embeddingCache.get(cacheKey);
 
     if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
-      logger.debug('Embedding cache hit', { cacheKey: cacheKey.substring(0, 8) });
+      logger.debug('Embedding cache hit', {
+        cacheKey: cacheKey.substring(0, 8),
+      });
       return cached.embedding;
     }
 
@@ -258,7 +263,10 @@ class VectorSearchService {
     }
 
     if (removed > 0) {
-      logger.debug('Cleaned up embedding cache', { removed, remaining: this.embeddingCache.size });
+      logger.debug('Cleaned up embedding cache', {
+        removed,
+        remaining: this.embeddingCache.size,
+      });
     }
   }
 
@@ -297,7 +305,9 @@ class VectorSearchService {
           // Filter by scope if provided
           ...(scope &&
             scopeId && {
-              key: { $regex: new RegExp(`^unified-workspace:/${scope}/${scopeId}/`) },
+              key: {
+                $regex: new RegExp(`^unified-workspace:/${scope}/${scopeId}/`),
+              },
             }),
           // Exclude expired documents
           $or: [
@@ -324,7 +334,8 @@ class VectorSearchService {
 
     return results.map((doc) => {
       // Deserialize the value
-      const value = typeof doc.value === 'string' ? JSON.parse(doc.value) : doc.value;
+      const value =
+        typeof doc.value === 'string' ? JSON.parse(doc.value) : doc.value;
 
       return {
         path: this.stripScopePrefix(doc.key),
@@ -392,7 +403,11 @@ class VectorSearchService {
 
     // Team scope
     if (scopes.includes('team') && teamIds && userId) {
-      const resolvedTeamIds = await this.resolveTeamIds(teamIds, companyId, userId);
+      const resolvedTeamIds = await this.resolveTeamIds(
+        teamIds,
+        companyId,
+        userId,
+      );
       for (const teamId of resolvedTeamIds) {
         scopeSearches.push(
           this.executeVectorSearch(queryEmbedding, {
@@ -409,7 +424,10 @@ class VectorSearchService {
     const allResults = await Promise.all(scopeSearches);
 
     // Flatten and deduplicate by path (keep highest score)
-    const deduplicatedResults = this.deduplicateResults(allResults.flat(), limit);
+    const deduplicatedResults = this.deduplicateResults(
+      allResults.flat(),
+      limit,
+    );
 
     logger.info('Multi-scope search completed', {
       query,
@@ -454,7 +472,9 @@ class VectorSearchService {
       {
         $match: {
           score: { $gte: minScore },
-          key: { $regex: new RegExp(`^unified-workspace:/${scope}/${scopeId}/`) },
+          key: {
+            $regex: new RegExp(`^unified-workspace:/${scope}/${scopeId}/`),
+          },
           $or: [
             { expiresAt: { $exists: false } },
             { expiresAt: null },
@@ -479,7 +499,8 @@ class VectorSearchService {
         .toArray();
 
       return results.map((doc) => {
-        const value = typeof doc.value === 'string' ? JSON.parse(doc.value) : doc.value;
+        const value =
+          typeof doc.value === 'string' ? JSON.parse(doc.value) : doc.value;
 
         return {
           path: this.stripScopePrefix(doc.key),
@@ -560,7 +581,9 @@ class VectorSearchService {
     if (teamIds === 'all') {
       const teams = await Team.find({
         companyId: new mongoose.Types.ObjectId(companyId),
-        members: { $elemMatch: { userId: new mongoose.Types.ObjectId(userId) } },
+        members: {
+          $elemMatch: { userId: new mongoose.Types.ObjectId(userId) },
+        },
       })
         .project({ _id: 1 })
         .toArray();
@@ -596,7 +619,8 @@ class VectorSearchService {
         }
 
         // Deserialize the value (keyv stores it as a JSON string)
-        const value = typeof doc.value === 'string' ? JSON.parse(doc.value) : doc.value;
+        const value =
+          typeof doc.value === 'string' ? JSON.parse(doc.value) : doc.value;
 
         if (!value?.value?.content) {
           logger.debug('No content to embed', { key });
@@ -623,7 +647,9 @@ class VectorSearchService {
           if (scope === 'agent') {
             // Look up agent to get companyId
             const Assistant = mongoose.connection.db.collection('assistants');
-            const agent = await Assistant.findOne({ _id: new mongoose.Types.ObjectId(scopeId) });
+            const agent = await Assistant.findOne({
+              _id: new mongoose.Types.ObjectId(scopeId),
+            });
             if (!agent) {
               logger.warn('Agent not found for embedding', { key, scopeId });
               return;
@@ -632,7 +658,9 @@ class VectorSearchService {
           } else if (scope === 'session') {
             // Look up session to get companyId
             const Session = mongoose.connection.db.collection('sessions');
-            const session = await Session.findOne({ _id: new mongoose.Types.ObjectId(scopeId) });
+            const session = await Session.findOne({
+              _id: new mongoose.Types.ObjectId(scopeId),
+            });
             if (!session) {
               logger.warn('Session not found for embedding', { key, scopeId });
               return;

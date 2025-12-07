@@ -103,7 +103,9 @@ export const googleLogin = async (
           });
 
           company = inviteCompany.toObject() as unknown as ICompany;
-          console.log(`User ${payload['email']} joined company via invite: ${company.name}`);
+          console.log(
+            `User ${payload['email']} joined company via invite: ${company.name}`,
+          );
         } catch (error) {
           console.error('Failed to process invite acceptance:', error);
           throw error;
@@ -116,7 +118,7 @@ export const googleLogin = async (
 
         if (!allowAutoSignup) {
           throw new Error(
-            'Account creation requires an invitation. Please contact your administrator for an invite.'
+            'Account creation requires an invitation. Please contact your administrator for an invite.',
           );
         }
 

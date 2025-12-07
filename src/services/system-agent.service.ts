@@ -13,16 +13,23 @@ export interface SystemAgentConfig {
   name: string;
   description: string;
   version: string;
-  type: 'text-generation' | 'image-generation' | 'audio-generation' | 'embedding';
+  type:
+    | 'text-generation'
+    | 'image-generation'
+    | 'audio-generation'
+    | 'embedding';
   provider: 'openai' | 'anthropic' | 'google' | 'custom';
   model: string;
   config: Record<string, any>; // Provider-specific config
-  parameters: Record<string, {
-    type: string;
-    required: boolean;
-    description: string;
-    default?: any;
-  }>;
+  parameters: Record<
+    string,
+    {
+      type: string;
+      required: boolean;
+      description: string;
+      default?: any;
+    }
+  >;
   metadata?: {
     createdAt?: string;
     category?: string;
@@ -61,16 +68,22 @@ class SystemAgentService {
    */
   private loadAllAgents(): void {
     if (!fs.existsSync(this.agentsDir)) {
-      logger.warn('System agents directory not found, creating:', this.agentsDir);
+      logger.warn(
+        'System agents directory not found, creating:',
+        this.agentsDir,
+      );
       fs.mkdirSync(this.agentsDir, { recursive: true });
       return;
     }
 
-    const agentDirs = fs.readdirSync(this.agentsDir, { withFileTypes: true })
-      .filter(dirent => dirent.isDirectory())
-      .filter(dirent => dirent.name.startsWith('sys-')); // Only load system agents
+    const agentDirs = fs
+      .readdirSync(this.agentsDir, { withFileTypes: true })
+      .filter((dirent) => dirent.isDirectory())
+      .filter((dirent) => dirent.name.startsWith('sys-')); // Only load system agents
 
-    logger.info(`Loading ${agentDirs.length} system agents from ${this.agentsDir}`);
+    logger.info(
+      `Loading ${agentDirs.length} system agents from ${this.agentsDir}`,
+    );
 
     for (const dirent of agentDirs) {
       try {
@@ -176,7 +189,9 @@ class SystemAgentService {
     }
 
     // Validate required parameters
-    for (const [paramName, paramConfig] of Object.entries(agent.config.parameters)) {
+    for (const [paramName, paramConfig] of Object.entries(
+      agent.config.parameters,
+    )) {
       if (paramConfig.required && !(paramName in params)) {
         throw new Error(`Required parameter missing: ${paramName}`);
       }
@@ -189,9 +204,13 @@ class SystemAgentService {
     if ('styleIndex' in params) {
       const styleIndex = params.styleIndex || 0;
       // Extract style variations from prompt.md
-      const styleMatch = prompt.match(/### Style (\d+):(.*?)(?=###|\n---|\n##|$)/g);
+      const styleMatch = prompt.match(
+        /### Style (\d+):(.*?)(?=###|\n---|\n##|$)/g,
+      );
       if (styleMatch && styleMatch[styleIndex]) {
-        const styleDesc = styleMatch[styleIndex].replace(/### Style \d+:\s*/, '').trim();
+        const styleDesc = styleMatch[styleIndex]
+          .replace(/### Style \d+:\s*/, '')
+          .trim();
         prompt = prompt.replace('{{styleVariation}}', styleDesc);
       }
     }
@@ -204,7 +223,9 @@ class SystemAgentService {
 
     // Extract the actual prompt (remove examples and documentation)
     // Look for "## Base Prompt Structure" or similar sections
-    const baseSectionMatch = prompt.match(/## Base Prompt Structure\n\n([\s\S]*?)(?=\n---|\n##|$)/);
+    const baseSectionMatch = prompt.match(
+      /## Base Prompt Structure\n\n([\s\S]*?)(?=\n---|\n##|$)/,
+    );
     if (baseSectionMatch) {
       prompt = baseSectionMatch[1].trim();
     }
@@ -254,7 +275,7 @@ class SystemAgentService {
    */
   getAgentsByCategory(category: string): SystemAgent[] {
     return this.getAllAgents().filter(
-      agent => agent.config.metadata?.category === category
+      (agent) => agent.config.metadata?.category === category,
     );
   }
 
@@ -262,17 +283,15 @@ class SystemAgentService {
    * List all agents by type
    */
   getAgentsByType(type: SystemAgentConfig['type']): SystemAgent[] {
-    return this.getAllAgents().filter(
-      agent => agent.config.type === type
-    );
+    return this.getAllAgents().filter((agent) => agent.config.type === type);
   }
 
   /**
    * Search agents by tag
    */
   getAgentsByTag(tag: string): SystemAgent[] {
-    return this.getAllAgents().filter(
-      agent => agent.config.metadata?.tags?.includes(tag)
+    return this.getAllAgents().filter((agent) =>
+      agent.config.metadata?.tags?.includes(tag),
     );
   }
 }

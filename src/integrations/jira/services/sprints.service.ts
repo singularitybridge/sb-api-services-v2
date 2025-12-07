@@ -20,7 +20,10 @@ import { validateBoardId } from './boards.service';
 /**
  * Map raw sprint data from API to JiraSprint interface
  */
-const mapSprintResponse = (sprint: any, fallbackBoardId?: number): JiraSprint => ({
+const mapSprintResponse = (
+  sprint: any,
+  fallbackBoardId?: number,
+): JiraSprint => ({
   id: sprint.id,
   self: sprint.self,
   state: sprint.state,
@@ -210,7 +213,9 @@ export const moveIssueToSprint = async (
   } catch (error: any) {
     return {
       success: false,
-      error: error.message || `Failed to move issue ${issueKey} to sprint ${targetSprintId}`,
+      error:
+        error.message ||
+        `Failed to move issue ${issueKey} to sprint ${targetSprintId}`,
     };
   }
 };
@@ -222,7 +227,12 @@ export const moveIssuesToSprint = async (
   companyId: string,
   issueKeys: string[],
   targetSprintId: string,
-): Promise<Result<{ successful: string[]; failed: Array<{ key: string; error: string }> }>> => {
+): Promise<
+  Result<{
+    successful: string[];
+    failed: Array<{ key: string; error: string }>;
+  }>
+> => {
   const results = await Promise.allSettled(
     issueKeys.map((key) => moveIssueToSprint(companyId, key, targetSprintId)),
   );
@@ -300,14 +310,18 @@ export const addIssueToCurrentSprint = async (
   companyId: string,
   boardId: string,
   issueKey: string,
-): Promise<Result<{ message: string; sprintId: number; sprintName: string }>> => {
+): Promise<
+  Result<{ message: string; sprintId: number; sprintName: string }>
+> => {
   // Get active sprint
   const activeSprintResult = await getActiveSprintForBoard(companyId, boardId);
 
   if (!activeSprintResult.success || !activeSprintResult.data) {
     return {
       success: false,
-      error: activeSprintResult.error || `No active sprint found for board ${boardId}`,
+      error:
+        activeSprintResult.error ||
+        `No active sprint found for board ${boardId}`,
     };
   }
 

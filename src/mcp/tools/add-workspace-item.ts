@@ -19,12 +19,16 @@ export const addWorkspaceItemSchema = z.object({
   content: z
     .any()
     .optional()
-    .describe('Content to store (can be string, object, array, etc.). Not required if fileUrl is provided.'),
+    .describe(
+      'Content to store (can be string, object, array, etc.). Not required if fileUrl is provided.',
+    ),
   fileUrl: z
     .string()
     .url()
     .optional()
-    .describe('URL to a file to download and store. Use this for large files (>50KB) to bypass MCP token limits. Mutually exclusive with content.'),
+    .describe(
+      'URL to a file to download and store. Use this for large files (>50KB) to bypass MCP token limits. Mutually exclusive with content.',
+    ),
   scope: z
     .enum(['company', 'session', 'agent'])
     .optional()
@@ -63,7 +67,9 @@ export async function addWorkspaceItem(
     }
 
     if (input.content && input.fileUrl) {
-      throw new Error('Cannot provide both content and fileUrl. Use fileUrl for large files.');
+      throw new Error(
+        'Cannot provide both content and fileUrl. Use fileUrl for large files.',
+      );
     }
 
     const scope = input.scope || 'agent';
@@ -75,10 +81,7 @@ export async function addWorkspaceItem(
     // Resolve agent ID if needed
     let resolvedScopeId = input.scopeId;
     if (scope === 'agent' && input.scopeId) {
-      const agent = await resolveAssistantIdentifier(
-        input.scopeId,
-        companyId,
-      );
+      const agent = await resolveAssistantIdentifier(input.scopeId, companyId);
       if (!agent) {
         throw new Error(`Agent not found: ${input.scopeId}`);
       }
@@ -151,7 +154,6 @@ export async function addWorkspaceItem(
           '.csv': 'text/csv',
         };
         mimeType = mimeTypes[ext] || 'application/octet-stream';
-
       } else if (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') {
         // Download file from HTTP/HTTPS URL using axios
         const response = await axios.get(input.fileUrl, {
@@ -161,10 +163,12 @@ export async function addWorkspaceItem(
 
         filename = input.fileUrl.split('/').pop() || 'file';
         buffer = Buffer.from(response.data);
-        mimeType = response.headers['content-type'] || 'application/octet-stream';
-
+        mimeType =
+          response.headers['content-type'] || 'application/octet-stream';
       } else {
-        throw new Error(`Unsupported protocol: ${urlObj.protocol}. Only file://, http://, and https:// are supported.`);
+        throw new Error(
+          `Unsupported protocol: ${urlObj.protocol}. Only file://, http://, and https:// are supported.`,
+        );
       }
 
       // Store file content as base64 with metadata
@@ -210,7 +214,7 @@ export async function addWorkspaceItem(
                 message: 'File downloaded and stored successfully via URL',
               },
               null,
-              2
+              2,
             ),
           },
         ],

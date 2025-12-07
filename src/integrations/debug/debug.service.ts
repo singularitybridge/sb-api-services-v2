@@ -201,7 +201,8 @@ export const getActionImplementationGuide = async (
             example[key] = true;
             break;
           case 'array':
-            example[key] = propDef.items?.type === 'string' ? ['item1', 'item2'] : [];
+            example[key] =
+              propDef.items?.type === 'string' ? ['item1', 'item2'] : [];
             break;
           case 'object':
             example[key] = {};
@@ -244,32 +245,34 @@ export const getActionImplementationGuide = async (
         aiAgentConfig: {
           allowedActions: [actionId],
           examplePrompt: `Use ${actionId} to ${action.description.toLowerCase()}`,
-          requiredParameters: ((action.parameters as any)?.required || []) as string[],
+          requiredParameters: ((action.parameters as any)?.required ||
+            []) as string[],
         },
       },
 
       schema: {
         parameters: action.parameters,
         required: ((action.parameters as any)?.required || []) as string[],
-        properties: Object.entries(((action.parameters as any)?.properties || {}) as Record<string, any>).map(
-          ([key, prop]: [string, any]) => ({
-            name: key,
-            type: prop.type,
-            description: prop.description,
-            required: (((action.parameters as any)?.required || []) as string[]).includes(key),
-            enum: prop.enum,
-            items: prop.items,
-          }),
-        ),
+        properties: Object.entries(
+          ((action.parameters as any)?.properties || {}) as Record<string, any>,
+        ).map(([key, prop]: [string, any]) => ({
+          name: key,
+          type: prop.type,
+          description: prop.description,
+          required: (
+            ((action.parameters as any)?.required || []) as string[]
+          ).includes(key),
+          enum: prop.enum,
+          items: prop.items,
+        })),
       },
 
       examples: {
         minimalRequest: JSON.stringify(
           Object.fromEntries(
-            (((action.parameters as any)?.required || []) as string[]).map((key: string) => [
-              key,
-              exampleRequest[key],
-            ]),
+            (((action.parameters as any)?.required || []) as string[]).map(
+              (key: string) => [key, exampleRequest[key]],
+            ),
           ),
           null,
           2,
@@ -494,13 +497,13 @@ export const discoverActionsByIntegration = async (
       const properties = (params?.properties || {}) as Record<string, any>;
 
       const requiredParams = requiredFields.map((param: string) => {
-          const propDef = properties[param];
-          return {
-            name: param,
-            description: propDef?.description || param,
-            type: propDef?.type || 'string',
-          };
-        });
+        const propDef = properties[param];
+        return {
+          name: param,
+          description: propDef?.description || param,
+          type: propDef?.type || 'string',
+        };
+      });
 
       return {
         id: action.id,
@@ -607,7 +610,8 @@ export const searchActions = async (
 
     // Match using both original term and extracted keywords
     const matchedActions = allActions.filter((action) => {
-      const searchableText = `${action.id} ${action.actionTitle} ${action.description} ${action.serviceName}`.toLowerCase();
+      const searchableText =
+        `${action.id} ${action.actionTitle} ${action.description} ${action.serviceName}`.toLowerCase();
 
       // Check original search term
       if (searchableText.includes(searchLower)) return true;

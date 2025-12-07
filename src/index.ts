@@ -182,18 +182,8 @@ app.use(
   verifyAccess(),
   unifiedWorkspaceRouter,
 ); // Unified Workspace (before generic /api)
-app.use(
-  '/api/ui-state',
-  verifyTokenMiddleware,
-  verifyAccess(),
-  uiStateRouter,
-); // UI State tracking (before generic /api)
-app.use(
-  '/api/invites',
-  verifyTokenMiddleware,
-  verifyAccess(),
-  inviteRouter,
-); // User invite system
+app.use('/api/ui-state', verifyTokenMiddleware, verifyAccess(), uiStateRouter); // UI State tracking (before generic /api)
+app.use('/api/invites', verifyTokenMiddleware, verifyAccess(), inviteRouter); // User invite system
 // MCP Server - custom auth that allows initialize, tools/list, and notifications without auth
 app.use(
   '/api/mcp',

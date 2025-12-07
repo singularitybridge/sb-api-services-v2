@@ -44,13 +44,18 @@ export async function getWorkspaceItem(
     const scope = input.scope || 'agent';
     const workspace = getWorkspaceService();
 
+    // Ensure itemPath starts with /
+    const itemPath = input.itemPath.startsWith('/')
+      ? input.itemPath
+      : `/${input.itemPath}`;
+
     let fullPath: string;
     const scopeInfo: any = { scope };
 
     // Build the full path based on scope
     switch (scope) {
       case 'company':
-        fullPath = `/company/${companyId}${input.itemPath}`;
+        fullPath = `/company/${companyId}${itemPath}`;
         scopeInfo.companyId = companyId;
         break;
 
@@ -58,7 +63,7 @@ export async function getWorkspaceItem(
         if (!input.scopeId) {
           throw new Error('scopeId (sessionId) is required for session scope');
         }
-        fullPath = `/session/${input.scopeId}${input.itemPath}`;
+        fullPath = `/session/${input.scopeId}${itemPath}`;
         scopeInfo.sessionId = input.scopeId;
         break;
 
@@ -79,7 +84,7 @@ export async function getWorkspaceItem(
           throw new Error(`Agent not found: ${input.scopeId}`);
         }
 
-        fullPath = `/agent/${agent._id.toString()}${input.itemPath}`;
+        fullPath = `/agent/${agent._id.toString()}${itemPath}`;
         scopeInfo.agentId = agent._id.toString();
         scopeInfo.agentName = agent.name;
         break;

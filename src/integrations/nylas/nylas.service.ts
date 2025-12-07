@@ -196,13 +196,21 @@ export async function sendEmail(
 }
 
 // Calendar functions
-export async function getCalendars(companyId: string): Promise<NylasCalendar[]> {
+export async function getCalendars(
+  companyId: string,
+): Promise<NylasCalendar[]> {
   console.log('[NYLAS DEBUG] getCalendars called for company:', companyId);
   const apiKey = await getApiKey(companyId, 'nylas_api_key');
   const grantId = await getApiKey(companyId, 'nylas_grant_id');
 
-  console.log('[NYLAS DEBUG] API Key:', apiKey ? `${apiKey.substring(0, 15)}...` : 'NULL');
-  console.log('[NYLAS DEBUG] Grant ID:', grantId ? `${grantId.substring(0, 15)}...` : 'NULL');
+  console.log(
+    '[NYLAS DEBUG] API Key:',
+    apiKey ? `${apiKey.substring(0, 15)}...` : 'NULL',
+  );
+  console.log(
+    '[NYLAS DEBUG] Grant ID:',
+    grantId ? `${grantId.substring(0, 15)}...` : 'NULL',
+  );
 
   if (!apiKey) {
     throw new Error('Nylas API key not found');
@@ -246,13 +254,15 @@ export async function getCalendarEvents(
   const primaryCalendar =
     calendars.find((cal) => cal.is_primary) || calendars[0];
 
-  let { limit = 20, start, end } = options;
+  const { limit = 20, start: startOpt, end: endOpt } = options;
+  let start = startOpt;
+  let end = endOpt;
 
   // Default to past 7 days to next 30 days if no time range is specified
   if (!start && !end) {
     const now = Math.floor(Date.now() / 1000);
-    const sevenDaysAgo = now - (7 * 24 * 60 * 60);
-    const thirtyDaysLater = now + (30 * 24 * 60 * 60);
+    const sevenDaysAgo = now - 7 * 24 * 60 * 60;
+    const thirtyDaysLater = now + 30 * 24 * 60 * 60;
     start = sevenDaysAgo;
     end = thirtyDaysLater;
   }
@@ -272,12 +282,23 @@ export async function getCalendarEvents(
     endpoint,
   );
 
-  console.log('[NYLAS DEBUG] getCalendarEvents query:', { start, end, limit, calendar: primaryCalendar.id });
-  console.log('[NYLAS DEBUG] getCalendarEvents returned:', response.data?.length || 0, 'events');
+  console.log('[NYLAS DEBUG] getCalendarEvents query:', {
+    start,
+    end,
+    limit,
+    calendar: primaryCalendar.id,
+  });
+  console.log(
+    '[NYLAS DEBUG] getCalendarEvents returned:',
+    response.data?.length || 0,
+    'events',
+  );
   if (response.data && response.data.length > 0) {
     console.log('[NYLAS DEBUG] First 3 events:');
     response.data.slice(0, 3).forEach((event, i) => {
-      const startTime = event.when?.start_time ? new Date(event.when.start_time * 1000).toISOString() : 'NO TIME';
+      const startTime = event.when?.start_time
+        ? new Date(event.when.start_time * 1000).toISOString()
+        : 'NO TIME';
       console.log(`[NYLAS DEBUG]   ${i + 1}. "${event.title}" at ${startTime}`);
     });
   }
@@ -354,7 +375,12 @@ export async function createCalendarEvent(
     }));
   }
 
-  console.log('[NYLAS DEBUG] Creating event:', { title, calendar: primaryCalendar.id, start: startTimestamp, end: endTimestamp });
+  console.log('[NYLAS DEBUG] Creating event:', {
+    title,
+    calendar: primaryCalendar.id,
+    start: startTimestamp,
+    end: endTimestamp,
+  });
   const response = await makeNylasRequest<{ data: NylasEvent } | NylasEvent>(
     apiKey,
     endpoint,
@@ -364,7 +390,12 @@ export async function createCalendarEvent(
     },
   );
   const eventData = 'data' in response ? response.data : response;
-  console.log('[NYLAS DEBUG] Event created:', eventData?.id || 'NO ID', 'title:', eventData?.title || 'NO TITLE');
+  console.log(
+    '[NYLAS DEBUG] Event created:',
+    eventData?.id || 'NO ID',
+    'title:',
+    eventData?.title || 'NO TITLE',
+  );
   return eventData;
 }
 
@@ -666,7 +697,7 @@ export async function findAvailableSlots(
   });
 
   // Get free/busy for participants if provided
-  let participantBusySlots: FreeBusySlot[] = [];
+  const participantBusySlots: FreeBusySlot[] = [];
   if (participants.length > 0) {
     const freeBusyData = await getFreeBusy(
       companyId,

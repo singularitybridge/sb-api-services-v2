@@ -147,9 +147,7 @@ export class InviteService {
 
     // Can only revoke pending invites
     if (invite.status !== InviteStatus.PENDING) {
-      throw new Error(
-        `Cannot revoke invite with status: ${invite.status}`,
-      );
+      throw new Error(`Cannot revoke invite with status: ${invite.status}`);
     }
 
     invite.status = InviteStatus.REVOKED;

@@ -58,12 +58,14 @@ export interface WorkspaceService {
   exists: (path: string) => Promise<boolean>;
   delete: (path: string) => Promise<boolean>;
   list: (prefix?: string) => Promise<string[]>;
-  listWithMetadata: (prefix?: string) => Promise<Array<{
-    path: string;
-    metadata?: any;
-    type?: 'embedded' | 'external';
-    size?: number;
-  }>>;
+  listWithMetadata: (prefix?: string) => Promise<
+    Array<{
+      path: string;
+      metadata?: any;
+      type?: 'embedded' | 'external';
+      size?: number;
+    }>
+  >;
   findByPattern: (pattern: RegExp) => Promise<string[]>;
   clear: (prefix?: string) => Promise<void>;
   export: (prefix?: string) => Promise<Record<string, any>>;
@@ -396,7 +398,12 @@ export const createWorkspaceService = (
       }
 
       // Content is embedded directly in the document (for small files < 1MB)
-      if (document.type === 'embedded' && document.content) {
+      // Check for undefined/null explicitly - empty string "" is valid content
+      if (
+        document.type === 'embedded' &&
+        document.content !== undefined &&
+        document.content !== null
+      ) {
         // Handle base64 encoded buffers
         if (
           document.content.type === 'buffer' &&
@@ -686,12 +693,16 @@ export const createWorkspaceService = (
     }
   };
 
-  const listWithMetadata = async (prefix?: string): Promise<Array<{
-    path: string;
-    metadata?: any;
-    type?: 'embedded' | 'external';
-    size?: number;
-  }>> => {
+  const listWithMetadata = async (
+    prefix?: string,
+  ): Promise<
+    Array<{
+      path: string;
+      metadata?: any;
+      type?: 'embedded' | 'external';
+      size?: number;
+    }>
+  > => {
     try {
       const namespace = options.namespace || 'workspace';
 
@@ -1129,7 +1140,8 @@ export class UnifiedWorkspaceService {
       sessionId,
       agentId: options.agentId,
       // Only set creation context on first create (version 1)
-      creationContext: version === 1 ? options.creationContext : existingCreationContext,
+      creationContext:
+        version === 1 ? options.creationContext : existingCreationContext,
     });
 
     // Trigger async embedding (fire-and-forget)
@@ -1139,7 +1151,10 @@ export class UnifiedWorkspaceService {
       const namespace = 'unified-workspace';
       const fullKey = `${namespace}:/${scopePath}`;
       vectorSearch.embedDocument(fullKey).catch((error) => {
-        logger.error('Async embedding failed', { fullKey, error: error.message });
+        logger.error('Async embedding failed', {
+          fullKey,
+          error: error.message,
+        });
       });
     });
 

@@ -45,7 +45,12 @@ async function makePerplexityRequest(
     return response.data;
   } catch (error: any) {
     const status = error.response?.status;
-    const isRetryable = status === 520 || status === 502 || status === 503 || status === 504 || status === 429;
+    const isRetryable =
+      status === 520 ||
+      status === 502 ||
+      status === 503 ||
+      status === 504 ||
+      status === 429;
 
     if (isRetryable && attempt < maxRetries) {
       const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
@@ -53,7 +58,12 @@ async function makePerplexityRequest(
         `Perplexity API error ${status}, retrying in ${backoffMs}ms (attempt ${attempt}/${maxRetries})`,
       );
       await sleep(backoffMs);
-      return makePerplexityRequest(apiKey, requestBody, attempt + 1, maxRetries);
+      return makePerplexityRequest(
+        apiKey,
+        requestBody,
+        attempt + 1,
+        maxRetries,
+      );
     }
 
     throw error;
@@ -116,9 +126,7 @@ export async function performPerplexitySearch(
     if (model.includes('reasoning')) {
       // Reasoning models may include <think> tags before the content
       // Extract content after any <think> sections if present
-      cleanContent = content
-        .replace(/<think>[\s\S]*?<\/think>/g, '')
-        .trim();
+      cleanContent = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     }
 
     const result: { searchResult: string; relatedQuestions?: string[] } = {
@@ -142,9 +150,11 @@ export async function performPerplexitySearch(
 
     let errorMessage = 'Failed to perform Perplexity search';
     if (status === 520) {
-      errorMessage = 'Perplexity API is temporarily unavailable (520 error). Please try again in a moment.';
+      errorMessage =
+        'Perplexity API is temporarily unavailable (520 error). Please try again in a moment.';
     } else if (status === 429) {
-      errorMessage = 'Perplexity API rate limit exceeded. Please try again later.';
+      errorMessage =
+        'Perplexity API rate limit exceeded. Please try again later.';
     } else if (status >= 500) {
       errorMessage = `Perplexity API server error (${status}). Please try again.`;
     } else if (error.response?.data?.error) {

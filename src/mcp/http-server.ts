@@ -763,7 +763,8 @@ export class MCPHttpServer {
             }
 
             case 'vector_search_workspace': {
-              const parseResult = vectorSearchWorkspaceSchema.safeParse(toolArgs);
+              const parseResult =
+                vectorSearchWorkspaceSchema.safeParse(toolArgs);
               if (!parseResult.success) {
                 throw new Error(
                   `Invalid parameters: ${parseResult.error.message}`,

@@ -99,7 +99,9 @@ export function initializeWebSocket(server: http.Server): Server {
         '../integrations/agent_hub_ui_context/agent_hub_ui_context.service'
       );
       await registerSocket(authSocket.companyId, authSocket);
-      logger.info(`Socket registered for UI RPC: company=${authSocket.companyId}`);
+      logger.info(
+        `Socket registered for UI RPC: company=${authSocket.companyId}`,
+      );
     } catch (error) {
       logger.error('Failed to register socket for UI RPC:', error);
     }
@@ -141,7 +143,9 @@ export function initializeWebSocket(server: http.Server): Server {
     // Handle UI state updates from frontend
     socket.on('ui-state-update', async (payload: any) => {
       try {
-        const { uiSessionStateService } = await import('../services/ui-session-state.service');
+        const { uiSessionStateService } = await import(
+          '../services/ui-session-state.service'
+        );
         uiSessionStateService.updateUIState(authSocket.userId, {
           sessionId: payload.sessionId,
           currentRoute: payload.currentRoute,
@@ -171,7 +175,9 @@ export function initializeWebSocket(server: http.Server): Server {
           '../integrations/agent_hub_ui_context/agent_hub_ui_context.service'
         );
         await unregisterSocket(authSocket.companyId);
-        logger.info(`Socket unregistered for UI RPC: company=${authSocket.companyId}`);
+        logger.info(
+          `Socket unregistered for UI RPC: company=${authSocket.companyId}`,
+        );
       } catch (error) {
         logger.error('Failed to unregister socket for UI RPC:', error);
       }
@@ -195,7 +201,9 @@ export function initializeWebSocket(server: http.Server): Server {
  */
 export function getSocketServer(): Server {
   if (!io) {
-    throw new Error('WebSocket server not initialized. Call initializeWebSocket first.');
+    throw new Error(
+      'WebSocket server not initialized. Call initializeWebSocket first.',
+    );
   }
   return io;
 }

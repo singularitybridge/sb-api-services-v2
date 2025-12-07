@@ -16,7 +16,9 @@ import { Result } from './types';
  * @param companyId - The company ID to get credentials for
  * @returns Initialized Version3Client
  */
-export const initializeClient = async (companyId: string): Promise<Version3Client> => {
+export const initializeClient = async (
+  companyId: string,
+): Promise<Version3Client> => {
   const apiToken = await getApiKey(companyId, 'jira_api_token');
   const domain = await getApiKey(companyId, 'jira_domain');
   const email = await getApiKey(companyId, 'jira_email');
@@ -125,7 +127,9 @@ export const withJiraClient = async <T>(
     const message = error?.message || errorContext;
     return {
       success: false,
-      error: message.startsWith('Failed') ? message : `${errorContext}: ${message}`,
+      error: message.startsWith('Failed')
+        ? message
+        : `${errorContext}: ${message}`,
     };
   }
 };

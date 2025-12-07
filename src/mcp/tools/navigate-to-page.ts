@@ -28,11 +28,9 @@ export async function navigateToPage(
   companyId: string,
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   try {
-    const result = await executeAgentHubUiAction(
-      companyId,
-      'navigateToPage',
-      { path: input.path },
-    );
+    const result = await executeAgentHubUiAction(companyId, 'navigateToPage', {
+      path: input.path,
+    });
 
     return {
       content: [

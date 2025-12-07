@@ -43,7 +43,9 @@ interface ServiceCallLambdaResponse<T> {
 // Contact Actions
 // ==========================================
 
-export const createContactActions = (context: ActionContext): FunctionFactory => ({
+export const createContactActions = (
+  context: ActionContext,
+): FunctionFactory => ({
   // Get contacts
   nylasGetContacts: {
     description:
@@ -74,7 +76,10 @@ export const createContactActions = (context: ActionContext): FunctionFactory =>
         throw new ActionValidationError('Company ID is missing from context.');
       }
 
-      return executeAction<ContactData[], ServiceCallLambdaResponse<ContactData[]>>(
+      return executeAction<
+        ContactData[],
+        ServiceCallLambdaResponse<ContactData[]>
+      >(
         'nylasGetContacts',
         async () => {
           const contacts = await getContactsService(context.companyId!, {
@@ -232,7 +237,15 @@ export const createContactActions = (context: ActionContext): FunctionFactory =>
       companyName?: string;
       notes?: string;
     }): Promise<StandardActionResult<ContactData>> => {
-      const { contactId, email, givenName, surname, phone, companyName, notes } = args;
+      const {
+        contactId,
+        email,
+        givenName,
+        surname,
+        phone,
+        companyName,
+        notes,
+      } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -252,14 +265,18 @@ export const createContactActions = (context: ActionContext): FunctionFactory =>
       return executeAction<ContactData, ServiceCallLambdaResponse<ContactData>>(
         'nylasUpdateContact',
         async () => {
-          const contact = await updateContactService(context.companyId!, contactId, {
-            email,
-            givenName,
-            surname,
-            phone,
-            companyName,
-            notes,
-          });
+          const contact = await updateContactService(
+            context.companyId!,
+            contactId,
+            {
+              email,
+              givenName,
+              surname,
+              phone,
+              companyName,
+              notes,
+            },
+          );
           return {
             success: true,
             data: {

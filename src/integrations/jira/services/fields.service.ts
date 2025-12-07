@@ -68,7 +68,9 @@ export const findSprintFieldId = async (
     if (!fieldsResult.success || !Array.isArray(fieldsResult.data)) {
       return {
         success: false,
-        error: fieldsResult.error || 'Failed to fetch Jira fields for sprint ID discovery.',
+        error:
+          fieldsResult.error ||
+          'Failed to fetch Jira fields for sprint ID discovery.',
       };
     }
 

@@ -24,21 +24,26 @@ router.post(
       if (!query || typeof query !== 'string') {
         return res.status(400).json({
           success: false,
-          error: 'Query parameter is required and must be a string'
+          error: 'Query parameter is required and must be a string',
         });
       }
 
       // Find assistant by ID or name using resolver
-      const assistant = await resolveAssistantIdentifier(assistantId, companyId.toString());
+      const assistant = await resolveAssistantIdentifier(
+        assistantId,
+        companyId.toString(),
+      );
 
       if (!assistant) {
         return res.status(404).json({
           success: false,
-          error: 'Assistant not found'
+          error: 'Assistant not found',
         });
       }
 
-      console.log(`🔍 [Workspace Execute] Assistant: ${assistant.name}, Query: "${query}"`);
+      console.log(
+        `🔍 [Workspace Execute] Assistant: ${assistant.name}, Query: "${query}"`,
+      );
       console.log(`📍 [Workspace Execute] Context:`, searchContext);
       console.log(`🔄 [Workspace Execute] Streaming: ${isSSE}`);
 
@@ -58,7 +63,9 @@ router.post(
         res.flushHeaders();
 
         // Send initial connection event
-        res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`);
+        res.write(
+          `data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`,
+        );
 
         // Execute assistant with streaming
         try {
@@ -70,7 +77,7 @@ router.post(
             undefined, // attachments
             undefined, // responseFormat
             { 'X-Experimental-Stream': 'true' }, // metadata - fixed key to match stateless service
-            promptOverride
+            promptOverride,
           );
 
           // Stream the response
@@ -79,36 +86,44 @@ router.post(
 
             for await (const chunk of textStream) {
               if (res.writableEnded) break;
-              res.write(`data: ${JSON.stringify({
-                type: 'chunk',
-                content: chunk,
-                timestamp: Date.now()
-              })}\n\n`);
+              res.write(
+                `data: ${JSON.stringify({
+                  type: 'chunk',
+                  content: chunk,
+                  timestamp: Date.now(),
+                })}\n\n`,
+              );
             }
           } else if (typeof result === 'string') {
             // Non-streaming response - send as single chunk
-            res.write(`data: ${JSON.stringify({
-              type: 'chunk',
-              content: result,
-              timestamp: Date.now()
-            })}\n\n`);
+            res.write(
+              `data: ${JSON.stringify({
+                type: 'chunk',
+                content: result,
+                timestamp: Date.now(),
+              })}\n\n`,
+            );
           }
 
           // Send completion event
-          res.write(`data: ${JSON.stringify({
-            type: 'complete',
-            timestamp: Date.now()
-          })}\n\n`);
+          res.write(
+            `data: ${JSON.stringify({
+              type: 'complete',
+              timestamp: Date.now(),
+            })}\n\n`,
+          );
 
           res.end();
         } catch (execError: any) {
           console.error('❌ [Workspace Execute] Execution error:', execError);
           if (!res.writableEnded) {
-            res.write(`data: ${JSON.stringify({
-              type: 'error',
-              error: execError.message || 'Execution failed',
-              timestamp: Date.now()
-            })}\n\n`);
+            res.write(
+              `data: ${JSON.stringify({
+                type: 'error',
+                error: execError.message || 'Execution failed',
+                timestamp: Date.now(),
+              })}\n\n`,
+            );
             res.end();
           }
         }
@@ -122,22 +137,23 @@ router.post(
           undefined,
           undefined,
           undefined,
-          promptOverride
+          promptOverride,
         );
 
         return res.json({
           success: true,
-          response: typeof result === 'string' ? result : JSON.stringify(result)
+          response:
+            typeof result === 'string' ? result : JSON.stringify(result),
         });
       }
     } catch (error: any) {
       console.error('❌ [Workspace Execute] Error:', error);
       return res.status(500).json({
         success: false,
-        error: error.message || 'Internal server error'
+        error: error.message || 'Internal server error',
       });
     }
-  }
+  },
 );
 
 export default router;

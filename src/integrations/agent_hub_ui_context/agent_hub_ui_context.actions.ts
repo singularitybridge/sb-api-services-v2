@@ -1,9 +1,7 @@
 import { ActionContext, FunctionFactory } from '../actions/types';
 import { getUiContext, executeUiAction } from './agent_hub_ui_context.service';
 import { executeAction } from '../actions/executor';
-import {
-  ActionValidationError,
-} from '../../utils/actionErrors';
+import { ActionValidationError } from '../../utils/actionErrors';
 
 // Define expected data shapes for StandardActionResult
 interface UiContextData {
@@ -28,7 +26,7 @@ export async function getAgentHubUiContext(companyId: string) {
 export async function executeAgentHubUiAction(
   companyId: string,
   action: string,
-  params: Record<string, any>
+  params: Record<string, any>,
 ) {
   return await executeUiAction(companyId, { action, params });
 }
@@ -37,7 +35,8 @@ export const createAgentHubUiContextActions = (
   context: ActionContext,
 ): FunctionFactory => ({
   getAgentHubUiContext: {
-    description: 'Get the current UI context from the Agent Hub chat interface. Returns information about the current page the user is viewing, including route, workspace file being viewed (with full content), assistant ID, and session ID. Use this to understand what the user is currently looking at in the UI.',
+    description:
+      'Get the current UI context from the Agent Hub chat interface. Returns information about the current page the user is viewing, including route, workspace file being viewed (with full content), assistant ID, and session ID. Use this to understand what the user is currently looking at in the UI.',
     strict: true,
     parameters: {
       type: 'object',
@@ -70,7 +69,8 @@ export const createAgentHubUiContextActions = (
   },
 
   executeAgentHubUiAction: {
-    description: 'Execute a UI action in the Agent Hub chat interface. Available actions: navigateToPage (navigate to a route), openWorkspaceFile (open a specific workspace file for an assistant), showNotification (show a toast notification to the user), pushMessageToChat (push a message to chat - DUAL UPDATE: saves to database + broadcasts via Pusher for all clients + immediate RPC update)',
+    description:
+      'Execute a UI action in the Agent Hub chat interface. Available actions: navigateToPage (navigate to a route), openWorkspaceFile (open a specific workspace file for an assistant), showNotification (show a toast notification to the user), pushMessageToChat (push a message to chat - DUAL UPDATE: saves to database + broadcasts via Pusher for all clients + immediate RPC update)',
     strict: true,
     parameters: {
       type: 'object',
@@ -78,11 +78,17 @@ export const createAgentHubUiContextActions = (
         action: {
           type: 'string',
           description: 'The UI action to execute',
-          enum: ['navigateToPage', 'openWorkspaceFile', 'showNotification', 'pushMessageToChat'],
+          enum: [
+            'navigateToPage',
+            'openWorkspaceFile',
+            'showNotification',
+            'pushMessageToChat',
+          ],
         },
         params: {
           type: 'object',
-          description: 'Parameters for the action. For navigateToPage: {path: string}. For openWorkspaceFile: {assistantId: string, path: string}. For showNotification: {message: string, type?: "success"|"error"|"info"}. For pushMessageToChat: {content: string, role?: "user"|"assistant", metadata?: object} - Saves to MongoDB, broadcasts via Pusher to all clients, and provides immediate RPC update',
+          description:
+            'Parameters for the action. For navigateToPage: {path: string}. For openWorkspaceFile: {assistantId: string, path: string}. For showNotification: {message: string, type?: "success"|"error"|"info"}. For pushMessageToChat: {content: string, role?: "user"|"assistant", metadata?: object} - Saves to MongoDB, broadcasts via Pusher to all clients, and provides immediate RPC update',
           additionalProperties: true,
         },
       },

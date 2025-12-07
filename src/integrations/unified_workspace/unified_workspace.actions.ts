@@ -54,7 +54,9 @@ async function getLastUserMessage(sessionId: string): Promise<{
   try {
     // Skip if sessionId is not a valid ObjectId (e.g., "stateless_execution")
     if (!mongoose.Types.ObjectId.isValid(sessionId)) {
-      logger.debug(`Session ID "${sessionId}" is not a valid ObjectId, skipping message lookup`);
+      logger.debug(
+        `Session ID "${sessionId}" is not a valid ObjectId, skipping message lookup`,
+      );
       return null;
     }
 
@@ -79,7 +81,10 @@ async function getLastUserMessage(sessionId: string): Promise<{
       timestamp: lastUserMessage.timestamp,
     };
   } catch (error) {
-    logger.error(`Error getting last user message for session ${sessionId}:`, error);
+    logger.error(
+      `Error getting last user message for session ${sessionId}:`,
+      error,
+    );
     return null;
   }
 }
@@ -633,8 +638,15 @@ export const createWorkspaceActions = (
         }
 
         // Single-scope search (backward compatible)
-        if (scope !== 'session' && scope !== 'agent' && scope !== 'company' && scope !== 'team') {
-          throw new Error('Scope must be one of: session, agent, company, team, multi');
+        if (
+          scope !== 'session' &&
+          scope !== 'agent' &&
+          scope !== 'company' &&
+          scope !== 'team'
+        ) {
+          throw new Error(
+            'Scope must be one of: session, agent, company, team, multi',
+          );
         }
 
         // Resolve scope ID based on scope type
@@ -646,9 +658,14 @@ export const createWorkspaceActions = (
               'agentId is required when scope is "agent" (or must be executing within an assistant context)',
             );
           }
-          const resolved = await resolveAgentId(agentIdentifier, context?.companyId);
+          const resolved = await resolveAgentId(
+            agentIdentifier,
+            context?.companyId,
+          );
           if (!resolved) {
-            throw new Error(`Could not find agent with identifier: ${agentIdentifier}`);
+            throw new Error(
+              `Could not find agent with identifier: ${agentIdentifier}`,
+            );
           }
           scopeId = resolved;
         } else if (scope === 'session') {
@@ -656,7 +673,9 @@ export const createWorkspaceActions = (
         } else if (scope === 'company') {
           scopeId = context.companyId;
         } else {
-          throw new Error(`Team scope requires multi-scope search with scope="multi"`);
+          throw new Error(
+            `Team scope requires multi-scope search with scope="multi"`,
+          );
         }
 
         const searchLimit = limit || 10;

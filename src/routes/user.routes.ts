@@ -79,7 +79,9 @@ userRouter.put(
         req.user?.role !== 'Admin' &&
         user.companyId.toString() !== req.user?.companyId.toString()
       ) {
-        return res.status(403).send({ message: 'Access denied: Cannot update users from other companies' });
+        return res.status(403).send({
+          message: 'Access denied: Cannot update users from other companies',
+        });
       }
 
       const updatedUser = await User.findByIdAndUpdate(id, userData, {
@@ -109,7 +111,9 @@ userRouter.delete(
         req.user?.role !== 'Admin' &&
         user.companyId.toString() !== req.user?.companyId.toString()
       ) {
-        return res.status(403).send({ message: 'Access denied: Cannot delete users from other companies' });
+        return res.status(403).send({
+          message: 'Access denied: Cannot delete users from other companies',
+        });
       }
 
       await User.findByIdAndDelete(id);

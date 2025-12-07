@@ -35,11 +35,14 @@ router.post('/create-with-wizard', async (req: AuthenticatedRequest, res) => {
     console.log(
       `Generating avatars for team "${teamName}" (company: ${companyId})`,
     );
-    const avatarResults = await generateTeamAvatarVariations({
-      teamName,
-      teamPurpose,
-      companyId,
-    }, 3);
+    const avatarResults = await generateTeamAvatarVariations(
+      {
+        teamName,
+        teamPurpose,
+        companyId,
+      },
+      3,
+    );
 
     // Filter successful generations
     const successfulAvatars = avatarResults.filter((r) => r.imageUrl);
@@ -58,7 +61,11 @@ router.post('/create-with-wizard', async (req: AuthenticatedRequest, res) => {
     for (const avatar of successfulAvatars) {
       try {
         // Download and compress image from DALL-E URL
-        const imageBuffer = await downloadAndCompressImage(avatar.imageUrl, 512, 85);
+        const imageBuffer = await downloadAndCompressImage(
+          avatar.imageUrl,
+          512,
+          85,
+        );
 
         // Generate workspace path
         const timestamp = new Date().getTime();
@@ -83,7 +90,9 @@ router.post('/create-with-wizard', async (req: AuthenticatedRequest, res) => {
           revisedPrompt: avatar.revisedPrompt,
         });
 
-        console.log(`Stored avatar ${avatar.styleIndex + 1}/${successfulAvatars.length} at ${path}`);
+        console.log(
+          `Stored avatar ${avatar.styleIndex + 1}/${successfulAvatars.length} at ${path}`,
+        );
       } catch (error) {
         console.error(
           `Failed to download/store avatar ${avatar.styleIndex}:`,
@@ -151,8 +160,9 @@ router.post('/create-with-wizard', async (req: AuthenticatedRequest, res) => {
       });
 
       // Clean up temp avatars asynchronously (non-blocking)
-      Promise.all(storedAvatars.map(avatar => workspace.delete(avatar.path)))
-        .catch(err => console.error('Failed to cleanup temp avatars:', err));
+      Promise.all(
+        storedAvatars.map((avatar) => workspace.delete(avatar.path)),
+      ).catch((err) => console.error('Failed to cleanup temp avatars:', err));
 
       return;
     }

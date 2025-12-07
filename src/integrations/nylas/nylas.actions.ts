@@ -59,7 +59,9 @@ interface ServiceCallLambdaResponse<T> {
   description?: string;
 }
 
-export const createNylasActions = (context: ActionContext): FunctionFactory => ({
+export const createNylasActions = (
+  context: ActionContext,
+): FunctionFactory => ({
   // Get emails
   nylasGetEmails: {
     description:
@@ -439,7 +441,8 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
 
   // Get specific event by ID
   nylasGetEvent: {
-    description: 'Retrieve a specific calendar event by its ID with full details.',
+    description:
+      'Retrieve a specific calendar event by its ID with full details.',
     strict: true,
     parameters: {
       type: 'object',
@@ -489,7 +492,8 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
 
   // Update existing event
   nylasUpdateEvent: {
-    description: 'Update an existing calendar event (move, reschedule, or modify details).',
+    description:
+      'Update an existing calendar event (move, reschedule, or modify details).',
     strict: true,
     parameters: {
       type: 'object',
@@ -535,7 +539,15 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
       endTime?: string;
       participants?: string;
     }): Promise<StandardActionResult<EventData>> => {
-      const { eventId, title, description, location, startTime, endTime, participants } = args;
+      const {
+        eventId,
+        title,
+        description,
+        location,
+        startTime,
+        endTime,
+        participants,
+      } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -548,14 +560,20 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
       return executeAction<EventData, ServiceCallLambdaResponse<EventData>>(
         'nylasUpdateEvent',
         async () => {
-          const event = await updateCalendarEventService(context.companyId!, eventId, {
-            title,
-            description,
-            location,
-            startTime,
-            endTime,
-            participants: participants ? participants.split(',').map((e) => e.trim()) : undefined,
-          });
+          const event = await updateCalendarEventService(
+            context.companyId!,
+            eventId,
+            {
+              title,
+              description,
+              location,
+              startTime,
+              endTime,
+              participants: participants
+                ? participants.split(',').map((e) => e.trim())
+                : undefined,
+            },
+          );
           return {
             success: true,
             data: {
@@ -602,7 +620,10 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
         throw new ActionValidationError('eventId is required');
       }
 
-      return executeAction<{ deleted: boolean }, ServiceCallLambdaResponse<{ deleted: boolean }>>(
+      return executeAction<
+        { deleted: boolean },
+        ServiceCallLambdaResponse<{ deleted: boolean }>
+      >(
         'nylasDeleteEvent',
         async () => {
           await deleteCalendarEventService(context.companyId!, eventId);
@@ -627,7 +648,8 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
         },
         dateRangeStart: {
           type: 'string',
-          description: 'Start date for search in ISO 8601 format (e.g., "2024-01-15T00:00:00Z")',
+          description:
+            'Start date for search in ISO 8601 format (e.g., "2024-01-15T00:00:00Z")',
         },
         dateRangeEnd: {
           type: 'string',
@@ -635,15 +657,18 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
         },
         preferredTimeStart: {
           type: 'string',
-          description: 'Preferred start time of day in HH:MM format (default: "09:00")',
+          description:
+            'Preferred start time of day in HH:MM format (default: "09:00")',
         },
         preferredTimeEnd: {
           type: 'string',
-          description: 'Preferred end time of day in HH:MM format (default: "17:00")',
+          description:
+            'Preferred end time of day in HH:MM format (default: "17:00")',
         },
         participants: {
           type: 'string',
-          description: 'Comma-separated email addresses to check availability (optional)',
+          description:
+            'Comma-separated email addresses to check availability (optional)',
         },
         bufferMinutes: {
           type: 'number',
@@ -683,8 +708,12 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
       return executeAction<any[], ServiceCallLambdaResponse<any[]>>(
         'nylasFindAvailableSlots',
         async () => {
-          const startTimestamp = Math.floor(new Date(dateRangeStart).getTime() / 1000);
-          const endTimestamp = Math.floor(new Date(dateRangeEnd).getTime() / 1000);
+          const startTimestamp = Math.floor(
+            new Date(dateRangeStart).getTime() / 1000,
+          );
+          const endTimestamp = Math.floor(
+            new Date(dateRangeEnd).getTime() / 1000,
+          );
 
           const slots = await findAvailableSlotsService(context.companyId!, {
             durationMinutes,
@@ -692,7 +721,9 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
             dateRangeEnd: endTimestamp,
             preferredTimeStart,
             preferredTimeEnd,
-            participants: participants ? participants.split(',').map((e) => e.trim()) : undefined,
+            participants: participants
+              ? participants.split(',').map((e) => e.trim())
+              : undefined,
             bufferMinutes,
           });
 
@@ -754,7 +785,9 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
         'nylasGetFreeBusy',
         async () => {
           const emailList = emails.split(',').map((e) => e.trim());
-          const startTimestamp = Math.floor(new Date(startTime).getTime() / 1000);
+          const startTimestamp = Math.floor(
+            new Date(startTime).getTime() / 1000,
+          );
           const endTimestamp = Math.floor(new Date(endTime).getTime() / 1000);
 
           const freeBusyData = await getFreeBusyService(
@@ -819,14 +852,18 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
       return executeAction<any, ServiceCallLambdaResponse<any>>(
         'nylasCheckConflicts',
         async () => {
-          const startTimestamp = Math.floor(new Date(startTime).getTime() / 1000);
+          const startTimestamp = Math.floor(
+            new Date(startTime).getTime() / 1000,
+          );
           const endTimestamp = Math.floor(new Date(endTime).getTime() / 1000);
 
           const result = await checkEventConflictsService(
             context.companyId!,
             startTimestamp,
             endTimestamp,
-            participants ? participants.split(',').map((e) => e.trim()) : undefined,
+            participants
+              ? participants.split(',').map((e) => e.trim())
+              : undefined,
           );
 
           // Format response
@@ -892,7 +929,10 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
             throw new Error('events must be a JSON array');
           }
 
-          const result = await createMultipleEventsService(context.companyId!, eventList);
+          const result = await createMultipleEventsService(
+            context.companyId!,
+            eventList,
+          );
 
           // Format response
           const formatted = {
@@ -936,7 +976,8 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
         },
         checkConflicts: {
           type: 'boolean',
-          description: 'Whether to check for conflicts before moving (default: true)',
+          description:
+            'Whether to check for conflicts before moving (default: true)',
         },
       },
       required: ['eventId', 'newStartTime', 'newEndTime'],
@@ -963,8 +1004,12 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
         async () => {
           // Check for conflicts if requested
           if (checkConflicts) {
-            const startTimestamp = Math.floor(new Date(newStartTime).getTime() / 1000);
-            const endTimestamp = Math.floor(new Date(newEndTime).getTime() / 1000);
+            const startTimestamp = Math.floor(
+              new Date(newStartTime).getTime() / 1000,
+            );
+            const endTimestamp = Math.floor(
+              new Date(newEndTime).getTime() / 1000,
+            );
 
             const conflictCheck = await checkEventConflictsService(
               context.companyId!,
@@ -978,7 +1023,9 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
                 conflicts: conflictCheck.conflicts.map((event) => ({
                   id: event.id,
                   title: event.title,
-                  startTime: new Date(event.when.start_time * 1000).toISOString(),
+                  startTime: new Date(
+                    event.when.start_time * 1000,
+                  ).toISOString(),
                   endTime: new Date(event.when.end_time * 1000).toISOString(),
                 })),
                 alternatives: conflictCheck.alternativeSlots?.map((slot) => ({
@@ -987,17 +1034,22 @@ export const createNylasActions = (context: ActionContext): FunctionFactory => (
                   score: slot.score,
                   reason: slot.reason,
                 })),
-                message: 'The proposed time conflicts with existing events. See alternatives.',
+                message:
+                  'The proposed time conflicts with existing events. See alternatives.',
               };
               return { success: true, data: conflictDetails };
             }
           }
 
           // No conflicts or check disabled, proceed with move
-          const event = await updateCalendarEventService(context.companyId!, eventId, {
-            startTime: newStartTime,
-            endTime: newEndTime,
-          });
+          const event = await updateCalendarEventService(
+            context.companyId!,
+            eventId,
+            {
+              startTime: newStartTime,
+              endTime: newEndTime,
+            },
+          );
 
           return {
             success: true,

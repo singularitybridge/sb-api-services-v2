@@ -100,10 +100,7 @@ InviteSchema.index({ companyId: 1, createdAt: -1 }); // For paginated listing
 InviteSchema.index({ inviteToken: 1 });
 
 // TTL index for automatic cleanup of expired invites (MongoDB native)
-InviteSchema.index(
-  { expiresAt: 1 },
-  { expireAfterSeconds: 0 }
-);
+InviteSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 // Compound unique index to prevent duplicate pending invites
 InviteSchema.index(

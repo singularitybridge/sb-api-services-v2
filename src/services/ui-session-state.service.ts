@@ -56,7 +56,8 @@ class UISessionStateService {
       userId,
       sessionId: state.sessionId || existingState?.sessionId || '',
       currentRoute: state.currentRoute || existingState?.currentRoute || '/',
-      openWorkspaceDocument: state.openWorkspaceDocument || existingState?.openWorkspaceDocument,
+      openWorkspaceDocument:
+        state.openWorkspaceDocument || existingState?.openWorkspaceDocument,
       uiContext: {
         ...existingState?.uiContext,
         ...state.uiContext,
@@ -106,7 +107,10 @@ class UISessionStateService {
   /**
    * Update open workspace document
    */
-  updateWorkspaceDocument(sessionId: string, document: WorkspaceDocument | undefined): void {
+  updateWorkspaceDocument(
+    sessionId: string,
+    document: WorkspaceDocument | undefined,
+  ): void {
     const state = this.stateBySession.get(sessionId);
     if (state) {
       this.updateUIState(state.userId, {
@@ -191,7 +195,7 @@ class UISessionStateService {
   private notifyListeners(userId: string, state: UISessionState): void {
     const userListeners = this.listeners.get(userId);
     if (userListeners) {
-      userListeners.forEach(callback => {
+      userListeners.forEach((callback) => {
         try {
           callback(state);
         } catch (error) {
@@ -226,7 +230,10 @@ class UISessionStateService {
     return {
       activeUsers: this.stateByUser.size,
       activeSessions: this.stateBySession.size,
-      listeners: Array.from(this.listeners.values()).reduce((sum, set) => sum + set.size, 0),
+      listeners: Array.from(this.listeners.values()).reduce(
+        (sum, set) => sum + set.size,
+        0,
+      ),
     };
   }
 

@@ -42,7 +42,8 @@ export const getBoardVelocity = async (
       .filter((s) => s.completeDate)
       .sort(
         (a, b) =>
-          new Date(b.completeDate!).getTime() - new Date(a.completeDate!).getTime(),
+          new Date(b.completeDate!).getTime() -
+          new Date(a.completeDate!).getTime(),
       )
       .slice(0, sprintCount);
 
@@ -107,7 +108,10 @@ export const getBoardVelocity = async (
     }
 
     // Calculate average velocity
-    const totalPoints = sprintVelocities.reduce((sum, s) => sum + s.completedPoints, 0);
+    const totalPoints = sprintVelocities.reduce(
+      (sum, s) => sum + s.completedPoints,
+      0,
+    );
     const averageVelocity =
       sprintVelocities.length > 0
         ? Math.round((totalPoints / sprintVelocities.length) * 10) / 10
@@ -118,10 +122,13 @@ export const getBoardVelocity = async (
     if (sprintVelocities.length >= 2) {
       const midpoint = Math.floor(sprintVelocities.length / 2);
       const recentAvg =
-        sprintVelocities.slice(0, midpoint).reduce((sum, s) => sum + s.completedPoints, 0) /
-        midpoint;
+        sprintVelocities
+          .slice(0, midpoint)
+          .reduce((sum, s) => sum + s.completedPoints, 0) / midpoint;
       const olderAvg =
-        sprintVelocities.slice(midpoint).reduce((sum, s) => sum + s.completedPoints, 0) /
+        sprintVelocities
+          .slice(midpoint)
+          .reduce((sum, s) => sum + s.completedPoints, 0) /
         (sprintVelocities.length - midpoint);
 
       const diff = recentAvg - olderAvg;
@@ -248,7 +255,9 @@ export const getSprintProgress = async (
 
     // Calculate progress percentages
     const progressPercent =
-      issues.length > 0 ? Math.round((completedIssues / issues.length) * 100) : 0;
+      issues.length > 0
+        ? Math.round((completedIssues / issues.length) * 100)
+        : 0;
     const pointsProgressPercent =
       totalPoints > 0 ? Math.round((completedPoints / totalPoints) * 100) : 0;
 
@@ -266,7 +275,9 @@ export const getSprintProgress = async (
         progressPercent,
         pointsProgressPercent,
         issuesByStatus,
-        atRiskIssues: atRiskIssues.sort((a, b) => b.daysSinceUpdate - a.daysSinceUpdate),
+        atRiskIssues: atRiskIssues.sort(
+          (a, b) => b.daysSinceUpdate - a.daysSinceUpdate,
+        ),
       },
     };
   } catch (error: any) {

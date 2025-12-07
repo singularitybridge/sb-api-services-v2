@@ -176,7 +176,11 @@ registerRpcMethod(
     } else if (result && typeof result === 'object') {
       // Handle message format from executeAssistantStateless
       // Format: { content: [{ type: 'text', text: { value: 'actual text' } }] }
-      if (result.content && Array.isArray(result.content) && result.content.length > 0) {
+      if (
+        result.content &&
+        Array.isArray(result.content) &&
+        result.content.length > 0
+      ) {
         const firstContent = result.content[0];
         if (firstContent.type === 'text' && firstContent.text?.value) {
           responseText = firstContent.text.value;
@@ -185,7 +189,8 @@ registerRpcMethod(
         responseText = result.text;
       } else {
         // Fallback: try other common formats
-        responseText = result.response || result.message || JSON.stringify(result);
+        responseText =
+          result.response || result.message || JSON.stringify(result);
       }
     }
 
@@ -193,21 +198,24 @@ registerRpcMethod(
       resultType: typeof result,
       hasContent: result && typeof result === 'object' && 'content' in result,
       textLength: responseText.length,
-      preview: responseText.substring(0, 150)
+      preview: responseText.substring(0, 150),
     });
 
     // Save to workspace if savePath provided
     if (params.savePath && responseText) {
       // Extract HTML from markdown code blocks if present
       let finalContent = responseText;
-      const htmlCodeBlockMatch = responseText.match(/```html\s*([\s\S]*?)\s*```/);
+      const htmlCodeBlockMatch = responseText.match(
+        /```html\s*([\s\S]*?)\s*```/,
+      );
       if (htmlCodeBlockMatch && htmlCodeBlockMatch[1]) {
         finalContent = htmlCodeBlockMatch[1].trim();
       }
 
       // Detect content type from response
-      const isHtml = finalContent.trim().startsWith('<!DOCTYPE html>') ||
-                     finalContent.trim().startsWith('<html');
+      const isHtml =
+        finalContent.trim().startsWith('<!DOCTYPE html>') ||
+        finalContent.trim().startsWith('<html');
       const contentType = isHtml ? 'text/html' : 'text/markdown';
 
       // UnifiedWorkspaceService signature: storeContent(sessionId, path, content, options)

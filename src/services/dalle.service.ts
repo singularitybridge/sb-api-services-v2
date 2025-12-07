@@ -76,7 +76,9 @@ export const generateTeamAvatar = async (
       throw new Error('No image URL returned from DALL-E');
     }
 
-    logger.info(`Successfully generated avatar: ${imageUrl.substring(0, 50)}...`);
+    logger.info(
+      `Successfully generated avatar: ${imageUrl.substring(0, 50)}...`,
+    );
 
     return {
       imageUrl,

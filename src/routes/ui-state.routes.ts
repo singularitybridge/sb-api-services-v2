@@ -63,7 +63,9 @@ router.post('/update', async (req, res) => {
     if (openWorkspaceDocument) {
       stateUpdate.openWorkspaceDocument = {
         path: openWorkspaceDocument.path,
-        lastModified: new Date(openWorkspaceDocument.lastModified || Date.now()),
+        lastModified: new Date(
+          openWorkspaceDocument.lastModified || Date.now(),
+        ),
         metadata: openWorkspaceDocument.metadata || {},
       };
     }

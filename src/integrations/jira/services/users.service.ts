@@ -34,7 +34,8 @@ export const searchUsers = async (
       maxResults: Math.min(options?.maxResults || 50, 50), // Max 50 users
     };
 
-    const users: Version3Models.User[] = await client.userSearch.findUsers(searchParams);
+    const users: Version3Models.User[] =
+      await client.userSearch.findUsers(searchParams);
 
     // Filter to only real users (accountType: "atlassian"), exclude bots/apps
     const realUsers = users.filter((user) => user.accountType === 'atlassian');

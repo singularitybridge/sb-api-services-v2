@@ -56,7 +56,9 @@ export const unregisterSocket = async (companyId: string): Promise<void> => {
     { $set: { isUiConnected: false } },
   );
 
-  console.log(`[AgentHubUiContext] Unregistered socket for company: ${companyId}`);
+  console.log(
+    `[AgentHubUiContext] Unregistered socket for company: ${companyId}`,
+  );
 };
 
 export const getUiContext = async (
@@ -90,7 +92,9 @@ export const getUiContext = async (
   }
 
   try {
-    console.log(`[AgentHubUiContext] Getting UI context for company: ${companyId}`);
+    console.log(
+      `[AgentHubUiContext] Getting UI context for company: ${companyId}`,
+    );
     const result = await callRpcMethod(socket, 'getUiContext', {});
     return {
       success: true,
@@ -147,19 +151,26 @@ export const executeUiAction = async (
   }
 
   try {
-    console.log(`[AgentHubUiContext] Executing UI action for company: ${companyId}`, {
-      action: actionParams.action,
-      params: actionParams.params,
-    });
+    console.log(
+      `[AgentHubUiContext] Executing UI action for company: ${companyId}`,
+      {
+        action: actionParams.action,
+        params: actionParams.params,
+      },
+    );
 
     // Special handling for pushMessageToChat - persist to DB and broadcast via Pusher
     if (actionParams.action === 'pushMessageToChat') {
-      console.log('[AgentHubUiContext] Handling pushMessageToChat with persistence');
+      console.log(
+        '[AgentHubUiContext] Handling pushMessageToChat with persistence',
+      );
 
       // 1. Get UI context to find sessionId
       const uiContextResult = await getUiContext(companyId);
       if (!uiContextResult.success || !uiContextResult.data?.sessionId) {
-        console.warn('[AgentHubUiContext] No active session found, skipping persistence');
+        console.warn(
+          '[AgentHubUiContext] No active session found, skipping persistence',
+        );
       } else {
         const sessionId = uiContextResult.data.sessionId;
 
@@ -167,10 +178,16 @@ export const executeUiAction = async (
           // 2. Get session and validate
           const session = await Session.findById(sessionId);
           if (!session) {
-            console.warn(`[AgentHubUiContext] Session ${sessionId} not found, skipping persistence`);
+            console.warn(
+              `[AgentHubUiContext] Session ${sessionId} not found, skipping persistence`,
+            );
           } else {
             // 3. Extract message data from params
-            const { content, role = 'assistant', metadata } = actionParams.params;
+            const {
+              content,
+              role = 'assistant',
+              metadata,
+            } = actionParams.params;
 
             // 4. Create Message document
             const message = new Message({
@@ -202,18 +219,29 @@ export const executeUiAction = async (
               data: message.data,
             };
 
-            await publishSessionMessage(sessionId, 'chat_message', pusherMessage);
+            await publishSessionMessage(
+              sessionId,
+              'chat_message',
+              pusherMessage,
+            );
             console.log('[AgentHubUiContext] Message broadcast via Pusher');
           }
         } catch (persistError) {
           // Log but don't fail - immediate RPC update will still work
-          console.error('[AgentHubUiContext] Error persisting message:', persistError);
+          console.error(
+            '[AgentHubUiContext] Error persisting message:',
+            persistError,
+          );
         }
       }
     }
 
     // 7. Always call RPC for immediate frontend update
-    const result = await callRpcMethod(socket, actionParams.action, actionParams.params);
+    const result = await callRpcMethod(
+      socket,
+      actionParams.action,
+      actionParams.params,
+    );
     return {
       success: true,
       data: result,

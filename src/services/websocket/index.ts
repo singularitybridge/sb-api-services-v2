@@ -19,10 +19,14 @@ const setupEventHandlers = (io: SocketServer): void => {
 
     // Register socket for UI RPC communication if company ID is available
     if (socket.decodedToken?.companyId) {
-      console.log(`Registering socket for company: ${socket.decodedToken.companyId}`);
+      console.log(
+        `Registering socket for company: ${socket.decodedToken.companyId}`,
+      );
       registerSocket(socket.decodedToken.companyId, socket);
     } else {
-      console.warn(`Socket ${socket.id} missing decodedToken or companyId - socket NOT registered`);
+      console.warn(
+        `Socket ${socket.id} missing decodedToken or companyId - socket NOT registered`,
+      );
     }
 
     socket.on('message', async (rawMessage: string) => {
@@ -50,7 +54,9 @@ const setupEventHandlers = (io: SocketServer): void => {
         const { userId } = socket.decodedToken!;
 
         // Update UI state in service
-        const { uiSessionStateService } = await import('../ui-session-state.service');
+        const { uiSessionStateService } = await import(
+          '../ui-session-state.service'
+        );
         uiSessionStateService.updateUIState(userId, {
           sessionId: payload.sessionId,
           currentRoute: payload.currentRoute,

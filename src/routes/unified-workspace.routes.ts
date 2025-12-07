@@ -502,7 +502,7 @@ router.get('/get', async (req: AuthenticatedRequest, res: Response) => {
           mimeType: content.mimeType,
           size: content.size,
           uploadedAt: content.uploadedAt,
-          sourceUrl: content.sourceUrl
+          sourceUrl: content.sourceUrl,
         };
       } else {
         // For text/JSON content, return as-is
@@ -622,7 +622,7 @@ router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
       prefix = '',
       scopes, // comma-separated: 'agent,team,company'
       agentIds, // comma-separated list of agent IDs/names
-      teamIds,  // comma-separated list of team IDs
+      teamIds, // comma-separated list of team IDs
       includeCompany = 'false',
       includeSession = 'false',
     } = req.query;
@@ -658,7 +658,10 @@ router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
 
               items.forEach((item) => {
                 // Clean path by removing scope prefix
-                const cleanPath = item.path.replace(new RegExp(`^/agent/${resolvedAgentId}/`), '');
+                const cleanPath = item.path.replace(
+                  new RegExp(`^/agent/${resolvedAgentId}/`),
+                  '',
+                );
 
                 results.push({
                   path: cleanPath,
@@ -672,7 +675,7 @@ router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
           } catch (error) {
             logger.warn(`Failed to search agent ${agentIdentifier}:`, error);
           }
-        })
+        }),
       );
       logger.debug(`Agent search took ${Date.now() - t1}ms`);
     }
@@ -683,7 +686,9 @@ router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
 
       // Validate that all requested teams belong to the user's company
       const companyTeamIds = new Set(
-        req.company?.teams?.map((t: any) => t._id?.toString() || t.toString()) || []
+        req.company?.teams?.map(
+          (t: any) => t._id?.toString() || t.toString(),
+        ) || [],
       );
 
       await Promise.all(
@@ -693,7 +698,9 @@ router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
 
             // Security check: verify team belongs to user's company
             if (!companyTeamIds.has(trimmedTeamId)) {
-              logger.warn(`User attempted to access team ${trimmedTeamId} outside their company`);
+              logger.warn(
+                `User attempted to access team ${trimmedTeamId} outside their company`,
+              );
               return;
             }
 
@@ -701,7 +708,10 @@ router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
             const items = await workspace.listWithMetadata(scopedPrefix);
 
             items.forEach((item) => {
-              const cleanPath = item.path.replace(new RegExp(`^/team/${trimmedTeamId}/`), '');
+              const cleanPath = item.path.replace(
+                new RegExp(`^/team/${trimmedTeamId}/`),
+                '',
+              );
 
               results.push({
                 path: cleanPath,
@@ -713,20 +723,26 @@ router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
           } catch (error) {
             logger.warn(`Failed to search team ${teamId}:`, error);
           }
-        })
+        }),
       );
       logger.debug(`Team search took ${Date.now() - t2}ms`);
     }
 
     // Search company scope
-    if ((requestedScopes.includes('company') || includeCompany === 'true') && req.company?._id) {
+    if (
+      (requestedScopes.includes('company') || includeCompany === 'true') &&
+      req.company?._id
+    ) {
       const t3 = Date.now();
       try {
         const scopedPrefix = `/company/${req.company._id}/${prefix}`;
         const items = await workspace.listWithMetadata(scopedPrefix);
 
         items.forEach((item) => {
-          const cleanPath = item.path.replace(`/company/${req.company._id}/`, '');
+          const cleanPath = item.path.replace(
+            `/company/${req.company._id}/`,
+            '',
+          );
 
           results.push({
             path: cleanPath,
@@ -744,13 +760,16 @@ router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
     // Search session scope
     if (requestedScopes.includes('session') || includeSession === 'true') {
       const t4 = Date.now();
-      const sessionId = req.headers['x-session-id'] as string || 'default';
+      const sessionId = (req.headers['x-session-id'] as string) || 'default';
       try {
         const scopedPrefix = `/session/${sessionId}/${prefix}`;
         const items = await workspace.listWithMetadata(scopedPrefix);
 
         items.forEach((item) => {
-          const cleanPath = item.path.replace(new RegExp(`^/session/${sessionId}/`), '');
+          const cleanPath = item.path.replace(
+            new RegExp(`^/session/${sessionId}/`),
+            '',
+          );
 
           results.push({
             path: cleanPath,
@@ -766,7 +785,9 @@ router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
     }
 
     const totalTime = Date.now() - startTime;
-    logger.debug(`Total multi-scope search took ${totalTime}ms, found ${results.length} items`);
+    logger.debug(
+      `Total multi-scope search took ${totalTime}ms, found ${results.length} items`,
+    );
 
     res.json({
       success: true,
@@ -838,13 +859,17 @@ router.post(
         scopes: scopes.join(','),
       });
     } catch (error: any) {
-      logger.error('Vector search failed', { error: error.message, stack: error.stack });
+      logger.error('Vector search failed', {
+        error: error.message,
+        stack: error.stack,
+      });
 
       // Check for circuit breaker error
       if (error.message?.includes('Circuit breaker is open')) {
         return res.status(503).json({
           success: false,
-          message: 'Search service temporarily unavailable. Please try again in a moment.',
+          message:
+            'Search service temporarily unavailable. Please try again in a moment.',
           error: 'CIRCUIT_BREAKER_OPEN',
         });
       }
