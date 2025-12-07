@@ -42,6 +42,33 @@ export interface BoardResolutionResult {
 }
 
 // ============================================================================
+// Project Types
+// ============================================================================
+
+export interface JiraProject {
+  id: string;
+  key: string;
+  name: string;
+  projectTypeKey: string;
+  simplified?: boolean;
+  style?: string;
+  isPrivate?: boolean;
+  description?: string;
+  lead?: {
+    accountId: string;
+    displayName?: string;
+    emailAddress?: string;
+  };
+  url?: string;
+  avatarUrls?: {
+    '48x48'?: string;
+    '24x24'?: string;
+    '16x16'?: string;
+    '32x32'?: string;
+  };
+}
+
+// ============================================================================
 // Sprint Types
 // ============================================================================
 

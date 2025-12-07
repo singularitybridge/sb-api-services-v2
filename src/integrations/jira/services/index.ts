@@ -6,6 +6,9 @@
 // Board operations
 export * from './boards.service';
 
+// Project operations
+export * from './projects.service';
+
 // Sprint operations
 export * from './sprints.service';
 

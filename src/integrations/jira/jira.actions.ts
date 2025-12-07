@@ -38,7 +38,11 @@ import {
   // Types needed for new actions
   JiraBoard,
   JiraSprint,
+  JiraProject,
   Result,
+  // Project functions
+  getJiraProject,
+  listJiraProjects,
   // --- END NEW SERVICE IMPORTS ---
 } from './jira.service';
 
@@ -179,6 +183,17 @@ interface MoveIssuesToProjectSprintArgs {
   issueKeys: string[];
   targetSprintDescriptor: TargetSprintDescriptor;
   jqlQueryForIssues?: string; // Optional: if issues are to be fetched by JQL instead of explicit keys
+}
+interface GetProjectArgs {
+  projectKeyOrId: string;
+}
+
+interface ListProjectsArgs {
+  startAt?: number;
+  maxResults?: number;
+  orderBy?: string;
+  query?: string;
+  typeKey?: string;
 }
 // --- END NEW INTERFACES ---
 
@@ -1392,6 +1407,99 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
       return {
         success: true,
         message: `Sprint progress: ${data.completedIssues}/${data.totalIssues} issues (${data.progressPercent}%), ${data.completedPoints}/${data.totalPoints} SP (${data.pointsProgressPercent}%). ${data.atRiskIssues.length} at-risk items.`,
+        data: result.data,
+      };
+    },
+  },
+
+  // --- PROJECT/SPACE ACTIONS ---
+  getProject: {
+    description:
+      'Gets detailed information about a JIRA space/project by its key or ID. Returns project name, key, type, lead, description, and avatar URLs.',
+    parameters: {
+      type: 'object',
+      properties: {
+        projectKeyOrId: {
+          type: 'string',
+          description:
+            'The project key (e.g., "PROJ") or numeric project ID to retrieve.',
+        },
+      },
+      required: ['projectKeyOrId'],
+      additionalProperties: false,
+    },
+    function: async (
+      params: GetProjectArgs,
+    ): Promise<StandardActionResult<JiraProject>> => {
+      const result = await getJiraProject(
+        context.sessionId,
+        context.companyId,
+        params,
+      );
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Failed to get project');
+      }
+
+      return {
+        success: true,
+        message: `Retrieved project ${result.data.key}: ${result.data.name}`,
+        data: result.data,
+      };
+    },
+  },
+
+  listProjects: {
+    description:
+      'Lists all JIRA spaces/projects accessible to the user. Supports pagination, filtering by name query, and project type. Returns project key, name, type, lead, and description.',
+    parameters: {
+      type: 'object',
+      properties: {
+        startAt: {
+          type: 'number',
+          description:
+            'Optional: The index of the first project to return (for pagination). Defaults to 0.',
+        },
+        maxResults: {
+          type: 'number',
+          description:
+            'Optional: Maximum number of projects to return. Defaults to 50.',
+        },
+        orderBy: {
+          type: 'string',
+          description:
+            'Optional: Order by field. Common values: "name", "-name" (descending), "key", "-key".',
+        },
+        query: {
+          type: 'string',
+          description:
+            'Optional: Filter projects by name containing this query string.',
+        },
+        typeKey: {
+          type: 'string',
+          description:
+            'Optional: Filter by project type key (e.g., "software", "business", "service_desk").',
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    function: async (
+      params: ListProjectsArgs,
+    ): Promise<StandardActionResult<{ projects: JiraProject[]; total: number }>> => {
+      const result = await listJiraProjects(
+        context.sessionId,
+        context.companyId,
+        params,
+      );
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Failed to list projects');
+      }
+
+      return {
+        success: true,
+        message: `Found ${result.data.projects.length} projects (total: ${result.data.total})`,
         data: result.data,
       };
     },
