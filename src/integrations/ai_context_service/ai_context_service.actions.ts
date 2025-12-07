@@ -142,6 +142,11 @@ export const createAIContextServiceActions = (
           type: 'number',
           description: 'Optional: The maximum number of results to return.',
         },
+        contextTypes: {
+          type: 'string',
+          description:
+            'Optional: Comma-separated list of context types to filter the search (e.g., "policies,controls,audits"). If not provided, searches across all context types.',
+        },
       },
       required: ['contextId', 'query'],
       additionalProperties: false,
@@ -150,6 +155,7 @@ export const createAIContextServiceActions = (
       contextId: string;
       query: string;
       limit?: number;
+      contextTypes?: string;
     }) => {
       const actionName = 'contextVectorSearch';
       if (!params.contextId) {
@@ -163,9 +169,20 @@ export const createAIContextServiceActions = (
         });
       }
 
+      // Convert comma-separated contextTypes string to array
+      let contextTypesArray: string[] | undefined;
+      if (params.contextTypes && params.contextTypes.trim()) {
+        contextTypesArray = params.contextTypes
+          .split(',')
+          .map((type) => type.trim())
+          .filter((type) => type.length > 0);
+      }
+
       const searchRequest: VectorSearchRequest = {
         query: params.query,
         ...(params.limit && { limit: params.limit }),
+        ...(contextTypesArray &&
+          contextTypesArray.length > 0 && { contextTypes: contextTypesArray }),
       };
 
       return executeAction<VectorSearchResponse>(

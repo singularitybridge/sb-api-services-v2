@@ -41,6 +41,7 @@ export interface ContextItem {
 export interface VectorSearchRequest {
   query: string;
   limit?: number;
+  contextTypes?: string[];
 }
 
 export interface VectorSearchResultItem {
