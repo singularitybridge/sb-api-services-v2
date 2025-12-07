@@ -1,0 +1,7 @@
+{
+  "name": "nylas",
+  "icon": "mail",
+  "apiKeyName": "nylas_api_key",
+  "actionCreator": "createNylasActions",
+  "actionsFile": "nylas.actions.ts"
+}

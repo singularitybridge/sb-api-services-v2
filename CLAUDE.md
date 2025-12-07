@@ -62,6 +62,53 @@ The `alfred-agent-manager` is equipped to:
 - **Chat Viewer**: HTML viewer at `chat-viewer.html` for browser viewing
 - **Recent Resolution**: Fixed image attachment format - requires `data:image/png;base64,` prefix
 
+### User Invite System (October 2025)
+
+#### Overview
+Complete invite-based user onboarding system with company assignment and auto-signup control.
+
+#### Security & Configuration
+- **ALLOW_AUTO_SIGNUP** environment variable controls automatic company creation
+  - Default: `false` (production-safe - requires invite)
+  - Set to `true` to allow users without invites to create new companies
+  - Located in `.env` and `.env.example`
+
+#### Components
+- **MongoDB Model**: `Invite` at `/src/models/Invite.ts`
+  - Secure token generation (nanoid, 132-bit entropy)
+  - TTL index for automatic cleanup (7-day expiration)
+  - Status tracking: pending, accepted, revoked, expired
+  - Rate limiting: max 3 resends per invite
+- **Service**: `invite.service.ts` - Business logic and validations
+- **Routes**: `/api/invites/*` endpoints
+- **Google OAuth Integration**: Auto-assignment to inviter's company
+
+#### API Endpoints
+```
+POST   /api/invites              - Create new invite
+GET    /api/invites              - List invites (with pagination & filters)
+GET    /api/invites/:id          - Get specific invite
+DELETE /api/invites/:id/revoke   - Revoke pending invite
+```
+
+#### Test Utilities
+```bash
+# Comprehensive test suite
+node test-invite-system.js
+
+# Quick bash tests
+./quick-test-invite.sh
+```
+
+#### Features
+- **Email Validation**: Using validator.js library
+- **Duplicate Prevention**: MongoDB unique index on email+company+status
+- **Rate Limiting**: 10 invites/hour per user
+- **Metadata Tracking**: IP, user agent, invite source
+- **Transaction Support**: Atomic invite acceptance
+- **Email Enumeration Prevention**: Generic error messages
+- **Auto-signup Control**: Environment variable to disable new company creation
+
 ### Prompt History System (January 2025)
 
 #### Overview

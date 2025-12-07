@@ -5,6 +5,7 @@ export interface ActionContext {
   companyId: string;
   language: SupportedLanguage;
   userId?: string;
+  assistantId?: string; // ID of the assistant executing the action
   isStateless?: boolean;
 }
 

@@ -25,6 +25,12 @@ import {
   transitionIssue as transitionIssueService,
   setStoryPoints as setStoryPointsService,
   getSprintsForBoard as getSprintsForBoardService,
+  deleteJiraTicket,
+  // Velocity and sprint progress
+  getBoardVelocity as getBoardVelocityService,
+  getSprintProgress as getSprintProgressService,
+  VelocityData,
+  SprintProgressData,
 
   // --- BEGIN NEW SERVICE IMPORTS ---
   resolveBoardForProject,
@@ -32,7 +38,11 @@ import {
   // Types needed for new actions
   JiraBoard,
   JiraSprint,
+  JiraProject,
   Result,
+  // Project functions
+  getJiraProject,
+  listJiraProjects,
   // --- END NEW SERVICE IMPORTS ---
 } from './jira.service';
 
@@ -148,6 +158,10 @@ interface GetTicketCommentsArgs {
   orderBy?: string;
   expand?: string;
 }
+interface DeleteTicketArgs {
+  issueIdOrKey: string;
+  deleteSubtasks?: boolean;
+}
 // --- END EXISTING INTERFACES ---
 
 // --- BEGIN NEW INTERFACES ---
@@ -169,6 +183,17 @@ interface MoveIssuesToProjectSprintArgs {
   issueKeys: string[];
   targetSprintDescriptor: TargetSprintDescriptor;
   jqlQueryForIssues?: string; // Optional: if issues are to be fetched by JQL instead of explicit keys
+}
+interface GetProjectArgs {
+  projectKeyOrId: string;
+}
+
+interface ListProjectsArgs {
+  startAt?: number;
+  maxResults?: number;
+  orderBy?: string;
+  query?: string;
+  typeKey?: string;
 }
 // --- END NEW INTERFACES ---
 
@@ -450,9 +475,8 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
     },
   },
   searchUsers: {
-    /* ... existing definition ... */
     description:
-      'Searches for JIRA users by query (name, email) or retrieves a specific user by accountId.',
+      'Searches for real JIRA users (excludes bots/service accounts) by query (name, email) or retrieves a specific user by accountId. Returns up to 50 users with: accountId (user ID), displayName (user name), emailAddress (user email).',
     parameters: {
       type: 'object',
       properties: {
@@ -469,7 +493,7 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
         maxResults: {
           type: 'number',
           description:
-            'Optional: The maximum number of users to return. Defaults to 50.',
+            'Optional: The maximum number of users to return. Max and default is 50.',
         },
         accountId: {
           type: 'string',
@@ -903,6 +927,38 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
       throw new Error(result.error || 'Failed to get ticket comments');
     },
   },
+  deleteTicket: {
+    description:
+      'Permanently deletes a JIRA ticket by its ID or key. WARNING: This action cannot be undone. If the ticket has subtasks, you must set deleteSubtasks to true or the deletion will fail.',
+    parameters: {
+      type: 'object',
+      properties: {
+        issueIdOrKey: {
+          type: 'string',
+          description:
+            "The ID or key of the JIRA ticket to delete (e.g., 'PROJ-123' or '10001').",
+        },
+        deleteSubtasks: {
+          type: 'boolean',
+          description:
+            'Optional: If true, also deletes all subtasks of this ticket. Required if the ticket has subtasks. Defaults to false.',
+        },
+      },
+      required: ['issueIdOrKey'],
+    },
+    function: async (
+      params: DeleteTicketArgs,
+    ): Promise<StandardActionResult<any>> => {
+      const result = await deleteJiraTicket(
+        context.sessionId,
+        context.companyId,
+        params,
+      );
+      if (result.success)
+        return { success: true, data: result.data, message: result.message };
+      throw new Error(result.error || 'Failed to delete JIRA ticket');
+    },
+  },
   // --- END EXISTING ACTIONS ---
 
   // --- BEGIN NEW ACTIONS ---
@@ -1274,6 +1330,177 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
           boardId: boardToUse.id,
           results: finalResults, // Array of individual move results
         },
+      };
+    },
+  },
+
+  // --- VELOCITY AND SPRINT PROGRESS ACTIONS ---
+  getBoardVelocity: {
+    description:
+      'Get team velocity data by analyzing story points completed in recent closed sprints. Returns average velocity, trend, and per-sprint breakdown.',
+    parameters: {
+      type: 'object',
+      properties: {
+        boardId: {
+          type: 'string',
+          description: 'The JIRA board ID to analyze velocity for',
+        },
+        sprintCount: {
+          type: 'number',
+          description:
+            'Number of closed sprints to analyze (default: 3). More sprints give more accurate average but may include older data.',
+        },
+      },
+      required: ['boardId'],
+      additionalProperties: false,
+    },
+    function: async (params: {
+      boardId: string;
+      sprintCount?: number;
+    }): Promise<StandardActionResult<VelocityData>> => {
+      const result = await getBoardVelocityService(
+        context.sessionId,
+        context.companyId,
+        params,
+      );
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Failed to get board velocity');
+      }
+
+      return {
+        success: true,
+        message: `Velocity for board ${params.boardId}: ${result.data.averageVelocity} SP/sprint (${result.data.sprintCount} sprints analyzed, trend: ${result.data.trend})`,
+        data: result.data,
+      };
+    },
+  },
+
+  getSprintProgress: {
+    description:
+      'Get current sprint progress including completion percentage, story points, issues by status, and at-risk items (no updates in 3+ days).',
+    parameters: {
+      type: 'object',
+      properties: {
+        sprintId: {
+          type: 'string',
+          description: 'The JIRA sprint ID to get progress for',
+        },
+      },
+      required: ['sprintId'],
+      additionalProperties: false,
+    },
+    function: async (params: {
+      sprintId: string;
+    }): Promise<StandardActionResult<SprintProgressData>> => {
+      const result = await getSprintProgressService(
+        context.sessionId,
+        context.companyId,
+        params,
+      );
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Failed to get sprint progress');
+      }
+
+      const data = result.data;
+      return {
+        success: true,
+        message: `Sprint progress: ${data.completedIssues}/${data.totalIssues} issues (${data.progressPercent}%), ${data.completedPoints}/${data.totalPoints} SP (${data.pointsProgressPercent}%). ${data.atRiskIssues.length} at-risk items.`,
+        data: result.data,
+      };
+    },
+  },
+
+  // --- PROJECT/SPACE ACTIONS ---
+  getProject: {
+    description:
+      'Gets detailed information about a JIRA space/project by its key or ID. Returns project name, key, type, lead, description, and avatar URLs.',
+    parameters: {
+      type: 'object',
+      properties: {
+        projectKeyOrId: {
+          type: 'string',
+          description:
+            'The project key (e.g., "PROJ") or numeric project ID to retrieve.',
+        },
+      },
+      required: ['projectKeyOrId'],
+      additionalProperties: false,
+    },
+    function: async (
+      params: GetProjectArgs,
+    ): Promise<StandardActionResult<JiraProject>> => {
+      const result = await getJiraProject(
+        context.sessionId,
+        context.companyId,
+        params,
+      );
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Failed to get project');
+      }
+
+      return {
+        success: true,
+        message: `Retrieved project ${result.data.key}: ${result.data.name}`,
+        data: result.data,
+      };
+    },
+  },
+
+  listProjects: {
+    description:
+      'Lists all JIRA spaces/projects accessible to the user. Supports pagination, filtering by name query, and project type. Returns project key, name, type, lead, and description.',
+    parameters: {
+      type: 'object',
+      properties: {
+        startAt: {
+          type: 'number',
+          description:
+            'Optional: The index of the first project to return (for pagination). Defaults to 0.',
+        },
+        maxResults: {
+          type: 'number',
+          description:
+            'Optional: Maximum number of projects to return. Defaults to 50.',
+        },
+        orderBy: {
+          type: 'string',
+          description:
+            'Optional: Order by field. Common values: "name", "-name" (descending), "key", "-key".',
+        },
+        query: {
+          type: 'string',
+          description:
+            'Optional: Filter projects by name containing this query string.',
+        },
+        typeKey: {
+          type: 'string',
+          description:
+            'Optional: Filter by project type key (e.g., "software", "business", "service_desk").',
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    function: async (
+      params: ListProjectsArgs,
+    ): Promise<StandardActionResult<{ projects: JiraProject[]; total: number }>> => {
+      const result = await listJiraProjects(
+        context.sessionId,
+        context.companyId,
+        params,
+      );
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Failed to list projects');
+      }
+
+      return {
+        success: true,
+        message: `Found ${result.data.projects.length} projects (total: ${result.data.total})`,
+        data: result.data,
       };
     },
   },

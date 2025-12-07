@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getWorkspaceService } from '../services/unified-workspace.service';
+import { getVectorSearchService } from '../services/vector-search.service';
 import { logger } from '../utils/logger';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { singleUpload } from '../middleware/file-upload.middleware';
@@ -230,38 +231,74 @@ router.get(
 
       const workspace = getWorkspaceService();
 
-      // Search for file in all scopes
-      const scopes = [
-        `/company/${req.company._id}/`,
-        `/session/${req.headers['x-session-id'] || 'default'}/`,
-        `/agent/`,
-        `/team/`,
-      ];
+      // Use pattern search to find the file efficiently (no N+1 queries)
+      // Search for keys that contain the fileId
+      const pattern = new RegExp(`/${fileId}/`);
+      const matchingPaths = await workspace.findByPattern(pattern);
 
-      for (const scopePrefix of scopes) {
-        const files = await workspace.list(scopePrefix);
+      if (matchingPaths.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'File not found',
+        });
+      }
 
-        for (const filePath of files) {
-          const fileInfo = await workspace.get(filePath);
-          if (fileInfo?.type === 'file-reference' && fileInfo?.id === fileId) {
-            // Check if file exists on disk
-            try {
-              await fs.access(fileInfo.storagePath);
-              // Send file directly from disk
-              return res.download(fileInfo.storagePath, fileInfo.filename);
-            } catch {
-              return res.status(404).json({
-                success: false,
-                error: 'File no longer exists on disk',
-              });
-            }
-          }
+      // Get the first matching file
+      const fileInfo = await workspace.get(matchingPaths[0]);
+
+      if (!fileInfo) {
+        return res.status(404).json({
+          success: false,
+          error: 'File not found',
+        });
+      }
+
+      // Check if it's a file-reference (old format)
+      if (fileInfo?.type === 'file-reference') {
+        try {
+          await fs.access(fileInfo.storagePath);
+          return res.download(fileInfo.storagePath, fileInfo.filename);
+        } catch {
+          return res.status(404).json({
+            success: false,
+            error: 'File no longer exists on disk',
+          });
         }
+      }
+
+      // New format: content embedded directly
+      if (fileInfo?.type === 'embedded' && fileInfo?.content) {
+        // Get metadata for filename and mimetype
+        const metadata = fileInfo.metadata || {};
+        const filename = metadata.filename || 'download';
+        const mimetype = metadata.contentType || 'application/octet-stream';
+
+        // Convert content to buffer
+        let buffer: Buffer;
+        if (
+          fileInfo.content.type === 'buffer' &&
+          fileInfo.content.encoding === 'base64'
+        ) {
+          buffer = Buffer.from(fileInfo.content.data, 'base64');
+        } else if (Buffer.isBuffer(fileInfo.content)) {
+          buffer = fileInfo.content;
+        } else if (typeof fileInfo.content === 'string') {
+          buffer = Buffer.from(fileInfo.content);
+        } else {
+          buffer = Buffer.from(JSON.stringify(fileInfo.content));
+        }
+
+        res.setHeader('Content-Type', mimetype);
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="${filename}"`,
+        );
+        return res.send(buffer);
       }
 
       return res.status(404).json({
         success: false,
-        error: 'File not found',
+        error: 'File format not supported',
       });
     } catch (error: any) {
       logger.error('File download error:', error);
@@ -324,6 +361,12 @@ router.get('/raw', async (req: AuthenticatedRequest, res: Response) => {
         error: `File not found: ${filePath}`,
       });
     }
+
+    // Set cache-control headers to prevent caching of workspace content
+    // This ensures the browser always fetches the latest version
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     // Check if it's a file reference
     if (content?.type === 'file-reference') {
@@ -443,10 +486,36 @@ router.get('/get', async (req: AuthenticatedRequest, res: Response) => {
       };
       responseData.isFile = true;
     } else {
-      // For regular content, return as-is
-      responseData.content = content;
-      responseData.isFile = false;
+      // For regular content, handle binary data (images, etc.)
+      if (Buffer.isBuffer(content)) {
+        // Convert buffer to base64 for JSON transport
+        responseData.content = content.toString('base64');
+        responseData.isFile = false;
+        responseData.isBinary = true;
+      } else if (content?.type === 'file' && content?.content) {
+        // File object with base64 content - extract the base64 data
+        responseData.content = content.content;
+        responseData.isFile = false;
+        responseData.isBinary = true;
+        responseData.fileMetadata = {
+          filename: content.filename,
+          mimeType: content.mimeType,
+          size: content.size,
+          uploadedAt: content.uploadedAt,
+          sourceUrl: content.sourceUrl,
+        };
+      } else {
+        // For text/JSON content, return as-is
+        responseData.content = content;
+        responseData.isFile = false;
+        responseData.isBinary = false;
+      }
     }
+
+    // Set cache-control headers to prevent caching of workspace content
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     res.json(responseData);
   } catch (error: any) {
@@ -464,6 +533,7 @@ router.get('/get', async (req: AuthenticatedRequest, res: Response) => {
  */
 router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const startTime = Date.now();
     const { prefix, scope = 'company', agentId, teamId } = req.query;
 
     // Build scoped prefix based on scope
@@ -482,10 +552,12 @@ router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
           error: 'Agent ID is required for agent scope',
         });
       }
+      const t1 = Date.now();
       const resolvedAgentId = await resolveAgentId(
         agentIdentifier as string,
         req.company?._id?.toString(),
       );
+      logger.debug(`Resolve agent took ${Date.now() - t1}ms`);
       if (!resolvedAgentId) {
         return res.status(400).json({
           success: false,
@@ -505,7 +577,9 @@ router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
     }
 
     const workspace = getWorkspaceService();
+    const t2 = Date.now();
     const paths = await workspace.list(scopedPrefix);
+    logger.debug(`Workspace list took ${Date.now() - t2}ms`);
 
     // Strip the scope prefix from returned paths for cleaner display
     const cleanPaths = paths.map((p) => {
@@ -518,6 +592,7 @@ router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
       return p;
     });
 
+    logger.debug(`Total list request took ${Date.now() - startTime}ms`);
     res.json({
       success: true,
       scope: scope as string,
@@ -533,6 +608,345 @@ router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
     });
   }
 });
+
+/**
+ * @route GET /api/workspace/search
+ * @desc Search workspace items across multiple scopes with metadata
+ * Supports searching across multiple agents, teams, or other scopes
+ * Returns items with metadata without loading full content (optimized for UI)
+ */
+router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const startTime = Date.now();
+    const {
+      prefix = '',
+      scopes, // comma-separated: 'agent,team,company'
+      agentIds, // comma-separated list of agent IDs/names
+      teamIds, // comma-separated list of team IDs
+      includeCompany = 'false',
+      includeSession = 'false',
+    } = req.query;
+
+    const workspace = getWorkspaceService();
+    const results: Array<{
+      path: string;
+      metadata: any;
+      scope: string;
+      scopeId?: string;
+      scopeName?: string;
+    }> = [];
+
+    // Parse scope queries
+    const requestedScopes = scopes ? (scopes as string).split(',') : ['agent'];
+    const agentList = agentIds ? (agentIds as string).split(',') : [];
+    const teamList = teamIds ? (teamIds as string).split(',') : [];
+
+    // Search agent scopes
+    if (requestedScopes.includes('agent') && agentList.length > 0) {
+      const t1 = Date.now();
+      await Promise.all(
+        agentList.map(async (agentIdentifier) => {
+          try {
+            const resolvedAgentId = await resolveAgentId(
+              agentIdentifier.trim(),
+              req.company?._id?.toString(),
+            );
+
+            if (resolvedAgentId) {
+              const scopedPrefix = `/agent/${resolvedAgentId}/${prefix}`;
+              const items = await workspace.listWithMetadata(scopedPrefix);
+
+              items.forEach((item) => {
+                // Clean path by removing scope prefix
+                const cleanPath = item.path.replace(
+                  new RegExp(`^/agent/${resolvedAgentId}/`),
+                  '',
+                );
+
+                results.push({
+                  path: cleanPath,
+                  metadata: item.metadata || {},
+                  scope: 'agent',
+                  scopeId: resolvedAgentId,
+                  scopeName: agentIdentifier.trim(),
+                });
+              });
+            }
+          } catch (error) {
+            logger.warn(`Failed to search agent ${agentIdentifier}:`, error);
+          }
+        }),
+      );
+      logger.debug(`Agent search took ${Date.now() - t1}ms`);
+    }
+
+    // Search team scopes
+    if (requestedScopes.includes('team') && teamList.length > 0) {
+      const t2 = Date.now();
+
+      // Validate that all requested teams belong to the user's company
+      const companyTeamIds = new Set(
+        req.company?.teams?.map(
+          (t: any) => t._id?.toString() || t.toString(),
+        ) || [],
+      );
+
+      await Promise.all(
+        teamList.map(async (teamId) => {
+          try {
+            const trimmedTeamId = teamId.trim();
+
+            // Security check: verify team belongs to user's company
+            if (!companyTeamIds.has(trimmedTeamId)) {
+              logger.warn(
+                `User attempted to access team ${trimmedTeamId} outside their company`,
+              );
+              return;
+            }
+
+            const scopedPrefix = `/team/${trimmedTeamId}/${prefix}`;
+            const items = await workspace.listWithMetadata(scopedPrefix);
+
+            items.forEach((item) => {
+              const cleanPath = item.path.replace(
+                new RegExp(`^/team/${trimmedTeamId}/`),
+                '',
+              );
+
+              results.push({
+                path: cleanPath,
+                metadata: item.metadata || {},
+                scope: 'team',
+                scopeId: trimmedTeamId,
+              });
+            });
+          } catch (error) {
+            logger.warn(`Failed to search team ${teamId}:`, error);
+          }
+        }),
+      );
+      logger.debug(`Team search took ${Date.now() - t2}ms`);
+    }
+
+    // Search company scope
+    if (
+      (requestedScopes.includes('company') || includeCompany === 'true') &&
+      req.company?._id
+    ) {
+      const t3 = Date.now();
+      try {
+        const scopedPrefix = `/company/${req.company._id}/${prefix}`;
+        const items = await workspace.listWithMetadata(scopedPrefix);
+
+        items.forEach((item) => {
+          const cleanPath = item.path.replace(
+            `/company/${req.company._id}/`,
+            '',
+          );
+
+          results.push({
+            path: cleanPath,
+            metadata: item.metadata || {},
+            scope: 'company',
+            scopeId: req.company._id.toString(),
+          });
+        });
+      } catch (error) {
+        logger.warn('Failed to search company scope:', error);
+      }
+      logger.debug(`Company search took ${Date.now() - t3}ms`);
+    }
+
+    // Search session scope
+    if (requestedScopes.includes('session') || includeSession === 'true') {
+      const t4 = Date.now();
+      const sessionId = (req.headers['x-session-id'] as string) || 'default';
+      try {
+        const scopedPrefix = `/session/${sessionId}/${prefix}`;
+        const items = await workspace.listWithMetadata(scopedPrefix);
+
+        items.forEach((item) => {
+          const cleanPath = item.path.replace(
+            new RegExp(`^/session/${sessionId}/`),
+            '',
+          );
+
+          results.push({
+            path: cleanPath,
+            metadata: item.metadata || {},
+            scope: 'session',
+            scopeId: sessionId,
+          });
+        });
+      } catch (error) {
+        logger.warn('Failed to search session scope:', error);
+      }
+      logger.debug(`Session search took ${Date.now() - t4}ms`);
+    }
+
+    const totalTime = Date.now() - startTime;
+    logger.debug(
+      `Total multi-scope search took ${totalTime}ms, found ${results.length} items`,
+    );
+
+    res.json({
+      success: true,
+      items: results,
+      count: results.length,
+      executionTimeMs: totalTime,
+    });
+  } catch (error: any) {
+    logger.error('Workspace search error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * @route POST /api/workspace/vector-search
+ * @desc Semantic search across workspace using vector embeddings
+ * @body {
+ *   query: string,                           // Required: search query
+ *   scopes?: ['company', 'agent', 'team'],  // Optional: scopes to search (default: all)
+ *   agentIds?: string[] | 'all',            // Optional: specific agents or 'all'
+ *   teamIds?: string[] | 'all',             // Optional: specific teams or 'all'
+ *   limit?: number,                          // Optional: max results (default: 20)
+ *   minScore?: number                        // Optional: similarity threshold (default: 0.7)
+ * }
+ */
+router.post(
+  '/vector-search',
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const {
+        query,
+        scopes = ['company', 'agent', 'team'],
+        agentIds = 'all',
+        teamIds = 'all',
+        limit = 20,
+        minScore = 0.7,
+      } = req.body;
+
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: 'Query string is required',
+        });
+      }
+
+      const vectorSearch = getVectorSearchService();
+      const companyId = req.company._id.toString();
+      const userId = req.user?._id?.toString();
+
+      // Use new multi-scope search method (with parallel execution)
+      const results = await vectorSearch.searchMultiScope(query, {
+        scopes,
+        agentIds,
+        teamIds,
+        limit,
+        minScore,
+        companyId,
+        userId,
+      });
+
+      res.json({
+        success: true,
+        query,
+        results,
+        count: results.length,
+        scopes: scopes.join(','),
+      });
+    } catch (error: any) {
+      logger.error('Vector search failed', {
+        error: error.message,
+        stack: error.stack,
+      });
+
+      // Check for circuit breaker error
+      if (error.message?.includes('Circuit breaker is open')) {
+        return res.status(503).json({
+          success: false,
+          message:
+            'Search service temporarily unavailable. Please try again in a moment.',
+          error: 'CIRCUIT_BREAKER_OPEN',
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Vector search failed',
+        error: error.message,
+      });
+    }
+  },
+);
+
+/**
+ * @route POST /api/workspace/embed-documents
+ * @desc Trigger embedding for existing documents
+ */
+router.post(
+  '/embed-documents',
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { scope, scopeId, limit = 100 } = req.body;
+
+      if (!scope || !scopeId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Scope and scopeId are required',
+        });
+      }
+
+      const vectorSearch = getVectorSearchService();
+      const workspace = getWorkspaceService();
+      const companyId = req.company._id.toString();
+
+      // Get all documents for the scope
+      const prefix = `/${scope}/${scopeId}/`;
+      const paths = await workspace.list(prefix);
+
+      logger.info(`Found ${paths.length} documents to embed in ${prefix}`);
+
+      // Limit the number of documents to process
+      const pathsToEmbed = paths.slice(0, limit);
+
+      // Trigger embedding for each document (async, fire-and-forget)
+      const results: any[] = [];
+      for (const path of pathsToEmbed) {
+        try {
+          // Add unified-workspace namespace prefix
+          const fullKey = `unified-workspace:${path}`;
+          await vectorSearch.embedDocument(fullKey, companyId);
+          results.push({ path, status: 'queued' });
+        } catch (error: any) {
+          logger.error(`Failed to queue embedding for ${path}`, error);
+          results.push({ path, status: 'error', error: error.message });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Queued ${results.length} documents for embedding`,
+        scope,
+        scopeId,
+        totalDocuments: paths.length,
+        queued: results.filter((r) => r.status === 'queued').length,
+        errors: results.filter((r) => r.status === 'error').length,
+        results,
+      });
+    } catch (error: any) {
+      logger.error('Embed documents failed', { error });
+      res.status(500).json({
+        success: false,
+        message: 'Failed to embed documents',
+        error: error.message,
+      });
+    }
+  },
+);
 
 /**
  * @route DELETE /api/workspace/delete

@@ -29,3 +29,6 @@ sb-api-services-404915-fc80ec518eae.json
 *.db
 *.db-shm
 *.db-wal
+
+# Local test scripts
+tests/

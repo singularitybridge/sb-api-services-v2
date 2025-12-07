@@ -1,0 +1,7 @@
+{
+  "name": "session_query",
+  "description": "Query session messages, state, and context for testing and debugging",
+  "actionsFile": "session_query.actions.ts",
+  "actionCreator": "createSessionQueryActions",
+  "enabled": true
+}

@@ -69,27 +69,81 @@ export const googleLogin = async (
     let company: ICompany;
 
     if (!user) {
-      // Create a new company with minimal info
-      const defaultCompany: Partial<ICompany> = {
-        name: `${payload['name']}'s Company`,
-        description: 'New company created during Google login',
-        api_keys: [],
-        identifiers: [{ key: 'email', value: payload['email'] }],
-      };
+      // Check for pending invite before creating new company
+      const { InviteService } = await import('./invite.service');
+      const invite = await InviteService.findActiveInvite(payload['email']);
 
-      company = await createCompany(defaultCompany);
+      if (invite) {
+        // User has a pending invite - join the inviter's company
+        const inviteCompany = await Company.findById(invite.companyId);
+        if (!inviteCompany) {
+          throw new Error('Invited company no longer exists');
+        }
 
-      // Create a new user
-      const newUser: Partial<IUser> = {
-        companyId: company._id as any,
-        name: payload['name'],
-        email: payload['email'],
-        googleId: payload['sub'],
-        role: 'CompanyUser',
-        identifiers: [{ key: 'email', value: payload['email'] }],
-      };
+        // Use MongoDB transaction for atomic operation
+        const session = await (await import('mongoose')).default.startSession();
 
-      user = await User.create(newUser);
+        try {
+          await session.withTransaction(async () => {
+            // Create user with invited company
+            const newUser: Partial<IUser> = {
+              companyId: inviteCompany._id as any,
+              name: payload['name'],
+              email: payload['email'],
+              googleId: payload['sub'],
+              role: invite.role || 'CompanyUser',
+              identifiers: [{ key: 'email', value: payload['email'] }],
+            };
+
+            const createdUsers = await User.create([newUser], { session });
+            user = createdUsers[0];
+
+            // Mark invite as accepted
+            await InviteService.acceptInvite(invite._id.toString(), session);
+          });
+
+          company = inviteCompany.toObject() as unknown as ICompany;
+          console.log(
+            `User ${payload['email']} joined company via invite: ${company.name}`,
+          );
+        } catch (error) {
+          console.error('Failed to process invite acceptance:', error);
+          throw error;
+        } finally {
+          await session.endSession();
+        }
+      } else {
+        // No invite found - check if auto-signup is allowed
+        const allowAutoSignup = process.env.ALLOW_AUTO_SIGNUP === 'true';
+
+        if (!allowAutoSignup) {
+          throw new Error(
+            'Account creation requires an invitation. Please contact your administrator for an invite.',
+          );
+        }
+
+        // Auto-signup is enabled - create a new company (existing flow)
+        const defaultCompany: Partial<ICompany> = {
+          name: `${payload['name']}'s Company`,
+          description: 'New company created during Google login',
+          api_keys: [],
+          identifiers: [{ key: 'email', value: payload['email'] }],
+        };
+
+        company = await createCompany(defaultCompany);
+
+        // Create a new user
+        const newUser: Partial<IUser> = {
+          companyId: company._id as any,
+          name: payload['name'],
+          email: payload['email'],
+          googleId: payload['sub'],
+          role: 'CompanyUser',
+          identifiers: [{ key: 'email', value: payload['email'] }],
+        };
+
+        user = await User.create(newUser);
+      }
     } else {
       // Update existing user information
       user.email = payload['email'];

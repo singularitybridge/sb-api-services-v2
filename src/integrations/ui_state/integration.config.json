@@ -1,0 +1,7 @@
+{
+  "name": "ui_state",
+  "description": "Query real-time UI state from Agent Hub web interface",
+  "actionsFile": "ui_state.actions.ts",
+  "actionCreator": "createUIStateActions",
+  "enabled": true
+}

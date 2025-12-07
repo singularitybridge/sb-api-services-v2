@@ -158,6 +158,171 @@ export const discoverActionById = async (
   }
 };
 
+/**
+ * Generate developer-focused implementation guide for an action
+ */
+export const getActionImplementationGuide = async (
+  actionId: string,
+  language: SupportedLanguage = 'en',
+): Promise<{ success: boolean; data?: any; error?: string }> => {
+  try {
+    const action = await discoverActionByIdService(actionId, language);
+    if (!action) {
+      return { success: false, error: `Action '${actionId}' not found` };
+    }
+
+    // Parse integration and action name from ID
+    const [integrationName, actionName] = actionId.split('.');
+
+    // Generate example request data based on schema
+    const generateExampleRequest = (parameters: any): any => {
+      if (!parameters || !parameters.properties) return {};
+
+      const example: any = {};
+      const props = parameters.properties as Record<string, any>;
+      const requiredFields = (parameters.required || []) as string[];
+
+      for (const [key, prop] of Object.entries(props)) {
+        const propDef = prop as any;
+        const isRequired = requiredFields.includes(key);
+
+        // Generate example based on type
+        switch (propDef.type) {
+          case 'string':
+            example[key] = propDef.description
+              ? `"your_${key.toLowerCase()}"`
+              : `"example_${key}"`;
+            break;
+          case 'number':
+          case 'integer':
+            example[key] = propDef.enum ? propDef.enum[0] : 123;
+            break;
+          case 'boolean':
+            example[key] = true;
+            break;
+          case 'array':
+            example[key] =
+              propDef.items?.type === 'string' ? ['item1', 'item2'] : [];
+            break;
+          case 'object':
+            example[key] = {};
+            break;
+          default:
+            if (isRequired) {
+              example[key] = `"${key}_value"`;
+            }
+        }
+      }
+
+      return example;
+    };
+
+    const exampleRequest = generateExampleRequest(action.parameters);
+
+    // Build implementation guide
+    const guide = {
+      action: {
+        id: actionId,
+        integration: integrationName,
+        actionName: actionName,
+        title: action.actionTitle,
+        description: action.description,
+      },
+
+      implementation: {
+        // How to call via triggerIntegrationAction
+        triggerAction: {
+          method: 'debug.triggerIntegrationAction',
+          parameters: {
+            integrationName: integrationName,
+            service: actionName,
+            requestData: JSON.stringify(exampleRequest, null, 2),
+          },
+          example: `debug.triggerIntegrationAction({\n  integrationName: "${integrationName}",\n  service: "${actionName}",\n  requestData: ${JSON.stringify(exampleRequest, null, 2)}\n})`,
+        },
+
+        // Direct AI agent configuration
+        aiAgentConfig: {
+          allowedActions: [actionId],
+          examplePrompt: `Use ${actionId} to ${action.description.toLowerCase()}`,
+          requiredParameters: ((action.parameters as any)?.required ||
+            []) as string[],
+        },
+      },
+
+      schema: {
+        parameters: action.parameters,
+        required: ((action.parameters as any)?.required || []) as string[],
+        properties: Object.entries(
+          ((action.parameters as any)?.properties || {}) as Record<string, any>,
+        ).map(([key, prop]: [string, any]) => ({
+          name: key,
+          type: prop.type,
+          description: prop.description,
+          required: (
+            ((action.parameters as any)?.required || []) as string[]
+          ).includes(key),
+          enum: prop.enum,
+          items: prop.items,
+        })),
+      },
+
+      examples: {
+        minimalRequest: JSON.stringify(
+          Object.fromEntries(
+            (((action.parameters as any)?.required || []) as string[]).map(
+              (key: string) => [key, exampleRequest[key]],
+            ),
+          ),
+          null,
+          2,
+        ),
+        fullRequest: JSON.stringify(exampleRequest, null, 2),
+        curl: `curl -X POST /api/integrations/trigger \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "integrationName": "${integrationName}",
+    "service": "${actionName}",
+    "data": ${JSON.stringify(exampleRequest)}
+  }'`,
+      },
+
+      errorHandling: {
+        commonErrors: [
+          {
+            error: 'Missing required parameter',
+            solution: `Ensure all required fields are provided: ${(((action.parameters as any)?.required || []) as string[]).join(', ')}`,
+          },
+          {
+            error: 'Invalid parameter type',
+            solution: 'Check schema.properties for correct data types',
+          },
+          {
+            error: 'Integration not configured',
+            solution: `Verify ${integrationName} credentials are set up`,
+          },
+        ],
+      },
+
+      bestPractices: [
+        'Always validate required parameters before calling',
+        'Handle errors gracefully with try/catch',
+        'Use the schema to validate input data',
+        'Test with minimal request first, then add optional params',
+        'Check integration setup requirements before use',
+      ],
+    };
+
+    return { success: true, data: guide };
+  } catch (error: any) {
+    console.error('Error in getActionImplementationGuide:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to generate implementation guide',
+    };
+  }
+};
+
 export const discoverAllIntegrations = async (
   language: SupportedLanguage = 'en',
 ): Promise<{ success: boolean; data?: any; error?: string }> => {
@@ -192,6 +357,125 @@ export const discoverAllIntegrations = async (
   }
 };
 
+/**
+ * Generate business-friendly context for an integration
+ */
+const generateBusinessContext = (
+  integrationId: string,
+  actions: any[],
+): {
+  setupRequirements: string[];
+  commonUseCases: string[];
+  requiredInfo: string[];
+} => {
+  const context = {
+    setupRequirements: [] as string[],
+    commonUseCases: [] as string[],
+    requiredInfo: [] as string[],
+  };
+
+  // Integration-specific context
+  const integrationContext: Record<string, any> = {
+    jira: {
+      setupRequirements: [
+        'JIRA workspace URL (e.g., yourcompany.atlassian.net)',
+        'API token from JIRA settings',
+        'User email address for authentication',
+      ],
+      commonUseCases: [
+        'Create and track bug reports',
+        'Manage project tasks and sprints',
+        'Automate ticket creation from customer feedback',
+        'Track team progress and velocity',
+      ],
+      requiredInfo: [
+        'Project key (e.g., "PROJ" from PROJ-123)',
+        'Issue type (Bug, Story, Task, Epic)',
+        'Summary and description for new tickets',
+      ],
+    },
+    sendgrid: {
+      setupRequirements: [
+        'SendGrid API key from account settings',
+        'Verified sender email address',
+      ],
+      commonUseCases: [
+        'Send customer notifications and alerts',
+        'Automated email campaigns',
+        'Transactional emails (receipts, confirmations)',
+        'Internal team notifications',
+      ],
+      requiredInfo: [
+        'Recipient email address',
+        'Email subject line',
+        'Message content (text and/or HTML)',
+      ],
+    },
+    linear: {
+      setupRequirements: [
+        'Linear workspace access',
+        'API key from Linear settings',
+      ],
+      commonUseCases: [
+        'Create and assign product issues',
+        'Track feature development',
+        'Manage product roadmap',
+        'Sprint planning and execution',
+      ],
+      requiredInfo: [
+        'Team ID for issue assignment',
+        'Issue title and description',
+        'Priority level and labels',
+      ],
+    },
+    mongodb: {
+      setupRequirements: [
+        'MongoDB connection string',
+        'Database and collection names',
+        'Read/write permissions',
+      ],
+      commonUseCases: [
+        'Query customer data',
+        'Generate reports and analytics',
+        'Update user records',
+        'Data migration and backup',
+      ],
+      requiredInfo: [
+        'Collection name to query',
+        'Filter criteria (MongoDB query)',
+        'Fields to retrieve or update',
+      ],
+    },
+  };
+
+  // Default context for unknown integrations
+  const defaultContext = {
+    setupRequirements: [
+      'API credentials or access token',
+      'Service account or workspace access',
+    ],
+    commonUseCases: [
+      'Automate repetitive tasks',
+      'Integrate with business workflows',
+      'Sync data across platforms',
+    ],
+    requiredInfo: ['Action-specific parameters', 'Target resource identifiers'],
+  };
+
+  const specific = integrationContext[integrationId.toLowerCase()];
+  if (specific) {
+    context.setupRequirements = specific.setupRequirements;
+    context.commonUseCases = specific.commonUseCases;
+    context.requiredInfo = specific.requiredInfo;
+  } else {
+    context.setupRequirements = defaultContext.setupRequirements;
+    context.commonUseCases = defaultContext.commonUseCases;
+    context.requiredInfo = defaultContext.requiredInfo;
+  }
+
+  return context;
+};
+
 export const discoverActionsByIntegration = async (
   integrationId: string,
   language: SupportedLanguage = 'en',
@@ -205,20 +489,43 @@ export const discoverActionsByIntegration = async (
       };
     }
 
-    // Return detailed action information
-    const actionsWithDetails = integration.actions.map((action) => ({
-      id: action.id,
-      serviceName: action.serviceName,
-      actionTitle: action.actionTitle,
-      description: action.description,
-      icon: action.icon,
-      parameters: action.parameters,
-      integration: {
-        id: integration.id,
-        name: integration.name,
-        icon: integration.icon,
-      },
-    }));
+    // Return detailed action information with simplified parameters
+    const actionsWithDetails = integration.actions.map((action) => {
+      // Extract required parameters in simple terms
+      const params = action.parameters as any;
+      const requiredFields = (params?.required || []) as string[];
+      const properties = (params?.properties || {}) as Record<string, any>;
+
+      const requiredParams = requiredFields.map((param: string) => {
+        const propDef = properties[param];
+        return {
+          name: param,
+          description: propDef?.description || param,
+          type: propDef?.type || 'string',
+        };
+      });
+
+      return {
+        id: action.id,
+        serviceName: action.serviceName,
+        actionTitle: action.actionTitle,
+        description: action.description,
+        icon: action.icon,
+        requiredParameters: requiredParams,
+        allParameters: action.parameters,
+        integration: {
+          id: integration.id,
+          name: integration.name,
+          icon: integration.icon,
+        },
+      };
+    });
+
+    // Add business context
+    const businessContext = generateBusinessContext(
+      integrationId,
+      actionsWithDetails,
+    );
 
     return {
       success: true,
@@ -231,6 +538,7 @@ export const discoverActionsByIntegration = async (
         },
         actions: actionsWithDetails,
         totalActions: actionsWithDetails.length,
+        businessContext,
       },
     };
   } catch (error: any) {
@@ -240,6 +548,50 @@ export const discoverActionsByIntegration = async (
       error: error.message || 'Failed to discover actions by integration',
     };
   }
+};
+
+/**
+ * Extract search keywords from a query
+ * Examples:
+ * "How can I send emails?" -> ["send", "email", "mail"]
+ * "Create JIRA tickets" -> ["create", "jira", "ticket", "issue"]
+ */
+const extractSearchKeywords = (query: string): string[] => {
+  const keywords: string[] = [];
+  const queryLower = query.toLowerCase();
+
+  // Common task verbs and their synonyms
+  const taskMappings: Record<string, string[]> = {
+    send: ['send', 'sending', 'sent', 'deliver', 'dispatch'],
+    create: ['create', 'creating', 'make', 'add', 'new', 'generate'],
+    get: ['get', 'fetch', 'retrieve', 'find', 'search', 'list'],
+    update: ['update', 'modify', 'edit', 'change'],
+    delete: ['delete', 'remove', 'clear'],
+    email: ['email', 'mail', 'message', 'notification'],
+    ticket: ['ticket', 'issue', 'task', 'story'],
+    file: ['file', 'document', 'upload', 'download'],
+    image: ['image', 'picture', 'photo', 'generate'],
+    user: ['user', 'person', 'account', 'member'],
+    message: ['message', 'chat', 'communicate'],
+  };
+
+  // Extract base query words
+  const words = queryLower
+    .replace(/[?!.,]/g, '')
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+
+  // Add original words
+  keywords.push(...words);
+
+  // Add mapped synonyms
+  for (const [key, synonyms] of Object.entries(taskMappings)) {
+    if (words.some((word) => synonyms.includes(word))) {
+      keywords.push(key, ...synonyms);
+    }
+  }
+
+  return [...new Set(keywords)]; // Remove duplicates
 };
 
 export const searchActions = async (
@@ -252,14 +604,21 @@ export const searchActions = async (
     );
     const allActions = await discoveryService.discoverActions(language);
 
+    // Extract smart keywords from search term
+    const keywords = extractSearchKeywords(searchTerm);
     const searchLower = searchTerm.toLowerCase();
-    const matchedActions = allActions.filter(
-      (action) =>
-        action.id.toLowerCase().includes(searchLower) ||
-        action.actionTitle.toLowerCase().includes(searchLower) ||
-        action.description.toLowerCase().includes(searchLower) ||
-        action.serviceName.toLowerCase().includes(searchLower),
-    );
+
+    // Match using both original term and extracted keywords
+    const matchedActions = allActions.filter((action) => {
+      const searchableText =
+        `${action.id} ${action.actionTitle} ${action.description} ${action.serviceName}`.toLowerCase();
+
+      // Check original search term
+      if (searchableText.includes(searchLower)) return true;
+
+      // Check extracted keywords
+      return keywords.some((keyword) => searchableText.includes(keyword));
+    });
 
     // Group actions by integration for better organization
     const groupedActions = matchedActions.reduce(
@@ -287,6 +646,7 @@ export const searchActions = async (
       success: true,
       data: {
         searchTerm,
+        keywords: keywords.slice(0, 5), // Show top 5 keywords used
         totalMatches: matchedActions.length,
         results: Object.values(groupedActions),
         allMatches: matchedActions,

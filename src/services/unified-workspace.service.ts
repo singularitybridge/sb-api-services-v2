@@ -7,6 +7,7 @@ import {
   StorageProvider,
 } from './storage-providers/local-storage.provider';
 import { createS3Provider } from './storage-providers/s3-storage.provider';
+import { getVectorSearchService } from './vector-search.service';
 import * as path from 'path';
 import * as fs from 'fs';
 import crypto from 'crypto';
@@ -57,6 +58,15 @@ export interface WorkspaceService {
   exists: (path: string) => Promise<boolean>;
   delete: (path: string) => Promise<boolean>;
   list: (prefix?: string) => Promise<string[]>;
+  listWithMetadata: (prefix?: string) => Promise<
+    Array<{
+      path: string;
+      metadata?: any;
+      type?: 'embedded' | 'external';
+      size?: number;
+    }>
+  >;
+  findByPattern: (pattern: RegExp) => Promise<string[]>;
   clear: (prefix?: string) => Promise<void>;
   export: (prefix?: string) => Promise<Record<string, any>>;
   import: (data: Record<string, any>) => Promise<void>;
@@ -101,6 +111,30 @@ export const createWorkspaceService = (
         namespace: options.namespace || 'workspace',
         ttl: options.ttl,
       });
+
+      // Create indexes for optimal query performance
+      if (mongoose.connection.db) {
+        const collection = mongoose.connection.db.collection('keyv');
+
+        // Skip key index creation - Keyv MongoDB adapter already creates a unique index on 'key'
+        // Attempting to create a non-unique index with the same auto-generated name causes conflicts
+        logger.debug('Workspace: Using Keyv default unique index on key field');
+
+        // Ensure TTL index exists on expiresAt for auto-cleanup
+        // Keyv typically creates this, but we verify it exists
+        collection
+          .createIndex(
+            { expiresAt: 1 },
+            { expireAfterSeconds: 0, background: true },
+          )
+          .then(() => {
+            logger.info('Workspace: Verified TTL index on expiresAt field');
+          })
+          .catch((err) => {
+            // TTL index might already exist, that's fine
+            logger.debug('Workspace: TTL index exists or creation skipped');
+          });
+      }
     } catch (error) {
       logger.warn(
         'Workspace: MongoDB connection failed, using disk storage',
@@ -209,8 +243,9 @@ export const createWorkspaceService = (
     const key = getCacheKey(sanitized);
 
     try {
-      // MongoDB document size limit is 16MB
-      const MAX_MONGODB_SIZE = 16 * 1024 * 1024; // 16MB
+      // Storage thresholds
+      const MAX_MONGODB_SIZE = 16 * 1024 * 1024; // 16MB (BSON limit)
+      const EXTERNAL_STORAGE_THRESHOLD = 1 * 1024 * 1024; // 1MB - use external storage for files larger than this
 
       // Convert content to Buffer for size check
       const contentBuffer = Buffer.isBuffer(content)
@@ -219,7 +254,7 @@ export const createWorkspaceService = (
           ? Buffer.from(content)
           : Buffer.from(JSON.stringify(content));
 
-      // Check size limit
+      // Check MongoDB hard limit
       if (contentBuffer.length > MAX_MONGODB_SIZE) {
         throw new Error(
           `Content size (${contentBuffer.length} bytes) exceeds MongoDB 16MB limit`,
@@ -230,33 +265,72 @@ export const createWorkspaceService = (
       const existingRef = await keyv.get(key);
       const isUpdate = !!existingRef;
 
-      // Store content directly in MongoDB
-      // For binary data, convert to base64 for storage
-      const storageContent = Buffer.isBuffer(content)
-        ? {
-            type: 'buffer',
-            data: content.toString('base64'),
-            encoding: 'base64',
-          }
-        : content;
+      let document;
 
-      // Create document with content embedded
-      const document = {
-        type: 'embedded',
-        content: storageContent,
-        metadata: {
-          ...metadata,
-          size: contentBuffer.length,
-          contentType:
-            metadata.contentType || detectContentType(sanitized, content),
-          createdAt: isUpdate ? existingRef?.metadata?.createdAt : new Date(),
-          updatedAt: new Date(),
-          version: isUpdate ? (existingRef?.metadata?.version || 0) + 1 : 1,
-          isBuffer: Buffer.isBuffer(content),
-        },
-      };
+      // Use external storage for large files (> 1MB)
+      if (contentBuffer.length > EXTERNAL_STORAGE_THRESHOLD) {
+        logger.info(
+          `Workspace: Large file detected (${contentBuffer.length} bytes), using external storage for ${sanitized}`,
+        );
 
-      // Store directly in MongoDB with timeout
+        // Store file externally (S3 or local disk)
+        // Note: Don't add 'workspace' prefix - storage provider already has it in baseDir
+        const externalPath = sanitized;
+        await fileStorage.upload(externalPath, contentBuffer);
+
+        // Store reference in MongoDB
+        document = {
+          type: 'external',
+          path: externalPath,
+          storageProvider: fileStorage.constructor.name,
+          metadata: {
+            ...metadata,
+            size: contentBuffer.length,
+            contentType:
+              metadata.contentType || detectContentType(sanitized, content),
+            createdAt: isUpdate ? existingRef?.metadata?.createdAt : new Date(),
+            updatedAt: new Date(),
+            version: isUpdate ? (existingRef?.metadata?.version || 0) + 1 : 1,
+            isBuffer: Buffer.isBuffer(content),
+          },
+        };
+
+        logger.debug(
+          `Workspace: ${isUpdate ? 'Updated' : 'Created'} ${sanitized} (${contentBuffer.length} bytes in external storage)`,
+        );
+      } else {
+        // Store small files directly in MongoDB (< 1MB)
+        // For binary data, convert to base64 for storage
+        const storageContent = Buffer.isBuffer(content)
+          ? {
+              type: 'buffer',
+              data: content.toString('base64'),
+              encoding: 'base64',
+            }
+          : content;
+
+        // Create document with content embedded
+        document = {
+          type: 'embedded',
+          content: storageContent,
+          metadata: {
+            ...metadata,
+            size: contentBuffer.length,
+            contentType:
+              metadata.contentType || detectContentType(sanitized, content),
+            createdAt: isUpdate ? existingRef?.metadata?.createdAt : new Date(),
+            updatedAt: new Date(),
+            version: isUpdate ? (existingRef?.metadata?.version || 0) + 1 : 1,
+            isBuffer: Buffer.isBuffer(content),
+          },
+        };
+
+        logger.debug(
+          `Workspace: ${isUpdate ? 'Updated' : 'Created'} ${sanitized} (${contentBuffer.length} bytes in MongoDB)`,
+        );
+      }
+
+      // Store document in MongoDB with timeout
       try {
         const timeoutPromise = new Promise((_, reject) => {
           setTimeout(() => reject(new Error('Database timeout')), 5000);
@@ -281,10 +355,6 @@ export const createWorkspaceService = (
         expiry: metadata.ttl ? Date.now() + metadata.ttl * 1000 : undefined,
       });
       pruneCache();
-
-      logger.debug(
-        `Workspace: ${isUpdate ? 'Updated' : 'Created'} ${sanitized} (${contentBuffer.length} bytes in MongoDB)`,
-      );
     } catch (error) {
       logger.error(`Workspace: Failed to set ${sanitized}`, error);
       throw error;
@@ -318,8 +388,22 @@ export const createWorkspaceService = (
         return undefined;
       }
 
-      // Content is embedded directly in the document
-      if (document.type === 'embedded' && document.content) {
+      // Handle external storage (for large files > 1MB)
+      if (document.type === 'external' && document.path) {
+        logger.debug(
+          `Workspace: Retrieving large file from external storage: ${sanitized}`,
+        );
+        const buffer = await fileStorage.download(document.path);
+        return parseContent(buffer, sanitized, document.metadata?.contentType);
+      }
+
+      // Content is embedded directly in the document (for small files < 1MB)
+      // Check for undefined/null explicitly - empty string "" is valid content
+      if (
+        document.type === 'embedded' &&
+        document.content !== undefined &&
+        document.content !== null
+      ) {
         // Handle base64 encoded buffers
         if (
           document.content.type === 'buffer' &&
@@ -448,11 +532,14 @@ export const createWorkspaceService = (
     const key = getCacheKey(sanitized);
 
     try {
-      // Get entry to check if it's a file
+      // Get entry to check if it uses external storage
       const entry = await keyv.get(key);
 
-      if (entry?.type === 'file') {
-        // Delete from file storage
+      // Delete from external storage if applicable
+      if (entry?.type === 'external' || entry?.type === 'file') {
+        logger.debug(
+          `Workspace: Deleting external file for ${sanitized}: ${entry.path}`,
+        );
         await fileStorage.delete(entry.path);
       }
 
@@ -467,6 +554,56 @@ export const createWorkspaceService = (
     } catch (error) {
       logger.error(`Workspace: Failed to delete ${sanitized}`, error);
       return false;
+    }
+  };
+
+  const findByPattern = async (pattern: RegExp): Promise<string[]> => {
+    try {
+      const namespace = options.namespace || 'workspace';
+
+      // If using MongoDB, query the database directly
+      if (store && store instanceof KeyvMongo && mongoose.connection.db) {
+        try {
+          const db = mongoose.connection.db;
+          const collection = db.collection('keyv');
+
+          const namespacePrefix = `${namespace}:`;
+          const query = {
+            key: { $regex: pattern },
+          };
+
+          // Fetch only keys using projection (covered query)
+          const cursor = collection.find(query, {
+            projection: { key: 1, _id: 0 },
+          });
+          cursor.hint({ key: 1 }); // Ensure index is used
+          const docs = await cursor.toArray();
+
+          // Extract and clean keys
+          const keys = docs.map((doc: any) => {
+            let key = doc.key;
+            if (key.startsWith(namespacePrefix)) {
+              key = key.substring(namespacePrefix.length);
+            }
+            return key;
+          });
+
+          logger.debug(`Workspace: Found ${keys.length} keys matching pattern`);
+          return keys;
+        } catch (mongoError) {
+          logger.warn(
+            'Failed to query MongoDB by pattern, falling back to cache',
+            mongoError,
+          );
+        }
+      }
+
+      // Fallback: search cache
+      const cachedKeys = Array.from(cache.keys());
+      return cachedKeys.filter((key) => pattern.test(key));
+    } catch (error) {
+      logger.error('Workspace: Failed to find by pattern', error);
+      return [];
     }
   };
 
@@ -489,23 +626,33 @@ export const createWorkspaceService = (
           if (prefix) {
             const sanitizedPrefix = sanitizePath(prefix);
             const fullPrefix = `${namespacePrefix}${sanitizedPrefix}`;
-            // Use a regex that matches the exact prefix
+            // Use range query for better index utilization
             query = {
               key: {
-                $regex: `^${fullPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+                $gte: fullPrefix,
+                $lt: fullPrefix + '\uffff',
               },
             };
           } else {
             // Match all keys with this namespace
             query = {
               key: {
-                $regex: `^${namespacePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+                $gte: namespacePrefix,
+                $lt: namespacePrefix + '\uffff',
               },
             };
           }
 
-          // Fetch matching documents
-          const docs = await collection.find(query).toArray();
+          // Fetch only keys using projection (much faster, doesn't load content)
+          // This creates a "covered query" - MongoDB can satisfy entirely from index
+          const cursor = collection.find(query, {
+            projection: { key: 1, _id: 0 },
+          });
+
+          // Add hint to ensure index is used
+          cursor.hint({ key: 1 });
+
+          const docs = await cursor.toArray();
 
           // Extract and clean keys
           const keys = docs.map((doc: any) => {
@@ -542,6 +689,116 @@ export const createWorkspaceService = (
       return cachedKeys;
     } catch (error) {
       logger.error('Workspace: Failed to list keys', error);
+      return [];
+    }
+  };
+
+  const listWithMetadata = async (
+    prefix?: string,
+  ): Promise<
+    Array<{
+      path: string;
+      metadata?: any;
+      type?: 'embedded' | 'external';
+      size?: number;
+    }>
+  > => {
+    try {
+      const namespace = options.namespace || 'workspace';
+
+      // If using MongoDB, query the database directly with metadata
+      if (store && store instanceof KeyvMongo && mongoose.connection.db) {
+        try {
+          const db = mongoose.connection.db;
+          const collection = db.collection('keyv');
+
+          const namespacePrefix = `${namespace}:`;
+          let query: any = {};
+
+          if (prefix) {
+            const sanitizedPrefix = sanitizePath(prefix);
+            const fullPrefix = `${namespacePrefix}${sanitizedPrefix}`;
+            query = {
+              key: {
+                $gte: fullPrefix,
+                $lt: fullPrefix + '\uffff',
+              },
+            };
+          } else {
+            query = {
+              key: {
+                $gte: namespacePrefix,
+                $lt: namespacePrefix + '\uffff',
+              },
+            };
+          }
+
+          // Fetch keys with metadata, but exclude large content field
+          // This is much more efficient than loading full documents
+          const cursor = collection.find(query, {
+            projection: {
+              key: 1,
+              'value.metadata': 1,
+              'value.type': 1,
+              _id: 0,
+            },
+          });
+
+          cursor.hint({ key: 1 });
+          const docs = await cursor.toArray();
+
+          // Extract and format results
+          const results = docs.map((doc: any) => {
+            let path = doc.key;
+            if (path.startsWith(namespacePrefix)) {
+              path = path.substring(namespacePrefix.length);
+            }
+
+            return {
+              path,
+              metadata: doc.value?.metadata || {},
+              type: doc.value?.type,
+              size: doc.value?.metadata?.size,
+            };
+          });
+
+          logger.debug(
+            `Workspace: Listed ${results.length} items with metadata from MongoDB with prefix: ${prefix || '/'}`,
+          );
+          return results;
+        } catch (mongoError) {
+          logger.warn(
+            'Failed to query MongoDB with metadata, falling back to cache',
+            mongoError,
+          );
+        }
+      }
+
+      // Fallback: use cache (less efficient but works)
+      const keys = await list(prefix);
+      const results = [];
+
+      for (const key of keys) {
+        const cached = cache.get(getCacheKey(key));
+        if (cached?.value) {
+          results.push({
+            path: key,
+            metadata: cached.value.metadata || {},
+            type: cached.value.type,
+            size: cached.value.metadata?.size,
+          });
+        } else {
+          // If not in cache, add without metadata
+          results.push({
+            path: key,
+            metadata: {},
+          });
+        }
+      }
+
+      return results;
+    } catch (error) {
+      logger.error('Workspace: Failed to list with metadata', error);
       return [];
     }
   };
@@ -782,6 +1039,8 @@ export const createWorkspaceService = (
     exists,
     delete: deleteItem,
     list,
+    listWithMetadata,
+    findByPattern,
     clear,
     export: exportData,
     import: importData,
@@ -843,7 +1102,15 @@ export class UnifiedWorkspaceService {
     sessionId: string,
     path: string,
     content: any,
-    options: { scope: string; agentId?: string } = { scope: 'session' },
+    options: {
+      scope: string;
+      agentId?: string;
+      creationContext?: {
+        content?: string;
+        messageId?: string;
+        timestamp?: Date;
+      };
+    } = { scope: 'session' },
   ): Promise<{ version: number }> {
     const scopePath = this.buildScopePath(
       options.scope,
@@ -852,12 +1119,15 @@ export class UnifiedWorkspaceService {
       options.agentId,
     );
 
-    // Get existing metadata to track version
+    // Get existing metadata to track version and preserve creation context
     let version = 1;
+    let existingCreationContext = null;
     try {
       const existing = await this.workspace.get(scopePath);
       if (existing && existing.metadata?.version) {
         version = existing.metadata.version + 1;
+        // Preserve original creation context on updates
+        existingCreationContext = existing.metadata?.creationContext;
       }
     } catch (error) {
       // Doesn't exist yet, version stays at 1
@@ -869,6 +1139,23 @@ export class UnifiedWorkspaceService {
       scope: options.scope,
       sessionId,
       agentId: options.agentId,
+      // Only set creation context on first create (version 1)
+      creationContext:
+        version === 1 ? options.creationContext : existingCreationContext,
+    });
+
+    // Trigger async embedding (fire-and-forget)
+    setImmediate(() => {
+      const vectorSearch = getVectorSearchService();
+      // Build full MongoDB key format: unified-workspace:/agent/id/path
+      const namespace = 'unified-workspace';
+      const fullKey = `${namespace}:/${scopePath}`;
+      vectorSearch.embedDocument(fullKey).catch((error) => {
+        logger.error('Async embedding failed', {
+          fullKey,
+          error: error.message,
+        });
+      });
     });
 
     return { version };
