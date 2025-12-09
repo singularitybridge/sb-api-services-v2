@@ -2,6 +2,37 @@ import axios from 'axios';
 import { getApiKey } from '../../services/api.key.service';
 
 const NYLAS_API_URL = 'https://api.us.nylas.com';
+const V3_SERVICE_URL = process.env.NYLAS_V3_SERVICE_URL || 'https://sb-api-services-v3-53926697384.us-central1.run.app';
+
+/**
+ * Resolve grant ID for a specific user email by calling V3 microservice
+ * Falls back to company default if user email not provided or not found
+ */
+async function resolveGrantId(companyId: string, userEmail?: string): Promise<string> {
+  // If userEmail provided, try to get user-specific grant from V3
+  if (userEmail) {
+    try {
+      const response = await axios.get(`${V3_SERVICE_URL}/api/v1/nylas/grants/by-email`, {
+        params: { email: userEmail.toLowerCase() },
+        timeout: 5000,
+      });
+
+      if (response.data?.grantId) {
+        console.log(`[nylas-service] Resolved grant for ${userEmail}: ${response.data.grantId.substring(0, 8)}...`);
+        return response.data.grantId;
+      }
+    } catch (error: any) {
+      console.warn(`[nylas-service] Could not resolve grant for ${userEmail}, falling back to company default:`, error.message);
+    }
+  }
+
+  // Fall back to company default grant
+  const grantId = await getApiKey(companyId, 'nylas_grant_id');
+  if (!grantId) {
+    throw new Error('Nylas Grant ID not found');
+  }
+  return grantId;
+}
 
 interface NylasEmailRecipient {
   email: string;
@@ -100,19 +131,15 @@ async function makeNylasRequest<T>(
 // Email functions
 export async function getEmails(
   companyId: string,
-  options: { limit?: number; unread?: boolean } = {},
+  options: { limit?: number; unread?: boolean; userEmail?: string } = {},
 ): Promise<NylasEmail[]> {
   const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
   if (!apiKey) {
     throw new Error('Nylas API key not found');
   }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
 
-  const { limit = 10, unread } = options;
+  const { limit = 10, unread, userEmail } = options;
+  const grantId = await resolveGrantId(companyId, userEmail);
   let endpoint = `/v3/grants/${grantId}/messages?limit=${limit}`;
 
   if (unread) {
@@ -129,17 +156,14 @@ export async function getEmails(
 export async function getEmailById(
   companyId: string,
   messageId: string,
+  userEmail?: string,
 ): Promise<NylasEmail> {
   const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
   if (!apiKey) {
     throw new Error('Nylas API key not found');
   }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
 
+  const grantId = await resolveGrantId(companyId, userEmail);
   const endpoint = `/v3/grants/${grantId}/messages/${messageId}`;
   const response = await makeNylasRequest<{ data: NylasEmail } | NylasEmail>(
     apiKey,
@@ -156,19 +180,16 @@ export async function sendEmail(
     body: string;
     cc?: string | string[];
     bcc?: string | string[];
+    userEmail?: string;
   },
 ): Promise<{ id: string; thread_id: string }> {
   const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
   if (!apiKey) {
     throw new Error('Nylas API key not found');
   }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
 
-  const { to, subject, body, cc, bcc } = params;
+  const { to, subject, body, cc, bcc, userEmail } = params;
+  const grantId = await resolveGrantId(companyId, userEmail);
   const endpoint = `/v3/grants/${grantId}/messages/send`;
 
   const payload: any = {
@@ -198,11 +219,15 @@ export async function sendEmail(
 // Calendar functions
 export async function getCalendars(
   companyId: string,
+  userEmail?: string,
 ): Promise<NylasCalendar[]> {
-  console.log('[NYLAS DEBUG] getCalendars called for company:', companyId);
+  console.log('[NYLAS DEBUG] getCalendars called for company:', companyId, 'userEmail:', userEmail || 'default');
   const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
+  if (!apiKey) {
+    throw new Error('Nylas API key not found');
+  }
 
+  const grantId = await resolveGrantId(companyId, userEmail);
   console.log(
     '[NYLAS DEBUG] API Key:',
     apiKey ? `${apiKey.substring(0, 15)}...` : 'NULL',
@@ -211,13 +236,6 @@ export async function getCalendars(
     '[NYLAS DEBUG] Grant ID:',
     grantId ? `${grantId.substring(0, 15)}...` : 'NULL',
   );
-
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
 
   const endpoint = `/v3/grants/${grantId}/calendars`;
   console.log('[NYLAS DEBUG] Calling:', endpoint);
@@ -231,20 +249,18 @@ export async function getCalendars(
 
 export async function getCalendarEvents(
   companyId: string,
-  options: { start?: number; end?: number; limit?: number } = {},
+  options: { start?: number; end?: number; limit?: number; userEmail?: string } = {},
 ): Promise<NylasEvent[]> {
   const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
   if (!apiKey) {
     throw new Error('Nylas API key not found');
   }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
+
+  const { userEmail } = options;
+  const grantId = await resolveGrantId(companyId, userEmail);
 
   // First, get the primary calendar
-  const calendars = await getCalendars(companyId);
+  const calendars = await getCalendars(companyId, userEmail);
 
   if (calendars.length === 0) {
     return [];
@@ -315,20 +331,19 @@ export async function createCalendarEvent(
     endTime: string | number;
     participants?: string[];
     location?: string;
+    userEmail?: string;
   },
 ): Promise<NylasEvent> {
   const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
   if (!apiKey) {
     throw new Error('Nylas API key not found');
   }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
+
+  const { userEmail } = params;
+  const grantId = await resolveGrantId(companyId, userEmail);
 
   // First, get the primary calendar
-  const calendars = await getCalendars(companyId);
+  const calendars = await getCalendars(companyId, userEmail);
 
   if (calendars.length === 0) {
     throw new Error('No calendars found for this account');
@@ -452,17 +467,14 @@ export async function verifyNylasKeys(
 export async function getEventById(
   companyId: string,
   eventId: string,
+  userEmail?: string,
 ): Promise<NylasEvent> {
   const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
   if (!apiKey) {
     throw new Error('Nylas API key not found');
   }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
 
+  const grantId = await resolveGrantId(companyId, userEmail);
   const endpoint = `/v3/grants/${grantId}/events/${eventId}`;
   const response = await makeNylasRequest<{ data: NylasEvent } | NylasEvent>(
     apiKey,
@@ -484,21 +496,20 @@ export async function updateCalendarEvent(
     endTime?: string | number;
     participants?: string[];
     location?: string;
+    userEmail?: string;
   },
 ): Promise<NylasEvent> {
   const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
   if (!apiKey) {
     throw new Error('Nylas API key not found');
   }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
+
+  const { userEmail } = params;
+  const grantId = await resolveGrantId(companyId, userEmail);
 
   // Get the event first to determine calendar ID
-  const existingEvent = await getEventById(companyId, eventId);
-  const calendars = await getCalendars(companyId);
+  const existingEvent = await getEventById(companyId, eventId, userEmail);
+  const calendars = await getCalendars(companyId, userEmail);
   const primaryCalendar =
     calendars.find((cal) => cal.is_primary) || calendars[0];
 
@@ -561,19 +572,17 @@ export async function updateCalendarEvent(
 export async function deleteCalendarEvent(
   companyId: string,
   eventId: string,
+  userEmail?: string,
 ): Promise<void> {
   const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
   if (!apiKey) {
     throw new Error('Nylas API key not found');
   }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
+
+  const grantId = await resolveGrantId(companyId, userEmail);
 
   // Get calendars to find primary calendar ID
-  const calendars = await getCalendars(companyId);
+  const calendars = await getCalendars(companyId, userEmail);
   const primaryCalendar =
     calendars.find((cal) => cal.is_primary) || calendars[0];
 
@@ -613,17 +622,14 @@ export async function getFreeBusy(
   emails: string[],
   startTime: number,
   endTime: number,
+  userEmail?: string,
 ): Promise<FreeBusyData[]> {
   const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
   if (!apiKey) {
     throw new Error('Nylas API key not found');
   }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
 
+  const grantId = await resolveGrantId(companyId, userEmail);
   const endpoint = `/v3/grants/${grantId}/calendars/free-busy`;
   const payload = {
     emails: emails,
@@ -667,6 +673,7 @@ export async function findAvailableSlots(
     preferredTimeEnd?: string; // "17:00"
     participants?: string[];
     bufferMinutes?: number;
+    userEmail?: string;
   },
 ): Promise<AvailableSlot[]> {
   const {
@@ -677,20 +684,19 @@ export async function findAvailableSlots(
     preferredTimeEnd = '17:00',
     participants = [],
     bufferMinutes = 15,
+    userEmail,
   } = params;
 
   const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-
   if (!apiKey) {
     throw new Error('Nylas API key not found');
   }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
+
+  const grantId = await resolveGrantId(companyId, userEmail);
 
   // Get existing events in the range
   const events = await getCalendarEvents(companyId, {
+    userEmail,
     start: dateRangeStart,
     end: dateRangeEnd,
     limit: 100,
@@ -704,6 +710,7 @@ export async function findAvailableSlots(
       participants,
       dateRangeStart,
       dateRangeEnd,
+      userEmail,
     );
 
     // Merge all busy slots from participants
@@ -943,6 +950,7 @@ export async function checkEventConflicts(
   startTime: number,
   endTime: number,
   participants?: string[],
+  userEmail?: string,
 ): Promise<ConflictCheck> {
   // Get events in the proposed time range (with some buffer)
   const bufferTime = 3600; // 1 hour buffer
@@ -950,6 +958,7 @@ export async function checkEventConflicts(
     start: startTime - bufferTime,
     end: endTime + bufferTime,
     limit: 100,
+    userEmail,
   });
 
   // Check for direct conflicts
@@ -975,6 +984,7 @@ export async function checkEventConflicts(
       dateRangeStart: startTime,
       dateRangeEnd: searchEnd,
       participants: participants || [],
+      userEmail,
     });
   }
 

@@ -65,11 +65,15 @@ export const createNylasActions = (
   // Get emails
   nylasGetEmails: {
     description:
-      'Retrieve emails from the connected email account. Returns a list of emails with subject, sender, and preview.',
+      'Retrieve emails from a team member\'s connected email account. Specify userEmail to access a specific user\'s mailbox.',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
+        userEmail: {
+          type: 'string',
+          description: 'Email of the team member whose emails to access. If not provided, uses company default.',
+        },
         limit: {
           type: 'number',
           description: 'Maximum number of emails to return (default: 10)',
@@ -83,10 +87,11 @@ export const createNylasActions = (
       additionalProperties: false,
     },
     function: async (args: {
+      userEmail?: string;
       limit?: number;
       unread?: boolean;
     }): Promise<StandardActionResult<EmailData[]>> => {
-      const { limit = 10, unread = false } = args;
+      const { userEmail, limit = 10, unread = false } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -98,6 +103,7 @@ export const createNylasActions = (
           const emails = await getEmailsService(context.companyId!, {
             limit,
             unread,
+            userEmail,
           });
           return {
             success: true,
@@ -120,7 +126,7 @@ export const createNylasActions = (
   // Get single email by ID
   nylasGetEmail: {
     description:
-      'Retrieve a specific email by its ID, including the full body content.',
+      'Retrieve a specific email by its ID, including the full body content. Specify userEmail to access a specific user\'s mailbox.',
     strict: true,
     parameters: {
       type: 'object',
@@ -129,14 +135,19 @@ export const createNylasActions = (
           type: 'string',
           description: 'The ID of the email message to retrieve',
         },
+        userEmail: {
+          type: 'string',
+          description: 'Email of the team member whose mailbox to access. If not provided, uses company default.',
+        },
       },
       required: ['messageId'],
       additionalProperties: false,
     },
     function: async (args: {
       messageId: string;
+      userEmail?: string;
     }): Promise<StandardActionResult<EmailData>> => {
-      const { messageId } = args;
+      const { messageId, userEmail } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -152,6 +163,7 @@ export const createNylasActions = (
           const email = await getEmailByIdService(
             context.companyId!,
             messageId,
+            userEmail,
           );
           return {
             success: true,
@@ -174,11 +186,15 @@ export const createNylasActions = (
 
   // Send email
   nylasSendEmail: {
-    description: 'Send an email using the connected email account.',
+    description: 'Send an email using a team member\'s connected email account. Specify userEmail to send from a specific user\'s mailbox.',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
+        userEmail: {
+          type: 'string',
+          description: 'Email of the team member whose account to send from. If not provided, uses company default.',
+        },
         to: {
           type: 'string',
           description:
@@ -207,13 +223,14 @@ export const createNylasActions = (
       additionalProperties: false,
     },
     function: async (args: {
+      userEmail?: string;
       to: string;
       subject: string;
       body: string;
       cc?: string;
       bcc?: string;
     }): Promise<StandardActionResult<{ id: string; thread_id: string }>> => {
-      const { to, subject, body, cc, bcc } = args;
+      const { userEmail, to, subject, body, cc, bcc } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -247,6 +264,7 @@ export const createNylasActions = (
             body,
             cc: cc ? cc.split(',').map((e) => e.trim()) : undefined,
             bcc: bcc ? bcc.split(',').map((e) => e.trim()) : undefined,
+            userEmail,
           });
           return { success: true, data: result };
         },
@@ -258,11 +276,15 @@ export const createNylasActions = (
   // Get calendar events
   nylasGetCalendarEvents: {
     description:
-      'Retrieve calendar events from the connected calendar account.',
+      'Retrieve calendar events from a team member\'s connected calendar. Specify userEmail to access a specific user\'s calendar.',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
+        userEmail: {
+          type: 'string',
+          description: 'Email of the team member whose calendar to access. If not provided, uses company default.',
+        },
         limit: {
           type: 'number',
           description: 'Maximum number of events to return (default: 20)',
@@ -281,11 +303,12 @@ export const createNylasActions = (
       additionalProperties: false,
     },
     function: async (args: {
+      userEmail?: string;
       limit?: number;
       start?: number;
       end?: number;
     }): Promise<StandardActionResult<EventData[]>> => {
-      const { limit = 20, start, end } = args;
+      const { userEmail, limit = 20, start, end } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -298,6 +321,7 @@ export const createNylasActions = (
             limit,
             start,
             end,
+            userEmail,
           });
           return {
             success: true,
@@ -319,11 +343,15 @@ export const createNylasActions = (
 
   // Create calendar event
   nylasCreateCalendarEvent: {
-    description: 'Create a new calendar event on the connected calendar.',
+    description: 'Create a new calendar event on a team member\'s connected calendar. Specify userEmail to create on a specific user\'s calendar.',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
+        userEmail: {
+          type: 'string',
+          description: 'Email of the team member whose calendar to create the event on. If not provided, uses company default.',
+        },
         title: {
           type: 'string',
           description: 'The title of the event',
@@ -356,6 +384,7 @@ export const createNylasActions = (
       additionalProperties: false,
     },
     function: async (args: {
+      userEmail?: string;
       title: string;
       description?: string;
       startTime: string;
@@ -363,7 +392,7 @@ export const createNylasActions = (
       participants?: string;
       location?: string;
     }): Promise<StandardActionResult<EventData>> => {
-      const { title, description, startTime, endTime, participants, location } =
+      const { userEmail, title, description, startTime, endTime, participants, location } =
         args;
 
       if (!context.companyId) {
@@ -390,6 +419,7 @@ export const createNylasActions = (
               ? participants.split(',').map((e) => e.trim())
               : undefined,
             location,
+            userEmail,
           });
           return {
             success: true,
@@ -442,7 +472,7 @@ export const createNylasActions = (
   // Get specific event by ID
   nylasGetEvent: {
     description:
-      'Retrieve a specific calendar event by its ID with full details.',
+      'Retrieve a specific calendar event by its ID with full details. Specify userEmail to access a specific user\'s calendar.',
     strict: true,
     parameters: {
       type: 'object',
@@ -451,14 +481,19 @@ export const createNylasActions = (
           type: 'string',
           description: 'The ID of the calendar event to retrieve',
         },
+        userEmail: {
+          type: 'string',
+          description: 'Email of the team member whose calendar to access. If not provided, uses company default.',
+        },
       },
       required: ['eventId'],
       additionalProperties: false,
     },
     function: async (args: {
       eventId: string;
+      userEmail?: string;
     }): Promise<StandardActionResult<EventData>> => {
-      const { eventId } = args;
+      const { eventId, userEmail } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -471,7 +506,7 @@ export const createNylasActions = (
       return executeAction<EventData, ServiceCallLambdaResponse<EventData>>(
         'nylasGetEvent',
         async () => {
-          const event = await getEventByIdService(context.companyId!, eventId);
+          const event = await getEventByIdService(context.companyId!, eventId, userEmail);
           return {
             success: true,
             data: {
@@ -493,7 +528,7 @@ export const createNylasActions = (
   // Update existing event
   nylasUpdateEvent: {
     description:
-      'Update an existing calendar event (move, reschedule, or modify details).',
+      'Update an existing calendar event (move, reschedule, or modify details). Specify userEmail to access a specific user\'s calendar.',
     strict: true,
     parameters: {
       type: 'object',
@@ -501,6 +536,10 @@ export const createNylasActions = (
         eventId: {
           type: 'string',
           description: 'The ID of the event to update',
+        },
+        userEmail: {
+          type: 'string',
+          description: 'Email of the team member whose calendar to access. If not provided, uses company default.',
         },
         title: {
           type: 'string',
@@ -532,6 +571,7 @@ export const createNylasActions = (
     },
     function: async (args: {
       eventId: string;
+      userEmail?: string;
       title?: string;
       description?: string;
       location?: string;
@@ -541,6 +581,7 @@ export const createNylasActions = (
     }): Promise<StandardActionResult<EventData>> => {
       const {
         eventId,
+        userEmail,
         title,
         description,
         location,
@@ -572,6 +613,7 @@ export const createNylasActions = (
               participants: participants
                 ? participants.split(',').map((e) => e.trim())
                 : undefined,
+              userEmail,
             },
           );
           return {
@@ -594,7 +636,7 @@ export const createNylasActions = (
 
   // Delete event
   nylasDeleteEvent: {
-    description: 'Delete a calendar event permanently.',
+    description: 'Delete a calendar event permanently. Specify userEmail to access a specific user\'s calendar.',
     strict: true,
     parameters: {
       type: 'object',
@@ -603,14 +645,19 @@ export const createNylasActions = (
           type: 'string',
           description: 'The ID of the event to delete',
         },
+        userEmail: {
+          type: 'string',
+          description: 'Email of the team member whose calendar to access. If not provided, uses company default.',
+        },
       },
       required: ['eventId'],
       additionalProperties: false,
     },
     function: async (args: {
       eventId: string;
+      userEmail?: string;
     }): Promise<StandardActionResult<{ deleted: boolean }>> => {
-      const { eventId } = args;
+      const { eventId, userEmail } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -626,7 +673,7 @@ export const createNylasActions = (
       >(
         'nylasDeleteEvent',
         async () => {
-          await deleteCalendarEventService(context.companyId!, eventId);
+          await deleteCalendarEventService(context.companyId!, eventId, userEmail);
           return { success: true, data: { deleted: true } };
         },
         { serviceName: SERVICE_NAME },
@@ -637,11 +684,15 @@ export const createNylasActions = (
   // Find available time slots
   nylasFindAvailableSlots: {
     description:
-      'Intelligently find available time slots for a meeting. Returns ranked slots based on optimal scheduling (morning priority, good spacing, mid-week preference).',
+      'Intelligently find available time slots for a meeting. Returns ranked slots based on optimal scheduling (morning priority, good spacing, mid-week preference). Specify userEmail to check a specific user\'s calendar.',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
+        userEmail: {
+          type: 'string',
+          description: 'Email of the team member whose calendar to check. If not provided, uses company default.',
+        },
         durationMinutes: {
           type: 'number',
           description: 'Meeting duration in minutes',
@@ -679,6 +730,7 @@ export const createNylasActions = (
       additionalProperties: false,
     },
     function: async (args: {
+      userEmail?: string;
       durationMinutes: number;
       dateRangeStart: string;
       dateRangeEnd: string;
@@ -688,6 +740,7 @@ export const createNylasActions = (
       bufferMinutes?: number;
     }): Promise<StandardActionResult<any[]>> => {
       const {
+        userEmail,
         durationMinutes,
         dateRangeStart,
         dateRangeEnd,
@@ -725,6 +778,7 @@ export const createNylasActions = (
               ? participants.split(',').map((e) => e.trim())
               : undefined,
             bufferMinutes,
+            userEmail,
           });
 
           // Convert timestamps back to ISO strings for better readability
@@ -745,11 +799,15 @@ export const createNylasActions = (
   // Get free/busy information
   nylasGetFreeBusy: {
     description:
-      'Check availability for one or more participants during a specific time range. Returns busy/free time slots.',
+      'Check availability for one or more participants during a specific time range. Returns busy/free time slots. Specify userEmail to use a specific user\'s calendar context.',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
+        userEmail: {
+          type: 'string',
+          description: 'Email of the team member whose calendar context to use. If not provided, uses company default.',
+        },
         emails: {
           type: 'string',
           description: 'Comma-separated email addresses to check',
@@ -767,11 +825,12 @@ export const createNylasActions = (
       additionalProperties: false,
     },
     function: async (args: {
+      userEmail?: string;
       emails: string;
       startTime: string;
       endTime: string;
     }): Promise<StandardActionResult<any[]>> => {
-      const { emails, startTime, endTime } = args;
+      const { userEmail, emails, startTime, endTime } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -795,6 +854,7 @@ export const createNylasActions = (
             emailList,
             startTimestamp,
             endTimestamp,
+            userEmail,
           );
 
           // Format for readability
@@ -817,11 +877,15 @@ export const createNylasActions = (
   // Check for conflicts
   nylasCheckConflicts: {
     description:
-      'Check if a proposed meeting time conflicts with existing events. Suggests alternative times if conflicts are found.',
+      'Check if a proposed meeting time conflicts with existing events. Suggests alternative times if conflicts are found. Specify userEmail to check a specific user\'s calendar.',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
+        userEmail: {
+          type: 'string',
+          description: 'Email of the team member whose calendar to check. If not provided, uses company default.',
+        },
         startTime: {
           type: 'string',
           description: 'Proposed start time in ISO 8601 format',
@@ -839,11 +903,12 @@ export const createNylasActions = (
       additionalProperties: false,
     },
     function: async (args: {
+      userEmail?: string;
       startTime: string;
       endTime: string;
       participants?: string;
     }): Promise<StandardActionResult<any>> => {
-      const { startTime, endTime, participants } = args;
+      const { userEmail, startTime, endTime, participants } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -864,6 +929,7 @@ export const createNylasActions = (
             participants
               ? participants.split(',').map((e) => e.trim())
               : undefined,
+            userEmail,
           );
 
           // Format response
@@ -957,7 +1023,7 @@ export const createNylasActions = (
   // Move event (convenience wrapper)
   nylasMoveEvent: {
     description:
-      'Move a calendar event to a new time. Optionally checks for conflicts before moving.',
+      'Move a calendar event to a new time. Optionally checks for conflicts before moving. Specify userEmail to access a specific user\'s calendar.',
     strict: true,
     parameters: {
       type: 'object',
@@ -965,6 +1031,10 @@ export const createNylasActions = (
         eventId: {
           type: 'string',
           description: 'The ID of the event to move',
+        },
+        userEmail: {
+          type: 'string',
+          description: 'Email of the team member whose calendar to access. If not provided, uses company default.',
         },
         newStartTime: {
           type: 'string',
@@ -985,11 +1055,12 @@ export const createNylasActions = (
     },
     function: async (args: {
       eventId: string;
+      userEmail?: string;
       newStartTime: string;
       newEndTime: string;
       checkConflicts?: boolean;
     }): Promise<StandardActionResult<any>> => {
-      const { eventId, newStartTime, newEndTime, checkConflicts = true } = args;
+      const { eventId, userEmail, newStartTime, newEndTime, checkConflicts = true } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -1015,6 +1086,8 @@ export const createNylasActions = (
               context.companyId!,
               startTimestamp,
               endTimestamp,
+              undefined,
+              userEmail,
             );
 
             if (conflictCheck.hasConflict) {
@@ -1048,6 +1121,7 @@ export const createNylasActions = (
             {
               startTime: newStartTime,
               endTime: newEndTime,
+              userEmail,
             },
           );
 
