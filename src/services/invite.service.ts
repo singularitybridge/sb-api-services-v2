@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { Invite, IInvite, InviteStatus, InviteSource } from '../models/Invite';
 import { User } from '../models/User';
 import { Company } from '../models/Company';
+import { InvitationEmailService, InviteData } from './invitation-email.service';
 
 export class InviteService {
   /**
@@ -90,6 +91,28 @@ export class InviteService {
         source: metadata?.source || InviteSource.DASHBOARD,
       },
     });
+
+    // Send invitation email (non-blocking)
+    try {
+      const inviteData: InviteData = {
+        _id: invite._id.toString(),
+        email: invite.email,
+        companyId: companyId,
+        invitedBy: invitedById,
+        inviteToken: invite.inviteToken,
+        expiresAt: invite.expiresAt,
+      };
+
+      await InvitationEmailService.sendInvitationEmail({
+        invite: inviteData,
+        inviterName: inviter.name,
+        companyName: company.name,
+        companyId: companyId,
+      });
+    } catch (emailError: any) {
+      // Log but don't fail the invite creation if email fails
+      console.error(`[invite] Failed to send invitation email: ${emailError.message}`);
+    }
 
     return invite;
   }
@@ -282,5 +305,79 @@ export class InviteService {
       remaining,
       resetAt,
     };
+  }
+
+  /**
+   * Resend invitation email
+   * @param inviteId - The invite ID to resend
+   * @param companyId - Company ID for authorization
+   * @param resenderId - User ID who is resending (for rate limiting)
+   */
+  static async resendInviteEmail(
+    inviteId: string,
+    companyId: string,
+    resenderId: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    const invite = await Invite.findById(inviteId);
+
+    if (!invite) {
+      throw new Error('Invite not found');
+    }
+
+    // Verify invite belongs to the company
+    if (invite.companyId.toString() !== companyId) {
+      throw new Error('Not authorized to resend this invite');
+    }
+
+    // Can only resend pending invites
+    if (invite.status !== InviteStatus.PENDING) {
+      throw new Error(`Cannot resend invite with status: ${invite.status}`);
+    }
+
+    // Check if invite has expired
+    if (invite.expiresAt < new Date()) {
+      throw new Error('Invite has expired');
+    }
+
+    // Check resend limit
+    if (invite.resendCount >= 3) {
+      throw new Error('Maximum resend limit reached for this invite');
+    }
+
+    // Get inviter and company info
+    const [inviter, company] = await Promise.all([
+      User.findById(resenderId),
+      Company.findById(companyId),
+    ]);
+
+    if (!inviter || !company) {
+      throw new Error('Inviter or company not found');
+    }
+
+    // Send the email
+    const inviteData: InviteData = {
+      _id: invite._id.toString(),
+      email: invite.email,
+      companyId: companyId,
+      invitedBy: resenderId,
+      inviteToken: invite.inviteToken,
+      expiresAt: invite.expiresAt,
+    };
+
+    const result = await InvitationEmailService.resendInvitationEmail({
+      invite: inviteData,
+      inviterName: inviter.name,
+      companyName: company.name,
+      companyId: companyId,
+    });
+
+    if (result.success) {
+      // Update resend count
+      invite.resendCount += 1;
+      invite.lastResendAt = new Date();
+      await invite.save();
+    }
+
+    return result;
   }
 }

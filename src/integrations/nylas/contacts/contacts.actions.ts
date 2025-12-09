@@ -49,11 +49,15 @@ export const createContactActions = (
   // Get contacts
   nylasGetContacts: {
     description:
-      'Retrieve contacts from Google Contacts. Optionally filter by email address.',
+      'Retrieve contacts from a team member\'s Google Contacts. Specify userEmail to access a specific user\'s contacts.',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
+        userEmail: {
+          type: 'string',
+          description: 'Email of the team member whose contacts to access. If not provided, uses company default.',
+        },
         limit: {
           type: 'number',
           description: 'Maximum number of contacts to return (default: 50)',
@@ -67,10 +71,11 @@ export const createContactActions = (
       additionalProperties: false,
     },
     function: async (args: {
+      userEmail?: string;
       limit?: number;
       email?: string;
     }): Promise<StandardActionResult<ContactData[]>> => {
-      const { limit = 50, email } = args;
+      const { userEmail, limit = 50, email } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -85,6 +90,7 @@ export const createContactActions = (
           const contacts = await getContactsService(context.companyId!, {
             limit,
             email,
+            userEmail,
           });
           return {
             success: true,
@@ -107,14 +113,18 @@ export const createContactActions = (
   // Create contact
   nylasCreateContact: {
     description:
-      'Create a new contact in Google Contacts with name, email, phone, company, and notes.',
+      'Create a new contact in Google Contacts with name, email, phone, company, and notes. Specify userEmail to create in a specific user\'s contacts.',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
+        userEmail: {
+          type: 'string',
+          description: 'Email of the team member whose contacts to add to. If not provided, uses company default.',
+        },
         email: {
           type: 'string',
-          description: 'Email address (required)',
+          description: 'Email address of the contact (required)',
         },
         givenName: {
           type: 'string',
@@ -141,6 +151,7 @@ export const createContactActions = (
       additionalProperties: false,
     },
     function: async (args: {
+      userEmail?: string;
       email: string;
       givenName?: string;
       surname?: string;
@@ -148,7 +159,7 @@ export const createContactActions = (
       companyName?: string;
       notes?: string;
     }): Promise<StandardActionResult<ContactData>> => {
-      const { email, givenName, surname, phone, companyName, notes } = args;
+      const { userEmail, email, givenName, surname, phone, companyName, notes } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -169,6 +180,7 @@ export const createContactActions = (
             phone,
             companyName,
             notes,
+            userEmail,
           });
           return {
             success: true,
@@ -191,11 +203,15 @@ export const createContactActions = (
   // Update contact
   nylasUpdateContact: {
     description:
-      'Update an existing contact in Google Contacts. All fields except contactId are optional.',
+      'Update an existing contact in Google Contacts. Specify userEmail to update in a specific user\'s contacts. All fields except contactId are optional.',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
+        userEmail: {
+          type: 'string',
+          description: 'Email of the team member whose contacts to update. If not provided, uses company default.',
+        },
         contactId: {
           type: 'string',
           description: 'The ID of the contact to update (required)',
@@ -229,6 +245,7 @@ export const createContactActions = (
       additionalProperties: false,
     },
     function: async (args: {
+      userEmail?: string;
       contactId: string;
       email?: string;
       givenName?: string;
@@ -238,6 +255,7 @@ export const createContactActions = (
       notes?: string;
     }): Promise<StandardActionResult<ContactData>> => {
       const {
+        userEmail,
         contactId,
         email,
         givenName,
@@ -275,6 +293,7 @@ export const createContactActions = (
               phone,
               companyName,
               notes,
+              userEmail,
             },
           );
           return {

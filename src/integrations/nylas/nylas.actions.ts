@@ -9,7 +9,6 @@ import {
   sendEmail as sendEmailService,
   getCalendarEvents as getCalendarEventsService,
   createCalendarEvent as createCalendarEventService,
-  getGrants as getGrantsService,
   // Advanced calendar management
   getEventById as getEventByIdService,
   updateCalendarEvent as updateCalendarEventService,
@@ -24,6 +23,17 @@ import { executeAction } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
 
 const SERVICE_NAME = 'nylasService';
+
+// Helper to provide current date context to the AI
+const getCurrentDateContext = () => {
+  const now = new Date();
+  return `Today is ${now.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })} (${now.toISOString().split('T')[0]}). Current time: ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}.`;
+};
 
 // Response interfaces
 interface EmailData {
@@ -47,12 +57,6 @@ interface EventData {
   participants?: { email: string }[];
 }
 
-interface GrantData {
-  id: string;
-  provider: string;
-  email: string;
-}
-
 interface ServiceCallLambdaResponse<T> {
   success: boolean;
   data: T;
@@ -65,7 +69,7 @@ export const createNylasActions = (
   // Get emails
   nylasGetEmails: {
     description:
-      'Retrieve emails from a team member\'s connected email account. Specify userEmail to access a specific user\'s mailbox.',
+      `Retrieve emails from a team member's connected email account. Specify userEmail to access a specific user's mailbox. ${getCurrentDateContext()}`,
     strict: true,
     parameters: {
       type: 'object',
@@ -276,7 +280,7 @@ export const createNylasActions = (
   // Get calendar events
   nylasGetCalendarEvents: {
     description:
-      'Retrieve calendar events from a team member\'s connected calendar. Specify userEmail to access a specific user\'s calendar.',
+      `Retrieve calendar events from a team member's connected calendar. Specify userEmail to access a specific user's calendar. ${getCurrentDateContext()}`,
     strict: true,
     parameters: {
       type: 'object',
@@ -433,32 +437,6 @@ export const createNylasActions = (
               participants: event.participants,
             },
           };
-        },
-        { serviceName: SERVICE_NAME },
-      );
-    },
-  },
-
-  // Get connected grants (accounts)
-  nylasGetGrants: {
-    description: 'Get list of connected email/calendar accounts (grants).',
-    strict: true,
-    parameters: {
-      type: 'object',
-      properties: {},
-      required: [],
-      additionalProperties: false,
-    },
-    function: async (): Promise<StandardActionResult<GrantData[]>> => {
-      if (!context.companyId) {
-        throw new ActionValidationError('Company ID is missing from context.');
-      }
-
-      return executeAction<GrantData[], ServiceCallLambdaResponse<GrantData[]>>(
-        'nylasGetGrants',
-        async () => {
-          const grants = await getGrantsService(context.companyId!);
-          return { success: true, data: grants };
         },
         { serviceName: SERVICE_NAME },
       );
@@ -684,7 +662,7 @@ export const createNylasActions = (
   // Find available time slots
   nylasFindAvailableSlots: {
     description:
-      'Intelligently find available time slots for a meeting. Returns ranked slots based on optimal scheduling (morning priority, good spacing, mid-week preference). Specify userEmail to check a specific user\'s calendar.',
+      `Intelligently find available time slots for a meeting. Returns ranked slots based on optimal scheduling (morning priority, good spacing, mid-week preference). Specify userEmail to check a specific user's calendar. ${getCurrentDateContext()}`,
     strict: true,
     parameters: {
       type: 'object',
@@ -799,7 +777,7 @@ export const createNylasActions = (
   // Get free/busy information
   nylasGetFreeBusy: {
     description:
-      'Check availability for one or more participants during a specific time range. Returns busy/free time slots. Specify userEmail to use a specific user\'s calendar context.',
+      `Check availability for one or more participants during a specific time range. Returns busy/free time slots. Specify userEmail to use a specific user's calendar context. ${getCurrentDateContext()}`,
     strict: true,
     parameters: {
       type: 'object',
@@ -877,7 +855,7 @@ export const createNylasActions = (
   // Check for conflicts
   nylasCheckConflicts: {
     description:
-      'Check if a proposed meeting time conflicts with existing events. Suggests alternative times if conflicts are found. Specify userEmail to check a specific user\'s calendar.',
+      `Check if a proposed meeting time conflicts with existing events. Suggests alternative times if conflicts are found. Specify userEmail to check a specific user's calendar. ${getCurrentDateContext()}`,
     strict: true,
     parameters: {
       type: 'object',

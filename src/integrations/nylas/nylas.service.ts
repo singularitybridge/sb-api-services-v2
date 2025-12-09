@@ -1,38 +1,18 @@
+/**
+ * Nylas Service - V3 Microservice Proxy
+ *
+ * All operations are proxied through the V3 GCP microservice
+ * which handles direct Nylas API communication.
+ */
+
 import axios from 'axios';
 import { getApiKey } from '../../services/api.key.service';
 
-const NYLAS_API_URL = 'https://api.us.nylas.com';
 const V3_SERVICE_URL = process.env.NYLAS_V3_SERVICE_URL || 'https://sb-api-services-v3-53926697384.us-central1.run.app';
 
-/**
- * Resolve grant ID for a specific user email by calling V3 microservice
- * Falls back to company default if user email not provided or not found
- */
-async function resolveGrantId(companyId: string, userEmail?: string): Promise<string> {
-  // If userEmail provided, try to get user-specific grant from V3
-  if (userEmail) {
-    try {
-      const response = await axios.get(`${V3_SERVICE_URL}/api/v1/nylas/grants/by-email`, {
-        params: { email: userEmail.toLowerCase() },
-        timeout: 5000,
-      });
-
-      if (response.data?.grantId) {
-        console.log(`[nylas-service] Resolved grant for ${userEmail}: ${response.data.grantId.substring(0, 8)}...`);
-        return response.data.grantId;
-      }
-    } catch (error: any) {
-      console.warn(`[nylas-service] Could not resolve grant for ${userEmail}, falling back to company default:`, error.message);
-    }
-  }
-
-  // Fall back to company default grant
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
-  return grantId;
-}
+// ==========================================
+// Interfaces
+// ==========================================
 
 interface NylasEmailRecipient {
   email: string;
@@ -71,107 +51,109 @@ interface NylasEvent {
   participants?: NylasEmailRecipient[];
 }
 
-interface NylasGrant {
-  id: string;
-  provider: string;
-  email: string;
-}
+// ==========================================
+// Helper Functions
+// ==========================================
 
-async function makeNylasRequest<T>(
-  apiKey: string,
-  endpoint: string,
-  options: {
-    method?: string;
-    body?: any;
-  } = {},
-): Promise<T> {
-  const url = `${NYLAS_API_URL}${endpoint}`;
-  const { method = 'GET', body } = options;
+/**
+ * Resolve grant ID for a specific user email by calling V3 microservice
+ * Falls back to company default, then to V3's default grant
+ */
+async function resolveGrantId(companyId: string, userEmail?: string): Promise<string> {
+  // If userEmail provided, try to get user-specific grant from V3
+  if (userEmail) {
+    try {
+      const response = await axios.get(`${V3_SERVICE_URL}/api/v1/nylas/grants/by-email`, {
+        params: { email: userEmail.toLowerCase() },
+        timeout: 15000, // Increased for Cloud Run cold start
+      });
 
-  try {
-    const response = await axios({
-      url,
-      method,
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      data: body,
-    });
-
-    return response.data;
-  } catch (error: any) {
-    const status = error.response?.status;
-    const errorData = error.response?.data;
-
-    let errorMessage = `Nylas API request failed: ${status || error.message}`;
-
-    if (errorData?.error) {
-      errorMessage =
-        typeof errorData.error === 'string'
-          ? errorData.error
-          : JSON.stringify(errorData.error);
-    } else if (errorData?.message) {
-      errorMessage = errorData.message;
-    } else if (errorData?.error_description) {
-      errorMessage = errorData.error_description;
+      if (response.data?.grantId) {
+        console.log(`[nylas-service] Resolved grant for ${userEmail}: ${response.data.grantId.substring(0, 8)}...`);
+        return response.data.grantId;
+      }
+    } catch (error: any) {
+      console.warn(`[nylas-service] Could not resolve grant for ${userEmail}, falling back to company default:`, error.message);
     }
-
-    console.error('Nylas API Error:', {
-      status,
-      url,
-      error: errorData,
-    });
-
-    throw new Error(errorMessage);
   }
+
+  // Try company default grant
+  const companyGrantId = await getApiKey(companyId, 'nylas_grant_id');
+  if (companyGrantId) {
+    console.log(`[nylas-service] Using company default grant: ${companyGrantId.substring(0, 8)}...`);
+    return companyGrantId;
+  }
+
+  // Fall back to V3's default grant (NYLAS_GRANT_ID secret)
+  // This calls V3 without a grantId, which will use V3's env default
+  console.log('[nylas-service] No company grant found, using V3 default grant');
+
+  // V3 will use its default grant when grantId is not provided
+  // Return empty string to indicate "use V3 default"
+  return '';
 }
 
-// Email functions
+// ==========================================
+// Email Functions
+// ==========================================
+
+/**
+ * Get emails via V3 microservice
+ */
 export async function getEmails(
   companyId: string,
   options: { limit?: number; unread?: boolean; userEmail?: string } = {},
 ): Promise<NylasEmail[]> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-
   const { limit = 10, unread, userEmail } = options;
   const grantId = await resolveGrantId(companyId, userEmail);
-  let endpoint = `/v3/grants/${grantId}/messages?limit=${limit}`;
 
-  if (unread) {
-    endpoint += '&unread=true';
+  console.log('[NYLAS] Getting emails via V3:', { limit, unread, grantId: grantId.substring(0, 8) + '...' });
+
+  try {
+    const response = await axios.get(`${V3_SERVICE_URL}/api/v1/nylas/email/messages`, {
+      params: {
+        grantId,
+        limit,
+        ...(unread !== undefined && { unread }),
+      },
+      timeout: 15000,
+    });
+
+    return response.data?.data || [];
+  } catch (error: any) {
+    console.error('[NYLAS ERROR] getEmails:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || error.message || 'Failed to get emails');
   }
-
-  const response = await makeNylasRequest<{ data: NylasEmail[] }>(
-    apiKey,
-    endpoint,
-  );
-  return response.data || [];
 }
 
+/**
+ * Get single email by ID via V3 microservice
+ */
 export async function getEmailById(
   companyId: string,
   messageId: string,
   userEmail?: string,
 ): Promise<NylasEmail> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-
   const grantId = await resolveGrantId(companyId, userEmail);
-  const endpoint = `/v3/grants/${grantId}/messages/${messageId}`;
-  const response = await makeNylasRequest<{ data: NylasEmail } | NylasEmail>(
-    apiKey,
-    endpoint,
-  );
-  return 'data' in response ? response.data : response;
+
+  console.log('[NYLAS] Getting email by ID via V3:', { messageId, grantId: grantId.substring(0, 8) + '...' });
+
+  try {
+    const response = await axios.get(`${V3_SERVICE_URL}/api/v1/nylas/email/messages/${messageId}`, {
+      params: { grantId },
+      timeout: 10000,
+    });
+
+    return response.data?.data || response.data;
+  } catch (error: any) {
+    console.error('[NYLAS ERROR] getEmailById:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || error.message || 'Failed to get email');
+  }
 }
 
+/**
+ * Send email via V3 microservice
+ */
 export async function sendEmail(
   companyId: string,
   params: {
@@ -183,92 +165,85 @@ export async function sendEmail(
     userEmail?: string;
   },
 ): Promise<{ id: string; thread_id: string }> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-
   const { to, subject, body, cc, bcc, userEmail } = params;
   const grantId = await resolveGrantId(companyId, userEmail);
-  const endpoint = `/v3/grants/${grantId}/messages/send`;
 
-  const payload: any = {
-    to: Array.isArray(to) ? to.map((email) => ({ email })) : [{ email: to }],
-    subject,
-    body,
-  };
+  console.log('[NYLAS] Sending email via V3:', { to, subject, grantId: grantId.substring(0, 8) + '...' });
 
-  if (cc) {
-    payload.cc = Array.isArray(cc)
-      ? cc.map((email) => ({ email }))
-      : [{ email: cc }];
+  // Format recipients
+  const toRecipients = Array.isArray(to) ? to.map((email) => ({ email })) : [{ email: to }];
+  const ccRecipients = cc ? (Array.isArray(cc) ? cc.map((email) => ({ email })) : [{ email: cc }]) : undefined;
+  const bccRecipients = bcc ? (Array.isArray(bcc) ? bcc.map((email) => ({ email })) : [{ email: bcc }]) : undefined;
+
+  try {
+    const response = await axios.post(`${V3_SERVICE_URL}/api/v1/nylas/email/messages/send`, {
+      grantId,
+      to: toRecipients,
+      subject,
+      body,
+      cc: ccRecipients,
+      bcc: bccRecipients,
+    }, {
+      timeout: 30000,
+    });
+
+    return response.data?.data || response.data;
+  } catch (error: any) {
+    console.error('[NYLAS ERROR] sendEmail:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || error.message || 'Failed to send email');
   }
-
-  if (bcc) {
-    payload.bcc = Array.isArray(bcc)
-      ? bcc.map((email) => ({ email }))
-      : [{ email: bcc }];
-  }
-
-  return await makeNylasRequest(apiKey, endpoint, {
-    method: 'POST',
-    body: payload,
-  });
 }
 
-// Calendar functions
+// ==========================================
+// Calendar Functions
+// ==========================================
+
+/**
+ * Get calendars via V3 microservice
+ */
 export async function getCalendars(
   companyId: string,
   userEmail?: string,
 ): Promise<NylasCalendar[]> {
-  console.log('[NYLAS DEBUG] getCalendars called for company:', companyId, 'userEmail:', userEmail || 'default');
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-
   const grantId = await resolveGrantId(companyId, userEmail);
-  console.log(
-    '[NYLAS DEBUG] API Key:',
-    apiKey ? `${apiKey.substring(0, 15)}...` : 'NULL',
-  );
-  console.log(
-    '[NYLAS DEBUG] Grant ID:',
-    grantId ? `${grantId.substring(0, 15)}...` : 'NULL',
-  );
 
-  const endpoint = `/v3/grants/${grantId}/calendars`;
-  console.log('[NYLAS DEBUG] Calling:', endpoint);
-  const response = await makeNylasRequest<{ data: NylasCalendar[] }>(
-    apiKey,
-    endpoint,
-  );
-  console.log('[NYLAS DEBUG] Got calendars:', response.data?.length || 0);
-  return response.data || [];
+  console.log('[NYLAS DEBUG] getCalendars via V3:', { grantId: grantId.substring(0, 8) + '...' });
+
+  try {
+    const response = await axios.get(`${V3_SERVICE_URL}/api/v1/nylas/calendar/calendars`, {
+      params: { grantId },
+      timeout: 10000,
+    });
+
+    const calendars = response.data?.data || [];
+    console.log('[NYLAS DEBUG] Got calendars:', calendars.length);
+    return calendars;
+  } catch (error: any) {
+    console.error('[NYLAS ERROR] getCalendars:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || error.message || 'Failed to get calendars');
+  }
 }
 
+/**
+ * Get calendar events via V3 microservice
+ */
 export async function getCalendarEvents(
   companyId: string,
-  options: { start?: number; end?: number; limit?: number; userEmail?: string } = {},
+  options: { start?: number; end?: number; limit?: number; userEmail?: string; calendarId?: string } = {},
 ): Promise<NylasEvent[]> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-
-  const { userEmail } = options;
+  const { userEmail, calendarId: providedCalendarId } = options;
   const grantId = await resolveGrantId(companyId, userEmail);
 
-  // First, get the primary calendar
-  const calendars = await getCalendars(companyId, userEmail);
-
-  if (calendars.length === 0) {
-    return [];
+  // Get calendar ID if not provided
+  let calendarId = providedCalendarId;
+  if (!calendarId) {
+    const calendars = await getCalendars(companyId, userEmail);
+    if (calendars.length === 0) {
+      return [];
+    }
+    const primaryCalendar = calendars.find((cal) => cal.is_primary) || calendars[0];
+    calendarId = primaryCalendar.id;
   }
-
-  // Use the primary calendar or the first calendar
-  const primaryCalendar =
-    calendars.find((cal) => cal.is_primary) || calendars[0];
 
   const { limit = 20, start: startOpt, end: endOpt } = options;
   let start = startOpt;
@@ -283,45 +258,43 @@ export async function getCalendarEvents(
     end = thirtyDaysLater;
   }
 
-  let endpoint = `/v3/grants/${grantId}/events?calendar_id=${primaryCalendar.id}&limit=${limit}`;
+  console.log('[NYLAS DEBUG] getCalendarEvents via V3:', { start, end, limit, calendarId });
 
-  if (start) {
-    endpoint += `&start=${start}`;
-  }
-
-  if (end) {
-    endpoint += `&end=${end}`;
-  }
-
-  const response = await makeNylasRequest<{ data: NylasEvent[] }>(
-    apiKey,
-    endpoint,
-  );
-
-  console.log('[NYLAS DEBUG] getCalendarEvents query:', {
-    start,
-    end,
-    limit,
-    calendar: primaryCalendar.id,
-  });
-  console.log(
-    '[NYLAS DEBUG] getCalendarEvents returned:',
-    response.data?.length || 0,
-    'events',
-  );
-  if (response.data && response.data.length > 0) {
-    console.log('[NYLAS DEBUG] First 3 events:');
-    response.data.slice(0, 3).forEach((event, i) => {
-      const startTime = event.when?.start_time
-        ? new Date(event.when.start_time * 1000).toISOString()
-        : 'NO TIME';
-      console.log(`[NYLAS DEBUG]   ${i + 1}. "${event.title}" at ${startTime}`);
+  try {
+    const response = await axios.get(`${V3_SERVICE_URL}/api/v1/nylas/calendar/events`, {
+      params: {
+        grantId,
+        calendarId,
+        limit,
+        start,
+        end,
+      },
+      timeout: 15000,
     });
-  }
 
-  return response.data || [];
+    const events = response.data?.data || [];
+    console.log('[NYLAS DEBUG] getCalendarEvents returned:', events.length, 'events');
+
+    if (events.length > 0) {
+      console.log('[NYLAS DEBUG] First 3 events:');
+      events.slice(0, 3).forEach((event: NylasEvent, i: number) => {
+        const startTime = event.when?.start_time
+          ? new Date(event.when.start_time * 1000).toISOString()
+          : 'NO TIME';
+        console.log(`[NYLAS DEBUG]   ${i + 1}. "${event.title}" at ${startTime}`);
+      });
+    }
+
+    return events;
+  } catch (error: any) {
+    console.error('[NYLAS ERROR] getCalendarEvents:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || error.message || 'Failed to get calendar events');
+  }
 }
 
+/**
+ * Create calendar event via V3 microservice
+ */
 export async function createCalendarEvent(
   companyId: string,
   params: {
@@ -334,157 +307,95 @@ export async function createCalendarEvent(
     userEmail?: string;
   },
 ): Promise<NylasEvent> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-
   const { userEmail } = params;
   const grantId = await resolveGrantId(companyId, userEmail);
 
-  // First, get the primary calendar
+  // Get primary calendar
   const calendars = await getCalendars(companyId, userEmail);
-
   if (calendars.length === 0) {
     throw new Error('No calendars found for this account');
   }
+  const primaryCalendar = calendars.find((cal) => cal.is_primary) || calendars[0];
 
-  // Use the primary calendar or the first calendar
-  const primaryCalendar =
-    calendars.find((cal) => cal.is_primary) || calendars[0];
-
-  const { title, description, startTime, endTime, participants, location } =
-    params;
-  const endpoint = `/v3/grants/${grantId}/events?calendar_id=${primaryCalendar.id}`;
+  const { title, description, startTime, endTime, participants, location } = params;
 
   // Convert timestamps to Unix timestamps if they're in ISO format
-  const startTimestamp =
-    typeof startTime === 'string'
-      ? Math.floor(new Date(startTime).getTime() / 1000)
-      : startTime;
-  const endTimestamp =
-    typeof endTime === 'string'
-      ? Math.floor(new Date(endTime).getTime() / 1000)
-      : endTime;
+  const startTimestamp = typeof startTime === 'string'
+    ? Math.floor(new Date(startTime).getTime() / 1000)
+    : startTime;
+  const endTimestamp = typeof endTime === 'string'
+    ? Math.floor(new Date(endTime).getTime() / 1000)
+    : endTime;
 
-  const payload: any = {
-    title,
-    when: {
-      start_time: startTimestamp,
-      end_time: endTimestamp,
-    },
-  };
-
-  if (description) {
-    payload.description = description;
-  }
-
-  if (location) {
-    payload.location = location;
-  }
-
-  if (participants && participants.length > 0) {
-    payload.participants = participants.map((email) => ({
-      email: typeof email === 'string' ? email : email,
-      status: 'noreply',
-    }));
-  }
-
-  console.log('[NYLAS DEBUG] Creating event:', {
+  console.log('[NYLAS DEBUG] Creating event via V3:', {
     title,
     calendar: primaryCalendar.id,
     start: startTimestamp,
     end: endTimestamp,
   });
-  const response = await makeNylasRequest<{ data: NylasEvent } | NylasEvent>(
-    apiKey,
-    endpoint,
-    {
-      method: 'POST',
-      body: payload,
-    },
-  );
-  const eventData = 'data' in response ? response.data : response;
-  console.log(
-    '[NYLAS DEBUG] Event created:',
-    eventData?.id || 'NO ID',
-    'title:',
-    eventData?.title || 'NO TITLE',
-  );
-  return eventData;
-}
 
-// Get list of connected grants (accounts)
-export async function getGrants(companyId: string): Promise<NylasGrant[]> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-
-  const endpoint = '/v3/grants';
-  const response = await makeNylasRequest<{ data: NylasGrant[] }>(
-    apiKey,
-    endpoint,
-  );
-  return response.data || [];
-}
-
-/**
- * Verify Nylas API key and grant ID by making a minimal test request
- */
-export async function verifyNylasKeys(
-  apiKey: string,
-  grantId: string,
-): Promise<boolean> {
   try {
-    // Make a minimal request to verify the key
-    await axios.get(`${NYLAS_API_URL}/v3/grants/${grantId}/messages?limit=1`, {
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+    const response = await axios.post(`${V3_SERVICE_URL}/api/v1/nylas/calendar/events`, {
+      grantId,
+      calendarId: primaryCalendar.id,
+      title,
+      description,
+      when: {
+        startTime: startTimestamp,
+        endTime: endTimestamp,
       },
+      location,
+      participants: participants?.map((email) => ({
+        email: typeof email === 'string' ? email : email,
+        status: 'noreply',
+      })),
+    }, {
+      timeout: 15000,
     });
-    return true;
+
+    const eventData = response.data?.data || response.data;
+    console.log('[NYLAS DEBUG] Event created:', eventData?.id || 'NO ID', 'title:', eventData?.title || 'NO TITLE');
+    return eventData;
   } catch (error: any) {
-    // 401 or 403 means invalid/unauthorized key
-    const status = error.response?.status;
-    if (status === 401 || status === 403) {
-      return false;
-    }
-    console.error('Nylas key verification error:', error.message, status);
-    return false;
+    console.error('[NYLAS ERROR] createCalendarEvent:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || error.message || 'Failed to create calendar event');
   }
 }
 
-// ==========================================
-// ADVANCED CALENDAR MANAGEMENT
-// ==========================================
-
 /**
- * Get a specific calendar event by ID
+ * Get a specific calendar event by ID via V3 microservice
  */
 export async function getEventById(
   companyId: string,
   eventId: string,
   userEmail?: string,
 ): Promise<NylasEvent> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-
   const grantId = await resolveGrantId(companyId, userEmail);
-  const endpoint = `/v3/grants/${grantId}/events/${eventId}`;
-  const response = await makeNylasRequest<{ data: NylasEvent } | NylasEvent>(
-    apiKey,
-    endpoint,
-  );
-  return 'data' in response ? response.data : response;
+
+  // Get primary calendar for the query
+  const calendars = await getCalendars(companyId, userEmail);
+  const primaryCalendar = calendars.find((cal) => cal.is_primary) || calendars[0];
+
+  console.log('[NYLAS] Getting event by ID via V3:', { eventId, grantId: grantId.substring(0, 8) + '...' });
+
+  try {
+    const response = await axios.get(`${V3_SERVICE_URL}/api/v1/nylas/calendar/events/${eventId}`, {
+      params: {
+        grantId,
+        calendarId: primaryCalendar?.id,
+      },
+      timeout: 10000,
+    });
+
+    return response.data?.data || response.data;
+  } catch (error: any) {
+    console.error('[NYLAS ERROR] getEventById:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || error.message || 'Failed to get event');
+  }
 }
 
 /**
- * Update an existing calendar event
+ * Update an existing calendar event via V3 microservice
  */
 export async function updateCalendarEvent(
   companyId: string,
@@ -499,101 +410,87 @@ export async function updateCalendarEvent(
     userEmail?: string;
   },
 ): Promise<NylasEvent> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-
   const { userEmail } = params;
   const grantId = await resolveGrantId(companyId, userEmail);
 
-  // Get the event first to determine calendar ID
-  const existingEvent = await getEventById(companyId, eventId, userEmail);
+  // Get primary calendar
   const calendars = await getCalendars(companyId, userEmail);
-  const primaryCalendar =
-    calendars.find((cal) => cal.is_primary) || calendars[0];
+  const primaryCalendar = calendars.find((cal) => cal.is_primary) || calendars[0];
 
-  const endpoint = `/v3/grants/${grantId}/events/${eventId}?calendar_id=${primaryCalendar.id}`;
+  const { title, description, startTime, endTime, participants, location } = params;
 
-  const { title, description, startTime, endTime, participants, location } =
-    params;
-  const payload: any = {};
+  const updatePayload: any = { grantId, calendarId: primaryCalendar?.id };
 
-  // Only include fields that are being updated
-  if (title !== undefined) {
-    payload.title = title;
-  }
-
-  if (description !== undefined) {
-    payload.description = description;
-  }
-
-  if (location !== undefined) {
-    payload.location = location;
-  }
+  if (title !== undefined) updatePayload.title = title;
+  if (description !== undefined) updatePayload.description = description;
+  if (location !== undefined) updatePayload.location = location;
 
   if (startTime !== undefined && endTime !== undefined) {
-    const startTimestamp =
-      typeof startTime === 'string'
-        ? Math.floor(new Date(startTime).getTime() / 1000)
-        : startTime;
-    const endTimestamp =
-      typeof endTime === 'string'
-        ? Math.floor(new Date(endTime).getTime() / 1000)
-        : endTime;
-
-    payload.when = {
-      start_time: startTimestamp,
-      end_time: endTimestamp,
+    const startTimestamp = typeof startTime === 'string'
+      ? Math.floor(new Date(startTime).getTime() / 1000)
+      : startTime;
+    const endTimestamp = typeof endTime === 'string'
+      ? Math.floor(new Date(endTime).getTime() / 1000)
+      : endTime;
+    updatePayload.when = {
+      startTime: startTimestamp,
+      endTime: endTimestamp,
     };
   }
 
   if (participants !== undefined) {
-    payload.participants = participants.map((email) => ({
+    updatePayload.participants = participants.map((email) => ({
       email: typeof email === 'string' ? email : email,
       status: 'noreply',
     }));
   }
 
-  const response = await makeNylasRequest<{ data: NylasEvent } | NylasEvent>(
-    apiKey,
-    endpoint,
-    {
-      method: 'PUT',
-      body: payload,
-    },
-  );
-  return 'data' in response ? response.data : response;
+  console.log('[NYLAS] Updating event via V3:', { eventId, grantId: grantId.substring(0, 8) + '...' });
+
+  try {
+    const response = await axios.put(`${V3_SERVICE_URL}/api/v1/nylas/calendar/events/${eventId}`, updatePayload, {
+      timeout: 15000,
+    });
+
+    return response.data?.data || response.data;
+  } catch (error: any) {
+    console.error('[NYLAS ERROR] updateCalendarEvent:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || error.message || 'Failed to update calendar event');
+  }
 }
 
 /**
- * Delete a calendar event
+ * Delete a calendar event via V3 microservice
  */
 export async function deleteCalendarEvent(
   companyId: string,
   eventId: string,
   userEmail?: string,
 ): Promise<void> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-
   const grantId = await resolveGrantId(companyId, userEmail);
 
-  // Get calendars to find primary calendar ID
+  // Get primary calendar
   const calendars = await getCalendars(companyId, userEmail);
-  const primaryCalendar =
-    calendars.find((cal) => cal.is_primary) || calendars[0];
+  const primaryCalendar = calendars.find((cal) => cal.is_primary) || calendars[0];
 
-  const endpoint = `/v3/grants/${grantId}/events/${eventId}?calendar_id=${primaryCalendar.id}`;
-  await makeNylasRequest(apiKey, endpoint, {
-    method: 'DELETE',
-  });
+  console.log('[NYLAS] Deleting event via V3:', { eventId, grantId: grantId.substring(0, 8) + '...' });
+
+  try {
+    await axios.delete(`${V3_SERVICE_URL}/api/v1/nylas/calendar/events/${eventId}`, {
+      params: {
+        grantId,
+        calendarId: primaryCalendar?.id,
+      },
+      timeout: 10000,
+    });
+  } catch (error: any) {
+    console.error('[NYLAS ERROR] deleteCalendarEvent:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || error.message || 'Failed to delete calendar event');
+  }
 }
 
 // ==========================================
-// AVAILABILITY & SMART SCHEDULING
+// Availability & Scheduling
 // ==========================================
 
 interface FreeBusySlot {
@@ -610,12 +507,12 @@ interface FreeBusyData {
 interface AvailableSlot {
   start_time: number;
   end_time: number;
-  score: number; // Quality score (0-100)
-  reason: string; // Why this slot is good/bad
+  score: number;
+  reason: string;
 }
 
 /**
- * Get free/busy information for participants
+ * Get free/busy information via V3 microservice
  */
 export async function getFreeBusy(
   companyId: string,
@@ -624,44 +521,46 @@ export async function getFreeBusy(
   endTime: number,
   userEmail?: string,
 ): Promise<FreeBusyData[]> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-
   const grantId = await resolveGrantId(companyId, userEmail);
-  const endpoint = `/v3/grants/${grantId}/calendars/free-busy`;
-  const payload = {
-    emails: emails,
-    start_time: startTime,
-    end_time: endTime,
-  };
 
-  const response = await makeNylasRequest<any>(apiKey, endpoint, {
-    method: 'POST',
-    body: payload,
-  });
+  console.log('[NYLAS] Getting free/busy via V3:', { emails, startTime, endTime, grantId: grantId.substring(0, 8) + '...' });
 
-  // Transform response to our format
-  const freeBusyData: FreeBusyData[] = [];
-
-  for (const email of emails) {
-    const emailData = response[email] || [];
-    freeBusyData.push({
-      email,
-      timeSlots: emailData.map((slot: any) => ({
-        start_time: slot.start_time,
-        end_time: slot.end_time,
-        status: slot.status || 'free',
-      })),
+  try {
+    const response = await axios.post(`${V3_SERVICE_URL}/api/v1/nylas/calendar/free-busy`, {
+      grantId,
+      emails,
+      startTime,
+      endTime,
+    }, {
+      timeout: 15000,
     });
-  }
 
-  return freeBusyData;
+    // Transform response to our format
+    const responseData = response.data?.data || response.data;
+    const freeBusyData: FreeBusyData[] = [];
+
+    for (const email of emails) {
+      const emailData = responseData?.[email] || [];
+      freeBusyData.push({
+        email,
+        timeSlots: emailData.map((slot: any) => ({
+          start_time: slot.start_time,
+          end_time: slot.end_time,
+          status: slot.status || 'free',
+        })),
+      });
+    }
+
+    return freeBusyData;
+  } catch (error: any) {
+    console.error('[NYLAS ERROR] getFreeBusy:', error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || error.message || 'Failed to get free/busy information');
+  }
 }
 
 /**
  * Find available time slots with intelligent ranking
+ * This uses internal logic based on getCalendarEvents and getFreeBusy
  */
 export async function findAvailableSlots(
   companyId: string,
@@ -669,8 +568,8 @@ export async function findAvailableSlots(
     durationMinutes: number;
     dateRangeStart: number;
     dateRangeEnd: number;
-    preferredTimeStart?: string; // "09:00"
-    preferredTimeEnd?: string; // "17:00"
+    preferredTimeStart?: string;
+    preferredTimeEnd?: string;
     participants?: string[];
     bufferMinutes?: number;
     userEmail?: string;
@@ -686,13 +585,6 @@ export async function findAvailableSlots(
     bufferMinutes = 15,
     userEmail,
   } = params;
-
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
-  }
-
-  const grantId = await resolveGrantId(companyId, userEmail);
 
   // Get existing events in the range
   const events = await getCalendarEvents(companyId, {
@@ -713,7 +605,6 @@ export async function findAvailableSlots(
       userEmail,
     );
 
-    // Merge all busy slots from participants
     freeBusyData.forEach((data) => {
       participantBusySlots.push(
         ...data.timeSlots.filter((slot) => slot.status === 'busy'),
@@ -722,9 +613,7 @@ export async function findAvailableSlots(
   }
 
   // Parse preferred times
-  const [prefStartHour, prefStartMin] = preferredTimeStart
-    .split(':')
-    .map(Number);
+  const [prefStartHour, prefStartMin] = preferredTimeStart.split(':').map(Number);
   const [prefEndHour, prefEndMin] = preferredTimeEnd.split(':').map(Number);
 
   // Generate candidate slots
@@ -733,7 +622,7 @@ export async function findAvailableSlots(
   const bufferSeconds = bufferMinutes * 60;
 
   // Iterate through each day in the range
-  let currentDay = Math.floor(dateRangeStart / 86400) * 86400; // Start of day
+  let currentDay = Math.floor(dateRangeStart / 86400) * 86400;
   const endDay = Math.floor(dateRangeEnd / 86400) * 86400;
 
   while (currentDay <= endDay) {
@@ -741,11 +630,7 @@ export async function findAvailableSlots(
     const dayEnd = currentDay + prefEndHour * 3600 + prefEndMin * 60;
 
     // Try slots every 30 minutes within work hours
-    for (
-      let slotStart = dayStart;
-      slotStart + durationSeconds <= dayEnd;
-      slotStart += 1800
-    ) {
+    for (let slotStart = dayStart; slotStart + durationSeconds <= dayEnd; slotStart += 1800) {
       const slotEnd = slotStart + durationSeconds;
 
       // Check if this slot conflicts with existing events
@@ -761,15 +646,7 @@ export async function findAvailableSlots(
       });
 
       if (!hasConflict && !participantConflict) {
-        // Calculate quality score
-        const score = calculateSlotScore(
-          slotStart,
-          slotEnd,
-          events,
-          prefStartHour,
-          prefEndHour,
-        );
-
+        const score = calculateSlotScore(slotStart, slotEnd, events, prefStartHour, prefEndHour);
         candidateSlots.push({
           start_time: slotStart,
           end_time: slotEnd,
@@ -779,7 +656,7 @@ export async function findAvailableSlots(
       }
     }
 
-    currentDay += 86400; // Next day
+    currentDay += 86400;
   }
 
   // Sort by score (highest first) and return top 10
@@ -796,18 +673,18 @@ function calculateSlotScore(
   preferredStartHour: number,
   preferredEndHour: number,
 ): number {
-  let score = 50; // Base score
+  let score = 50;
 
   const slotDate = new Date(slotStart * 1000);
   const hour = slotDate.getUTCHours();
 
   // Time of day preference (max +30)
   if (hour >= 9 && hour < 12) {
-    score += 30; // Morning prime time
+    score += 30;
   } else if (hour >= 13 && hour < 15) {
-    score += 20; // Early afternoon
+    score += 20;
   } else if (hour >= 15 && hour < 17) {
-    score += 10; // Late afternoon
+    score += 10;
   }
 
   // Check spacing from other events (max +20)
@@ -825,20 +702,19 @@ function calculateSlotScore(
     }
   });
 
-  // Reward good spacing
   const minGap = Math.min(minGapBefore, minGapAfter);
   if (minGap > 3600) {
-    score += 20; // 1+ hour gap
+    score += 20;
   } else if (minGap > 1800) {
-    score += 10; // 30+ min gap
+    score += 10;
   }
 
   // Day of week preference (max +10)
   const dayOfWeek = slotDate.getUTCDay();
   if (dayOfWeek >= 1 && dayOfWeek <= 4) {
-    score += 10; // Tue-Thu preferred
+    score += 10;
   } else if (dayOfWeek === 5) {
-    score += 5; // Friday okay
+    score += 5;
   }
 
   return Math.min(100, Math.max(0, score));
@@ -878,7 +754,7 @@ function generateSlotReason(
 }
 
 // ==========================================
-// BATCH OPERATIONS
+// Batch Operations
 // ==========================================
 
 interface BatchEventCreate {
@@ -933,7 +809,7 @@ export async function createMultipleEvents(
 }
 
 // ==========================================
-// CONFLICT DETECTION
+// Conflict Detection
 // ==========================================
 
 interface ConflictCheck {
@@ -953,7 +829,7 @@ export async function checkEventConflicts(
   userEmail?: string,
 ): Promise<ConflictCheck> {
   // Get events in the proposed time range (with some buffer)
-  const bufferTime = 3600; // 1 hour buffer
+  const bufferTime = 3600;
   const events = await getCalendarEvents(companyId, {
     start: startTime - bufferTime,
     end: endTime + bufferTime,
@@ -963,9 +839,7 @@ export async function checkEventConflicts(
 
   // Check for direct conflicts
   const conflicts = events.filter((event) => {
-    return !(
-      endTime <= event.when.start_time || startTime >= event.when.end_time
-    );
+    return !(endTime <= event.when.start_time || startTime >= event.when.end_time);
   });
 
   const hasConflict = conflicts.length > 0;
@@ -974,9 +848,7 @@ export async function checkEventConflicts(
   let alternativeSlots: AvailableSlot[] | undefined;
 
   if (hasConflict) {
-    const duration = (endTime - startTime) / 60; // Convert to minutes
-
-    // Search for alternatives in the next 7 days
+    const duration = (endTime - startTime) / 60;
     const searchEnd = startTime + 7 * 86400;
 
     alternativeSlots = await findAvailableSlots(companyId, {

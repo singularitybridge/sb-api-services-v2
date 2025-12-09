@@ -1,13 +1,13 @@
 /**
  * Nylas Contact Management Service
  *
- * Provides CRUD operations for Google Contacts through Nylas API v3
+ * Proxies contact operations through V3 microservice
  */
 
 import axios from 'axios';
 import { getApiKey } from '../../../services/api.key.service';
 
-const NYLAS_API_URL = 'https://api.us.nylas.com';
+const V3_SERVICE_URL = process.env.NYLAS_V3_SERVICE_URL || 'https://sb-api-services-v3-53926697384.us-central1.run.app';
 
 // ==========================================
 // Interfaces
@@ -34,53 +34,37 @@ export interface NylasContact {
 }
 
 // ==========================================
-// Utility Functions
+// Helper Functions
 // ==========================================
 
-async function makeNylasRequest<T>(
-  apiKey: string,
-  endpoint: string,
-  options: {
-    method?: string;
-    body?: any;
-  } = {},
-): Promise<T> {
-  const url = `${NYLAS_API_URL}${endpoint}`;
-  const { method = 'GET', body } = options;
+/**
+ * Resolve grant ID for a specific user email by calling V3 microservice
+ * Falls back to company default if user email not provided or not found
+ */
+async function resolveGrantId(companyId: string, userEmail?: string): Promise<string> {
+  // If userEmail provided, try to get user-specific grant from V3
+  if (userEmail) {
+    try {
+      const response = await axios.get(`${V3_SERVICE_URL}/api/v1/nylas/grants/by-email`, {
+        params: { email: userEmail.toLowerCase() },
+        timeout: 5000,
+      });
 
-  try {
-    const response = await axios({
-      url,
-      method,
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      data: body,
-    });
-
-    return response.data;
-  } catch (error: any) {
-    const status = error.response?.status;
-    const errorData = error.response?.data;
-
-    let errorMessage = `Nylas API request failed: ${status || error.message}`;
-
-    if (errorData?.error) {
-      errorMessage =
-        typeof errorData.error === 'string'
-          ? errorData.error
-          : JSON.stringify(errorData.error);
-    } else if (errorData?.message) {
-      errorMessage = errorData.message;
-    } else if (errorData?.error_description) {
-      errorMessage = errorData.error_description;
+      if (response.data?.grantId) {
+        console.log(`[contacts-service] Resolved grant for ${userEmail}: ${response.data.grantId.substring(0, 8)}...`);
+        return response.data.grantId;
+      }
+    } catch (error: any) {
+      console.warn(`[contacts-service] Could not resolve grant for ${userEmail}, falling back to company default:`, error.message);
     }
-
-    console.error(`[NYLAS CONTACTS ERROR] ${errorMessage}`);
-    throw new Error(errorMessage);
   }
+
+  // Fall back to company default grant
+  const grantId = await getApiKey(companyId, 'nylas_grant_id');
+  if (!grantId) {
+    throw new Error('Nylas Grant ID not found');
+  }
+  return grantId;
 }
 
 // ==========================================
@@ -88,44 +72,38 @@ async function makeNylasRequest<T>(
 // ==========================================
 
 /**
- * Get contacts from Nylas
+ * Get contacts via V3 microservice
  */
 export async function getContacts(
   companyId: string,
-  options: { limit?: number; email?: string } = {},
+  options: { limit?: number; email?: string; userEmail?: string } = {},
 ): Promise<NylasContact[]> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
+  const { limit = 50, email, userEmail } = options;
+  const grantId = await resolveGrantId(companyId, userEmail);
 
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
+  console.log('[NYLAS CONTACTS] Getting contacts via V3:', { limit, email, grantId: grantId.substring(0, 8) + '...' });
+
+  try {
+    const response = await axios.get(`${V3_SERVICE_URL}/api/v1/nylas/contacts`, {
+      params: {
+        grantId,
+        limit,
+        email,
+      },
+      timeout: 10000,
+    });
+
+    const contacts = response.data?.data || [];
+    console.log('[NYLAS CONTACTS] Got contacts:', contacts.length);
+    return contacts;
+  } catch (error: any) {
+    console.error('[NYLAS CONTACTS ERROR]', error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || error.message || 'Failed to get contacts');
   }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
-
-  const { limit = 50, email } = options;
-
-  let endpoint = `/v3/grants/${grantId}/contacts?limit=${limit}`;
-
-  if (email) {
-    endpoint += `&email=${encodeURIComponent(email)}`;
-  }
-
-  console.log('[NYLAS CONTACTS] Getting contacts:', { limit, email });
-
-  const response = await makeNylasRequest<{ data: NylasContact[] }>(
-    apiKey,
-    endpoint,
-  );
-
-  console.log('[NYLAS CONTACTS] Got contacts:', response.data?.length || 0);
-
-  return response.data || [];
 }
 
 /**
- * Create a new contact in Nylas
+ * Create a new contact via V3 microservice
  */
 export async function createContact(
   companyId: string,
@@ -136,61 +114,38 @@ export async function createContact(
     phone?: string;
     companyName?: string;
     notes?: string;
+    userEmail?: string;
   },
 ): Promise<NylasContact> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
+  const { userEmail, ...contactData } = contact;
+  const grantId = await resolveGrantId(companyId, userEmail);
 
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
+  console.log('[NYLAS CONTACTS] Creating contact via V3:', { email: contact.email, grantId: grantId.substring(0, 8) + '...' });
+
+  try {
+    const response = await axios.post(`${V3_SERVICE_URL}/api/v1/nylas/contacts`, {
+      grantId,
+      givenName: contactData.givenName,
+      surname: contactData.surname,
+      email: contactData.email,
+      phone: contactData.phone,
+      companyName: contactData.companyName,
+      notes: contactData.notes,
+    }, {
+      timeout: 10000,
+    });
+
+    const createdContact = response.data?.data || response.data;
+    console.log('[NYLAS CONTACTS] Contact created:', createdContact?.id);
+    return createdContact;
+  } catch (error: any) {
+    console.error('[NYLAS CONTACTS ERROR]', error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || error.message || 'Failed to create contact');
   }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
-
-  const payload: any = {
-    emails: [{ email: contact.email, type: 'work' }],
-  };
-
-  if (contact.givenName) {
-    payload.given_name = contact.givenName;
-  }
-
-  if (contact.surname) {
-    payload.surname = contact.surname;
-  }
-
-  if (contact.phone) {
-    payload.phone_numbers = [{ number: contact.phone, type: 'work' }];
-  }
-
-  if (contact.companyName) {
-    payload.company_name = contact.companyName;
-  }
-
-  if (contact.notes) {
-    payload.notes = contact.notes;
-  }
-
-  console.log('[NYLAS CONTACTS] Creating contact:', payload);
-
-  const endpoint = `/v3/grants/${grantId}/contacts`;
-  const response = await makeNylasRequest<
-    { data: NylasContact } | NylasContact
-  >(apiKey, endpoint, {
-    method: 'POST',
-    body: payload,
-  });
-
-  const contactData = 'data' in response ? response.data : response;
-
-  console.log('[NYLAS CONTACTS] Contact created:', contactData.id);
-
-  return contactData;
 }
 
 /**
- * Update an existing contact
+ * Update an existing contact via V3 microservice
  */
 export async function updateContact(
   companyId: string,
@@ -202,57 +157,27 @@ export async function updateContact(
     phone?: string;
     companyName?: string;
     notes?: string;
+    userEmail?: string;
   },
 ): Promise<NylasContact> {
-  const apiKey = await getApiKey(companyId, 'nylas_api_key');
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
+  const { userEmail, ...updateData } = updates;
+  const grantId = await resolveGrantId(companyId, userEmail);
 
-  if (!apiKey) {
-    throw new Error('Nylas API key not found');
+  console.log('[NYLAS CONTACTS] Updating contact via V3:', { contactId, grantId: grantId.substring(0, 8) + '...' });
+
+  try {
+    const response = await axios.put(`${V3_SERVICE_URL}/api/v1/nylas/contacts/${contactId}`, {
+      grantId,
+      ...updateData,
+    }, {
+      timeout: 10000,
+    });
+
+    const updatedContact = response.data?.data || response.data;
+    console.log('[NYLAS CONTACTS] Contact updated:', updatedContact?.id);
+    return updatedContact;
+  } catch (error: any) {
+    console.error('[NYLAS CONTACTS ERROR]', error.response?.data || error.message);
+    throw new Error(error.response?.data?.error || error.message || 'Failed to update contact');
   }
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
-
-  const payload: any = {};
-
-  if (updates.givenName !== undefined) {
-    payload.given_name = updates.givenName;
-  }
-
-  if (updates.surname !== undefined) {
-    payload.surname = updates.surname;
-  }
-
-  if (updates.email !== undefined) {
-    payload.emails = [{ email: updates.email, type: 'work' }];
-  }
-
-  if (updates.phone !== undefined) {
-    payload.phone_numbers = [{ number: updates.phone, type: 'work' }];
-  }
-
-  if (updates.companyName !== undefined) {
-    payload.company_name = updates.companyName;
-  }
-
-  if (updates.notes !== undefined) {
-    payload.notes = updates.notes;
-  }
-
-  console.log('[NYLAS CONTACTS] Updating contact:', contactId, payload);
-
-  const endpoint = `/v3/grants/${grantId}/contacts/${contactId}`;
-  const response = await makeNylasRequest<
-    { data: NylasContact } | NylasContact
-  >(apiKey, endpoint, {
-    method: 'PUT',
-    body: payload,
-  });
-
-  const contactData = 'data' in response ? response.data : response;
-
-  console.log('[NYLAS CONTACTS] Contact updated:', contactData.id);
-
-  return contactData;
 }

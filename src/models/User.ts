@@ -1,5 +1,18 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
+/**
+ * Nylas grant information for per-user email/calendar access
+ */
+export interface INylasGrant {
+  grantId: string;
+  email: string;
+  provider: string;
+  status: 'active' | 'expired' | 'revoked';
+  scopes?: string[];
+  createdAt: Date;
+  expiresAt?: Date;
+}
+
 export interface IUser extends Document {
   name: string;
   googleId?: string;
@@ -7,6 +20,7 @@ export interface IUser extends Document {
   companyId: mongoose.Types.ObjectId;
   role: 'Admin' | 'CompanyUser';
   identifiers: { key: string; value: string }[];
+  nylasGrant?: INylasGrant;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,6 +41,19 @@ const UserSchema: Schema = new Schema(
       default: 'CompanyUser',
     },
     identifiers: [{ key: String, value: String }],
+    nylasGrant: {
+      grantId: { type: String },
+      email: { type: String },
+      provider: { type: String },
+      status: {
+        type: String,
+        enum: ['active', 'expired', 'revoked'],
+        default: 'active',
+      },
+      scopes: [{ type: String }],
+      createdAt: { type: Date },
+      expiresAt: { type: Date },
+    },
   },
   { timestamps: true },
 );
