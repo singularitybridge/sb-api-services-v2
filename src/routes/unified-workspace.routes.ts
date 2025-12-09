@@ -530,11 +530,13 @@ router.get('/get', async (req: AuthenticatedRequest, res: Response) => {
 /**
  * @route GET /api/workspace/list
  * @desc List all paths under a prefix
+ * @query withMetadata - Optional boolean to include metadata (timestamps, size, etc.)
  */
 router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const startTime = Date.now();
-    const { prefix, scope = 'company', agentId, teamId } = req.query;
+    const { prefix, scope = 'company', agentId, teamId, withMetadata } = req.query;
+    const includeMetadata = withMetadata === 'true';
 
     // Build scoped prefix based on scope
     let scopedPrefix = (prefix as string) || '';
@@ -578,28 +580,65 @@ router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
 
     const workspace = getWorkspaceService();
     const t2 = Date.now();
-    const paths = await workspace.list(scopedPrefix);
-    logger.debug(`Workspace list took ${Date.now() - t2}ms`);
 
-    // Strip the scope prefix from returned paths for cleaner display
-    const cleanPaths = paths.map((p) => {
-      if (scope === 'company')
-        return p.replace(`/company/${req.company._id}/`, '');
-      if (scope === 'session')
-        return p.replace(new RegExp(`^/session/[^/]+/`), '');
-      if (scope === 'agent') return p.replace(new RegExp(`^/agent/[^/]+/`), '');
-      if (scope === 'team') return p.replace(new RegExp(`^/team/[^/]+/`), '');
-      return p;
-    });
+    if (includeMetadata) {
+      // Use listWithMetadata to get timestamps
+      const items = await workspace.listWithMetadata(scopedPrefix);
+      logger.debug(`Workspace listWithMetadata took ${Date.now() - t2}ms`);
 
-    logger.debug(`Total list request took ${Date.now() - startTime}ms`);
-    res.json({
-      success: true,
-      scope: scope as string,
-      prefix: prefix || '/',
-      paths: cleanPaths,
-      count: cleanPaths.length,
-    });
+      // Strip the scope prefix from returned paths for cleaner display
+      const cleanItems = items.map((item) => {
+        let cleanPath = item.path;
+        if (scope === 'company')
+          cleanPath = cleanPath.replace(`/company/${req.company._id}/`, '');
+        if (scope === 'session')
+          cleanPath = cleanPath.replace(new RegExp(`^/session/[^/]+/`), '');
+        if (scope === 'agent')
+          cleanPath = cleanPath.replace(new RegExp(`^/agent/[^/]+/`), '');
+        if (scope === 'team')
+          cleanPath = cleanPath.replace(new RegExp(`^/team/[^/]+/`), '');
+
+        return {
+          path: cleanPath,
+          metadata: item.metadata || {},
+          type: item.type,
+          size: item.size,
+        };
+      });
+
+      logger.debug(`Total list request took ${Date.now() - startTime}ms`);
+      res.json({
+        success: true,
+        scope: scope as string,
+        prefix: prefix || '/',
+        items: cleanItems,
+        count: cleanItems.length,
+      });
+    } else {
+      // Original behavior: return only paths
+      const paths = await workspace.list(scopedPrefix);
+      logger.debug(`Workspace list took ${Date.now() - t2}ms`);
+
+      // Strip the scope prefix from returned paths for cleaner display
+      const cleanPaths = paths.map((p) => {
+        if (scope === 'company')
+          return p.replace(`/company/${req.company._id}/`, '');
+        if (scope === 'session')
+          return p.replace(new RegExp(`^/session/[^/]+/`), '');
+        if (scope === 'agent') return p.replace(new RegExp(`^/agent/[^/]+/`), '');
+        if (scope === 'team') return p.replace(new RegExp(`^/team/[^/]+/`), '');
+        return p;
+      });
+
+      logger.debug(`Total list request took ${Date.now() - startTime}ms`);
+      res.json({
+        success: true,
+        scope: scope as string,
+        prefix: prefix || '/',
+        paths: cleanPaths,
+        count: cleanPaths.length,
+      });
+    }
   } catch (error: any) {
     logger.error('Workspace list error:', error);
     res.status(500).json({
