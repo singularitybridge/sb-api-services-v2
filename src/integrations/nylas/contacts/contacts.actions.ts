@@ -13,7 +13,7 @@ import {
   getContacts as getContactsService,
   createContact as createContactService,
   updateContact as updateContactService,
-} from './contacts.service';
+} from '../services/contacts.service';
 import { executeAction } from '../../actions/executor';
 import { ActionValidationError } from '../../../utils/actionErrors';
 

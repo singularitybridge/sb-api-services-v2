@@ -1,5 +1,5 @@
 /**
- * Invitation Email Service
+ * Nylas Invitation Service
  *
  * Sends invitation emails to team members via the Nylas V3 microservice.
  * Generates OAuth URLs for Nylas Hosted Authentication so users can
@@ -7,7 +7,7 @@
  */
 
 import axios from 'axios';
-import { sendEmail } from '../integrations/nylas/nylas.service';
+import { sendEmail } from './email.service';
 
 const V3_SERVICE_URL = process.env.NYLAS_V3_SERVICE_URL || 'https://sb-api-services-v3-53926697384.us-central1.run.app';
 const V2_BASE_URL = process.env.V2_BASE_URL || 'https://api.agentportal.ai';
@@ -28,7 +28,7 @@ export interface SendInvitationParams {
   companyId: string;
 }
 
-export class InvitationEmailService {
+export class InvitationService {
   /**
    * Generate Nylas OAuth URL via V3 microservice
    */
@@ -59,13 +59,13 @@ export class InvitationEmailService {
       });
 
       if (response.data?.authUrl) {
-        console.log(`[invitation-email] Generated auth URL for ${invite.email}`);
+        console.log(`[invitations-service] Generated auth URL for ${invite.email}`);
         return response.data.authUrl;
       }
 
       throw new Error('No auth URL returned from V3');
     } catch (error: any) {
-      console.error('[invitation-email] Failed to generate auth URL:', error.message);
+      console.error('[invitations-service] Failed to generate auth URL:', error.message);
       // Fall back to a frontend-based URL if V3 fails
       return this.generateFrontendAuthUrl(invite);
     }
@@ -212,14 +212,14 @@ Sent by ${companyName} via Agent Portal
         body: htmlBody,
       });
 
-      console.log(`[invitation-email] Sent invitation to ${invite.email}, messageId: ${result.id}`);
+      console.log(`[invitations-service] Sent invitation to ${invite.email}, messageId: ${result.id}`);
 
       return {
         success: true,
         messageId: result.id,
       };
     } catch (error: any) {
-      console.error(`[invitation-email] Failed to send invitation to ${invite.email}:`, error.message);
+      console.error(`[invitations-service] Failed to send invitation to ${invite.email}:`, error.message);
       return {
         success: false,
         error: error.message,
@@ -259,14 +259,14 @@ Sent by ${companyName} via Agent Portal
         body: htmlBody,
       });
 
-      console.log(`[invitation-email] Resent invitation to ${invite.email}, messageId: ${result.id}`);
+      console.log(`[invitations-service] Resent invitation to ${invite.email}, messageId: ${result.id}`);
 
       return {
         success: true,
         messageId: result.id,
       };
     } catch (error: any) {
-      console.error(`[invitation-email] Failed to resend invitation to ${invite.email}:`, error.message);
+      console.error(`[invitations-service] Failed to resend invitation to ${invite.email}:`, error.message);
       return {
         success: false,
         error: error.message,

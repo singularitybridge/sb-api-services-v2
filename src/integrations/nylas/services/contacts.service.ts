@@ -5,67 +5,10 @@
  */
 
 import axios from 'axios';
-import { getApiKey } from '../../../services/api.key.service';
+import { resolveGrantId } from '../utils/grant-resolver';
+import { NylasContact, NylasContactEmail, NylasContactPhone } from '../types';
 
 const V3_SERVICE_URL = process.env.NYLAS_V3_SERVICE_URL || 'https://sb-api-services-v3-53926697384.us-central1.run.app';
-
-// ==========================================
-// Interfaces
-// ==========================================
-
-export interface NylasContactEmail {
-  email: string;
-  type?: string;
-}
-
-export interface NylasContactPhone {
-  number: string;
-  type?: string;
-}
-
-export interface NylasContact {
-  id: string;
-  given_name?: string;
-  surname?: string;
-  emails?: NylasContactEmail[];
-  phone_numbers?: NylasContactPhone[];
-  company_name?: string;
-  notes?: string;
-}
-
-// ==========================================
-// Helper Functions
-// ==========================================
-
-/**
- * Resolve grant ID for a specific user email by calling V3 microservice
- * Falls back to company default if user email not provided or not found
- */
-async function resolveGrantId(companyId: string, userEmail?: string): Promise<string> {
-  // If userEmail provided, try to get user-specific grant from V3
-  if (userEmail) {
-    try {
-      const response = await axios.get(`${V3_SERVICE_URL}/api/v1/nylas/grants/by-email`, {
-        params: { email: userEmail.toLowerCase() },
-        timeout: 5000,
-      });
-
-      if (response.data?.grantId) {
-        console.log(`[contacts-service] Resolved grant for ${userEmail}: ${response.data.grantId.substring(0, 8)}...`);
-        return response.data.grantId;
-      }
-    } catch (error: any) {
-      console.warn(`[contacts-service] Could not resolve grant for ${userEmail}, falling back to company default:`, error.message);
-    }
-  }
-
-  // Fall back to company default grant
-  const grantId = await getApiKey(companyId, 'nylas_grant_id');
-  if (!grantId) {
-    throw new Error('Nylas Grant ID not found');
-  }
-  return grantId;
-}
 
 // ==========================================
 // Contact Management Functions

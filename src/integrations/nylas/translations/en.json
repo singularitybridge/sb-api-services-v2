@@ -111,9 +111,71 @@
       "newEndTime": "New end time"
     }
   },
-  "nylasGetGrants": {
-    "actionTitle": "Get Grants",
-    "description": "Retrieves Nylas authentication grants",
+  "nylasCheckGrantStatus": {
+    "actionTitle": "Check Grant Status",
+    "description": "Check if a user has an active Nylas grant for email/calendar/contacts access",
+    "category": "grant_management",
+    "parameters": {
+      "userEmail": "Email of user to check (optional, defaults to current user)"
+    }
+  },
+  "nylasListCompanyGrants": {
+    "actionTitle": "List Company Grants",
+    "description": "List all users in the company with active Nylas grants (admin only)",
+    "category": "grant_management",
     "parameters": {}
+  },
+  "nylasSendInvitation": {
+    "actionTitle": "Send Nylas Invitation",
+    "description": "Send a Nylas grant invitation email to onboard a new user (admin only)",
+    "category": "grant_management",
+    "parameters": {
+      "email": "Email address of person to invite",
+      "firstName": "First name (optional)",
+      "lastName": "Last name (optional)"
+    }
+  },
+  "nylasRevokeGrant": {
+    "actionTitle": "Revoke Grant",
+    "description": "Revoke a user's Nylas grant and remove their email/calendar/contacts access (admin only)",
+    "category": "grant_management",
+    "parameters": {
+      "userEmail": "Email of user whose grant to revoke"
+    }
+  },
+  "nylasGetContacts": {
+    "actionTitle": "Get Contacts",
+    "description": "Retrieve contacts from user's address book",
+    "category": "contacts",
+    "parameters": {
+      "userEmail": "Email of user whose contacts to retrieve (optional, defaults to current user)",
+      "limit": "Maximum number of contacts to return (optional)"
+    }
+  },
+  "nylasCreateContact": {
+    "actionTitle": "Create Contact",
+    "description": "Create a new contact in user's address book",
+    "category": "contacts",
+    "parameters": {
+      "userEmail": "Email of user whose address book to add contact to (optional)",
+      "givenName": "Contact's first name",
+      "surname": "Contact's last name (optional)",
+      "emails": "Comma-separated list of email addresses",
+      "phoneNumbers": "Comma-separated list of phone numbers (optional)",
+      "companyName": "Company name (optional)"
+    }
+  },
+  "nylasUpdateContact": {
+    "actionTitle": "Update Contact",
+    "description": "Update an existing contact in user's address book",
+    "category": "contacts",
+    "parameters": {
+      "userEmail": "Email of user whose contact to update (optional)",
+      "contactId": "ID of contact to update",
+      "givenName": "Updated first name (optional)",
+      "surname": "Updated last name (optional)",
+      "emails": "Updated email addresses (optional)",
+      "phoneNumbers": "Updated phone numbers (optional)"
+    }
   }
 }

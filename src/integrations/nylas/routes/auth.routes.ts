@@ -1,15 +1,15 @@
 /**
  * Nylas Auth Routes
  *
- * Handles OAuth callback from V3 microservice and webhook events.
+ * Handles OAuth callback from V3 microservice and grant management.
  * These routes receive grant information after a user completes Nylas OAuth.
  */
 
 import { Router, Request, Response } from 'express';
-import { UserGrantService, GrantData } from '../services/user-grant.service';
-import { Invite, InviteStatus } from '../models/Invite';
-import { User } from '../models/User';
-import mongoose from 'mongoose';
+import { GrantsService, GrantData } from '../services/grants.service';
+import { Invite, InviteStatus } from '../../../models/Invite';
+import { User } from '../../../models/User';
+import { verifyTokenMiddleware, verifyAccess } from '../../../middleware/auth.middleware';
 
 const router = Router();
 
@@ -59,7 +59,7 @@ router.post('/link-grant', async (req: Request, res: Response) => {
       const invite = await Invite.findOne({ inviteToken });
 
       if (!invite) {
-        return res.status(404).json({
+        return res.status(400).json({
           success: false,
           error: 'Invite not found',
         });
@@ -91,7 +91,7 @@ router.post('/link-grant', async (req: Request, res: Response) => {
       }
 
       // Store the grant
-      user = await UserGrantService.storeNylasGrant(user._id.toString(), grantData);
+      await GrantsService.storeNylasGrant(user._id.toString(), grantData);
 
       // Mark invite as accepted
       invite.status = InviteStatus.ACCEPTED;
@@ -102,7 +102,8 @@ router.post('/link-grant', async (req: Request, res: Response) => {
     }
     // Scenario 2: User ID provided - update existing user
     else if (userId) {
-      user = await UserGrantService.storeNylasGrant(userId, grantData);
+      await GrantsService.storeNylasGrant(userId, grantData);
+      user = await User.findById(userId);
 
       if (!user) {
         return res.status(404).json({
@@ -113,7 +114,7 @@ router.post('/link-grant', async (req: Request, res: Response) => {
     }
     // Scenario 3: Company ID + email - find existing user in company
     else if (companyId && email) {
-      user = await UserGrantService.getUserByEmailAndCompany(email, companyId);
+      user = await GrantsService.getUserByEmailAndCompany(email, companyId);
 
       if (!user) {
         return res.status(404).json({
@@ -122,7 +123,7 @@ router.post('/link-grant', async (req: Request, res: Response) => {
         });
       }
 
-      user = await UserGrantService.storeNylasGrant(user._id.toString(), grantData);
+      await GrantsService.storeNylasGrant(user._id.toString(), grantData);
     }
     else {
       return res.status(400).json({
@@ -146,68 +147,28 @@ router.post('/link-grant', async (req: Request, res: Response) => {
 });
 
 /**
- * POST /webhooks/nylas/callback
- *
- * Receives forwarded webhook events from V3 microservice.
- * Handles grant lifecycle events (created, updated, expired, deleted).
- */
-router.post('/webhooks/nylas/callback', async (req: Request, res: Response) => {
-  try {
-    const { type, data } = req.body;
-
-    console.log(`[nylas-auth] Received webhook: ${type}`);
-
-    switch (type) {
-      case 'grant.created':
-      case 'grant.updated':
-        // Grant was created or updated - no action needed
-        // The grant is linked via /link-grant endpoint
-        console.log(`[nylas-auth] Grant ${type}: ${data?.grantId}`);
-        break;
-
-      case 'grant.expired':
-        // Mark grant as expired
-        if (data?.grantId) {
-          await UserGrantService.markGrantExpired(data.grantId);
-          console.log(`[nylas-auth] Grant expired: ${data.grantId}`);
-        }
-        break;
-
-      case 'grant.deleted':
-        // Grant was deleted from Nylas
-        if (data?.grantId) {
-          const user = await UserGrantService.getUserByGrantId(data.grantId);
-          if (user) {
-            await UserGrantService.removeGrant(user._id.toString());
-            console.log(`[nylas-auth] Grant deleted: ${data.grantId}`);
-          }
-        }
-        break;
-
-      default:
-        console.log(`[nylas-auth] Unhandled webhook type: ${type}`);
-    }
-
-    return res.json({ success: true });
-  } catch (error: any) {
-    console.error('[nylas-auth] Webhook error:', error);
-    return res.status(500).json({
-      success: false,
-      error: error.message || 'Internal server error',
-    });
-  }
-});
-
-/**
  * GET /grant/:userId
  *
  * Get a user's Nylas grant status (requires authentication).
+ * Users can view their own grant, admins can view any grant.
  */
-router.get('/grant/:userId', async (req: Request, res: Response) => {
+router.get('/grant/:userId', verifyTokenMiddleware, verifyAccess(), async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    const requestingUserId = (req as any).user?.userId;
 
-    const grant = await UserGrantService.getUserGrant(userId);
+    // Check permission: user can view their own grant OR admin can view any
+    if (userId !== requestingUserId) {
+      const requestingUser = await User.findById(requestingUserId);
+      if (!requestingUser || requestingUser.role !== 'Admin') {
+        return res.status(403).json({
+          success: false,
+          error: 'Forbidden: Only administrators can view other users\' grants',
+        });
+      }
+    }
+
+    const grant = await GrantsService.getUserGrant(userId);
 
     if (!grant) {
       return res.json({
@@ -240,20 +201,23 @@ router.get('/grant/:userId', async (req: Request, res: Response) => {
 /**
  * DELETE /grant/:userId
  *
- * Revoke a user's Nylas grant (requires authentication).
+ * Revoke a user's Nylas grant (requires authentication and admin role).
  */
-router.delete('/grant/:userId', async (req: Request, res: Response) => {
+router.delete('/grant/:userId', verifyTokenMiddleware, verifyAccess(), async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    const requestingUserId = (req as any).user?.userId;
 
-    const user = await UserGrantService.revokeGrant(userId);
-
-    if (!user) {
-      return res.status(404).json({
+    // Admin-only action
+    const requestingUser = await User.findById(requestingUserId);
+    if (!requestingUser || requestingUser.role !== 'Admin') {
+      return res.status(403).json({
         success: false,
-        error: 'User not found',
+        error: 'Forbidden: Only administrators can revoke grants',
       });
     }
+
+    await GrantsService.revokeGrant(userId);
 
     return res.json({
       success: true,
@@ -271,27 +235,54 @@ router.delete('/grant/:userId', async (req: Request, res: Response) => {
 /**
  * GET /company-grants/:companyId
  *
- * Get all users with active grants in a company (requires authentication).
+ * Get all users with active grants in a company (requires authentication and admin role).
+ * Admin must belong to the company they're querying.
  */
-router.get('/company-grants/:companyId', async (req: Request, res: Response) => {
+router.get('/company-grants/:companyId', verifyTokenMiddleware, verifyAccess(), async (req: Request, res: Response) => {
   try {
     const { companyId } = req.params;
+    const requestingUserId = (req as any).user?.userId;
 
-    const users = await UserGrantService.getCompanyUsersWithGrants(companyId);
+    // Admin-only action
+    const requestingUser = await User.findById(requestingUserId);
+    if (!requestingUser || requestingUser.role !== 'Admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: Only administrators can list company grants',
+      });
+    }
+
+    // Verify user belongs to the company they're querying
+    if (requestingUser.companyId.toString() !== companyId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden: Cannot access grants from a different company',
+      });
+    }
+
+    const users = await GrantsService.getCompanyUsersWithGrants(companyId);
+
+    // Get grants for each user
+    const usersWithGrants = await Promise.all(
+      users.map(async (u) => {
+        const grant = await GrantsService.getUserGrant(u._id.toString());
+        return {
+          userId: u._id,
+          name: u.name,
+          email: u.email,
+          grant: grant ? {
+            email: grant.email,
+            provider: grant.provider,
+            status: grant.status,
+          } : null,
+        };
+      })
+    );
 
     return res.json({
       success: true,
-      count: users.length,
-      users: users.map((u) => ({
-        userId: u._id,
-        name: u.name,
-        email: u.email,
-        grant: u.nylasGrant ? {
-          email: u.nylasGrant.email,
-          provider: u.nylasGrant.provider,
-          status: u.nylasGrant.status,
-        } : null,
-      })),
+      count: usersWithGrants.length,
+      users: usersWithGrants,
     });
   } catch (error: any) {
     console.error('[nylas-auth] Error getting company grants:', error);

@@ -49,6 +49,7 @@ The SB Agent Portal integrates with various third-party services. The following 
 10. Linear
 11. Code Indexer
 12. JIRA
+13. **Nylas** (Email, Calendar, Contacts)
 
 Each integration requires an API key, which can be managed through the Company settings. These integrations collectively enhance the capabilities of the AI agents, allowing them to perform a wide range of tasks across different domains and communication channels.
 
@@ -77,6 +78,96 @@ To configure the JIRA integration, you need to set up the following API keys in 
 - `jira_email`: The email address associated with your JIRA account
 
 You can obtain these credentials from your JIRA account settings and API tokens page.
+
+### Nylas Integration
+
+The Nylas integration provides comprehensive email, calendar, and contacts management through the Nylas V3 API. This integration supports per-user grant management, enabling AI agents to access and manage email/calendar/contacts for individual team members.
+
+#### Features
+
+**Email Operations:**
+- Get emails from user's inbox
+- Get specific email by ID
+- Send emails on behalf of users
+
+**Calendar Operations:**
+- List calendar events within time ranges
+- Create, update, and delete calendar events
+- Find available time slots
+- Check free/busy status
+- Detect scheduling conflicts
+- Batch create multiple events
+- Move events to new time slots
+- **Admin Calendar Creation**: Administrators can create events directly in team members' calendars
+
+**Contacts Operations:**
+- Retrieve contacts from user's address book
+- Create new contacts
+- Update existing contacts
+
+**Grant Management (Admin-only):**
+- Check grant status for users
+- List all company grants
+- Send OAuth invitations to new users
+- Revoke user grants
+
+#### Configuration
+
+**V3 Microservice URL:**
+The integration uses a V3 microservice proxy deployed on Google Cloud Platform:
+```env
+NYLAS_V3_SERVICE_URL=https://sb-api-services-v3-53926697384.us-central1.run.app
+```
+
+**Company Default Grant (Optional):**
+Set a company-wide default grant in Company settings:
+- API Key: `nylas_grant_id`
+- Value: Your company's Nylas grant ID
+
+**SendGrid Configuration (for invitations):**
+```env
+SENDGRID_API_KEY=your_sendgrid_api_key
+SENDGRID_FROM_EMAIL=noreply@yourcompany.com
+```
+
+#### Per-User Grant System
+
+The integration supports per-user grants, allowing each team member to connect their own email/calendar/contacts:
+
+1. **Grant Resolution Chain:**
+   - User-specific grant (if userEmail provided)
+   - Company default grant
+   - V3 microservice default
+
+2. **User Onboarding:**
+   - Admin sends invitation via `nylasSendInvitation` action
+   - User receives email with OAuth link
+   - User authorizes Google/Outlook account
+   - Grant automatically linked to user's account
+
+3. **Admin Calendar Control:**
+   Administrators can create events in team members' calendars:
+   ```
+   "Create meeting 'Daily Standup' for user john@company.com tomorrow at 9am"
+   ```
+   This creates the event directly in John's calendar without requiring invitation acceptance.
+
+#### Available Actions
+
+**20 Nylas Actions Total:**
+- Email: `nylasGetEmails`, `nylasGetEmail`, `nylasSendEmail`
+- Calendar: `nylasGetCalendarEvents`, `nylasCreateCalendarEvent`, `nylasGetEvent`, `nylasUpdateEvent`, `nylasDeleteEvent`, `nylasFindAvailableSlots`, `nylasGetFreeBusy`, `nylasCheckConflicts`, `nylasBatchCreateEvents`, `nylasMoveEvent`
+- Contacts: `nylasGetContacts`, `nylasCreateContact`, `nylasUpdateContact`
+- Grant Management: `nylasCheckGrantStatus`, `nylasListCompanyGrants`, `nylasSendInvitation`, `nylasRevokeGrant`
+
+#### Documentation
+
+For detailed testing and integration information, see:
+- [Test Data Examples](./docs/TEST_DATA_EXAMPLES.md)
+- [Test Scenarios](./docs/TEST_SCENARIOS.md)
+- [V3 Integration Testing](./docs/V3_INTEGRATION_TEST.md)
+- [Grant Management Implementation](./docs/GRANT_MANAGEMENT_IMPLEMENTATION.md)
+- [Admin Calendar Creation Guide](./docs/ADMIN_CALENDAR_CREATION_GUIDE.md)
 
 ### Vector Search Functionality
 

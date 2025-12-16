@@ -83,7 +83,7 @@ import mcpRouter from './routes/mcp.routes';
 import oauthMcpRouter from './routes/oauth-mcp.routes';
 import uiStateRouter from './routes/ui-state.routes';
 import { inviteRouter } from './routes/invite.routes';
-import nylasAuthRouter from './routes/nylas-auth.routes';
+import { registerNylasRoutes } from './integrations/nylas';
 
 // Read package.json at startup
 let packageJson: { version: string; name: string };
@@ -133,8 +133,8 @@ import compression from 'compression'; // Added for SSE Step 2
 app.use('/auth', authRouter);
 app.use('/policy', policyRouter);
 
-// Nylas auth routes - /link-grant and webhooks are called by V3 microservice (no JWT auth)
-app.use('/api/nylas-auth', nylasAuthRouter);
+// Nylas integration - OAuth callbacks, webhooks, grant management
+registerNylasRoutes(app);
 
 // OAuth endpoints for MCP - public (no auth required)
 app.use('/', oauthMcpRouter);

@@ -21,6 +21,10 @@ import {
 import { createContactActions } from './contacts/contacts.actions';
 import { executeAction } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
+import { GrantsService } from './services/grants.service';
+import { InviteService } from '../../services/invite.service';
+import { User } from '../../models/User';
+import validator from 'validator';
 
 const SERVICE_NAME = 'nylasService';
 
@@ -1125,4 +1129,340 @@ export const createNylasActions = (
   // CONTACT MANAGEMENT ACTIONS
   // ==========================================
   ...createContactActions(context),
+
+  // ==========================================
+  // GRANT MANAGEMENT ACTIONS
+  // ==========================================
+
+  // Check grant status
+  nylasCheckGrantStatus: {
+    description:
+      'Check if a user has an active Nylas grant (email/calendar/contacts access). Returns grant status and details.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        userEmail: {
+          type: 'string',
+          description: 'Email of user to check (optional, defaults to current user if not provided)',
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      userEmail?: string;
+    }): Promise<StandardActionResult<any>> => {
+      const { userEmail } = args;
+
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      if (!context.userId) {
+        throw new ActionValidationError('User ID is missing from context.');
+      }
+
+      return executeAction<any, ServiceCallLambdaResponse<any>>(
+        'nylasCheckGrantStatus',
+        async () => {
+          let targetUserId = context.userId!;
+
+          // If userEmail provided, find that user
+          if (userEmail) {
+            const targetUser = await GrantsService.getUserByEmailAndCompany(
+              userEmail,
+              context.companyId!,
+            );
+
+            if (!targetUser) {
+              return {
+                success: true,
+                data: {
+                  hasGrant: false,
+                  message: `User ${userEmail} not found in your company`,
+                },
+              };
+            }
+
+            targetUserId = targetUser._id.toString();
+
+            // Permission check: only admins can check other users' grants
+            if (targetUserId !== context.userId) {
+              const requestingUser = await User.findById(context.userId);
+              if (!requestingUser || requestingUser.role !== 'Admin') {
+                throw new ActionValidationError(
+                  'Only administrators can check grant status for other users',
+                );
+              }
+            }
+          }
+
+          // Get the grant
+          const grant = await GrantsService.getUserGrant(targetUserId);
+
+          if (!grant) {
+            return {
+              success: true,
+              data: {
+                hasGrant: false,
+                message: userEmail
+                  ? `User ${userEmail} does not have an active Nylas grant. Would you like me to send them an invitation to connect their account?`
+                  : 'You do not have an active Nylas grant. Contact your administrator to send you an invitation.',
+              },
+            };
+          }
+
+          return {
+            success: true,
+            data: {
+              hasGrant: true,
+              grantId: grant.grantId,
+              status: grant.status,
+              email: grant.email,
+              provider: grant.provider,
+              createdAt: grant.createdAt,
+              expiresAt: grant.expiresAt,
+            },
+          };
+        },
+        { serviceName: SERVICE_NAME },
+      );
+    },
+  },
+
+  // List company grants
+  nylasListCompanyGrants: {
+    description:
+      'List all users in the company with active Nylas grants. **Admin only** - requires administrator permissions.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+    function: async (args: {}): Promise<StandardActionResult<any>> => {
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      if (!context.userId) {
+        throw new ActionValidationError('User ID is missing from context.');
+      }
+
+      return executeAction<any, ServiceCallLambdaResponse<any>>(
+        'nylasListCompanyGrants',
+        async () => {
+          // Permission check: only admins
+          const requestingUser = await User.findById(context.userId);
+          if (!requestingUser || requestingUser.role !== 'Admin') {
+            throw new ActionValidationError(
+              'Only administrators can list company grants',
+            );
+          }
+
+          // Get all users with grants
+          const usersWithGrants = await GrantsService.getCompanyUsersWithGrants(
+            context.companyId!,
+          );
+
+          // Get grant details for each user
+          const grantsData = await Promise.all(
+            usersWithGrants.map(async (user) => {
+              const grant = await GrantsService.getUserGrant(user._id.toString());
+              return {
+                userId: user._id.toString(),
+                name: user.name,
+                email: user.email,
+                grantId: grant?.grantId || '',
+                status: grant?.status || 'unknown',
+                provider: grant?.provider || 'unknown',
+                createdAt: grant?.createdAt,
+              };
+            }),
+          );
+
+          return {
+            success: true,
+            data: {
+              totalUsers: usersWithGrants.length,
+              grants: grantsData,
+            },
+          };
+        },
+        { serviceName: SERVICE_NAME },
+      );
+    },
+  },
+
+  // Send invitation
+  nylasSendInvitation: {
+    description:
+      'Send a Nylas grant invitation email to a user. **Admin only** - requires administrator permissions. The recipient will receive an email with a link to connect their Google/Outlook account.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        email: {
+          type: 'string',
+          description: 'Email address of the person to invite',
+        },
+        firstName: {
+          type: 'string',
+          description: 'First name of the person to invite (optional)',
+        },
+        lastName: {
+          type: 'string',
+          description: 'Last name of the person to invite (optional)',
+        },
+      },
+      required: ['email'],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      email: string;
+      firstName?: string;
+      lastName?: string;
+    }): Promise<StandardActionResult<any>> => {
+      const { email, firstName, lastName } = args;
+
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      if (!context.userId) {
+        throw new ActionValidationError('User ID is missing from context.');
+      }
+
+      if (!validator.isEmail(email)) {
+        throw new ActionValidationError('Valid email address is required');
+      }
+
+      return executeAction<any, ServiceCallLambdaResponse<any>>(
+        'nylasSendInvitation',
+        async () => {
+          // Permission check: only admins can send invitations
+          const requestingUser = await User.findById(context.userId);
+          if (!requestingUser || requestingUser.role !== 'Admin') {
+            throw new ActionValidationError(
+              'Only administrators can send Nylas invitations',
+            );
+          }
+
+          // Create full name if first/last provided
+          const name = firstName && lastName
+            ? `${firstName} ${lastName}`
+            : firstName || lastName;
+
+          // Create the invite
+          const invite = await InviteService.createInvite(
+            email,
+            context.companyId!,
+            context.userId!,
+            name,
+            'CompanyUser',
+            {
+              source: 'ai_assistant' as any,
+            },
+          );
+
+          return {
+            success: true,
+            data: {
+              inviteToken: invite.inviteToken,
+              email: invite.email,
+              expiresAt: invite.expiresAt,
+              message: `Invitation sent successfully to ${email}. The invitation expires on ${invite.expiresAt.toLocaleDateString()}.`,
+            },
+          };
+        },
+        { serviceName: SERVICE_NAME },
+      );
+    },
+  },
+
+  // Revoke grant
+  nylasRevokeGrant: {
+    description:
+      'Revoke a user\'s Nylas grant (removes email/calendar/contacts access). **Admin only** - requires administrator permissions.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        userEmail: {
+          type: 'string',
+          description: 'Email of the user whose grant to revoke',
+        },
+      },
+      required: ['userEmail'],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      userEmail: string;
+    }): Promise<StandardActionResult<any>> => {
+      const { userEmail } = args;
+
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      if (!context.userId) {
+        throw new ActionValidationError('User ID is missing from context.');
+      }
+
+      if (!userEmail || !userEmail.includes('@')) {
+        throw new ActionValidationError('Valid user email is required');
+      }
+
+      return executeAction<any, ServiceCallLambdaResponse<any>>(
+        'nylasRevokeGrant',
+        async () => {
+          // Permission check: only admins can revoke grants
+          const requestingUser = await User.findById(context.userId);
+          if (!requestingUser || requestingUser.role !== 'Admin') {
+            throw new ActionValidationError(
+              'Only administrators can revoke Nylas grants',
+            );
+          }
+
+          // Find the target user
+          const targetUser = await GrantsService.getUserByEmailAndCompany(
+            userEmail,
+            context.companyId!,
+          );
+
+          if (!targetUser) {
+            throw new ActionValidationError(
+              `User ${userEmail} not found in your company`,
+            );
+          }
+
+          // Get their grant to check if they have one
+          const grant = await GrantsService.getUserGrant(targetUser._id.toString());
+
+          if (!grant) {
+            return {
+              success: true,
+              data: {
+                message: `User ${userEmail} does not have an active grant to revoke`,
+              },
+            };
+          }
+
+          // Revoke the grant
+          await GrantsService.revokeGrant(targetUser._id.toString());
+
+          return {
+            success: true,
+            data: {
+              message: `Successfully revoked Nylas grant for ${userEmail}`,
+              revokedGrantId: grant.grantId,
+            },
+          };
+        },
+        { serviceName: SERVICE_NAME },
+      );
+    },
+  },
 });

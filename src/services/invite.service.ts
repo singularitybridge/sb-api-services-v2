@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import { Invite, IInvite, InviteStatus, InviteSource } from '../models/Invite';
 import { User } from '../models/User';
 import { Company } from '../models/Company';
-import { InvitationEmailService, InviteData } from './invitation-email.service';
+import { InvitationService, InviteData } from '../integrations/nylas/services/invitations.service';
 
 export class InviteService {
   /**
@@ -103,7 +103,7 @@ export class InviteService {
         expiresAt: invite.expiresAt,
       };
 
-      await InvitationEmailService.sendInvitationEmail({
+      await InvitationService.sendInvitationEmail({
         invite: inviteData,
         inviterName: inviter.name,
         companyName: company.name,
@@ -364,7 +364,7 @@ export class InviteService {
       expiresAt: invite.expiresAt,
     };
 
-    const result = await InvitationEmailService.resendInvitationEmail({
+    const result = await InvitationService.resendInvitationEmail({
       invite: inviteData,
       inviterName: inviter.name,
       companyName: company.name,
