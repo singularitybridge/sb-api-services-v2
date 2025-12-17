@@ -1,11 +1,10 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { getWorkspaceService } from '../services/unified-workspace.service';
 import { getVectorSearchService } from '../services/vector-search.service';
 import { logger } from '../utils/logger';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { singleUpload } from '../middleware/file-upload.middleware';
 import { resolveAssistantIdentifier } from '../services/assistant/assistant-resolver.service';
-import path from 'path';
 import fs from 'fs/promises';
 
 const router = Router();
@@ -36,6 +35,44 @@ async function resolveAgentId(
     logger.warn(`Failed to resolve agent identifier: ${identifier}`, error);
     return identifier; // Return original if resolution fails
   }
+}
+
+/**
+ * Helper function to build scope prefix
+ * Returns the base path for a given scope (e.g., "/company/123/", "/agent/456/")
+ */
+function buildScopePrefix(
+  scope: string,
+  params: {
+    companyId?: string;
+    sessionId?: string;
+    agentId?: string;
+    teamId?: string;
+  },
+): string {
+  switch (scope) {
+    case 'company':
+      return `/company/${params.companyId}/`;
+    case 'session':
+      return `/session/${params.sessionId}/`;
+    case 'agent':
+      return `/agent/${params.agentId}/`;
+    case 'team':
+      return `/team/${params.teamId}/`;
+    default:
+      return '';
+  }
+}
+
+/**
+ * Helper function to strip scope prefix from path
+ * Uses simple string slicing instead of regex for better performance and clarity
+ */
+function stripScopePrefix(path: string, scopePrefix: string): string {
+  if (path.startsWith(scopePrefix)) {
+    return path.slice(scopePrefix.length);
+  }
+  return path;
 }
 
 /**
@@ -530,20 +567,27 @@ router.get('/get', async (req: AuthenticatedRequest, res: Response) => {
 /**
  * @route GET /api/workspace/list
  * @desc List all paths under a prefix
+ * @query withMetadata - Optional boolean to include metadata (timestamps, size, etc.)
  */
 router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const startTime = Date.now();
-    const { prefix, scope = 'company', agentId, teamId } = req.query;
+    const {
+      prefix,
+      scope = 'company',
+      agentId,
+      teamId,
+      withMetadata,
+    } = req.query;
+    const includeMetadata = withMetadata === 'true';
 
-    // Build scoped prefix based on scope
-    let scopedPrefix = (prefix as string) || '';
+    // Determine scope IDs
+    let sessionId: string | undefined;
+    let resolvedAgentId: string | undefined;
+    let resolvedTeamId: string | undefined;
 
-    if (scope === 'company') {
-      scopedPrefix = `/company/${req.company._id}/${prefix || ''}`;
-    } else if (scope === 'session') {
-      const sessionId = req.headers['x-session-id'] || 'default';
-      scopedPrefix = `/session/${sessionId}/${prefix || ''}`;
+    if (scope === 'session') {
+      sessionId = (req.headers['x-session-id'] as string) || 'default';
     } else if (scope === 'agent') {
       const agentIdentifier = agentId || req.headers['x-agent-id'];
       if (!agentIdentifier) {
@@ -553,10 +597,11 @@ router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
         });
       }
       const t1 = Date.now();
-      const resolvedAgentId = await resolveAgentId(
-        agentIdentifier as string,
-        req.company?._id?.toString(),
-      );
+      resolvedAgentId =
+        (await resolveAgentId(
+          agentIdentifier as string,
+          req.company?._id?.toString(),
+        )) || undefined;
       logger.debug(`Resolve agent took ${Date.now() - t1}ms`);
       if (!resolvedAgentId) {
         return res.status(400).json({
@@ -564,42 +609,68 @@ router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
           error: `Could not resolve agent: ${agentIdentifier}`,
         });
       }
-      scopedPrefix = `/agent/${resolvedAgentId}/${prefix || ''}`;
     } else if (scope === 'team') {
-      const resolvedTeamName = teamId || req.headers['x-team-id'];
-      if (!resolvedTeamName) {
+      resolvedTeamId = (teamId || req.headers['x-team-id']) as string;
+      if (!resolvedTeamId) {
         return res.status(400).json({
           success: false,
           error: 'Team ID is required for team scope',
         });
       }
-      scopedPrefix = `/team/${resolvedTeamName}/${prefix || ''}`;
     }
+
+    // Build scope prefix using helper
+    const scopePrefix = buildScopePrefix(scope as string, {
+      companyId: req.company._id.toString(),
+      sessionId,
+      agentId: resolvedAgentId,
+      teamId: resolvedTeamId,
+    });
+
+    // Build full scoped prefix with user's prefix
+    const scopedPrefix = `${scopePrefix}${prefix || ''}`;
 
     const workspace = getWorkspaceService();
     const t2 = Date.now();
-    const paths = await workspace.list(scopedPrefix);
-    logger.debug(`Workspace list took ${Date.now() - t2}ms`);
 
-    // Strip the scope prefix from returned paths for cleaner display
-    const cleanPaths = paths.map((p) => {
-      if (scope === 'company')
-        return p.replace(`/company/${req.company._id}/`, '');
-      if (scope === 'session')
-        return p.replace(new RegExp(`^/session/[^/]+/`), '');
-      if (scope === 'agent') return p.replace(new RegExp(`^/agent/[^/]+/`), '');
-      if (scope === 'team') return p.replace(new RegExp(`^/team/[^/]+/`), '');
-      return p;
-    });
+    if (includeMetadata) {
+      // Use listWithMetadata to get timestamps
+      const items = await workspace.listWithMetadata(scopedPrefix);
+      logger.debug(`Workspace listWithMetadata took ${Date.now() - t2}ms`);
 
-    logger.debug(`Total list request took ${Date.now() - startTime}ms`);
-    res.json({
-      success: true,
-      scope: scope as string,
-      prefix: prefix || '/',
-      paths: cleanPaths,
-      count: cleanPaths.length,
-    });
+      // Strip the scope prefix from returned paths for cleaner display
+      const cleanItems = items.map((item) => ({
+        path: stripScopePrefix(item.path, scopePrefix),
+        metadata: item.metadata || {},
+        type: item.type,
+        size: item.size,
+      }));
+
+      logger.debug(`Total list request took ${Date.now() - startTime}ms`);
+      res.json({
+        success: true,
+        scope: scope as string,
+        prefix: prefix || '/',
+        items: cleanItems,
+        count: cleanItems.length,
+      });
+    } else {
+      // Original behavior: return only paths
+      const paths = await workspace.list(scopedPrefix);
+      logger.debug(`Workspace list took ${Date.now() - t2}ms`);
+
+      // Strip the scope prefix from returned paths for cleaner display
+      const cleanPaths = paths.map((p) => stripScopePrefix(p, scopePrefix));
+
+      logger.debug(`Total list request took ${Date.now() - startTime}ms`);
+      res.json({
+        success: true,
+        scope: scope as string,
+        prefix: prefix || '/',
+        paths: cleanPaths,
+        count: cleanPaths.length,
+      });
+    }
   } catch (error: any) {
     logger.error('Workspace list error:', error);
     res.status(500).json({
@@ -653,18 +724,15 @@ router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
             );
 
             if (resolvedAgentId) {
-              const scopedPrefix = `/agent/${resolvedAgentId}/${prefix}`;
+              const scopePrefix = buildScopePrefix('agent', {
+                agentId: resolvedAgentId,
+              });
+              const scopedPrefix = `${scopePrefix}${prefix}`;
               const items = await workspace.listWithMetadata(scopedPrefix);
 
               items.forEach((item) => {
-                // Clean path by removing scope prefix
-                const cleanPath = item.path.replace(
-                  new RegExp(`^/agent/${resolvedAgentId}/`),
-                  '',
-                );
-
                 results.push({
-                  path: cleanPath,
+                  path: stripScopePrefix(item.path, scopePrefix),
                   metadata: item.metadata || {},
                   scope: 'agent',
                   scopeId: resolvedAgentId,
@@ -704,17 +772,15 @@ router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
               return;
             }
 
-            const scopedPrefix = `/team/${trimmedTeamId}/${prefix}`;
+            const scopePrefix = buildScopePrefix('team', {
+              teamId: trimmedTeamId,
+            });
+            const scopedPrefix = `${scopePrefix}${prefix}`;
             const items = await workspace.listWithMetadata(scopedPrefix);
 
             items.forEach((item) => {
-              const cleanPath = item.path.replace(
-                new RegExp(`^/team/${trimmedTeamId}/`),
-                '',
-              );
-
               results.push({
-                path: cleanPath,
+                path: stripScopePrefix(item.path, scopePrefix),
                 metadata: item.metadata || {},
                 scope: 'team',
                 scopeId: trimmedTeamId,
@@ -735,17 +801,15 @@ router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
     ) {
       const t3 = Date.now();
       try {
-        const scopedPrefix = `/company/${req.company._id}/${prefix}`;
+        const scopePrefix = buildScopePrefix('company', {
+          companyId: req.company._id.toString(),
+        });
+        const scopedPrefix = `${scopePrefix}${prefix}`;
         const items = await workspace.listWithMetadata(scopedPrefix);
 
         items.forEach((item) => {
-          const cleanPath = item.path.replace(
-            `/company/${req.company._id}/`,
-            '',
-          );
-
           results.push({
-            path: cleanPath,
+            path: stripScopePrefix(item.path, scopePrefix),
             metadata: item.metadata || {},
             scope: 'company',
             scopeId: req.company._id.toString(),
@@ -762,17 +826,15 @@ router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
       const t4 = Date.now();
       const sessionId = (req.headers['x-session-id'] as string) || 'default';
       try {
-        const scopedPrefix = `/session/${sessionId}/${prefix}`;
+        const scopePrefix = buildScopePrefix('session', {
+          sessionId,
+        });
+        const scopedPrefix = `${scopePrefix}${prefix}`;
         const items = await workspace.listWithMetadata(scopedPrefix);
 
         items.forEach((item) => {
-          const cleanPath = item.path.replace(
-            new RegExp(`^/session/${sessionId}/`),
-            '',
-          );
-
           results.push({
-            path: cleanPath,
+            path: stripScopePrefix(item.path, scopePrefix),
             metadata: item.metadata || {},
             scope: 'session',
             scopeId: sessionId,

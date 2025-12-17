@@ -733,13 +733,13 @@ export const createWorkspaceService = (
             };
           }
 
-          // Fetch keys with metadata, but exclude large content field
-          // This is much more efficient than loading full documents
+          // Fetch keys with metadata
+          // NOTE: Keyv stores value as serialized JSON, so we need to get the whole value
+          // We can't use nested projections like 'value.metadata' on a JSON string
           const cursor = collection.find(query, {
             projection: {
               key: 1,
-              'value.metadata': 1,
-              'value.type': 1,
+              value: 1,
               _id: 0,
             },
           });
@@ -748,17 +748,34 @@ export const createWorkspaceService = (
           const docs = await cursor.toArray();
 
           // Extract and format results
+          // NOTE: Keyv stores value as a JSON string, so we need to parse it
           const results = docs.map((doc: any) => {
             let path = doc.key;
             if (path.startsWith(namespacePrefix)) {
               path = path.substring(namespacePrefix.length);
             }
 
+            // Parse the serialized value if it's a string
+            // NOTE: Keyv wraps the value in another "value" property
+            let parsedValue = doc.value;
+            if (typeof doc.value === 'string') {
+              try {
+                parsedValue = JSON.parse(doc.value);
+                // Keyv stores as {value: {actual data}}
+                if (parsedValue?.value) {
+                  parsedValue = parsedValue.value;
+                }
+              } catch (e) {
+                logger.warn(`Failed to parse value for ${path}`);
+                parsedValue = {};
+              }
+            }
+
             return {
               path,
-              metadata: doc.value?.metadata || {},
-              type: doc.value?.type,
-              size: doc.value?.metadata?.size,
+              metadata: parsedValue?.metadata || {},
+              type: parsedValue?.type,
+              size: parsedValue?.metadata?.size,
             };
           });
 
