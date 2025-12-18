@@ -7,7 +7,7 @@ export interface IIdentifier {
 
 export const IdentifierSchema: Schema = new Schema({
   key: { type: String, required: true },
-  value: { type: String, required: true },
+  value: { type: String, required: false, default: '' },
 });
 
 export interface IAssistant extends Document {
