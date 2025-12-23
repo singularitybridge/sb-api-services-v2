@@ -34,8 +34,12 @@ import { trimToWindow } from '../../utils/tokenWindow';
 import { getProvider, MODEL_CONFIGS } from './provider.service';
 // import util from 'node:util'; // No longer needed after debug log removal
 
-// Simple in-memory cache for toolsForSdk
+// In-memory cache for toolsForSdk
+// Key format: `${assistantId}-${userId}-${allowedActionsHash}`
+// userId is included because tools close over the ActionContext at creation time,
+// so each user needs their own cached tools with their own context.
 const toolsCache = new Map<string, Record<string, Tool<any, any>>>();
+const TOOLS_CACHE_MAX_SIZE = 500; // Limit cache size to prevent unbounded memory growth
 
 // Helper function to clean action annotations from text
 const cleanActionAnnotations = (text: string): string => {
@@ -389,6 +393,7 @@ export const handleSessionMessage = async (
       content: msg.content as string,
     }));
 
+  // ActionContext must include userId - tools like getCurrentUser depend on it
   const actionContext = {
     sessionId: sessionId.toString(),
     companyId: session.companyId.toString(),
@@ -397,7 +402,9 @@ export const handleSessionMessage = async (
     assistantId: assistant._id.toString(),
   };
 
-  // Cache key includes userId to ensure each user gets tools with their own context
+  // Cache key MUST include userId because tools close over actionContext at creation time.
+  // Without userId in the key, User A's cached tools (with User A's context) would be
+  // returned to User B, causing incorrect user identification.
   const cacheKey = `${assistant._id.toString()}-${session.userId.toString()}-${JSON.stringify(
     assistant.allowedActions.slice().sort(),
   )}`;
@@ -612,8 +619,13 @@ export const handleSessionMessage = async (
         execute: executeFunc,
       } as any);
     }
+    // Evict oldest entries if cache exceeds max size (simple FIFO eviction)
+    if (toolsCache.size >= TOOLS_CACHE_MAX_SIZE) {
+      const keysToDelete = Array.from(toolsCache.keys()).slice(0, 50); // Remove 50 oldest entries
+      keysToDelete.forEach(key => toolsCache.delete(key));
+      console.log(`[toolsCache] Evicted ${keysToDelete.length} entries, new size: ${toolsCache.size}`);
+    }
     toolsCache.set(cacheKey, toolsForSdk);
-    // console.log(`Cached toolsForSdk for assistant ${assistant._id}`);
   }
 
   let modelIdentifier = assistant.llmModel || 'gpt-4.1-mini';
