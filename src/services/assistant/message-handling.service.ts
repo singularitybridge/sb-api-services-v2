@@ -34,8 +34,12 @@ import { trimToWindow } from '../../utils/tokenWindow';
 import { getProvider, MODEL_CONFIGS } from './provider.service';
 // import util from 'node:util'; // No longer needed after debug log removal
 
-// Simple in-memory cache for toolsForSdk
+// In-memory cache for toolsForSdk
+// Key format: `${assistantId}-${userId}-${allowedActionsHash}`
+// userId is included because tools close over the ActionContext at creation time,
+// so each user needs their own cached tools with their own context.
 const toolsCache = new Map<string, Record<string, Tool<any, any>>>();
+const TOOLS_CACHE_MAX_SIZE = 500; // Limit cache size to prevent unbounded memory growth
 
 // Helper function to clean action annotations from text
 const cleanActionAnnotations = (text: string): string => {
@@ -389,13 +393,19 @@ export const handleSessionMessage = async (
       content: msg.content as string,
     }));
 
+  // ActionContext must include userId - tools like getCurrentUser depend on it
   const actionContext = {
     sessionId: sessionId.toString(),
     companyId: session.companyId.toString(),
     language: session.language as SupportedLanguage,
+    userId: session.userId.toString(),
+    assistantId: assistant._id.toString(),
   };
 
-  const cacheKey = `${assistant._id.toString()}-${JSON.stringify(
+  // Cache key MUST include userId because tools close over actionContext at creation time.
+  // Without userId in the key, User A's cached tools (with User A's context) would be
+  // returned to User B, causing incorrect user identification.
+  const cacheKey = `${assistant._id.toString()}-${session.userId.toString()}-${JSON.stringify(
     assistant.allowedActions.slice().sort(),
   )}`;
   let toolsForSdk: Record<string, Tool<any, any>>;
@@ -609,8 +619,13 @@ export const handleSessionMessage = async (
         execute: executeFunc,
       } as any);
     }
+    // Evict oldest entries if cache exceeds max size (simple FIFO eviction)
+    if (toolsCache.size >= TOOLS_CACHE_MAX_SIZE) {
+      const keysToDelete = Array.from(toolsCache.keys()).slice(0, 50); // Remove 50 oldest entries
+      keysToDelete.forEach(key => toolsCache.delete(key));
+      console.log(`[toolsCache] Evicted ${keysToDelete.length} entries, new size: ${toolsCache.size}`);
+    }
     toolsCache.set(cacheKey, toolsForSdk);
-    // console.log(`Cached toolsForSdk for assistant ${assistant._id}`);
   }
 
   let modelIdentifier = assistant.llmModel || 'gpt-4.1-mini';
@@ -776,7 +791,7 @@ export const handleSessionMessage = async (
         messages: trimmedMessages, // This now contains correctly formatted multimodal messages
         tools: relevantTools,
         maxRetries: 2,
-        stopWhen: stepCountIs(5), // Stop after 5 tool steps
+        stopWhen: stepCountIs(10), // Stop after 10 tool steps
       };
       if (systemPrompt !== undefined) {
         streamCallOptions.system = systemPrompt;
@@ -1002,53 +1017,51 @@ export const handleSessionMessage = async (
             await logCostTracking(costInfo);
           }
 
-          // Check for empty response which might indicate an API key error
+          // Check for empty response - only treat as error if no tools were called
           if (!finalText || finalText.length === 0) {
-            console.error(
-              `[handleSessionMessage] Empty response from LLM stream for session ${sessionId}.`,
-            );
-            console.error(
-              `[handleSessionMessage] Model: ${modelIdentifier}, Provider: ${providerKey}`,
-            );
-            console.error(
-              `[handleSessionMessage] Tools count: ${
-                Object.keys(relevantTools).length
-              }`,
-            );
-            console.error(
-              `[handleSessionMessage] Tool calls: ${toolCalls?.length || 0}`,
-            );
-            console.error(
-              `[handleSessionMessage] Tool results: ${
-                toolResults?.length || 0
-              }`,
-            );
+            const hasToolResults = toolResults && toolResults.length > 0;
+            const hasToolCalls = toolCalls && toolCalls.length > 0;
 
-            // Log streamResult properties for debugging
-            try {
-              const usage = await streamResult.usage;
-              console.error(`[handleSessionMessage] Stream usage:`, usage);
-            } catch (e) {
+            if (!hasToolResults && !hasToolCalls) {
+              // No text and no tool activity - this is an error
               console.error(
-                `[handleSessionMessage] Could not get stream usage:`,
-                e,
+                `[handleSessionMessage] Empty response from LLM stream for session ${sessionId}.`,
+              );
+              console.error(
+                `[handleSessionMessage] Model: ${modelIdentifier}, Provider: ${providerKey}`,
+              );
+
+              // Log streamResult properties for debugging
+              try {
+                const usage = await streamResult.usage;
+                console.error(`[handleSessionMessage] Stream usage:`, usage);
+              } catch (e) {
+                console.error(
+                  `[handleSessionMessage] Could not get stream usage:`,
+                  e,
+                );
+              }
+
+              // Save an error message to inform the user
+              await saveSystemMessage(
+                new mongoose.Types.ObjectId(session._id as string),
+                new mongoose.Types.ObjectId(assistant._id as string),
+                new mongoose.Types.ObjectId(session.userId as string),
+                'Failed to generate response. Please check your API key configuration.',
+                'error',
+                {
+                  error: 'empty_response',
+                  provider: providerKey,
+                  model: modelIdentifier,
+                },
+              );
+              return;
+            } else {
+              // Tools were executed but no final text - this is normal for tool-heavy responses
+              console.log(
+                `[handleSessionMessage] No final text but tools were executed. Tool calls: ${toolCalls?.length || 0}, Tool results: ${toolResults?.length || 0}`,
               );
             }
-
-            // Save an error message to inform the user
-            await saveSystemMessage(
-              new mongoose.Types.ObjectId(session._id as string),
-              new mongoose.Types.ObjectId(assistant._id as string),
-              new mongoose.Types.ObjectId(session.userId as string),
-              'Failed to generate response. Please check your API key configuration.',
-              'error',
-              {
-                error: 'empty_response',
-                provider: providerKey,
-                model: modelIdentifier,
-              },
-            );
-            return;
           }
 
           if (toolCalls && toolCalls.length > 0) {
@@ -1144,8 +1157,20 @@ export const handleSessionMessage = async (
       // Monitor the stream to catch empty responses and save error messages
       // Also attach an error indicator to the stream result for the route handler
       streamResult.text
-        .then((text: string) => {
+        .then(async (text: string) => {
           if (!text || text.length === 0) {
+            // Check if tools were executed - if so, empty text is not an error
+            const toolCalls = await streamResult.toolCalls;
+            const toolResults = await streamResult.toolResults;
+            const hasToolActivity = (toolCalls && toolCalls.length > 0) || (toolResults && toolResults.length > 0);
+
+            if (hasToolActivity) {
+              console.log(
+                `[handleSessionMessage] Stream completed with empty text but tools were executed for session ${sessionId}`,
+              );
+              return; // Not an error - tools were executed
+            }
+
             console.error(
               `[handleSessionMessage] Stream completed with empty text for session ${sessionId}`,
             );
@@ -1218,7 +1243,7 @@ export const handleSessionMessage = async (
         messages: trimmedMessages, // This now contains correctly formatted multimodal messages
         tools: relevantTools,
         maxRetries: 2,
-        stopWhen: stepCountIs(5), // Stop after 5 tool steps
+        stopWhen: stepCountIs(10), // Stop after 10 tool steps
       };
       if (systemPrompt !== undefined) {
         generateCallOptions.system = systemPrompt;
@@ -1334,23 +1359,34 @@ export const handleSessionMessage = async (
       throw new Error('LLM result was not obtained for non-streaming case.');
     }
 
-    // Check for empty response which might indicate an API key error
+    // Check for empty response - only treat as error if no tools were called
     if (!aggregatedResponse || aggregatedResponse.length === 0) {
-      console.error(
-        `[handleSessionMessage] Empty response from LLM for session ${sessionId}. This might indicate an invalid API key.`,
-      );
+      const hasToolCalls = finalLlmResult.toolCalls && finalLlmResult.toolCalls.length > 0;
+      const hasToolResults = finalLlmResult.toolResults && finalLlmResult.toolResults.length > 0;
 
-      // Save an error message to inform the user
-      await saveSystemMessage(
-        new mongoose.Types.ObjectId(session._id as string),
-        new mongoose.Types.ObjectId(assistant._id as string),
-        new mongoose.Types.ObjectId(session.userId as string),
-        'Failed to generate response. Please check your API key configuration.',
-        'error',
-        { error: 'empty_response', provider: providerKey },
-      );
+      if (!hasToolCalls && !hasToolResults) {
+        // No text and no tool activity - this is an error
+        console.error(
+          `[handleSessionMessage] Empty response from LLM for session ${sessionId}. This might indicate an invalid API key.`,
+        );
 
-      return 'Failed to generate response. Please check your API key configuration.';
+        // Save an error message to inform the user
+        await saveSystemMessage(
+          new mongoose.Types.ObjectId(session._id as string),
+          new mongoose.Types.ObjectId(assistant._id as string),
+          new mongoose.Types.ObjectId(session.userId as string),
+          'Failed to generate response. Please check your API key configuration.',
+          'error',
+          { error: 'empty_response', provider: providerKey },
+        );
+
+        return 'Failed to generate response. Please check your API key configuration.';
+      } else {
+        // Tools were executed but no final text - this is normal for tool-heavy responses
+        console.log(
+          `[handleSessionMessage] No final text but tools were executed. Tool calls: ${finalLlmResult.toolCalls?.length || 0}, Tool results: ${finalLlmResult.toolResults?.length || 0}`,
+        );
+      }
     }
 
     const cleanedResponse = cleanActionAnnotations(aggregatedResponse);
