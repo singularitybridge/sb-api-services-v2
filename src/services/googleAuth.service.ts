@@ -178,10 +178,3 @@ export const googleLogin = async (
   }
 };
 
-export const verifyBetaKey = async (betaKey: string) => {
-  if (betaKey === process.env.BETA_INVITE_KEY) {
-    return true;
-  } else {
-    return false;
-  }
-};
