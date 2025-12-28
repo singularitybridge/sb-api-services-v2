@@ -1,7 +1,7 @@
 /// file_path: src/routes/auth.routes.ts
 import express from 'express';
 import { extractTokenFromHeader, verifyToken } from '../services/token.service';
-import { googleLogin, verifyBetaKey } from '../services/googleAuth.service';
+import { googleLogin } from '../services/googleAuth.service';
 import { refreshApiKeyCache } from '../services/api.key.service';
 import { ApiKeyService } from '../services/apiKey.service';
 
@@ -63,16 +63,6 @@ authRouter.post('/google/login', async (req, res) => {
   } catch (error) {
     console.error('Error during Google login:', error);
     res.status(500).json({ error: 'Failed to login with Google' });
-  }
-});
-
-authRouter.post('/beta-key', async (req, res) => {
-  const { betaKey } = req.body;
-  try {
-    const isValid = await verifyBetaKey(betaKey);
-    res.json({ isValid });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to verify beta key' });
   }
 });
 
