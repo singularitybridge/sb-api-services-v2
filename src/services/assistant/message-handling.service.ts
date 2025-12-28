@@ -28,8 +28,9 @@ import {
   ImagePart,
   TextPart,
   stepCountIs,
+  Output,
 } from 'ai';
-import { z, ZodTypeAny } from 'zod';
+import { z, ZodType } from 'zod';
 import { trimToWindow } from '../../utils/tokenWindow';
 import { getProvider, MODEL_CONFIGS } from './provider.service';
 // import util from 'node:util'; // No longer needed after debug log removal
@@ -52,11 +53,7 @@ const cleanActionAnnotations = (text: string): string => {
 };
 
 // Helper function for Zod parsing diagnostics
-function logParse(
-  result: z.SafeParseReturnType<any, any>,
-  fnName: string,
-  raw: any,
-) {
+function logParse(result: z.ZodSafeParseResult<any>, fnName: string, raw: any) {
   if (!result.success) {
     console.error(`[ToolArgError] ${fnName} args failed Zod parse`, {
       raw,
@@ -146,18 +143,17 @@ interface Attachment {
   fileName: string;
 }
 
-type OpenAIImageUrlPart = {
-  type: 'image_url';
-  image_url: { url: string; detail?: 'low' | 'high' | 'auto' };
-};
-
 export const handleSessionMessage = async (
   userInput: string,
   sessionId: string,
   metadata?: Record<string, string>,
   attachments?: Attachment[],
 ): Promise<
-  string | StreamTextResult<Record<string, Tool<any, any>>, unknown>
+  | string
+  | StreamTextResult<
+      Record<string, Tool<any, any>>,
+      Output.Output<string, string>
+    >
 > => {
   const requestStartTime = Date.now();
   console.log(
@@ -426,7 +422,7 @@ export const handleSessionMessage = async (
     );
     for (const funcName in functionFactory) {
       const funcDef = functionFactory[funcName];
-      const zodShape: Record<string, ZodTypeAny> = {};
+      const zodShape: Record<string, ZodType> = {};
       let saneRequiredParams: string[] = [];
 
       if (
@@ -445,7 +441,7 @@ export const handleSessionMessage = async (
       if (funcDef.parameters && funcDef.parameters.properties) {
         for (const paramName in funcDef.parameters.properties) {
           const paramDef = funcDef.parameters.properties[paramName] as any;
-          let zodType: ZodTypeAny;
+          let zodType: ZodType;
           switch (paramDef.type) {
             case 'string':
               zodType = z.string();
@@ -454,7 +450,7 @@ export const handleSessionMessage = async (
               zodType = z.number();
               break;
             case 'integer':
-              zodType = z.number().int();
+              zodType = z.int();
               break;
             case 'boolean':
               zodType = z.boolean();
@@ -466,12 +462,12 @@ export const handleSessionMessage = async (
                   paramDef.items.properties
                 ) {
                   // Handle array of objects, like the 'attributes' array
-                  const itemZodShape: Record<string, ZodTypeAny> = {};
+                  const itemZodShape: Record<string, ZodType> = {};
                   for (const itemPropName in paramDef.items.properties) {
                     const itemPropDef = paramDef.items.properties[
                       itemPropName
                     ] as any;
-                    let itemZodType: ZodTypeAny;
+                    let itemZodType: ZodType;
                     switch (itemPropDef.type) {
                       case 'string':
                         itemZodType = z.string();
@@ -622,8 +618,10 @@ export const handleSessionMessage = async (
     // Evict oldest entries if cache exceeds max size (simple FIFO eviction)
     if (toolsCache.size >= TOOLS_CACHE_MAX_SIZE) {
       const keysToDelete = Array.from(toolsCache.keys()).slice(0, 50); // Remove 50 oldest entries
-      keysToDelete.forEach(key => toolsCache.delete(key));
-      console.log(`[toolsCache] Evicted ${keysToDelete.length} entries, new size: ${toolsCache.size}`);
+      keysToDelete.forEach((key) => toolsCache.delete(key));
+      console.log(
+        `[toolsCache] Evicted ${keysToDelete.length} entries, new size: ${toolsCache.size}`,
+      );
     }
     toolsCache.set(cacheKey, toolsForSdk);
   }
@@ -784,6 +782,10 @@ export const handleSessionMessage = async (
       return allTools;
     };
     const relevantTools = slimToolsForIntent(userInput, toolsForSdk);
+    const toolNames = Object.keys(relevantTools);
+    console.log(
+      `[TOOLS_AVAILABLE] ${toolNames.length} tools: ${toolNames.length > 0 ? toolNames.join(', ') : 'none'}`,
+    );
 
     if (shouldStream) {
       const streamCallOptions: Parameters<typeof streamText>[0] = {
@@ -834,7 +836,6 @@ export const handleSessionMessage = async (
 
         // Set up periodic progress logging for long-running streams
         let progressLogInterval: NodeJS.Timeout | null = null;
-        const lastProgressTime = Date.now();
         let chunksReceived = 0;
 
         progressLogInterval = setInterval(() => {
@@ -850,6 +851,7 @@ export const handleSessionMessage = async (
             let firstChunkTime: number | null = null;
             // textStream is a ReadableStream, not a promise
             for await (const chunk of streamResult.textStream) {
+              void chunk; // Explicitly mark as intentionally unused
               chunksReceived++;
               if (!firstChunkTime) {
                 firstChunkTime = Date.now() - streamStartTime;
@@ -1162,7 +1164,9 @@ export const handleSessionMessage = async (
             // Check if tools were executed - if so, empty text is not an error
             const toolCalls = await streamResult.toolCalls;
             const toolResults = await streamResult.toolResults;
-            const hasToolActivity = (toolCalls && toolCalls.length > 0) || (toolResults && toolResults.length > 0);
+            const hasToolActivity =
+              (toolCalls && toolCalls.length > 0) ||
+              (toolResults && toolResults.length > 0);
 
             if (hasToolActivity) {
               console.log(
@@ -1361,8 +1365,10 @@ export const handleSessionMessage = async (
 
     // Check for empty response - only treat as error if no tools were called
     if (!aggregatedResponse || aggregatedResponse.length === 0) {
-      const hasToolCalls = finalLlmResult.toolCalls && finalLlmResult.toolCalls.length > 0;
-      const hasToolResults = finalLlmResult.toolResults && finalLlmResult.toolResults.length > 0;
+      const hasToolCalls =
+        finalLlmResult.toolCalls && finalLlmResult.toolCalls.length > 0;
+      const hasToolResults =
+        finalLlmResult.toolResults && finalLlmResult.toolResults.length > 0;
 
       if (!hasToolCalls && !hasToolResults) {
         // No text and no tool activity - this is an error
