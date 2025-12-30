@@ -5,61 +5,50 @@ import { ProviderKey } from '../../types/assistant.types';
 
 // Model configurations with built-in capabilities for v5
 const MODEL_CONFIGS: Record<string, any> = {
-  // O3-mini models - v5 handles strict mode automatically
-  'o3-mini': {
-    provider: 'openai',
-    baseModel: 'o3-mini',
-    providerOptions: {
-      openai: { reasoningEffort: 'medium' },
-    },
-  },
-  'o3-mini-low': {
-    provider: 'openai',
-    baseModel: 'o3-mini',
-    providerOptions: {
-      openai: { reasoningEffort: 'low' },
-    },
-  },
-  'o3-mini-medium': {
-    provider: 'openai',
-    baseModel: 'o3-mini',
-    providerOptions: {
-      openai: { reasoningEffort: 'medium' },
-    },
-  },
-  'o3-mini-high': {
-    provider: 'openai',
-    baseModel: 'o3-mini',
-    providerOptions: {
-      openai: { reasoningEffort: 'high' },
-    },
-  },
-  // GPT models
+  // === OpenAI GPT-5.x family ===
+  'gpt-5.2': { provider: 'openai', baseModel: 'gpt-5.2' },
+  'gpt-5': { provider: 'openai', baseModel: 'gpt-5' },
+  'gpt-5-mini': { provider: 'openai', baseModel: 'gpt-5-mini' },
+  'gpt-5-nano': { provider: 'openai', baseModel: 'gpt-5-nano' },
+
+  // === OpenAI GPT-4.x family ===
+  'gpt-4.1': { provider: 'openai', baseModel: 'gpt-4.1' },
+  'gpt-4.1-mini': { provider: 'openai', baseModel: 'gpt-4.1-mini' },
+  'gpt-4.1-nano': { provider: 'openai', baseModel: 'gpt-4.1-nano' },
   'gpt-4o': { provider: 'openai', baseModel: 'gpt-4o' },
   'gpt-4o-mini': { provider: 'openai', baseModel: 'gpt-4o-mini' },
-  'gpt-4.1-mini': { provider: 'openai', baseModel: 'gpt-4.1-mini' },
   'gpt-4-turbo': { provider: 'openai', baseModel: 'gpt-4-turbo' },
   'gpt-3.5-turbo': { provider: 'openai', baseModel: 'gpt-3.5-turbo' },
-  // Claude models
-  'claude-3-5-sonnet': {
-    provider: 'anthropic',
-    baseModel: 'claude-3-5-sonnet-latest',
-  },
-  'claude-3-5-haiku': {
-    provider: 'anthropic',
-    baseModel: 'claude-3-5-haiku-latest',
-  },
+
+  // === Google Gemini 3 (preview) ===
+  'gemini-3-pro-preview': { provider: 'google', baseModel: 'gemini-3-pro-preview' },
+  'gemini-3-flash-preview': { provider: 'google', baseModel: 'gemini-3-flash-preview' },
+
+  // === Google Gemini 2.5 (stable) ===
+  'gemini-2.5-pro': { provider: 'google', baseModel: 'gemini-2.5-pro' },
+  'gemini-2.5-flash': { provider: 'google', baseModel: 'gemini-2.5-flash' },
+  'gemini-2.5-flash-lite': { provider: 'google', baseModel: 'gemini-2.5-flash-lite' },
+
+  // === Google Gemini 2.0 (legacy) ===
+  'gemini-2.0-flash': { provider: 'google', baseModel: 'gemini-2.0-flash' },
+
+  // === Anthropic Claude 4.5 ===
+  'claude-sonnet-4-5': { provider: 'anthropic', baseModel: 'claude-sonnet-4-5-20250929' },
+  'claude-haiku-4-5': { provider: 'anthropic', baseModel: 'claude-haiku-4-5-20251001' },
+  'claude-opus-4-5': { provider: 'anthropic', baseModel: 'claude-opus-4-5-20251101' },
+
+  // === Anthropic Claude 4.1 ===
+  'claude-opus-4-1': { provider: 'anthropic', baseModel: 'claude-opus-4-1-20250805' },
+
+  // === Anthropic Claude 4 ===
+  'claude-sonnet-4-0': { provider: 'anthropic', baseModel: 'claude-sonnet-4-20250514' },
+  'claude-opus-4-0': { provider: 'anthropic', baseModel: 'claude-opus-4-20250514' },
+
+  // === Anthropic Claude 3 (legacy) ===
+  'claude-3-haiku-20240307': { provider: 'anthropic', baseModel: 'claude-3-haiku-20240307' },
+  'claude-3-5-sonnet': { provider: 'anthropic', baseModel: 'claude-3-5-sonnet-latest' },
+  'claude-3-5-haiku': { provider: 'anthropic', baseModel: 'claude-3-5-haiku-latest' },
   'claude-3-opus': { provider: 'anthropic', baseModel: 'claude-3-opus-latest' },
-  // Gemini models
-  'gemini-2.0-flash': {
-    provider: 'google',
-    baseModel: 'gemini-2.0-flash-latest',
-  },
-  'gemini-1.5-pro': { provider: 'google', baseModel: 'gemini-1.5-pro-latest' },
-  'gemini-1.5-flash': {
-    provider: 'google',
-    baseModel: 'gemini-1.5-flash-latest',
-  },
 };
 
 export function getProvider(pk: ProviderKey, model: string, key: string) {
