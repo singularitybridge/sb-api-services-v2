@@ -20,7 +20,7 @@ const CreateEntrySchema = z.object({
   content: z.string().min(1),
   entryType: z.string(),
   tags: z.array(z.string()).optional(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
   // userId and companyId will be taken from authenticated session, not request body
 });
 
@@ -37,26 +37,26 @@ const GetEntriesQuerySchema = z.object({
     .string()
     .optional()
     .refine((val: any) => !val || mongoose.Types.ObjectId.isValid(val), {
-      message: 'Invalid sessionId',
+      error: 'Invalid sessionId',
     }),
   entryType: z.string().optional(),
   tags: z.preprocess(
     (val: any) => (typeof val === 'string' ? val.split(',') : val),
     z.array(z.string()).optional(),
   ),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(25),
-  scope: z.enum(['user', 'company']).optional().default('user'),
+  limit: z.coerce.number().int().min(1).max(100).optional().prefault(25),
+  scope: z.enum(['user', 'company']).optional().prefault('user'),
   userId: z
     .string()
     .optional()
     .refine((val: any) => !val || mongoose.Types.ObjectId.isValid(val), {
-      message: 'Invalid userId',
+      error: 'Invalid userId',
     }), // Made optional
   companyId: z
     .string()
     .optional()
     .refine((val: any) => !val || mongoose.Types.ObjectId.isValid(val), {
-      message: 'Invalid companyId',
+      error: 'Invalid companyId',
     }), // Made optional
 });
 
@@ -67,18 +67,18 @@ const SearchEntriesQuerySchema = z.object({
     (val: any) => (typeof val === 'string' ? val.split(',') : val),
     z.array(z.string()).optional(),
   ),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(10),
+  limit: z.coerce.number().int().min(1).max(100).optional().prefault(10),
   userId: z
     .string()
     .optional()
     .refine((val: any) => !val || mongoose.Types.ObjectId.isValid(val), {
-      message: 'Invalid userId',
+      error: 'Invalid userId',
     }), // Already optional
   companyId: z
     .string()
     .optional()
     .refine((val: any) => !val || mongoose.Types.ObjectId.isValid(val), {
-      message: 'Invalid companyId',
+      error: 'Invalid companyId',
     }), // Made optional
 });
 
@@ -86,7 +86,7 @@ const UpdateEntrySchema = CreateEntrySchema.partial(); // All fields optional fo
 
 // Middleware for Zod validation error handling
 const validate =
-  (schema: z.ZodSchema<any>) =>
+  (schema: z.ZodType<any>) =>
   (req: Request, res: Response, next: NextFunction) => {
     try {
       if (req.method === 'GET' || req.method === 'DELETE') {
@@ -97,7 +97,7 @@ const validate =
       next();
     } catch (error) {
       if (error instanceof ZodError) {
-        res.status(400).json({ errors: error.errors });
+        res.status(400).json({ errors: error.issues });
       } else {
         next(error as Error);
       }

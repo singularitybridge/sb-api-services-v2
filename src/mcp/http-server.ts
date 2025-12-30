@@ -14,7 +14,7 @@ import {
   LATEST_PROTOCOL_VERSION,
 } from '@modelcontextprotocol/sdk/types.js';
 import { Request, Response } from 'express';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { z } from 'zod';
 
 import {
   executeTool,
@@ -184,17 +184,20 @@ export class MCPHttpServer {
    */
   private setupHandlers(): void {
     // Handle initialization
-    this.server.setRequestHandler(InitializeRequestSchema, async (request) => ({
-      protocolVersion: LATEST_PROTOCOL_VERSION,
-      capabilities: {
-        tools: {},
-        logging: {},
-      },
-      serverInfo: {
-        name: 'sb-agent-hub',
-        version: '1.0.0',
-      },
-    }));
+    this.server.setRequestHandler(
+      InitializeRequestSchema,
+      async (_request) => ({
+        protocolVersion: LATEST_PROTOCOL_VERSION,
+        capabilities: {
+          tools: {},
+          logging: {},
+        },
+        serverInfo: {
+          name: 'sb-agent-hub',
+          version: '1.0.0',
+        },
+      }),
+    );
 
     // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -375,141 +378,135 @@ export class MCPHttpServer {
           {
             name: executeTool.name,
             description: executeTool.description,
-            inputSchema: zodToJsonSchema(executeSchema, {
-              $refStrategy: 'none',
-            }),
+            inputSchema: z.toJSONSchema(executeSchema, { reused: 'inline' }),
           },
           {
             name: listAgentsTool.name,
             description: listAgentsTool.description,
-            inputSchema: zodToJsonSchema(listAgentsSchema, {
-              $refStrategy: 'none',
-            }),
+            inputSchema: z.toJSONSchema(listAgentsSchema, { reused: 'inline' }),
           },
           {
             name: listAgentsByTeamTool.name,
             description: listAgentsByTeamTool.description,
-            inputSchema: zodToJsonSchema(listAgentsByTeamSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(listAgentsByTeamSchema, {
+              reused: 'inline',
             }),
           },
           {
             name: getAgentPromptTool.name,
             description: getAgentPromptTool.description,
-            inputSchema: zodToJsonSchema(getAgentPromptSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(getAgentPromptSchema, {
+              reused: 'inline',
             }),
           },
           {
             name: updateAgentPromptTool.name,
             description: updateAgentPromptTool.description,
-            inputSchema: zodToJsonSchema(updateAgentPromptSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(updateAgentPromptSchema, {
+              reused: 'inline',
             }),
           },
           {
             name: updateAgentTool.name,
             description: updateAgentTool.description,
-            inputSchema: zodToJsonSchema(updateAgentSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(updateAgentSchema, {
+              reused: 'inline',
             }),
           },
           {
             name: listWorkspaceItemsTool.name,
             description: listWorkspaceItemsTool.description,
-            inputSchema: zodToJsonSchema(listWorkspaceItemsSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(listWorkspaceItemsSchema, {
+              reused: 'inline',
             }),
           },
           {
             name: getWorkspaceItemTool.name,
             description: getWorkspaceItemTool.description,
-            inputSchema: zodToJsonSchema(getWorkspaceItemSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(getWorkspaceItemSchema, {
+              reused: 'inline',
             }),
           },
           {
             name: getAgentInfoTool.name,
             description: getAgentInfoTool.description,
-            inputSchema: zodToJsonSchema(getAgentInfoSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(getAgentInfoSchema, {
+              reused: 'inline',
             }),
           },
           {
             name: listTeamsTool.name,
             description: listTeamsTool.description,
-            inputSchema: zodToJsonSchema(listTeamsSchema, {
-              $refStrategy: 'none',
-            }),
+            inputSchema: z.toJSONSchema(listTeamsSchema, { reused: 'inline' }),
           },
           {
             name: createAgentTool.name,
             description: createAgentTool.description,
-            inputSchema: zodToJsonSchema(createAgentSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(createAgentSchema, {
+              reused: 'inline',
             }),
           },
           {
             name: assignAgentToTeamTool.name,
             description: assignAgentToTeamTool.description,
-            inputSchema: zodToJsonSchema(assignAgentToTeamSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(assignAgentToTeamSchema, {
+              reused: 'inline',
             }),
           },
           {
             name: addWorkspaceItemTool.name,
             description: addWorkspaceItemTool.description,
-            inputSchema: zodToJsonSchema(addWorkspaceItemSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(addWorkspaceItemSchema, {
+              reused: 'inline',
             }),
           },
           {
             name: deleteWorkspaceItemTool.name,
             description: deleteWorkspaceItemTool.description,
-            inputSchema: zodToJsonSchema(deleteWorkspaceItemSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(deleteWorkspaceItemSchema, {
+              reused: 'inline',
             }),
           },
           {
             name: moveWorkspaceItemTool.name,
             description: moveWorkspaceItemTool.description,
-            inputSchema: zodToJsonSchema(moveWorkspaceItemSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(moveWorkspaceItemSchema, {
+              reused: 'inline',
             }),
           },
           {
             name: vectorSearchWorkspaceTool.name,
             description: vectorSearchWorkspaceTool.description,
-            inputSchema: zodToJsonSchema(vectorSearchWorkspaceSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(vectorSearchWorkspaceSchema, {
+              reused: 'inline',
             }),
           },
           {
             name: getUiContextTool.name,
             description: getUiContextTool.description,
-            inputSchema: zodToJsonSchema(getUiContextSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(getUiContextSchema, {
+              reused: 'inline',
             }),
           },
           {
             name: navigateToPageTool.name,
             description: navigateToPageTool.description,
-            inputSchema: zodToJsonSchema(navigateToPageSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(navigateToPageSchema, {
+              reused: 'inline',
             }),
           },
           {
             name: openWorkspaceFileTool.name,
             description: openWorkspaceFileTool.description,
-            inputSchema: zodToJsonSchema(openWorkspaceFileSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(openWorkspaceFileSchema, {
+              reused: 'inline',
             }),
           },
           {
             name: showNotificationTool.name,
             description: showNotificationTool.description,
-            inputSchema: zodToJsonSchema(showNotificationSchema, {
-              $refStrategy: 'none',
+            inputSchema: z.toJSONSchema(showNotificationSchema, {
+              reused: 'inline',
             }),
           },
         ];

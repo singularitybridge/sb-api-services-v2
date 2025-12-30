@@ -23,7 +23,6 @@ export const addWorkspaceItemSchema = z.object({
       'Content to store (can be string, object, array, etc.). Not required if fileUrl is provided.',
     ),
   fileUrl: z
-    .string()
     .url()
     .optional()
     .describe(

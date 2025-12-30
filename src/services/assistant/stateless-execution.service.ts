@@ -1,9 +1,6 @@
 import { IAssistant } from '../../models/Assistant';
-import { processTemplate } from '../template.service';
 import { SupportedLanguage } from '../discovery.service';
 import { createFunctionFactory } from '../../integrations/actions/loaders';
-import { executeFunctionCall } from '../../integrations/actions/executors';
-import { FunctionCall } from '../../integrations/actions/types';
 import { getApiKey } from '../api.key.service';
 import { downloadFile } from '../file-downloader.service';
 import axios from 'axios';
@@ -21,10 +18,10 @@ import {
   Tool,
   ImagePart,
   TextPart,
-  generateObject,
   stepCountIs,
+  Output,
 } from 'ai';
-import { z, ZodTypeAny } from 'zod';
+import { z, ZodType } from 'zod';
 import { trimToWindow } from '../../utils/tokenWindow';
 import { getProvider } from './provider.service';
 // import { getSessionOrStatelessContext } from '../session.service'; // This utility was merged into getSessionById
@@ -39,11 +36,7 @@ const cleanActionAnnotations = (text: string): string => {
 };
 
 // Helper function for Zod parsing diagnostics
-function logParse(
-  result: z.SafeParseReturnType<any, any>,
-  fnName: string,
-  raw: any,
-) {
+function logParse(result: z.ZodSafeParseResult<any>, fnName: string, raw: any) {
   if (!result.success) {
     console.error(`[ToolArgError] ${fnName} args failed Zod parse`, {
       raw,
@@ -150,7 +143,7 @@ const attemptJsonRepair = (jsonString: string): any | null => {
 
 interface ResponseFormat {
   type: 'json_object' | 'json_schema';
-  schema?: z.ZodSchema<any>; // For json_schema type
+  schema?: z.ZodType<any>; // For json_schema type
 }
 
 interface Attachment {
@@ -181,7 +174,10 @@ export const executeAssistantStateless = async (
   promptOverride?: string, // Add promptOverride parameter
 ): Promise<
   | string
-  | StreamTextResult<Record<string, Tool<any, any>>, unknown>
+  | StreamTextResult<
+      Record<string, Tool<any, any>>,
+      Output.Output<string, string>
+    >
   | Record<string, any>
 > => {
   console.log(
@@ -342,7 +338,7 @@ export const executeAssistantStateless = async (
     );
     for (const funcName in functionFactory) {
       const funcDef = functionFactory[funcName];
-      const zodShape: Record<string, ZodTypeAny> = {};
+      const zodShape: Record<string, ZodType> = {};
       let saneRequiredParams: string[] = [];
 
       if (
@@ -361,7 +357,7 @@ export const executeAssistantStateless = async (
       if (funcDef.parameters && funcDef.parameters.properties) {
         for (const paramName in funcDef.parameters.properties) {
           const paramDef = funcDef.parameters.properties[paramName] as any;
-          let zodType: ZodTypeAny;
+          let zodType: ZodType;
           switch (paramDef.type) {
             case 'string':
               zodType = z.string();
@@ -370,7 +366,7 @@ export const executeAssistantStateless = async (
               zodType = z.number();
               break;
             case 'integer':
-              zodType = z.number().int();
+              zodType = z.int();
               break;
             case 'boolean':
               zodType = z.boolean();
@@ -382,12 +378,12 @@ export const executeAssistantStateless = async (
                   paramDef.items.properties
                 ) {
                   // Handle array of objects, like the 'attributes' array
-                  const itemZodShape: Record<string, ZodTypeAny> = {};
+                  const itemZodShape: Record<string, ZodType> = {};
                   for (const itemPropName in paramDef.items.properties) {
                     const itemPropDef = paramDef.items.properties[
                       itemPropName
                     ] as any;
-                    let itemZodType: ZodTypeAny;
+                    let itemZodType: ZodType;
                     switch (itemPropDef.type) {
                       case 'string':
                         itemZodType = z.string();
@@ -632,13 +628,15 @@ export const executeAssistantStateless = async (
       // For now, let's assume the route handles the full stream object.
       return streamResult;
     } else if (useStructuredOutput) {
-      // Use generateObject for structured JSON output
+      // Use generateText with Output.object() for structured JSON output
       if (responseFormat.type === 'json_schema' && responseFormat.schema) {
-        // Use provided schema
-        const objectResult = await (generateObject as any)({
+        // Use provided schema with Output.object()
+        const { output } = await generateText({
           model: llm,
           messages: trimmedMessages,
-          schema: responseFormat.schema,
+          output: Output.object({
+            schema: responseFormat.schema,
+          }),
           system: providerKey !== 'anthropic' ? systemPrompt : undefined,
         });
 
@@ -654,7 +652,7 @@ export const executeAssistantStateless = async (
           created_at: Math.floor(Date.now() / 1000),
           assistant_id: assistant._id.toString(),
           message_type: 'json',
-          data: { json: objectResult.object },
+          data: { json: output },
         };
       } else {
         // Use json mode (less strict, but ensures valid JSON)
