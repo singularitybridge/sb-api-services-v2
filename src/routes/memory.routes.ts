@@ -130,8 +130,8 @@ router.post(
         entryType,
         tags,
         metadata,
-        userId: new mongoose.Types.ObjectId(userId as string),
-        companyId: new mongoose.Types.ObjectId(companyId as string),
+        userId: new mongoose.Types.ObjectId(String(userId)),
+        companyId: new mongoose.Types.ObjectId(String(companyId)),
       };
       const entry = await createJournalEntryService(journalData, apiKey);
       res.status(201).json(entry);

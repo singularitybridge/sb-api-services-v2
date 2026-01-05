@@ -47,7 +47,7 @@ export async function getSessionMessages(apiKey: string, sessionId: string) {
   })
     .sort({ timestamp: -1 }) // Sort by timestamp descending (newest first)
     .limit(20) // Limit to 20 messages to match OpenAI default
-    .lean(); // Use .lean() for better performance as we are transforming the data
+    .lean<IMessage[]>(); // Use .lean() for better performance as we are transforming the data
 
   console.log(
     `Retrieved ${mongoMessages.length} messages for session ${sessionId}`,
@@ -59,9 +59,7 @@ export async function getSessionMessages(apiKey: string, sessionId: string) {
 
   const formattedMessages = await Promise.all(
     mongoMessages.map(async (msg) => {
-      const openAIFormattedMessage = transformMessageToOpenAIFormat(
-        msg as IMessage,
-      );
+      const openAIFormattedMessage = transformMessageToOpenAIFormat(msg);
 
       // Apply template processing for assistant messages
       if (
