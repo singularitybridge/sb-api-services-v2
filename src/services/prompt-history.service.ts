@@ -120,7 +120,7 @@ class PromptHistoryService {
           .skip(offset)
           .limit(limit)
           .populate('userId', 'name email')
-          .lean(),
+          .lean<IPromptHistory[]>(),
         PromptHistory.countDocuments(filter),
       ]);
 

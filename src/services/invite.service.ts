@@ -120,11 +120,11 @@ export class InviteService {
         .sort({ createdAt: -1 })
         .limit(limit)
         .skip(offset)
-        .lean(),
+        .lean<IInvite[]>(),
       Invite.countDocuments(query),
     ]);
 
-    return { invites: invites as IInvite[], total };
+    return { invites, total };
   }
 
   /**
