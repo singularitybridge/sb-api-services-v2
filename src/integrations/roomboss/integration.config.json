@@ -1,0 +1,7 @@
+{
+  "name": "roomboss",
+  "icon": "hotel",
+  "apiKeyName": "roomboss_username",
+  "actionCreator": "createRoomBossActions",
+  "actionsFile": "roomboss.actions.ts"
+}
