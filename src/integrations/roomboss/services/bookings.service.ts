@@ -32,10 +32,16 @@ export const createBooking = async (
     return { success: false, error: 'ratePlanId is required.' };
   }
   if (!params.checkIn) {
-    return { success: false, error: 'checkIn date is required (yyyyMMdd format).' };
+    return {
+      success: false,
+      error: 'checkIn date is required (yyyyMMdd format).',
+    };
   }
   if (!params.checkOut) {
-    return { success: false, error: 'checkOut date is required (yyyyMMdd format).' };
+    return {
+      success: false,
+      error: 'checkOut date is required (yyyyMMdd format).',
+    };
   }
   if (!params.guestGivenName) {
     return { success: false, error: 'guestGivenName is required.' };
@@ -106,7 +112,9 @@ export const listBookingsByDate = async (
   return withRoomBossClient(
     companyId,
     async (client) => {
-      const response = await executeRoomBossRequest<{ bookings: RoomBossBooking[] }>(
+      const response = await executeRoomBossRequest<{
+        bookings: RoomBossBooking[];
+      }>(
         client,
         {
           endpoint: '/extws/hotel/v1/listBookings',
@@ -138,7 +146,9 @@ export const getBooking = async (
   return withRoomBossClient(
     companyId,
     async (client) => {
-      const response = await executeRoomBossRequest<{ order: { bookings: RoomBossBooking[] } }>(
+      const response = await executeRoomBossRequest<{
+        order: { bookings: RoomBossBooking[] };
+      }>(
         client,
         {
           endpoint: '/extws/hotel/v1/listBooking',
@@ -189,7 +199,8 @@ export const cancelBooking = async (
       return {
         bookingId: params.bookingId,
         status: response.status || 'cancelled',
-        message: response.message || `Booking ${params.bookingId} has been cancelled.`,
+        message:
+          response.message || `Booking ${params.bookingId} has been cancelled.`,
       };
     },
     'Failed to cancel booking',

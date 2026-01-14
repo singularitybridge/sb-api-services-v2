@@ -1486,7 +1486,9 @@ export const createJiraActions = (context: ActionContext): FunctionFactory => ({
     },
     function: async (
       params: ListProjectsArgs,
-    ): Promise<StandardActionResult<{ projects: JiraProject[]; total: number }>> => {
+    ): Promise<
+      StandardActionResult<{ projects: JiraProject[]; total: number }>
+    > => {
       const result = await listJiraProjects(
         context.sessionId,
         context.companyId,

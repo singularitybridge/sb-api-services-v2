@@ -82,10 +82,16 @@ export const createRoomBossActions = (
         throw new ActionValidationError('Company ID is missing.');
       }
 
-      return executeAction<RoomBossHotel[], ServiceLambdaResponse<RoomBossHotel[]>>(
+      return executeAction<
+        RoomBossHotel[],
+        ServiceLambdaResponse<RoomBossHotel[]>
+      >(
         'listHotels',
         async () => {
-          const res = await hotelsService.listHotels(context.companyId!, params);
+          const res = await hotelsService.listHotels(
+            context.companyId!,
+            params,
+          );
           return { ...res, description: res.error };
         },
         { serviceName: SERVICE_NAME },
@@ -148,10 +154,16 @@ export const createRoomBossActions = (
         throw new ActionValidationError('Company ID is missing.');
       }
 
-      return executeAction<RoomBossHotel[], ServiceLambdaResponse<RoomBossHotel[]>>(
+      return executeAction<
+        RoomBossHotel[],
+        ServiceLambdaResponse<RoomBossHotel[]>
+      >(
         'searchAvailability',
         async () => {
-          const res = await hotelsService.searchAvailability(context.companyId!, params);
+          const res = await hotelsService.searchAvailability(
+            context.companyId!,
+            params,
+          );
           return { ...res, description: res.error };
         },
         { serviceName: SERVICE_NAME },
@@ -160,7 +172,8 @@ export const createRoomBossActions = (
   },
 
   listHotelImages: {
-    description: 'Get all images for a specific hotel including room type images.',
+    description:
+      'Get all images for a specific hotel including room type images.',
     strict: true,
     parameters: {
       type: 'object',
@@ -180,10 +193,16 @@ export const createRoomBossActions = (
         throw new ActionValidationError('Company ID is missing.');
       }
 
-      return executeAction<RoomBossHotelImages, ServiceLambdaResponse<RoomBossHotelImages>>(
+      return executeAction<
+        RoomBossHotelImages,
+        ServiceLambdaResponse<RoomBossHotelImages>
+      >(
         'listHotelImages',
         async () => {
-          const res = await hotelsService.listImages(context.companyId!, params);
+          const res = await hotelsService.listImages(
+            context.companyId!,
+            params,
+          );
           return { ...res, description: res.error };
         },
         { serviceName: SERVICE_NAME },
@@ -204,7 +223,8 @@ export const createRoomBossActions = (
         },
         locale: {
           type: 'string',
-          description: 'Language code: en (English), ja (Japanese), zh (Chinese), ko (Korean). Default: en',
+          description:
+            'Language code: en (English), ja (Japanese), zh (Chinese), ko (Korean). Default: en',
         },
       },
       required: ['hotelId'],
@@ -217,10 +237,16 @@ export const createRoomBossActions = (
         throw new ActionValidationError('Company ID is missing.');
       }
 
-      return executeAction<RoomBossHotelDescription, ServiceLambdaResponse<RoomBossHotelDescription>>(
+      return executeAction<
+        RoomBossHotelDescription,
+        ServiceLambdaResponse<RoomBossHotelDescription>
+      >(
         'getHotelDescription',
         async () => {
-          const res = await hotelsService.listDescription(context.companyId!, params);
+          const res = await hotelsService.listDescription(
+            context.companyId!,
+            params,
+          );
           return { ...res, description: res.error };
         },
         { serviceName: SERVICE_NAME },
@@ -229,7 +255,8 @@ export const createRoomBossActions = (
   },
 
   listRatePlans: {
-    description: 'Get rate plan descriptions for a hotel including meal plans and policies.',
+    description:
+      'Get rate plan descriptions for a hotel including meal plans and policies.',
     strict: true,
     parameters: {
       type: 'object',
@@ -253,10 +280,16 @@ export const createRoomBossActions = (
         throw new ActionValidationError('Company ID is missing.');
       }
 
-      return executeAction<RoomBossRatePlanDescription, ServiceLambdaResponse<RoomBossRatePlanDescription>>(
+      return executeAction<
+        RoomBossRatePlanDescription,
+        ServiceLambdaResponse<RoomBossRatePlanDescription>
+      >(
         'listRatePlans',
         async () => {
-          const res = await hotelsService.listRatePlanDescription(context.companyId!, params);
+          const res = await hotelsService.listRatePlanDescription(
+            context.companyId!,
+            params,
+          );
           return { ...res, description: res.error };
         },
         { serviceName: SERVICE_NAME },
@@ -361,10 +394,16 @@ export const createRoomBossActions = (
         throw new ActionValidationError('Company ID is missing.');
       }
 
-      return executeAction<RoomBossBooking, ServiceLambdaResponse<RoomBossBooking>>(
+      return executeAction<
+        RoomBossBooking,
+        ServiceLambdaResponse<RoomBossBooking>
+      >(
         'createBooking',
         async () => {
-          const res = await bookingsService.createBooking(context.companyId!, params);
+          const res = await bookingsService.createBooking(
+            context.companyId!,
+            params,
+          );
           return { ...res, description: res.error };
         },
         { serviceName: SERVICE_NAME },
@@ -397,10 +436,16 @@ export const createRoomBossActions = (
         throw new ActionValidationError('Company ID is missing.');
       }
 
-      return executeAction<RoomBossBooking[], ServiceLambdaResponse<RoomBossBooking[]>>(
+      return executeAction<
+        RoomBossBooking[],
+        ServiceLambdaResponse<RoomBossBooking[]>
+      >(
         'listBookings',
         async () => {
-          const res = await bookingsService.listBookingsByDate(context.companyId!, params);
+          const res = await bookingsService.listBookingsByDate(
+            context.companyId!,
+            params,
+          );
           return { ...res, description: res.error };
         },
         { serviceName: SERVICE_NAME },
@@ -429,10 +474,16 @@ export const createRoomBossActions = (
         throw new ActionValidationError('Company ID is missing.');
       }
 
-      return executeAction<RoomBossBooking, ServiceLambdaResponse<RoomBossBooking>>(
+      return executeAction<
+        RoomBossBooking,
+        ServiceLambdaResponse<RoomBossBooking>
+      >(
         'getBooking',
         async () => {
-          const res = await bookingsService.getBooking(context.companyId!, params);
+          const res = await bookingsService.getBooking(
+            context.companyId!,
+            params,
+          );
           return { ...res, description: res.error };
         },
         { serviceName: SERVICE_NAME },
@@ -456,18 +507,31 @@ export const createRoomBossActions = (
     },
     function: async (
       params: CancelBookingParams,
-    ): Promise<StandardActionResult<{ bookingId: string; status: string; message: string }>> => {
+    ): Promise<
+      StandardActionResult<{
+        bookingId: string;
+        status: string;
+        message: string;
+      }>
+    > => {
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing.');
       }
 
       return executeAction<
         { bookingId: string; status: string; message: string },
-        ServiceLambdaResponse<{ bookingId: string; status: string; message: string }>
+        ServiceLambdaResponse<{
+          bookingId: string;
+          status: string;
+          message: string;
+        }>
       >(
         'cancelBooking',
         async () => {
-          const res = await bookingsService.cancelBooking(context.companyId!, params);
+          const res = await bookingsService.cancelBooking(
+            context.companyId!,
+            params,
+          );
           return { ...res, description: res.error };
         },
         { serviceName: SERVICE_NAME },
@@ -505,10 +569,16 @@ export const createRoomBossActions = (
         throw new ActionValidationError('Company ID is missing.');
       }
 
-      return executeAction<RoomBossVendor[], ServiceLambdaResponse<RoomBossVendor[]>>(
+      return executeAction<
+        RoomBossVendor[],
+        ServiceLambdaResponse<RoomBossVendor[]>
+      >(
         'listVendors',
         async () => {
-          const res = await activitiesService.listVendors(context.companyId!, params);
+          const res = await activitiesService.listVendors(
+            context.companyId!,
+            params,
+          );
           return { ...res, description: res.error };
         },
         { serviceName: SERVICE_NAME },
@@ -542,10 +612,16 @@ export const createRoomBossActions = (
         throw new ActionValidationError('Company ID is missing.');
       }
 
-      return executeAction<RoomBossCategory[], ServiceLambdaResponse<RoomBossCategory[]>>(
+      return executeAction<
+        RoomBossCategory[],
+        ServiceLambdaResponse<RoomBossCategory[]>
+      >(
         'listCategories',
         async () => {
-          const res = await activitiesService.listCategories(context.companyId!, params);
+          const res = await activitiesService.listCategories(
+            context.companyId!,
+            params,
+          );
           return { ...res, description: res.error };
         },
         { serviceName: SERVICE_NAME },
@@ -579,10 +655,16 @@ export const createRoomBossActions = (
         throw new ActionValidationError('Company ID is missing.');
       }
 
-      return executeAction<RoomBossProduct[], ServiceLambdaResponse<RoomBossProduct[]>>(
+      return executeAction<
+        RoomBossProduct[],
+        ServiceLambdaResponse<RoomBossProduct[]>
+      >(
         'listProducts',
         async () => {
-          const res = await activitiesService.listProducts(context.companyId!, params);
+          const res = await activitiesService.listProducts(
+            context.companyId!,
+            params,
+          );
           return { ...res, description: res.error };
         },
         { serviceName: SERVICE_NAME },

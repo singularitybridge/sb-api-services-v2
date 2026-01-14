@@ -77,7 +77,12 @@ router.get(
       if (!userId || !companyId) {
         throw new Error('User ID or Company ID not found');
       }
-      const language = await getSessionLanguage(userId, companyId);
+      // Support explicit lang query param, fall back to session language
+      const langParam = req.query.lang as string | undefined;
+      const language: SupportedLanguage =
+        langParam === 'en' || langParam === 'he'
+          ? langParam
+          : await getSessionLanguage(userId, companyId);
       const fieldsParam = req.query.fields as string | undefined;
       const fields = fieldsParam
         ? (fieldsParam.split(',') as (keyof Integration)[])
