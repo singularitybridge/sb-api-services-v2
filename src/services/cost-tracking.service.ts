@@ -2,6 +2,51 @@ import { CostTracking, ICostTracking } from '../models/CostTracking';
 import mongoose from 'mongoose';
 import { CostTrackingInfo } from '../utils/cost-tracking';
 
+/**
+ * Helper function to safely extract assistant ID and name from a record
+ * Handles all edge cases: null, undefined, populated objects, ObjectIds
+ */
+function extractAssistantInfo(assistantIdField: any): {
+  id: string;
+  name: string;
+} {
+  const defaultResult = { id: 'unknown', name: 'Deleted Assistant' };
+
+  // Handle null, undefined, or falsy values
+  if (assistantIdField == null) {
+    return defaultResult;
+  }
+
+  // Handle populated object with _id and name (from Mongoose populate)
+  if (
+    typeof assistantIdField === 'object' &&
+    assistantIdField !== null &&
+    assistantIdField._id
+  ) {
+    return {
+      id: String(assistantIdField._id),
+      name: assistantIdField.name || 'Unknown',
+    };
+  }
+
+  // Handle ObjectId or any object with toString method
+  if (
+    assistantIdField != null &&
+    typeof assistantIdField.toString === 'function'
+  ) {
+    try {
+      return {
+        id: String(assistantIdField),
+        name: 'Unknown',
+      };
+    } catch {
+      return defaultResult;
+    }
+  }
+
+  return defaultResult;
+}
+
 export interface CostSummary {
   totalCost: number;
   totalInputTokens: number;
@@ -95,11 +140,19 @@ export async function saveCostTracking(
 }
 
 /**
- * Get cost records with filtering
+ * Result type for getCostRecords with total count for pagination
+ */
+export interface CostRecordsResult {
+  records: any[]; // Records with populated assistantName
+  totalCount: number;
+}
+
+/**
+ * Get cost records with filtering and assistant names populated
  */
 export async function getCostRecords(
   query: CostQuery,
-): Promise<ICostTracking[]> {
+): Promise<CostRecordsResult> {
   const filter: any = {};
 
   if (query.companyId) {
@@ -127,12 +180,30 @@ export async function getCostRecords(
     }
   }
 
-  const queryBuilder = CostTracking.find(filter)
+  // Get total count for pagination (before limit/skip)
+  const totalCount = await CostTracking.countDocuments(filter);
+
+  // Get records with assistant name populated
+  const records = await CostTracking.find(filter)
+    .populate('assistantId', 'name')
     .sort({ timestamp: -1 })
     .limit(query.limit || 100)
-    .skip(query.skip || 0);
+    .skip(query.skip || 0)
+    .lean();
 
-  return queryBuilder.exec();
+  // Transform records to include assistantName at top level
+  const transformedRecords = records.map((record: any) => {
+    const { id: assistantId, name: assistantName } = extractAssistantInfo(
+      record.assistantId,
+    );
+    return {
+      ...record,
+      assistantId,
+      assistantName,
+    };
+  });
+
+  return { records: transformedRecords, totalCount };
 }
 
 /**
@@ -142,6 +213,7 @@ export async function getCostSummary(
   companyId: string,
   startDate?: Date,
   endDate?: Date,
+  provider?: string,
 ): Promise<CostSummary> {
   const filter: any = {
     companyId: new mongoose.Types.ObjectId(companyId),
@@ -155,6 +227,10 @@ export async function getCostSummary(
     if (endDate) {
       filter.timestamp.$lte = endDate;
     }
+  }
+
+  if (provider) {
+    filter.provider = provider;
   }
 
   const records = await CostTracking.find(filter).populate(
@@ -201,21 +277,10 @@ export async function getCostSummary(
     summary.byProvider[record.provider].requests += 1;
     summary.byProvider[record.provider].tokens += record.totalTokens;
 
-    // By Assistant
-    // Handle both populated and non-populated assistantId
-    let assistantId: string;
-    let assistantName: string | undefined;
-
-    if (typeof record.assistantId === 'object' && record.assistantId !== null) {
-      // Populated assistant object
-      const assistantObj = record.assistantId as any;
-      assistantId = assistantObj._id?.toString() || assistantObj.toString();
-      assistantName = assistantObj.name;
-    } else {
-      // Just the ID string
-      assistantId = (record.assistantId as any).toString();
-      assistantName = undefined;
-    }
+    // By Assistant - using helper function for safe extraction
+    const { id: assistantId, name: assistantName } = extractAssistantInfo(
+      record.assistantId,
+    );
 
     if (!assistantMap[assistantId]) {
       assistantMap[assistantId] = {
@@ -254,18 +319,40 @@ export async function getCostSummary(
 export async function getDailyCosts(
   companyId: string,
   days: number = 30,
+  startDate?: Date,
+  endDate?: Date,
+  provider?: string,
 ): Promise<
   Array<{ date: string; cost: number; requests: number; tokens: number }>
 > {
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
+  // Build match filter
+  const matchFilter: any = {
+    companyId: new mongoose.Types.ObjectId(companyId),
+  };
+
+  // Use provided dates or default to last N days
+  if (startDate || endDate) {
+    matchFilter.timestamp = {};
+    if (startDate) {
+      matchFilter.timestamp.$gte = startDate;
+    }
+    if (endDate) {
+      matchFilter.timestamp.$lte = endDate;
+    }
+  } else {
+    const defaultStartDate = new Date();
+    defaultStartDate.setDate(defaultStartDate.getDate() - days);
+    matchFilter.timestamp = { $gte: defaultStartDate };
+  }
+
+  // Add provider filter if specified
+  if (provider) {
+    matchFilter.provider = provider;
+  }
 
   const result = await CostTracking.aggregate([
     {
-      $match: {
-        companyId: new mongoose.Types.ObjectId(companyId),
-        timestamp: { $gte: startDate },
-      },
+      $match: matchFilter,
     },
     {
       $group: {

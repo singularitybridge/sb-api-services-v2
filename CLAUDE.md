@@ -1,16 +1,27 @@
 ## Claude Code Sub-Agents Management
 
 ### Sub-Agent Location & Structure
-- **Location**: `/Users/avi/.claude/agents/[agent-name].md`
+- **User agents**: `~/.claude/agents/[agent-name].md`
+- **Project agents**: `.claude-agents/[agent-name].md` (version controlled)
 - **Format**: YAML frontmatter + Markdown content
 - **Key Fields**: name, description, model (e.g., sonnet), color
+
+### Project Agents Setup
+This project includes shared agents in `.claude-agents/`. To install them:
+```bash
+./scripts/setup-claude-agents.sh
+```
+
+**Available Project Agents:**
+- `pricing-validator`: Validates AI model pricing against LiteLLM (see Monthly Tasks below)
 
 ### Creating & Managing Sub-Agents
 1. **Create Agent**: Use `/agents` command in Claude Code
 2. **Update Agent**: Edit the `.md` file directly at `~/.claude/agents/`
 3. **Trigger Agent**: Use `Task` tool with `subagent_type` parameter
-4. **Available Agents**: 
+4. **Available Agents**:
    - `alfred-agent-manager`: AI system orchestration and testing
+   - `pricing-validator`: AI model pricing validation (project agent)
    - Custom agents can be created for specific domains
 
 ### Testing Sub-Agents with Testing Utilities
@@ -239,6 +250,29 @@ Routes at `/src/routes/cost-tracking.routes.ts`:
 #### Test Utilities
 - `/test-costs-api.js` - Comprehensive API testing
 - `/test-costs-curl.sh` - Quick curl-based verification
+
+#### Monthly Task: Pricing Validation
+**Frequency**: Monthly (or when working on cost-tracking code)
+**Agent**: `pricing-validator`
+
+AI model pricing changes periodically. Run the pricing validator to ensure our costs are accurate:
+
+1. **Automatic** (when using Claude Code on cost-tracking):
+   - The `pricing-validator` agent should be triggered proactively
+   - Compares `src/utils/cost-tracking.ts` against LiteLLM pricing database
+
+2. **Manual validation**:
+   ```bash
+   # Fetch current LiteLLM prices
+   curl -s "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json" | jq '.["gpt-4o", "claude-3-5-sonnet-20241022"]'
+   ```
+
+3. **Update process**:
+   - Update `MODEL_PRICING` in `src/utils/cost-tracking.ts`
+   - Update the "Pricing last validated" comment with current date
+   - LiteLLM prices are per-token; our file uses per-1000-tokens (multiply by 1000)
+
+**Source**: https://github.com/BerriAI/litellm (matches official OpenAI/Anthropic/Google prices)
 
 ### AI Assistant Access Tracking
 - Added `lastAccessedAt` field to Assistant model for usage tracking

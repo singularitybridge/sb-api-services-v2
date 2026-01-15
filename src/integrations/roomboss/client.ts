@@ -147,8 +147,7 @@ export const withRoomBossClient = async <T>(
     const data = await operation(client);
     return { success: true, data };
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error ? error.message : String(error);
     return {
       success: false,
       error: message.startsWith('Failed')

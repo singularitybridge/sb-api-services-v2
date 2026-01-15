@@ -21,33 +21,69 @@ const MODEL_CONFIGS: Record<string, any> = {
   'gpt-3.5-turbo': { provider: 'openai', baseModel: 'gpt-3.5-turbo' },
 
   // === Google Gemini 3 (preview) ===
-  'gemini-3-pro-preview': { provider: 'google', baseModel: 'gemini-3-pro-preview' },
-  'gemini-3-flash-preview': { provider: 'google', baseModel: 'gemini-3-flash-preview' },
+  'gemini-3-pro-preview': {
+    provider: 'google',
+    baseModel: 'gemini-3-pro-preview',
+  },
+  'gemini-3-flash-preview': {
+    provider: 'google',
+    baseModel: 'gemini-3-flash-preview',
+  },
 
   // === Google Gemini 2.5 (stable) ===
   'gemini-2.5-pro': { provider: 'google', baseModel: 'gemini-2.5-pro' },
   'gemini-2.5-flash': { provider: 'google', baseModel: 'gemini-2.5-flash' },
-  'gemini-2.5-flash-lite': { provider: 'google', baseModel: 'gemini-2.5-flash-lite' },
+  'gemini-2.5-flash-lite': {
+    provider: 'google',
+    baseModel: 'gemini-2.5-flash-lite',
+  },
 
   // === Google Gemini 2.0 (legacy) ===
   'gemini-2.0-flash': { provider: 'google', baseModel: 'gemini-2.0-flash' },
 
   // === Anthropic Claude 4.5 ===
-  'claude-sonnet-4-5': { provider: 'anthropic', baseModel: 'claude-sonnet-4-5-20250929' },
-  'claude-haiku-4-5': { provider: 'anthropic', baseModel: 'claude-haiku-4-5-20251001' },
-  'claude-opus-4-5': { provider: 'anthropic', baseModel: 'claude-opus-4-5-20251101' },
+  'claude-sonnet-4-5': {
+    provider: 'anthropic',
+    baseModel: 'claude-sonnet-4-5-20250929',
+  },
+  'claude-haiku-4-5': {
+    provider: 'anthropic',
+    baseModel: 'claude-haiku-4-5-20251001',
+  },
+  'claude-opus-4-5': {
+    provider: 'anthropic',
+    baseModel: 'claude-opus-4-5-20251101',
+  },
 
   // === Anthropic Claude 4.1 ===
-  'claude-opus-4-1': { provider: 'anthropic', baseModel: 'claude-opus-4-1-20250805' },
+  'claude-opus-4-1': {
+    provider: 'anthropic',
+    baseModel: 'claude-opus-4-1-20250805',
+  },
 
   // === Anthropic Claude 4 ===
-  'claude-sonnet-4-0': { provider: 'anthropic', baseModel: 'claude-sonnet-4-20250514' },
-  'claude-opus-4-0': { provider: 'anthropic', baseModel: 'claude-opus-4-20250514' },
+  'claude-sonnet-4-0': {
+    provider: 'anthropic',
+    baseModel: 'claude-sonnet-4-20250514',
+  },
+  'claude-opus-4-0': {
+    provider: 'anthropic',
+    baseModel: 'claude-opus-4-20250514',
+  },
 
   // === Anthropic Claude 3 (legacy) ===
-  'claude-3-haiku-20240307': { provider: 'anthropic', baseModel: 'claude-3-haiku-20240307' },
-  'claude-3-5-sonnet': { provider: 'anthropic', baseModel: 'claude-3-5-sonnet-latest' },
-  'claude-3-5-haiku': { provider: 'anthropic', baseModel: 'claude-3-5-haiku-latest' },
+  'claude-3-haiku-20240307': {
+    provider: 'anthropic',
+    baseModel: 'claude-3-haiku-20240307',
+  },
+  'claude-3-5-sonnet': {
+    provider: 'anthropic',
+    baseModel: 'claude-3-5-sonnet-latest',
+  },
+  'claude-3-5-haiku': {
+    provider: 'anthropic',
+    baseModel: 'claude-3-5-haiku-latest',
+  },
   'claude-3-opus': { provider: 'anthropic', baseModel: 'claude-3-opus-latest' },
 };
 

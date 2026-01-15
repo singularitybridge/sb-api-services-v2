@@ -35,7 +35,9 @@ export const listHotels = async (
   return withRoomBossClient(
     companyId,
     async (client) => {
-      const response = await executeRoomBossRequest<{ hotels: RoomBossHotel[] }>(
+      const response = await executeRoomBossRequest<{
+        hotels: RoomBossHotel[];
+      }>(
         client,
         {
           endpoint: '/extws/hotel/v1/list',
@@ -64,10 +66,16 @@ export const searchAvailability = async (
     return { success: false, error: 'At least one hotelId is required.' };
   }
   if (!params.checkIn) {
-    return { success: false, error: 'checkIn date is required (yyyyMMdd format).' };
+    return {
+      success: false,
+      error: 'checkIn date is required (yyyyMMdd format).',
+    };
   }
   if (!params.checkOut) {
-    return { success: false, error: 'checkOut date is required (yyyyMMdd format).' };
+    return {
+      success: false,
+      error: 'checkOut date is required (yyyyMMdd format).',
+    };
   }
   if (!params.numberGuests || params.numberGuests < 1) {
     return { success: false, error: 'numberGuests must be at least 1.' };
@@ -93,7 +101,9 @@ export const searchAvailability = async (
         queryParams[`hotelIds[${index}]`] = id;
       });
 
-      const response = await executeRoomBossRequest<{ hotels: RoomBossHotel[] }>(
+      const response = await executeRoomBossRequest<{
+        hotels: RoomBossHotel[];
+      }>(
         client,
         {
           endpoint: '/extws/hotel/v1/listAvailable',
@@ -183,17 +193,18 @@ export const listRatePlanDescription = async (
   return withRoomBossClient(
     companyId,
     async (client) => {
-      const response = await executeRoomBossRequest<RoomBossRatePlanDescription>(
-        client,
-        {
-          endpoint: '/extws/hotel/v1/listRatePlanDescription',
-          params: {
-            hotelId: params.hotelId,
-            locale: params.locale || 'en',
+      const response =
+        await executeRoomBossRequest<RoomBossRatePlanDescription>(
+          client,
+          {
+            endpoint: '/extws/hotel/v1/listRatePlanDescription',
+            params: {
+              hotelId: params.hotelId,
+              locale: params.locale || 'en',
+            },
           },
-        },
-        'Failed to list rate plans',
-      );
+          'Failed to list rate plans',
+        );
       return response;
     },
     'Failed to list rate plans',

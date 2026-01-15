@@ -56,7 +56,7 @@ export const googleLogin = async (
   try {
     const ticket = await client.verifyIdToken({
       idToken: token,
-      audience: G_CLIENT_ID_ENV, // Use the env variable directly here
+      audience: G_CLIENT_ID_ENV,
     });
 
     const payload = ticket.getPayload();
@@ -147,7 +147,6 @@ export const googleLogin = async (
     } else {
       // Update existing user information
       user.email = payload['email'];
-      // Only set the name if it's not already set
       if (!user.name) {
         user.name = payload['name'];
       }
@@ -168,13 +167,12 @@ export const googleLogin = async (
         companyId: user.companyId,
       },
       JWT_SECRET,
-      { expiresIn: '7d' }, // Adjust expiration as needed
+      { expiresIn: '7d' },
     );
 
     return { user, company, sessionToken };
-  } catch (error) {
-    console.error('Google authentication failed:', error);
+  } catch (error: any) {
+    console.error('Google authentication failed:', error.message);
     throw error;
   }
 };
-

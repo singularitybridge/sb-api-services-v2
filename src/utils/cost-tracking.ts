@@ -6,7 +6,8 @@ interface ModelPricing {
   outputCost: number; // Cost per 1000 output tokens
 }
 
-// Pricing as of January 2025 (subject to change)
+// Pricing last validated: 2026-01-14 (source: LiteLLM - github.com/BerriAI/litellm)
+// To update: run pricing-validator agent or check CLAUDE.md "Monthly Task: Pricing Validation"
 const MODEL_PRICING: Record<string, ModelPricing> = {
   // OpenAI Models
   'gpt-4o': { inputCost: 0.0025, outputCost: 0.01 },
@@ -16,25 +17,28 @@ const MODEL_PRICING: Record<string, ModelPricing> = {
   'gpt-3.5-turbo': { inputCost: 0.0005, outputCost: 0.0015 },
   'gpt-4o-2024-08-06': { inputCost: 0.0025, outputCost: 0.01 },
 
-  // O3 Models (estimated based on your actual costs - these are expensive!)
-  'o3-mini': { inputCost: 0.001, outputCost: 0.002 }, // Estimated, adjust based on actual pricing
-  'o3-mini-high': { inputCost: 0.001, outputCost: 0.002 }, // Your log shows ~$0.001/1k input, ~$0.002/1k output
-  o3: { inputCost: 0.015, outputCost: 0.06 }, // Estimated for full O3 model
+  // OpenAI O3 Models
+  'o3-mini': { inputCost: 0.0011, outputCost: 0.0044 },
+  'o3-mini-high': { inputCost: 0.0011, outputCost: 0.0044 },
+  o3: { inputCost: 0.002, outputCost: 0.008 },
 
   // Anthropic Models
   'claude-3-5-sonnet-20241022': { inputCost: 0.003, outputCost: 0.015 },
-  'claude-3-5-haiku-20241022': { inputCost: 0.001, outputCost: 0.005 },
+  'claude-3-5-haiku-20241022': { inputCost: 0.0008, outputCost: 0.004 },
   'claude-3-opus-20240229': { inputCost: 0.015, outputCost: 0.075 },
   'claude-3-sonnet-20240229': { inputCost: 0.003, outputCost: 0.015 },
   'claude-3-haiku-20240307': { inputCost: 0.00025, outputCost: 0.00125 },
 
   // Google Models
+  'gemini-2.5-pro': { inputCost: 0.00125, outputCost: 0.01 },
+  'gemini-2.5-flash': { inputCost: 0.0003, outputCost: 0.0025 },
+  'gemini-2.0-flash': { inputCost: 0.0001, outputCost: 0.0004 },
+  'gemini-2.0-flash-exp': { inputCost: 0.0001, outputCost: 0.0004 },
   'gemini-1.5-pro': { inputCost: 0.00125, outputCost: 0.005 },
   'gemini-1.5-flash': { inputCost: 0.000075, outputCost: 0.0003 },
   'gemini-1.5-flash-8b': { inputCost: 0.0000375, outputCost: 0.00015 },
-  'gemini-2.0-flash-exp': { inputCost: 0.000075, outputCost: 0.0003 },
 
-  // Add default pricing for unknown models
+  // Default pricing for unknown models
   default: { inputCost: 0.001, outputCost: 0.002 },
 };
 

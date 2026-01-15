@@ -32,7 +32,9 @@ export const listVendors = async (
   return withRoomBossClient(
     companyId,
     async (client) => {
-      const response = await executeRoomBossRequest<{ vendors: RoomBossVendor[] }>(
+      const response = await executeRoomBossRequest<{
+        vendors: RoomBossVendor[];
+      }>(
         client,
         {
           endpoint: '/extws/gs/v1/vendors/list',
@@ -64,7 +66,9 @@ export const listCategories = async (
   return withRoomBossClient(
     companyId,
     async (client) => {
-      const response = await executeRoomBossRequest<{ categories: RoomBossCategory[] }>(
+      const response = await executeRoomBossRequest<{
+        categories: RoomBossCategory[];
+      }>(
         client,
         {
           endpoint: '/extws/gs/v1/categories/list',
@@ -96,7 +100,9 @@ export const listProducts = async (
   return withRoomBossClient(
     companyId,
     async (client) => {
-      const response = await executeRoomBossRequest<{ products: RoomBossProduct[] }>(
+      const response = await executeRoomBossRequest<{
+        products: RoomBossProduct[];
+      }>(
         client,
         {
           endpoint: '/extws/gs/v1/products/list',

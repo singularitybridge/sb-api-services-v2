@@ -33,7 +33,7 @@ costTrackingRouter.get(
         return res.status(400).json({ error: 'Company ID is required' });
       }
 
-      const records = await getCostRecords({
+      const { records, totalCount } = await getCostRecords({
         companyId,
         assistantId: assistantId as string,
         userId: userId as string,
@@ -49,6 +49,7 @@ costTrackingRouter.get(
         success: true,
         data: records,
         count: records.length,
+        totalCount,
       });
     } catch (error) {
       next(error);
@@ -64,7 +65,7 @@ costTrackingRouter.get(
   '/summary',
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      const { startDate, endDate } = req.query;
+      const { startDate, endDate, provider } = req.query;
 
       const companyId = req.company?._id?.toString();
       if (!companyId) {
@@ -75,6 +76,7 @@ costTrackingRouter.get(
         companyId,
         startDate ? new Date(startDate as string) : undefined,
         endDate ? new Date(endDate as string) : undefined,
+        provider as string | undefined,
       );
 
       res.json({
@@ -95,7 +97,7 @@ costTrackingRouter.get(
   '/daily',
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      const { days = '30' } = req.query;
+      const { days = '30', startDate, endDate, provider } = req.query;
 
       const companyId = req.company?._id?.toString();
       if (!companyId) {
@@ -105,6 +107,9 @@ costTrackingRouter.get(
       const dailyCosts = await getDailyCosts(
         companyId,
         parseInt(days as string, 10),
+        startDate ? new Date(startDate as string) : undefined,
+        endDate ? new Date(endDate as string) : undefined,
+        provider as string | undefined,
       );
 
       res.json({
@@ -143,7 +148,7 @@ costTrackingRouter.get(
         return res.status(404).json({ error: 'Assistant not found' });
       }
 
-      const records = await getCostRecords({
+      const result = await getCostRecords({
         companyId,
         assistantId: assistant._id.toString(),
         startDate: startDate ? new Date(startDate as string) : undefined,
@@ -152,11 +157,11 @@ costTrackingRouter.get(
       });
 
       // Calculate total cost for this assistant
-      const totalCost = records.reduce(
+      const totalCost = result.records.reduce(
         (sum, record) => sum + record.totalCost,
         0,
       );
-      const totalTokens = records.reduce(
+      const totalTokens = result.records.reduce(
         (sum, record) => sum + record.totalTokens,
         0,
       );
@@ -164,12 +169,12 @@ costTrackingRouter.get(
       res.json({
         success: true,
         data: {
-          records,
+          records: result.records,
           summary: {
             totalCost,
             totalTokens,
-            totalRequests: records.length,
-            averageCost: records.length > 0 ? totalCost / records.length : 0,
+            totalRequests: result.records.length,
+            averageCost: result.records.length > 0 ? totalCost / result.records.length : 0,
           },
         },
         assistantId: assistant._id.toString(),
@@ -197,7 +202,7 @@ costTrackingRouter.get(
         return res.status(400).json({ error: 'Company ID is required' });
       }
 
-      const records = await getCostRecords({
+      const result = await getCostRecords({
         companyId,
         model,
         startDate: startDate ? new Date(startDate as string) : undefined,
@@ -206,11 +211,11 @@ costTrackingRouter.get(
       });
 
       // Calculate total cost for this model
-      const totalCost = records.reduce(
+      const totalCost = result.records.reduce(
         (sum, record) => sum + record.totalCost,
         0,
       );
-      const totalTokens = records.reduce(
+      const totalTokens = result.records.reduce(
         (sum, record) => sum + record.totalTokens,
         0,
       );
@@ -218,12 +223,12 @@ costTrackingRouter.get(
       res.json({
         success: true,
         data: {
-          records,
+          records: result.records,
           summary: {
             totalCost,
             totalTokens,
-            totalRequests: records.length,
-            averageCost: records.length > 0 ? totalCost / records.length : 0,
+            totalRequests: result.records.length,
+            averageCost: result.records.length > 0 ? totalCost / result.records.length : 0,
           },
         },
       });

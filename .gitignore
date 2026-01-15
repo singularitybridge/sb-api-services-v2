@@ -19,7 +19,8 @@ tokens.json
 
 # ignore the files folder
 files/
-scripts/
+scripts/*
+!scripts/setup-claude-agents.sh
 
 sb-api-services-404915-fc80ec518eae.json
 .aider*
