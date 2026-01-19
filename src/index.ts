@@ -185,10 +185,11 @@ app.use(
 ); // Unified Workspace (before generic /api)
 app.use('/api/ui-state', verifyTokenMiddleware, verifyAccess(), uiStateRouter); // UI State tracking (before generic /api)
 app.use('/api/invites', verifyTokenMiddleware, verifyAccess(), inviteRouter); // User invite system
-// MCP Server - custom auth that allows initialize, tools/list, and notifications without auth
+// MCP Server - custom auth that attempts to authenticate but doesn't block on failure
+// The MCP handler returns proper JSON-RPC format 401 errors itself
 app.use(
   '/api/mcp',
-  (req, res, next) => {
+  async (req, res, next) => {
     // Allow initialize, tools/list, and initialized notification without auth (required by MCP spec for capability discovery)
     if (
       req.body?.method === 'initialize' ||
@@ -198,23 +199,37 @@ app.use(
       return next();
     }
 
-    // For MCP, intercept 401 responses to add WWW-Authenticate header per RFC 9728
-    const originalJson = res.json;
-    res.json = function (body: any) {
-      if (res.statusCode === 401) {
-        const baseUrl = getBaseUrl(req);
-        res.header(
-          'WWW-Authenticate',
-          `Bearer realm="MCP", resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
-        );
+    // For other methods, try to authenticate but don't fail on error
+    // The MCP handler will return proper JSON-RPC 401 errors
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      try {
+        // Try API key auth
+        if (authHeader.startsWith('Bearer sk_live_')) {
+          const apiKey = authHeader.substring(7);
+          const { ApiKeyService } = await import('./services/apiKey.service');
+          const result = await ApiKeyService.validateApiKey(apiKey);
+          if (result) {
+            (req as any).user = result.user;
+            (req as any).company = result.company;
+          }
+        } else {
+          // Try JWT auth
+          const { extractTokenFromHeader, verifyToken } = await import(
+            './services/token.service'
+          );
+          const token = extractTokenFromHeader(authHeader);
+          const { user, company } = await verifyToken(token);
+          if (user && company) {
+            (req as any).user = user;
+            (req as any).company = company;
+          }
+        }
+      } catch {
+        // Auth failed - don't set user/company, let MCP handler return JSON-RPC 401
       }
-      return originalJson.call(this, body);
-    };
-
-    // All other methods require auth
-    return verifyTokenMiddleware(req, res, () => {
-      verifyAccess()(req, res, next);
-    });
+    }
+    next();
   },
   mcpRouter,
 ); // MCP Server (before generic /api)
