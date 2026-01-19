@@ -12,7 +12,7 @@ COPY package*.json ./
 COPY tsconfig.json ./
 
 # Install all dependencies (including devDependencies)
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # Copy source code
 COPY src ./src
@@ -33,8 +33,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install production dependencies AND ts-node (required by start script)
-RUN npm ci --only=production && \
-    npm install ts-node typescript @types/node
+RUN npm ci --only=production --legacy-peer-deps && \
+    npm install --legacy-peer-deps ts-node typescript @types/node
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
