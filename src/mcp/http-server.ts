@@ -15,6 +15,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { Request, Response } from 'express';
 import { z } from 'zod';
+import { getBaseUrl } from '../services/oauth-mcp.service';
 
 import {
   executeTool,
@@ -522,11 +523,12 @@ export class MCPHttpServer {
       // All other methods require authentication
       if (!companyId || !userId) {
         // Return 401 with WWW-Authenticate header per RFC 9728
+        const baseUrl = getBaseUrl(req);
         res
           .status(401)
           .header(
             'WWW-Authenticate',
-            'Bearer realm="MCP", resource_metadata="http://localhost:3000/.well-known/oauth-protected-resource"',
+            `Bearer realm="MCP", resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
           )
           .json({
             jsonrpc: '2.0',

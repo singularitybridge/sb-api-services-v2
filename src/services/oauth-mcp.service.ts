@@ -10,8 +10,9 @@ import { Request, Response } from 'express';
 
 /**
  * Get the base URL from the request, handling proxies and different environments
+ * Exported for use in MCP authentication middleware
  */
-function getBaseUrl(req: Request): string {
+export function getBaseUrl(req: Request): string {
   // Check environment variable first (explicit configuration)
   if (process.env.API_BASE_URL) {
     return process.env.API_BASE_URL;

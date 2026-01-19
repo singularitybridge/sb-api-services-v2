@@ -81,6 +81,7 @@ import promptHistoryRouter from './routes/prompt-history.routes';
 import unifiedWorkspaceRouter from './routes/unified-workspace.routes';
 import mcpRouter from './routes/mcp.routes';
 import oauthMcpRouter from './routes/oauth-mcp.routes';
+import { getBaseUrl } from './services/oauth-mcp.service';
 import uiStateRouter from './routes/ui-state.routes';
 import { inviteRouter } from './routes/invite.routes';
 
@@ -201,9 +202,10 @@ app.use(
     const originalJson = res.json;
     res.json = function (body: any) {
       if (res.statusCode === 401) {
+        const baseUrl = getBaseUrl(req);
         res.header(
           'WWW-Authenticate',
-          'Bearer realm="MCP", resource_metadata="http://localhost:3000/.well-known/oauth-protected-resource"',
+          `Bearer realm="MCP", resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
         );
       }
       return originalJson.call(this, body);
