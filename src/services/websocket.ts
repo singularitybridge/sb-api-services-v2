@@ -140,6 +140,26 @@ export function initializeWebSocket(server: http.Server): Server {
       }
     });
 
+    // Handle session subscription (for real-time chat messages)
+    socket.on('session:subscribe', (sessionId: string) => {
+      if (!sessionId) {
+        logger.warn('session:subscribe called without sessionId');
+        return;
+      }
+      socket.join(`session:${sessionId}`);
+      logger.info(`Socket ${socket.id} subscribed to session:${sessionId}`);
+    });
+
+    // Handle session unsubscription
+    socket.on('session:unsubscribe', (sessionId: string) => {
+      if (!sessionId) {
+        logger.warn('session:unsubscribe called without sessionId');
+        return;
+      }
+      socket.leave(`session:${sessionId}`);
+      logger.info(`Socket ${socket.id} unsubscribed from session:${sessionId}`);
+    });
+
     // Handle UI state updates from frontend
     socket.on('ui-state-update', async (payload: any) => {
       try {
@@ -232,4 +252,18 @@ export function emitToAll(event: string, data: any): void {
 
   io.emit(event, data);
   logger.debug(`Emitted ${event} to all clients`);
+}
+
+/**
+ * Emit event to a specific session room
+ * Used for session-scoped real-time messaging (chat messages, assistant events)
+ */
+export function emitToSession(sessionId: string, event: string, data: any): void {
+  if (!io) {
+    logger.warn('Cannot emit to session: WebSocket server not initialized');
+    return;
+  }
+
+  io.to(`session:${sessionId}`).emit(event, data);
+  logger.debug(`Emitted ${event} to session:${sessionId}`);
 }

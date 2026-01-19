@@ -3,7 +3,7 @@ import { AuthenticatedSocket } from '../../services/websocket/types';
 import { UIConnection } from '../../models/UIConnection';
 import { Message } from '../../models/Message';
 import { Session } from '../../models/Session';
-import { publishSessionMessage } from '../../services/pusher.service';
+import { publishSessionMessage } from '../../services/session-messaging.service';
 import mongoose from 'mongoose';
 
 // Store socket instances by socketId for quick lookup

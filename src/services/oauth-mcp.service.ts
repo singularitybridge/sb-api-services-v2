@@ -8,20 +8,35 @@
 import crypto from 'crypto';
 import { Request, Response } from 'express';
 
-const BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000';
+/**
+ * Get the base URL from the request, handling proxies and different environments
+ */
+function getBaseUrl(req: Request): string {
+  // Check environment variable first (explicit configuration)
+  if (process.env.API_BASE_URL) {
+    return process.env.API_BASE_URL;
+  }
+
+  // Derive from request for automatic detection
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
+
+  return `${protocol}://${host}`;
+}
 
 /**
  * OAuth Protected Resource Metadata (RFC 9728)
  * Required by MCP June 2025 specification
  */
-export function getProtectedResourceMetadata() {
+export function getProtectedResourceMetadata(req: Request) {
+  const baseUrl = getBaseUrl(req);
   return {
-    resource: BASE_URL,
-    authorization_servers: [BASE_URL],
+    resource: baseUrl,
+    authorization_servers: [baseUrl],
     scopes_supported: ['mcp:execute', 'mcp:read'],
     bearer_methods_supported: ['header'],
     resource_signing_alg_values_supported: [],
-    resource_documentation: `${BASE_URL}/docs/mcp`,
+    resource_documentation: `${baseUrl}/docs/mcp`,
   };
 }
 
@@ -29,18 +44,19 @@ export function getProtectedResourceMetadata() {
  * OAuth Authorization Server Metadata (RFC 8414)
  * Required for MCP client discovery
  */
-export function getAuthorizationServerMetadata() {
+export function getAuthorizationServerMetadata(req: Request) {
+  const baseUrl = getBaseUrl(req);
   return {
-    issuer: BASE_URL,
-    authorization_endpoint: `${BASE_URL}/oauth/authorize`,
-    token_endpoint: `${BASE_URL}/oauth/token`,
-    registration_endpoint: `${BASE_URL}/oauth/register`,
+    issuer: baseUrl,
+    authorization_endpoint: `${baseUrl}/oauth/authorize`,
+    token_endpoint: `${baseUrl}/oauth/token`,
+    registration_endpoint: `${baseUrl}/oauth/register`,
     token_endpoint_auth_methods_supported: ['none', 'client_secret_post'],
     grant_types_supported: ['authorization_code', 'client_credentials'],
     response_types_supported: ['code'],
     code_challenge_methods_supported: ['S256'],
     scopes_supported: ['mcp:execute', 'mcp:read'],
-    service_documentation: `${BASE_URL}/docs/oauth`,
+    service_documentation: `${baseUrl}/docs/oauth`,
     ui_locales_supported: ['en-US'],
   };
 }

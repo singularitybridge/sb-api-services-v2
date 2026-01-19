@@ -1,7 +1,7 @@
 import { Assistant, IIdentifier, IAssistant } from '../../models/Assistant';
 import { Session } from '../../models/Session';
 import { Team, ITeam } from '../../models/Team';
-import { publishMessage } from '../../services/pusher.service';
+import { publishMessage } from '../../services/session-messaging.service';
 import { resolveAssistantIdentifier } from '../../services/assistant/assistant-resolver.service';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';

@@ -24,7 +24,7 @@ const router = Router();
 router.get(
   '/.well-known/oauth-protected-resource',
   (req: Request, res: Response) => {
-    res.json(getProtectedResourceMetadata());
+    res.json(getProtectedResourceMetadata(req));
   },
 );
 
@@ -36,7 +36,7 @@ router.get(
 router.get(
   '/.well-known/oauth-authorization-server',
   (req: Request, res: Response) => {
-    res.json(getAuthorizationServerMetadata());
+    res.json(getAuthorizationServerMetadata(req));
   },
 );
 

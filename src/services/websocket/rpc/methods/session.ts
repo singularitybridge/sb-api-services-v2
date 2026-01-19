@@ -3,7 +3,7 @@ import { handleSessionMessage } from '../../../assistant/message-handling.servic
 import { getSessionOrCreate } from '../../../session.service';
 import { registerRpcMethod } from '../utils';
 import { getApiKey } from '../../../api.key.service';
-import { publishSessionMessage } from '../../../pusher.service';
+import { publishSessionMessage } from '../../../session-messaging.service';
 
 const processSessionMessage = async (
   socket: AuthenticatedSocket,

@@ -357,6 +357,40 @@ This bypasses the 403 Forbidden errors from Google APIs.
 - View logs: `docker logs [container-name] --tail 50`
 - Test build locally: `docker build -t sb-api-test .`
 
+### Local Development with PM2
+Both frontend and backend run via PM2 for local development:
+
+**Services:**
+- `sb-api` - Backend API (port 3000)
+- `sb-ui` - Frontend UI (Vite dev server)
+
+**Common Commands:**
+```bash
+# View all processes
+pm2 list
+
+# View logs (last N lines)
+pm2 logs sb-api --lines 50
+pm2 logs sb-ui --lines 50
+
+# Restart services
+pm2 restart sb-api
+pm2 restart sb-ui
+pm2 restart all
+
+# Stop/Start services
+pm2 stop sb-api
+pm2 start sb-api
+
+# Monitor in real-time
+pm2 monit
+```
+
+**Troubleshooting:**
+- If a service shows "online" but doesn't respond, check logs for `[nodemon] app crashed`
+- Use `pm2 restart sb-api` to recover from crashes
+- WebSocket server runs on the same port as API: `ws://localhost:3000/realtime`
+
 ## Code Execution Integration (January 2025)
 
 ### Overview
@@ -429,6 +463,23 @@ await Task({
 - **ContentFile**: Permanent GCP storage (existing)
 - **FileManager**: Unified ephemeral/permanent storage (new)
 - No duplication - different purposes
+
+# Documentation Maintenance
+
+### Updating Docs Before Pushing
+**IMPORTANT**: Before pushing significant changes to remote, update the documentation project:
+
+1. Navigate to `/Users/avio/dev/sb/sb-docs`
+2. Update `/docs/changelog.md` with your changes under `[Unreleased]`
+3. Update relevant documentation pages if APIs/features changed
+4. Run `npm run build` to verify no broken links
+
+### Categories for Changelog
+- **Added** - New features, endpoints, integrations
+- **Changed** - Modified behavior, API changes, refactoring
+- **Fixed** - Bug fixes
+- **Removed** - Deprecated features
+- **Security** - Security improvements
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.

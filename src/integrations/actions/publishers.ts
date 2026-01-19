@@ -1,5 +1,5 @@
 import { Message } from '../../models/Message';
-import { publishSessionMessage } from '../../services/pusher.service';
+import { publishSessionMessage } from '../../services/session-messaging.service';
 import { ExecutionDetails } from './types';
 import { Session } from '../../models/Session';
 import mongoose from 'mongoose';
