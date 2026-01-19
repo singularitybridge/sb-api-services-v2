@@ -61,10 +61,17 @@ router.post('/oauth/register', (req: Request, res: Response) => {
 
 /**
  * GET /oauth/authorize
- * Authorization endpoint
+ * Authorization endpoint - shows API key form
  * Public endpoint - handles authorization flow
  */
 router.get('/oauth/authorize', handleAuthorization);
+
+/**
+ * POST /oauth/authorize
+ * Authorization endpoint - processes API key submission
+ * Public endpoint - handles authorization flow
+ */
+router.post('/oauth/authorize', handleAuthorization);
 
 /**
  * POST /oauth/token

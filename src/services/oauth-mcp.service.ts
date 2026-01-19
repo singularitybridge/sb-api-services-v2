@@ -20,7 +20,8 @@ export function getBaseUrl(req: Request): string {
 
   // Derive from request for automatic detection
   const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
+  const host =
+    req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
 
   return `${protocol}://${host}`;
 }
@@ -85,18 +86,261 @@ export function registerClient(req: Request) {
 }
 
 /**
- * Authorization endpoint
- * For MCP, we simplify by treating API key as the authorization
+ * Generate the authorization page HTML
+ * This page asks the user to enter their API key to authorize the MCP client
+ */
+function generateAuthorizationPage(params: {
+  client_id: string;
+  redirect_uri: string;
+  state?: string;
+  code_challenge: string;
+  code_challenge_method?: string;
+  error?: string;
+  baseUrl: string;
+}): string {
+  const errorHtml = params.error
+    ? `<div style="background: #fee2e2; border: 1px solid #ef4444; color: #dc2626; padding: 12px; border-radius: 8px; margin-bottom: 16px;">${params.error}</div>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authorize MCP Client - Agent Hub</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      padding: 40px;
+      max-width: 440px;
+      width: 100%;
+    }
+    .logo {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .logo svg {
+      width: 48px;
+      height: 48px;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      color: #1e1b4b;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: #6b7280;
+      text-align: center;
+      margin-bottom: 32px;
+      font-size: 14px;
+    }
+    .client-info {
+      background: #f3f4f6;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+    .client-info p {
+      font-size: 13px;
+      color: #4b5563;
+      margin-bottom: 4px;
+    }
+    .client-info strong {
+      color: #1f2937;
+    }
+    label {
+      display: block;
+      font-weight: 500;
+      color: #374151;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    input[type="password"] {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+      font-family: monospace;
+    }
+    input[type="password"]:focus {
+      outline: none;
+      border-color: #6366f1;
+    }
+    .help-text {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 8px;
+      margin-bottom: 24px;
+    }
+    .help-text a {
+      color: #6366f1;
+      text-decoration: none;
+    }
+    .help-text a:hover {
+      text-decoration: underline;
+    }
+    .buttons {
+      display: flex;
+      gap: 12px;
+    }
+    button {
+      flex: 1;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #6366f1;
+      color: white;
+      border: none;
+    }
+    .btn-primary:hover {
+      background: #4f46e5;
+    }
+    .btn-secondary {
+      background: white;
+      color: #374151;
+      border: 2px solid #e5e7eb;
+    }
+    .btn-secondary:hover {
+      background: #f9fafb;
+    }
+    .permissions {
+      margin-bottom: 24px;
+    }
+    .permissions h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 12px;
+    }
+    .permission-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #4b5563;
+      margin-bottom: 8px;
+    }
+    .permission-item svg {
+      width: 16px;
+      height: 16px;
+      color: #10b981;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+        <path d="M2 17l10 5 10-5"/>
+        <path d="M2 12l10 5 10-5"/>
+      </svg>
+    </div>
+    <h1>Authorize MCP Client</h1>
+    <p class="subtitle">Connect an AI assistant to Agent Hub</p>
+
+    ${errorHtml}
+
+    <div class="client-info">
+      <p><strong>Client:</strong> MCP Client</p>
+      <p><strong>Redirect:</strong> ${params.redirect_uri.split('?')[0]}</p>
+    </div>
+
+    <div class="permissions">
+      <h3>This application will be able to:</h3>
+      <div class="permission-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Execute AI assistants on your behalf
+      </div>
+      <div class="permission-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Read assistant configurations and workspace
+      </div>
+    </div>
+
+    <form method="POST" action="/oauth/authorize">
+      <input type="hidden" name="client_id" value="${params.client_id}">
+      <input type="hidden" name="redirect_uri" value="${params.redirect_uri}">
+      <input type="hidden" name="state" value="${params.state || ''}">
+      <input type="hidden" name="code_challenge" value="${params.code_challenge}">
+      <input type="hidden" name="code_challenge_method" value="${params.code_challenge_method || 'S256'}">
+
+      <label for="api_key">API Key</label>
+      <input type="password" id="api_key" name="api_key" placeholder="sk_live_..." required autocomplete="off">
+      <p class="help-text">
+        Enter your Agent Hub API key. You can create one in
+        <a href="${params.baseUrl}/admin/settings" target="_blank">Settings → API Keys</a>.
+      </p>
+
+      <div class="buttons">
+        <button type="button" class="btn-secondary" onclick="window.close()">Cancel</button>
+        <button type="submit" class="btn-primary">Authorize</button>
+      </div>
+    </form>
+  </div>
+</body>
+</html>`;
+}
+
+/**
+ * Authorization endpoint - GET shows the form, POST processes it
  */
 export function handleAuthorization(req: Request, res: Response) {
-  const {
-    client_id,
-    redirect_uri,
-    state,
-    code_challenge,
-    code_challenge_method,
-    scope,
-  } = req.query;
+  const baseUrl = getBaseUrl(req);
+
+  if (req.method === 'GET') {
+    // Show authorization form
+    const { client_id, redirect_uri, state, code_challenge, code_challenge_method } =
+      req.query;
+
+    // Validate required parameters
+    if (!client_id || !redirect_uri || !code_challenge) {
+      return res.status(400).json({
+        error: 'invalid_request',
+        error_description: 'Missing required parameters',
+      });
+    }
+
+    const html = generateAuthorizationPage({
+      client_id: client_id as string,
+      redirect_uri: redirect_uri as string,
+      state: state as string,
+      code_challenge: code_challenge as string,
+      code_challenge_method: code_challenge_method as string,
+      baseUrl,
+    });
+
+    return res.type('html').send(html);
+  }
+
+  // POST - process the authorization
+  const { client_id, redirect_uri, state, code_challenge, code_challenge_method, api_key } =
+    req.body;
 
   // Validate required parameters
   if (!client_id || !redirect_uri || !code_challenge) {
@@ -106,28 +350,36 @@ export function handleAuthorization(req: Request, res: Response) {
     });
   }
 
-  // Generate authorization code (short-lived, 1 minute)
-  const authCode = crypto.randomBytes(32).toString('hex');
+  // Validate API key format
+  if (!api_key || !api_key.startsWith('sk_live_')) {
+    const html = generateAuthorizationPage({
+      client_id,
+      redirect_uri,
+      state,
+      code_challenge,
+      code_challenge_method,
+      baseUrl,
+      error: 'Invalid API key. API keys must start with sk_live_',
+    });
+    return res.type('html').send(html);
+  }
 
-  // Store code with PKCE challenge (in production, use Redis with TTL)
-  // For now, we'll encode it in the code itself
+  // Generate authorization code with API key encrypted inside
   const codeData = {
-    code: authCode,
+    api_key, // Store the API key to return as access token
     challenge: code_challenge,
-    method: code_challenge_method,
+    method: code_challenge_method || 'S256',
     client_id,
     redirect_uri,
     expires: Date.now() + 60000, // 1 minute
   };
 
-  const encodedCode = Buffer.from(JSON.stringify(codeData)).toString(
-    'base64url',
-  );
+  const encodedCode = Buffer.from(JSON.stringify(codeData)).toString('base64url');
 
   // Redirect back with code
-  const redirectUrl = new URL(redirect_uri as string);
+  const redirectUrl = new URL(redirect_uri);
   redirectUrl.searchParams.set('code', encodedCode);
-  if (state) redirectUrl.searchParams.set('state', state as string);
+  if (state) redirectUrl.searchParams.set('state', state);
 
   res.redirect(redirectUrl.toString());
 }
@@ -137,7 +389,7 @@ export function handleAuthorization(req: Request, res: Response) {
  * Exchanges authorization code or API key for access token
  */
 export function handleTokenRequest(req: Request, res: Response) {
-  const { grant_type, code, code_verifier, client_id } = req.body;
+  const { grant_type, code, code_verifier } = req.body;
 
   // Support two grant types:
   // 1. authorization_code (OAuth flow)
@@ -194,14 +446,12 @@ function handleAuthorizationCodeGrant(
       });
     }
 
-    // Generate access token
-    // In our case, we'll return a bearer token format that clients can use
-    const accessToken = crypto.randomBytes(32).toString('hex');
-
+    // Return the API key as the access token
+    // This way, the existing auth middleware will recognize it
     return res.json({
-      access_token: accessToken,
+      access_token: codeData.api_key,
       token_type: 'Bearer',
-      expires_in: 3600,
+      expires_in: 86400 * 30, // 30 days (API keys don't expire)
       scope: 'mcp:execute mcp:read',
     });
   } catch (error) {
@@ -244,7 +494,7 @@ function handleClientCredentialsGrant(req: Request, res: Response) {
  * This integrates with our existing API key validation
  */
 export function validateAccessToken(token: string): boolean {
-  // For authorization_code tokens, we'd check against a token store
+  // For authorization_code tokens, the token IS the API key
   // For client_credentials (API keys), our existing middleware validates them
   return true; // Delegate to existing middleware
 }
