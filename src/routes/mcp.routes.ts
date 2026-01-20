@@ -65,15 +65,19 @@ router.get('/', (req: Request, res: Response) => {
 
   // Set SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+  res.setHeader('Transfer-Encoding', 'chunked');
 
   // Generate session ID if not provided
   const sessionId =
     (req.headers['mcp-session-id'] as string) ||
     `mcp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
   res.setHeader('Mcp-Session-Id', sessionId);
+
+  // Flush headers immediately to establish SSE connection
+  res.flushHeaders();
 
   // Send initial connection event
   res.write(`event: open\ndata: {"sessionId":"${sessionId}"}\n\n`);
