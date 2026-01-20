@@ -63,12 +63,12 @@ router.get('/', (req: Request, res: Response) => {
     });
   }
 
-  // Set SSE headers
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  // Set SSE headers - include all headers that help bypass CDN buffering
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, private');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
-  res.setHeader('Transfer-Encoding', 'chunked');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
 
   // Generate session ID if not provided
   const sessionId =
@@ -76,8 +76,21 @@ router.get('/', (req: Request, res: Response) => {
     `mcp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
   res.setHeader('Mcp-Session-Id', sessionId);
 
-  // Flush headers immediately to establish SSE connection
+  // Disable Nagle's algorithm for immediate sending
+  if (req.socket) {
+    req.socket.setNoDelay(true);
+    req.socket.setKeepAlive(true);
+  }
+
+  // Write status and flush headers
+  res.status(200);
   res.flushHeaders();
+
+  // Send retry directive and initial padding to trigger CDN streaming
+  // Cloudflare may buffer until it sees enough data
+  const padding = ' '.repeat(2048); // 2KB padding
+  res.write(`:${padding}\n`);
+  res.write('retry: 3000\n\n');
 
   // Send initial connection event
   res.write(`event: open\ndata: {"sessionId":"${sessionId}"}\n\n`);
@@ -85,7 +98,7 @@ router.get('/', (req: Request, res: Response) => {
   // Keep connection alive with periodic heartbeats
   const heartbeat = setInterval(() => {
     res.write(': heartbeat\n\n');
-  }, 30000);
+  }, 15000); // More frequent heartbeats
 
   // Clean up on close
   req.on('close', () => {
