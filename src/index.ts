@@ -190,8 +190,13 @@ app.use('/api/invites', verifyTokenMiddleware, verifyAccess(), inviteRouter); //
 app.use(
   '/api/mcp',
   async (req, res, next) => {
-    // Allow initialize, tools/list, and initialized notification without auth (required by MCP spec for capability discovery)
-    if (
+    // Allow GET requests for SSE stream (Streamable HTTP transport)
+    // Also allow info endpoint
+    if (req.method === 'GET') {
+      // Still try to authenticate GET requests for session auth
+      // but don't block - the SSE handler will manage session state
+    } else if (
+      // POST: Allow initialize, tools/list, and initialized notification without auth (required by MCP spec for capability discovery)
       req.body?.method === 'initialize' ||
       req.body?.method === 'tools/list' ||
       req.body?.method === 'notifications/initialized'
