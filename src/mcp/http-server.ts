@@ -348,6 +348,13 @@ export class MCPHttpServer {
         const requestedVersion =
           jsonRpcRequest.params?.protocolVersion || '2024-11-05';
 
+        // Generate session ID for this MCP session
+        // Per MCP spec: include Mcp-Session-Id header on InitializeResult response
+        const sessionId =
+          (req.headers['mcp-session-id'] as string) ||
+          `mcp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+        res.setHeader('Mcp-Session-Id', sessionId);
+
         res.json({
           jsonrpc: '2.0',
           result: {
