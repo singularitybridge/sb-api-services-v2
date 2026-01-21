@@ -157,6 +157,19 @@ import {
   type ShowNotificationInput,
 } from './tools/show-notification';
 
+// Session data stored per session ID
+interface MCPSession {
+  createdAt: number;
+  userId?: string;
+  companyId?: string;
+}
+
+// Global session store (survives MCPHttpServer recreation)
+const activeSessions = new Map<string, MCPSession>();
+
+// Session expiry time (1 hour)
+const SESSION_TTL_MS = 60 * 60 * 1000;
+
 /**
  * MCP Server for HTTP transport
  */
@@ -178,6 +191,60 @@ export class MCPHttpServer {
     );
 
     this.setupHandlers();
+
+    // Clean up expired sessions every 5 minutes
+    setInterval(() => this.cleanupExpiredSessions(), 5 * 60 * 1000);
+  }
+
+  /**
+   * Create a new session and return the session ID
+   */
+  createSession(userId?: string, companyId?: string): string {
+    const sessionId = `mcp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    activeSessions.set(sessionId, {
+      createdAt: Date.now(),
+      userId,
+      companyId,
+    });
+    return sessionId;
+  }
+
+  /**
+   * Check if a session ID is valid
+   */
+  isValidSession(sessionId: string): boolean {
+    if (!sessionId) return false;
+    const session = activeSessions.get(sessionId);
+    if (!session) {
+      return false;
+    }
+    // Check if session has expired
+    if (Date.now() - session.createdAt > SESSION_TTL_MS) {
+      activeSessions.delete(sessionId);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Get session data
+   */
+  getSession(sessionId: string): MCPSession | undefined {
+    return activeSessions.get(sessionId);
+  }
+
+  /**
+   * Remove expired sessions
+   */
+  private cleanupExpiredSessions(): void {
+    const now = Date.now();
+    let cleaned = 0;
+    for (const [id, session] of activeSessions.entries()) {
+      if (now - session.createdAt > SESSION_TTL_MS) {
+        activeSessions.delete(id);
+        cleaned++;
+      }
+    }
   }
 
   /**
@@ -338,9 +405,32 @@ export class MCPHttpServer {
       // Get the JSON-RPC request from the body
       const jsonRpcRequest = req.body;
 
+      // Get session ID from header
+      const sessionId = req.headers['mcp-session-id'] as string;
+
       // Get user context from Express middleware
       const companyId = (req as any).company?.id;
       const userId = (req as any).user?.id;
+
+      // Session validation - be lenient during initialization handshake
+      // The handshake methods (initialize, notifications/initialized, tools/list) don't require valid sessions
+      // Claude.ai can send stale session IDs, so we only enforce sessions for authenticated tool calls
+      const handshakeMethods = ['initialize', 'notifications/initialized', 'tools/list'];
+      const isHandshakeMethod = handshakeMethods.includes(jsonRpcRequest.method);
+
+      if (!isHandshakeMethod) {
+        if (sessionId && !this.isValidSession(sessionId)) {
+          res.status(404).json({
+            jsonrpc: '2.0',
+            error: {
+              code: -32600,
+              message: 'Session not found. Please reinitialize.',
+            },
+            id: jsonRpcRequest.id,
+          });
+          return;
+        }
+      }
 
       // Handle initialize (no auth required for capability negotiation)
       if (jsonRpcRequest.method === 'initialize') {
@@ -348,11 +438,9 @@ export class MCPHttpServer {
         const requestedVersion =
           jsonRpcRequest.params?.protocolVersion || '2024-11-05';
 
-        // Generate session ID for this MCP session
+        // Create and store a new session
         // Per MCP spec: include Mcp-Session-Id header on InitializeResult response
-        const sessionId =
-          (req.headers['mcp-session-id'] as string) ||
-          `mcp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+        const sessionId = this.createSession(userId, companyId);
         res.setHeader('Mcp-Session-Id', sessionId);
 
         res.json({

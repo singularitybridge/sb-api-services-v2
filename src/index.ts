@@ -230,7 +230,7 @@ app.use(
             (req as any).company = company;
           }
         }
-      } catch {
+      } catch (authError: any) {
         // Auth failed - don't set user/company, let MCP handler return JSON-RPC 401
       }
     }

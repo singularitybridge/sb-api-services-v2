@@ -43,16 +43,13 @@ router.post('/', async (req: Request, res: Response) => {
 /**
  * GET /api/mcp
  * Handle MCP SSE stream for server-to-client messages (Streamable HTTP transport)
- * Per MCP spec: servers that don't need to initiate messages may return 405
- * But for compatibility with Claude.ai, we'll accept and keep connection open
+ * Claude.ai requires an active SSE connection to mark the server as connected
  */
 router.get('/', (req: Request, res: Response) => {
-  // Check Accept header
   const acceptHeader = req.headers.accept || '';
   const acceptsSSE = acceptHeader.includes('text/event-stream');
 
   if (!acceptsSSE) {
-    // Per spec: if client doesn't accept SSE, return 405
     return res.status(405).json({
       jsonrpc: '2.0',
       error: {
@@ -63,50 +60,40 @@ router.get('/', (req: Request, res: Response) => {
     });
   }
 
-  // Set SSE headers - include all headers that help bypass CDN buffering
+  // SSE is just a notification channel - don't require or create sessions here
+  // Sessions are managed by POST requests (initialize creates, others validate)
+  // Don't echo back session IDs - let Claude use the one from initialize
+
+  // Set SSE headers with aggressive anti-buffering for Cloudflare
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, private');
+  res.setHeader('Cache-Control', 'no-cache, no-store, no-transform, must-revalidate, private');
   res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+  res.setHeader('X-Accel-Buffering', 'no'); // nginx
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Transfer-Encoding', 'chunked');
 
-  // Generate session ID if not provided
-  const sessionId =
-    (req.headers['mcp-session-id'] as string) ||
-    `mcp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-  res.setHeader('Mcp-Session-Id', sessionId);
-
-  // Disable Nagle's algorithm for immediate sending
+  // Disable socket buffering
   if (req.socket) {
     req.socket.setNoDelay(true);
-    req.socket.setKeepAlive(true);
+    req.socket.setKeepAlive(true, 10000);
   }
 
-  // Write status and flush headers
-  res.status(200);
+  // Flush headers immediately
   res.flushHeaders();
 
-  // Send retry directive and initial padding to trigger CDN streaming
-  // Cloudflare may buffer until it sees enough data
-  const padding = ' '.repeat(2048); // 2KB padding
-  res.write(`:${padding}\n`);
-  res.write('retry: 3000\n\n');
+  // Send a simple comment to confirm connection
+  // Note: removed 4KB padding - testing if it was causing issues
+  res.write(': ok\n\n');
 
-  // Send initial connection event
-  res.write(`event: open\ndata: {"sessionId":"${sessionId}"}\n\n`);
-
-  // Keep connection alive with periodic heartbeats
+  // Keep connection alive with heartbeats
   const heartbeat = setInterval(() => {
-    res.write(': heartbeat\n\n');
-  }, 15000); // More frequent heartbeats
+    res.write(': ping\n\n');
+  }, 30000); // Every 30 seconds
 
   // Clean up on close
   req.on('close', () => {
     clearInterval(heartbeat);
   });
-
-  // Note: For now we don't send server-initiated messages
-  // This just keeps the SSE channel open for compatibility
 });
 
 /**
