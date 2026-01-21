@@ -4,7 +4,7 @@ HTTP-based Model Context Protocol (MCP) server for the SB Agent Hub platform. Pr
 
 ## Overview
 
-The MCP server exposes 13 tools for managing AI agents, workspace items, and team operations. All tools are accessible via HTTP POST requests to `/api/mcp` with Bearer token authentication.
+The MCP server exposes 30 tools for managing AI agents, workspace items, team operations, cost tracking, and integrations. All tools are accessible via HTTP POST requests to `/api/mcp` with Bearer token authentication.
 
 ## Authentication
 
@@ -366,6 +366,307 @@ List all teams for the authenticated company.
 }
 ```
 
+#### 14. `create_team`
+Create a new team.
+
+**Parameters:**
+- `name` (string, required): Team name
+- `description` (string, optional): Team description
+- `icon` (string, optional): Icon name (e.g., "Users", "Star")
+
+**Example:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "create_team",
+    "arguments": {
+      "name": "Engineering",
+      "description": "Engineering team agents",
+      "icon": "Code"
+    }
+  },
+  "id": 15
+}
+```
+
+#### 15. `update_team`
+Update an existing team.
+
+**Parameters:**
+- `teamId` (string, required): Team ID
+- `name` (string, optional): New team name
+- `description` (string, optional): New description
+- `icon` (string, optional): New icon
+
+**Example:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "update_team",
+    "arguments": {
+      "teamId": "66d41ac3487c19f6d4c23fa2",
+      "description": "Updated description"
+    }
+  },
+  "id": 16
+}
+```
+
+#### 16. `delete_team`
+Delete a team.
+
+**Parameters:**
+- `teamId` (string, required): Team ID to delete
+
+**Example:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "delete_team",
+    "arguments": {
+      "teamId": "66d41ac3487c19f6d4c23fa2"
+    }
+  },
+  "id": 17
+}
+```
+
+#### 17. `get_team`
+Get detailed information about a specific team.
+
+**Parameters:**
+- `teamId` (string, required): Team ID
+
+**Example:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "get_team",
+    "arguments": {
+      "teamId": "66d41ac3487c19f6d4c23fa2"
+    }
+  },
+  "id": 18
+}
+```
+
+#### 18. `remove_agent_from_team`
+Remove an agent from one or more teams.
+
+**Parameters:**
+- `agentId` (string, required): Agent ID or name
+- `teamIds` (string[], required): Array of team IDs to remove from
+
+**Example:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "remove_agent_from_team",
+    "arguments": {
+      "agentId": "Test MCP Agent",
+      "teamIds": ["66d41ac3487c19f6d4c23fa2"]
+    }
+  },
+  "id": 19
+}
+```
+
+#### 19. `delete_agent`
+Delete an agent permanently.
+
+**Parameters:**
+- `agentId` (string, required): Agent ID or name
+
+**Example:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "delete_agent",
+    "arguments": {
+      "agentId": "Test Agent"
+    }
+  },
+  "id": 20
+}
+```
+
+#### 20. `update_agent`
+Update an existing agent's configuration.
+
+**Parameters:**
+- `agentId` (string, required): Agent ID or name
+- `name` (string, optional): New agent name
+- `description` (string, optional): New description
+- `llmModel` (string, optional): New model
+- `maxTokens` (number, optional): New max tokens
+
+**Example:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "update_agent",
+    "arguments": {
+      "agentId": "Test MCP Agent",
+      "description": "Updated description",
+      "maxTokens": 4096
+    }
+  },
+  "id": 21
+}
+```
+
+### Cost Tracking
+
+#### 21. `get_cost_summary`
+Get cost tracking summary with breakdown by model, provider, and assistant.
+
+**Parameters:**
+- `startDate` (string, optional): Start date (ISO format)
+- `endDate` (string, optional): End date (ISO format)
+- `assistantId` (string, optional): Filter by assistant
+
+**Example:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "get_cost_summary",
+    "arguments": {}
+  },
+  "id": 22
+}
+```
+
+### Workspace Advanced
+
+#### 22. `move_workspace_item`
+Move a workspace item to a new path.
+
+**Parameters:**
+- `sourcePath` (string, required): Current path
+- `destinationPath` (string, required): New path
+- `scope` (string, optional): Scope (company/session/agent)
+- `scopeId` (string, optional): Scope ID
+
+#### 23. `vector_search_workspace`
+Semantic search across workspace using vector embeddings.
+
+**Parameters:**
+- `query` (string, required): Search query
+- `scope` (string, optional): Search scope
+- `limit` (number, optional): Max results
+
+### UI Context & Control
+
+#### 24. `get_ui_context`
+Get current UI context from Agent Hub interface.
+
+**Parameters:** None
+
+#### 25. `navigate_to_page`
+Navigate user to a specific page in the UI.
+
+**Parameters:**
+- `route` (string, required): Target route path
+
+#### 26. `open_workspace_file`
+Open a specific workspace file in the UI.
+
+**Parameters:**
+- `filePath` (string, required): Path to open
+- `assistantId` (string, optional): Assistant context
+
+#### 27. `show_notification`
+Display a notification to the user.
+
+**Parameters:**
+- `message` (string, required): Notification message
+- `type` (string, optional): "success", "error", "info", "warning"
+
+### Integration Management
+
+#### 28. `list_integrations`
+List all available integrations with their actions.
+
+**Parameters:**
+- `language` (string, optional): Language for descriptions (default: "en")
+
+**Example:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "list_integrations",
+    "arguments": {}
+  },
+  "id": 28
+}
+```
+
+#### 29. `get_integration_details`
+Get detailed information about a specific integration.
+
+**Parameters:**
+- `integrationId` (string, required): Integration ID (e.g., "jira", "sendgrid")
+
+**Example:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "get_integration_details",
+    "arguments": {
+      "integrationId": "jira"
+    }
+  },
+  "id": 29
+}
+```
+
+#### 30. `trigger_integration_action`
+Trigger a specific integration action.
+
+**Parameters:**
+- `actionId` (string, required): Action ID (format: "integration.action")
+- `parameters` (object, required): Action parameters
+
+**Example:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "tools/call",
+  "params": {
+    "name": "trigger_integration_action",
+    "arguments": {
+      "actionId": "jira.createTicket",
+      "parameters": {
+        "summary": "New ticket",
+        "description": "Description here",
+        "projectKey": "PROJ"
+      }
+    }
+  },
+  "id": 30
+}
+```
+
 ## Testing
 
 A comprehensive test utility is available at `tests/integration/ai-agent/testing-utils/test-mcp-tools.js`:
@@ -445,9 +746,19 @@ All responses follow the JSON-RPC 2.0 format:
    - Requires agent ID or name as scopeId
    - Use for: Agent memory, preferences, cached data
 
+## Session Handling
+
+The MCP server implements intelligent session management:
+
+1. **Session Creation**: A new session is created on `initialize` and returned via `Mcp-Session-Id` header
+2. **Session Validation**: Sessions expire after 1 hour of inactivity
+3. **Auto-Recovery**: If a client sends a stale session ID but has valid authentication, the server automatically creates a new session instead of returning an error
+
+This ensures smooth operation with clients like Claude Code that may cache session IDs across restarts.
+
 ## Error Codes
 
-- `-32600`: Invalid Request
+- `-32600`: Invalid Request / Session not found (for unauthenticated clients)
 - `-32601`: Method Not Found (unknown tool)
 - `-32602`: Invalid Params (validation failed)
 - `-32603`: Internal Error
