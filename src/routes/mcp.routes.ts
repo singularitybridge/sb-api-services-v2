@@ -66,7 +66,10 @@ router.get('/', (req: Request, res: Response) => {
 
   // Set SSE headers with aggressive anti-buffering for Cloudflare
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-cache, no-store, no-transform, must-revalidate, private');
+  res.setHeader(
+    'Cache-Control',
+    'no-cache, no-store, no-transform, must-revalidate, private',
+  );
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no'); // nginx
   res.setHeader('X-Content-Type-Options', 'nosniff');

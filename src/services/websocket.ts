@@ -258,7 +258,11 @@ export function emitToAll(event: string, data: any): void {
  * Emit event to a specific session room
  * Used for session-scoped real-time messaging (chat messages, assistant events)
  */
-export function emitToSession(sessionId: string, event: string, data: any): void {
+export function emitToSession(
+  sessionId: string,
+  event: string,
+  data: any,
+): void {
   if (!io) {
     logger.warn('Cannot emit to session: WebSocket server not initialized');
     return;

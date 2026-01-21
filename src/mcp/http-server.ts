@@ -95,6 +95,55 @@ import {
 } from './tools/create-agent';
 
 import {
+  createTeamTool,
+  createTeamSchema,
+  createTeam,
+  type CreateTeamInput,
+} from './tools/create-team';
+
+import {
+  updateTeamTool,
+  updateTeamSchema,
+  updateTeam,
+  type UpdateTeamInput,
+} from './tools/update-team';
+
+import {
+  deleteTeamTool,
+  deleteTeamSchema,
+  deleteTeam,
+  type DeleteTeamInput,
+} from './tools/delete-team';
+
+import {
+  getTeamTool,
+  getTeamSchema,
+  getTeam,
+  type GetTeamInput,
+} from './tools/get-team';
+
+import {
+  removeAgentFromTeamTool,
+  removeAgentFromTeamSchema,
+  removeAgentFromTeam,
+  type RemoveAgentFromTeamInput,
+} from './tools/remove-agent-from-team';
+
+import {
+  getCostSummaryToolMeta,
+  getCostSummarySchema,
+  getCostSummaryTool,
+  type GetCostSummaryInput,
+} from './tools/get-cost-summary';
+
+import {
+  deleteAgentTool,
+  deleteAgentSchema,
+  deleteAgent,
+  type DeleteAgentInput,
+} from './tools/delete-agent';
+
+import {
   assignAgentToTeamTool,
   assignAgentToTeamSchema,
   assignAgentToTeam,
@@ -156,6 +205,27 @@ import {
   showNotification,
   type ShowNotificationInput,
 } from './tools/show-notification';
+
+import {
+  listIntegrationsTool,
+  listIntegrationsSchema,
+  listIntegrations,
+  type ListIntegrationsInput,
+} from './tools/list-integrations';
+
+import {
+  getIntegrationDetailsTool,
+  getIntegrationDetailsSchema,
+  getIntegrationDetails,
+  type GetIntegrationDetailsInput,
+} from './tools/get-integration-details';
+
+import {
+  triggerIntegrationActionTool,
+  triggerIntegrationActionSchema,
+  triggerIntegrationAction,
+  type TriggerIntegrationActionInput,
+} from './tools/trigger-integration-action';
 
 // Session data stored per session ID
 interface MCPSession {
@@ -326,6 +396,41 @@ export class MCPHttpServer {
           inputSchema: createAgentSchema,
         },
         {
+          name: createTeamTool.name,
+          description: createTeamTool.description,
+          inputSchema: createTeamSchema,
+        },
+        {
+          name: updateTeamTool.name,
+          description: updateTeamTool.description,
+          inputSchema: updateTeamSchema,
+        },
+        {
+          name: deleteTeamTool.name,
+          description: deleteTeamTool.description,
+          inputSchema: deleteTeamSchema,
+        },
+        {
+          name: getTeamTool.name,
+          description: getTeamTool.description,
+          inputSchema: getTeamSchema,
+        },
+        {
+          name: removeAgentFromTeamTool.name,
+          description: removeAgentFromTeamTool.description,
+          inputSchema: removeAgentFromTeamSchema,
+        },
+        {
+          name: getCostSummaryToolMeta.name,
+          description: getCostSummaryToolMeta.description,
+          inputSchema: getCostSummarySchema,
+        },
+        {
+          name: deleteAgentTool.name,
+          description: deleteAgentTool.description,
+          inputSchema: deleteAgentSchema,
+        },
+        {
           name: assignAgentToTeamTool.name,
           description: assignAgentToTeamTool.description,
           inputSchema: assignAgentToTeamSchema,
@@ -364,6 +469,21 @@ export class MCPHttpServer {
           name: showNotificationTool.name,
           description: showNotificationTool.description,
           inputSchema: showNotificationSchema,
+        },
+        {
+          name: listIntegrationsTool.name,
+          description: listIntegrationsTool.description,
+          inputSchema: listIntegrationsSchema,
+        },
+        {
+          name: getIntegrationDetailsTool.name,
+          description: getIntegrationDetailsTool.description,
+          inputSchema: getIntegrationDetailsSchema,
+        },
+        {
+          name: triggerIntegrationActionTool.name,
+          description: triggerIntegrationActionTool.description,
+          inputSchema: triggerIntegrationActionSchema,
         },
       ],
     }));
@@ -415,20 +535,35 @@ export class MCPHttpServer {
       // Session validation - be lenient during initialization handshake
       // The handshake methods (initialize, notifications/initialized, tools/list) don't require valid sessions
       // Claude.ai can send stale session IDs, so we only enforce sessions for authenticated tool calls
-      const handshakeMethods = ['initialize', 'notifications/initialized', 'tools/list'];
-      const isHandshakeMethod = handshakeMethods.includes(jsonRpcRequest.method);
+      const handshakeMethods = [
+        'initialize',
+        'notifications/initialized',
+        'tools/list',
+      ];
+      const isHandshakeMethod = handshakeMethods.includes(
+        jsonRpcRequest.method,
+      );
 
       if (!isHandshakeMethod) {
         if (sessionId && !this.isValidSession(sessionId)) {
-          res.status(404).json({
-            jsonrpc: '2.0',
-            error: {
-              code: -32600,
-              message: 'Session not found. Please reinitialize.',
-            },
-            id: jsonRpcRequest.id,
-          });
-          return;
+          // Session is stale - if authenticated, auto-create a new session
+          // This handles clients like Claude Code that may send stale session IDs
+          if (companyId && userId) {
+            const newSessionId = this.createSession(userId, companyId);
+            res.setHeader('Mcp-Session-Id', newSessionId);
+            // Continue processing with the new session
+          } else {
+            // Not authenticated and session is invalid - require reinit
+            res.status(404).json({
+              jsonrpc: '2.0',
+              error: {
+                code: -32600,
+                message: 'Session not found. Please reinitialize.',
+              },
+              id: jsonRpcRequest.id,
+            });
+            return;
+          }
         }
       }
 
@@ -543,6 +678,55 @@ export class MCPHttpServer {
             }),
           },
           {
+            name: createTeamTool.name,
+            description: createTeamTool.description,
+            inputSchema: z.toJSONSchema(createTeamSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: updateTeamTool.name,
+            description: updateTeamTool.description,
+            inputSchema: z.toJSONSchema(updateTeamSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: deleteTeamTool.name,
+            description: deleteTeamTool.description,
+            inputSchema: z.toJSONSchema(deleteTeamSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: getTeamTool.name,
+            description: getTeamTool.description,
+            inputSchema: z.toJSONSchema(getTeamSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: removeAgentFromTeamTool.name,
+            description: removeAgentFromTeamTool.description,
+            inputSchema: z.toJSONSchema(removeAgentFromTeamSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: getCostSummaryToolMeta.name,
+            description: getCostSummaryToolMeta.description,
+            inputSchema: z.toJSONSchema(getCostSummarySchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: deleteAgentTool.name,
+            description: deleteAgentTool.description,
+            inputSchema: z.toJSONSchema(deleteAgentSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
             name: assignAgentToTeamTool.name,
             description: assignAgentToTeamTool.description,
             inputSchema: z.toJSONSchema(assignAgentToTeamSchema, {
@@ -602,6 +786,27 @@ export class MCPHttpServer {
             name: showNotificationTool.name,
             description: showNotificationTool.description,
             inputSchema: z.toJSONSchema(showNotificationSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: listIntegrationsTool.name,
+            description: listIntegrationsTool.description,
+            inputSchema: z.toJSONSchema(listIntegrationsSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: getIntegrationDetailsTool.name,
+            description: getIntegrationDetailsTool.description,
+            inputSchema: z.toJSONSchema(getIntegrationDetailsSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: triggerIntegrationActionTool.name,
+            description: triggerIntegrationActionTool.description,
+            inputSchema: z.toJSONSchema(triggerIntegrationActionSchema, {
               reused: 'inline',
             }),
           },
@@ -800,6 +1005,104 @@ export class MCPHttpServer {
               break;
             }
 
+            case 'create_team': {
+              const parseResult = createTeamSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await createTeam(
+                parseResult.data as CreateTeamInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'update_team': {
+              const parseResult = updateTeamSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await updateTeam(
+                parseResult.data as UpdateTeamInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'delete_team': {
+              const parseResult = deleteTeamSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await deleteTeam(
+                parseResult.data as DeleteTeamInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'get_team': {
+              const parseResult = getTeamSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await getTeam(
+                parseResult.data as GetTeamInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'remove_agent_from_team': {
+              const parseResult = removeAgentFromTeamSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await removeAgentFromTeam(
+                parseResult.data as RemoveAgentFromTeamInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'get_cost_summary': {
+              const parseResult = getCostSummarySchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await getCostSummaryTool(
+                parseResult.data as GetCostSummaryInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'delete_agent': {
+              const parseResult = deleteAgentSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await deleteAgent(
+                parseResult.data as DeleteAgentInput,
+                companyId,
+              );
+              break;
+            }
+
             case 'assign_agent_to_team': {
               const parseResult = assignAgentToTeamSchema.safeParse(toolArgs);
               if (!parseResult.success) {
@@ -923,6 +1226,49 @@ export class MCPHttpServer {
               result = await showNotification(
                 parseResult.data as ShowNotificationInput,
                 companyId,
+              );
+              break;
+            }
+
+            case 'list_integrations': {
+              const parseResult = listIntegrationsSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await listIntegrations(
+                parseResult.data as ListIntegrationsInput,
+              );
+              break;
+            }
+
+            case 'get_integration_details': {
+              const parseResult =
+                getIntegrationDetailsSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await getIntegrationDetails(
+                parseResult.data as GetIntegrationDetailsInput,
+              );
+              break;
+            }
+
+            case 'trigger_integration_action': {
+              const parseResult =
+                triggerIntegrationActionSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await triggerIntegrationAction(
+                parseResult.data as TriggerIntegrationActionInput,
+                companyId,
+                userId,
               );
               break;
             }

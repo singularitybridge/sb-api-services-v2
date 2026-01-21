@@ -315,8 +315,13 @@ export function handleAuthorization(req: Request, res: Response) {
 
   if (req.method === 'GET') {
     // Show authorization form
-    const { client_id, redirect_uri, state, code_challenge, code_challenge_method } =
-      req.query;
+    const {
+      client_id,
+      redirect_uri,
+      state,
+      code_challenge,
+      code_challenge_method,
+    } = req.query;
 
     // Validate required parameters
     if (!client_id || !redirect_uri || !code_challenge) {
@@ -339,8 +344,14 @@ export function handleAuthorization(req: Request, res: Response) {
   }
 
   // POST - process the authorization
-  const { client_id, redirect_uri, state, code_challenge, code_challenge_method, api_key } =
-    req.body;
+  const {
+    client_id,
+    redirect_uri,
+    state,
+    code_challenge,
+    code_challenge_method,
+    api_key,
+  } = req.body;
 
   // Validate required parameters
   if (!client_id || !redirect_uri || !code_challenge) {
@@ -374,7 +385,9 @@ export function handleAuthorization(req: Request, res: Response) {
     expires: Date.now() + 60000, // 1 minute
   };
 
-  const encodedCode = Buffer.from(JSON.stringify(codeData)).toString('base64url');
+  const encodedCode = Buffer.from(JSON.stringify(codeData)).toString(
+    'base64url',
+  );
 
   // Redirect back with code
   const redirectUrl = new URL(redirect_uri);

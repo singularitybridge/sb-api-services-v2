@@ -6,7 +6,6 @@
 
 import { z } from 'zod';
 import { executeAssistantStateless } from '../../services/assistant/stateless-execution.service';
-import { Assistant } from '../../models/Assistant';
 import { resolveAssistantIdentifier } from '../../services/assistant/assistant-resolver.service';
 
 /**
@@ -55,6 +54,18 @@ export const executeSchema = z.object({
     )
     .optional()
     .describe('Optional array of attachments (images, files)'),
+  responseFormat: z
+    .object({
+      type: z
+        .enum(['json_object'])
+        .describe(
+          'Response format type: "json_object" for JSON mode (instructs the model to return valid JSON)',
+        ),
+    })
+    .optional()
+    .describe(
+      'Optional response format for structured JSON output. Use { type: "json_object" } to get JSON responses.',
+    ),
 });
 
 export type ExecuteInput = z.infer<typeof executeSchema>;
@@ -98,7 +109,7 @@ export async function execute(
       companyId,
       userId,
       attachments,
-      undefined, // responseFormat
+      input.responseFormat as any, // responseFormat for JSON mode (json_object only via MCP)
       input.sessionId ? { sessionId: input.sessionId } : undefined,
       input.systemPromptOverride,
     );

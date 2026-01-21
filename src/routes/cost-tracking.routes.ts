@@ -174,7 +174,8 @@ costTrackingRouter.get(
             totalCost,
             totalTokens,
             totalRequests: result.records.length,
-            averageCost: result.records.length > 0 ? totalCost / result.records.length : 0,
+            averageCost:
+              result.records.length > 0 ? totalCost / result.records.length : 0,
           },
         },
         assistantId: assistant._id.toString(),
@@ -228,7 +229,8 @@ costTrackingRouter.get(
             totalCost,
             totalTokens,
             totalRequests: result.records.length,
-            averageCost: result.records.length > 0 ? totalCost / result.records.length : 0,
+            averageCost:
+              result.records.length > 0 ? totalCost / result.records.length : 0,
           },
         },
       });

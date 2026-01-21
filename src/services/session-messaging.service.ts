@@ -95,7 +95,10 @@ export const publishSessionMessage = async (
         `[SessionMessaging] Message size (${messageStr.length} bytes) exceeds ${MAX_MESSAGE_SIZE} bytes, truncating`,
       );
       // Truncate the message to fit within limits
-      const truncatedMessage = truncateForMessaging(message, MAX_MESSAGE_SIZE - 1024);
+      const truncatedMessage = truncateForMessaging(
+        message,
+        MAX_MESSAGE_SIZE - 1024,
+      );
       emitToSession(sessionId, eventName, truncatedMessage);
     } else {
       emitToSession(sessionId, eventName, message);
@@ -127,5 +130,7 @@ export const publishMessage = async (
   }
 
   // For non-session channels, log a warning as this shouldn't happen
-  logger.warn(`[SessionMessaging] Non-session channel used: ${channel}. This may need special handling.`);
+  logger.warn(
+    `[SessionMessaging] Non-session channel used: ${channel}. This may need special handling.`,
+  );
 };

@@ -56,7 +56,9 @@ export const createBooking = async (
   return withRoomBossClient(
     companyId,
     async (client) => {
-      const response = await executeRoomBossRequest<{ order: { bookings: RoomBossBooking[] } }>(
+      const response = await executeRoomBossRequest<{
+        order: { bookings: RoomBossBooking[] };
+      }>(
         client,
         {
           endpoint: '/extws/hotel/v1/createBooking',
