@@ -67,7 +67,6 @@ export const createCompany = async (
       { key: 'openai_api_key', value: 'default_openai_key' },
       { key: 'labs11_api_key', value: 'default_labs11_key' },
       { key: 'google_api_key', value: 'default_google_key' },
-      { key: 'twilio_api_key', value: 'default_twilio_key' },
       { key: 'getimg_api_key', value: 'default_getimg_key' },
       { key: 'perplexity_api_key', value: 'default_perplexity_key' },
       { key: 'sendgrid_api_key', value: 'default_sendgrid_key' },

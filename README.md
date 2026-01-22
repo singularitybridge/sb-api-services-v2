@@ -40,15 +40,13 @@ The SB Agent Portal integrates with various third-party services. The following 
 1. OpenAI
 2. Eleven Labs
 3. Google
-4. Twilio
-5. JSONbin
-6. GetImg
-7. Perplexity
-8. SendGrid
-9. PhotoRoom
-10. Linear
-11. Code Indexer
-12. JIRA
+4. GetImg
+5. Perplexity
+6. SendGrid
+7. PhotoRoom
+8. Linear
+9. Code Indexer
+10. JIRA
 
 Each integration requires an API key, which can be managed through the Company settings. These integrations collectively enhance the capabilities of the AI agents, allowing them to perform a wide range of tasks across different domains and communication channels.
 
