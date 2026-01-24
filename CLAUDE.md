@@ -291,6 +291,44 @@ AI model pricing changes periodically. Run the pricing validator to ensure our c
   - `transcribeAudioWhisperFromURL` - Audio transcription
   - `webSearch` - Web search capabilities
 
+### MCP Tools Versioning (January 2025)
+
+#### Overview
+MCP server supports `list_changed` notifications to help clients detect when tools have been updated after deployment.
+
+#### Location
+- **Version Constant**: `TOOLS_VERSION` in `/src/mcp/http-server.ts` (line ~287)
+- **Format**: `YYYY-MM-DD-vN` (e.g., `2026-01-24-v1`)
+
+#### When to Update TOOLS_VERSION
+**IMPORTANT**: Update `TOOLS_VERSION` whenever you:
+- Add a new MCP tool
+- Remove an MCP tool
+- Change a tool's name, description, or input schema
+- Modify tool behavior significantly
+
+#### How It Works
+1. Server advertises `listChanged: true` capability
+2. `X-MCP-Tools-Version` header included in `initialize` and `tools/list` responses
+3. MCP clients can compare versions to detect changes
+4. Clients supporting `list_changed` will auto-refresh their tool cache
+
+#### Deployment Workflow
+```bash
+# 1. Add/modify MCP tools in /src/mcp/tools/
+
+# 2. Update version in http-server.ts
+const TOOLS_VERSION = '2026-01-25-v1';  # Increment date or version
+
+# 3. Commit and push
+git add . && git commit -m "Add new MCP tool X" && git push
+
+# 4. After deployment, clients will detect the version change
+```
+
+#### Current Tools (36 total)
+Agent management, workspace, teams, integrations, costs, prompt history, and UI control tools. See `http-server.ts` for full list.
+
 ## AI Context Service Integration
 
 - Located at @src/integrations/ai_context_service for integration logic
