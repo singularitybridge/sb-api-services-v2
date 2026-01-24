@@ -234,6 +234,13 @@ import {
   type ListModelsInput,
 } from './tools/list-models';
 
+import {
+  updateAgentActionsTool,
+  updateAgentActionsSchema,
+  updateAgentActions,
+  type UpdateAgentActionsInput,
+} from './tools/update-agent-actions';
+
 // Session data stored per session ID
 interface MCPSession {
   createdAt: number;
@@ -496,6 +503,11 @@ export class MCPHttpServer {
           name: listModelsTool.name,
           description: listModelsTool.description,
           inputSchema: listModelsSchema,
+        },
+        {
+          name: updateAgentActionsTool.name,
+          description: updateAgentActionsTool.description,
+          inputSchema: updateAgentActionsSchema,
         },
       ],
     }));
@@ -826,6 +838,13 @@ export class MCPHttpServer {
             name: listModelsTool.name,
             description: listModelsTool.description,
             inputSchema: z.toJSONSchema(listModelsSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: updateAgentActionsTool.name,
+            description: updateAgentActionsTool.description,
+            inputSchema: z.toJSONSchema(updateAgentActionsSchema, {
               reused: 'inline',
             }),
           },
@@ -1334,6 +1353,20 @@ export class MCPHttpServer {
                 );
               }
               result = await listModels(parseResult.data as ListModelsInput);
+              break;
+            }
+
+            case 'update_agent_actions': {
+              const parseResult = updateAgentActionsSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await updateAgentActions(
+                parseResult.data as UpdateAgentActionsInput,
+                companyId,
+              );
               break;
             }
 
