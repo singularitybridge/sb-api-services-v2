@@ -609,12 +609,14 @@ class VectorSearchService {
   async embedDocument(key: string, companyId?: string): Promise<void> {
     return embeddingLimiter(async () => {
       try {
+        logger.debug('Starting embedDocument', { key, companyIdProvided: !!companyId });
+
         const doc = await mongoose.connection.db
           .collection('keyv')
           .findOne({ key });
 
         if (!doc?.value) {
-          logger.debug('No document found', { key });
+          logger.debug('No document found for embedding', { key });
           return;
         }
 
@@ -623,19 +625,38 @@ class VectorSearchService {
           typeof doc.value === 'string' ? JSON.parse(doc.value) : doc.value;
 
         if (!value?.value?.content) {
-          logger.debug('No content to embed', { key });
+          logger.debug('No content to embed', { key, hasValue: !!value, hasValueValue: !!value?.value });
           return;
         }
 
-        // Extract text
+        // Extract text from content
         let text = '';
-        if (typeof value.value.content === 'string') {
-          text = value.value.content;
-        } else if (typeof value.value.content === 'object') {
-          text = JSON.stringify(value.value.content);
+        const content = value.value.content;
+
+        // Handle different content structures
+        if (typeof content === 'string') {
+          text = content;
+        } else if (content?.type === 'file' && content?.content) {
+          // File reference with base64 content - skip binary files, embed text files
+          if (content.mimeType?.startsWith('text/') || content.mimeType === 'application/json') {
+            try {
+              text = Buffer.from(content.content, 'base64').toString('utf-8');
+            } catch {
+              logger.debug('Could not decode file content', { key, mimeType: content.mimeType });
+              return;
+            }
+          } else {
+            logger.debug('Skipping binary file embedding', { key, mimeType: content.mimeType });
+            return;
+          }
+        } else if (typeof content === 'object') {
+          text = JSON.stringify(content);
         }
 
-        if (!text) return;
+        if (!text || text.length < 10) {
+          logger.debug('Content too short for embedding', { key, length: text?.length });
+          return;
+        }
 
         // Get companyId if not provided
         let resolvedCompanyId = companyId;
@@ -644,7 +665,14 @@ class VectorSearchService {
           const scope = this.extractScope(key);
           const scopeId = this.extractScopeId(key);
 
+          logger.debug('Resolving companyId from scope', { key, scope, scopeId });
+
           if (scope === 'agent') {
+            // Validate scopeId is a valid ObjectId
+            if (!mongoose.Types.ObjectId.isValid(scopeId)) {
+              logger.warn('Invalid agent ID for embedding', { key, scopeId });
+              return;
+            }
             // Look up agent to get companyId
             const Assistant = mongoose.connection.db.collection('assistants');
             const agent = await Assistant.findOne({
@@ -656,6 +684,11 @@ class VectorSearchService {
             }
             resolvedCompanyId = agent.companyId.toString();
           } else if (scope === 'session') {
+            // Validate scopeId is a valid ObjectId (skip "stateless_execution" etc.)
+            if (!mongoose.Types.ObjectId.isValid(scopeId)) {
+              logger.debug('Skipping session embedding - invalid ObjectId', { key, scopeId });
+              return;
+            }
             // Look up session to get companyId
             const Session = mongoose.connection.db.collection('sessions');
             const session = await Session.findOne({
@@ -676,6 +709,7 @@ class VectorSearchService {
         }
 
         // Generate embedding using company-specific API key
+        logger.debug('Generating embedding', { key, textLength: text.length, companyId: resolvedCompanyId });
         const embedding = await this.generateEmbedding(text, resolvedCompanyId);
 
         // Update the deserialized value with embedding metadata
@@ -696,9 +730,18 @@ class VectorSearchService {
           },
         );
 
-        logger.info('Document embedded', { key, companyId: resolvedCompanyId });
+        logger.info('Document embedded successfully', {
+          key,
+          companyId: resolvedCompanyId,
+          textLength: text.length,
+          embeddingDimensions: embedding.length
+        });
       } catch (error: any) {
-        logger.error('Embed failed', { key, error: error.message });
+        logger.error('Embed failed', {
+          key,
+          error: error.message,
+          stack: error.stack?.split('\n').slice(0, 3).join('\n')
+        });
       }
     });
   }

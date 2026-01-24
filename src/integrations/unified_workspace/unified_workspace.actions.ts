@@ -172,6 +172,7 @@ export const createWorkspaceActions = (
           {
             scope,
             agentId: scope === 'agent' ? resolvedAgentId : undefined,
+            companyId: context?.companyId,
             creationContext: creationContext || undefined,
           },
         );

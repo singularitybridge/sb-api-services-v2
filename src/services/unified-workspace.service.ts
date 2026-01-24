@@ -1122,6 +1122,7 @@ export class UnifiedWorkspaceService {
     options: {
       scope: string;
       agentId?: string;
+      companyId?: string;
       creationContext?: {
         content?: string;
         messageId?: string;
@@ -1162,14 +1163,17 @@ export class UnifiedWorkspaceService {
     });
 
     // Trigger async embedding (fire-and-forget)
+    // Pass companyId to avoid expensive database lookups in embedDocument
+    const companyId = options.companyId;
     setImmediate(() => {
       const vectorSearch = getVectorSearchService();
       // Build full MongoDB key format: unified-workspace:/agent/id/path
       const namespace = 'unified-workspace';
       const fullKey = `${namespace}:/${scopePath}`;
-      vectorSearch.embedDocument(fullKey).catch((error) => {
+      vectorSearch.embedDocument(fullKey, companyId).catch((error) => {
         logger.error('Async embedding failed', {
           fullKey,
+          companyId,
           error: error.message,
         });
       });

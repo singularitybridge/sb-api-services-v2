@@ -8,6 +8,7 @@ import { z } from 'zod';
 import axios from 'axios';
 import { resolveAssistantIdentifier } from '../../services/assistant/assistant-resolver.service';
 import { getWorkspaceService } from '../../services/unified-workspace.service';
+import { getVectorSearchService } from '../../services/vector-search.service';
 
 /**
  * Input schema for the add_workspace_item tool
@@ -195,6 +196,19 @@ export async function addWorkspaceItem(
 
       await workspace.set(fullPath, fileReference, metadata);
 
+      // Trigger async embedding for vector search
+      setImmediate(() => {
+        const vectorSearch = getVectorSearchService();
+        const namespace = 'unified-workspace';
+        const fullKey = `${namespace}:${fullPath}`;
+        vectorSearch.embedDocument(fullKey, companyId).catch((error) => {
+          console.error('Async embedding failed for file:', {
+            fullKey,
+            error: error.message,
+          });
+        });
+      });
+
       return {
         content: [
           {
@@ -231,6 +245,19 @@ export async function addWorkspaceItem(
 
     // Store the item
     await workspace.set(fullPath, input.content, metadata);
+
+    // Trigger async embedding for vector search
+    setImmediate(() => {
+      const vectorSearch = getVectorSearchService();
+      const namespace = 'unified-workspace';
+      const fullKey = `${namespace}:${fullPath}`;
+      vectorSearch.embedDocument(fullKey, companyId).catch((error) => {
+        console.error('Async embedding failed:', {
+          fullKey,
+          error: error.message,
+        });
+      });
+    });
 
     return {
       content: [
