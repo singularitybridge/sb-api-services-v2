@@ -282,6 +282,10 @@ const activeSessions = new Map<string, MCPSession>();
 // Session expiry time (1 hour)
 const SESSION_TTL_MS = 60 * 60 * 1000;
 
+// Tools version - update this when tools change to trigger client refresh
+// Format: YYYY-MM-DD-vN (increment N for same-day changes)
+const TOOLS_VERSION = '2026-01-24-v1';
+
 /**
  * MCP Server for HTTP transport
  */
@@ -297,7 +301,9 @@ export class MCPHttpServer {
       },
       {
         capabilities: {
-          tools: {},
+          tools: {
+            listChanged: true,
+          },
         },
       },
     );
@@ -649,13 +655,16 @@ export class MCPHttpServer {
         // Per MCP spec: include Mcp-Session-Id header on InitializeResult response
         const sessionId = this.createSession(userId, companyId);
         res.setHeader('Mcp-Session-Id', sessionId);
+        res.setHeader('X-MCP-Tools-Version', TOOLS_VERSION);
 
         res.json({
           jsonrpc: '2.0',
           result: {
             protocolVersion: requestedVersion,
             capabilities: {
-              tools: {},
+              tools: {
+                listChanged: true,
+              },
               logging: {},
             },
             serverInfo: {
@@ -926,6 +935,8 @@ export class MCPHttpServer {
           },
         ];
 
+        // Include tools version header for client cache invalidation
+        res.setHeader('X-MCP-Tools-Version', TOOLS_VERSION);
         res.json({
           jsonrpc: '2.0',
           result: { tools },
