@@ -6,6 +6,7 @@
 
 import { z } from 'zod';
 import { resolveAssistantIdentifier } from '../../services/assistant/assistant-resolver.service';
+import { validateSessionOwnership } from '../../services/session/session-resolver.service';
 import { getWorkspaceService } from '../../services/unified-workspace.service';
 
 /**
@@ -60,6 +61,8 @@ export async function deleteWorkspaceItem(
         if (!input.scopeId) {
           throw new Error('scopeId (sessionId) is required for session scope');
         }
+        // Validate session belongs to the authenticated company
+        await validateSessionOwnership(input.scopeId, companyId);
         fullPath = `/session/${input.scopeId}${input.itemPath}`;
         scopeInfo.sessionId = input.scopeId;
         break;

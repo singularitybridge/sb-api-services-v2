@@ -519,6 +519,57 @@ await Task({
 - **Removed** - Deprecated features
 - **Security** - Security improvements
 
+# Security Review Guidelines
+
+### Code Review Checklist for Security
+
+When reviewing code that handles user input or data access, verify ALL entry points:
+
+1. **Identify All Entry Points**
+   - REST API routes (Express routers)
+   - MCP tools (MCP server handlers)
+   - WebSocket RPC methods
+   - Public endpoints (no auth)
+
+2. **Verify Authentication at Entry Point**
+   - Check `index.ts` for how routes are mounted
+   - Look for `verifyTokenMiddleware`, `verifyAccess()` middleware
+   - Note any routes WITHOUT auth middleware (public endpoints)
+
+3. **Verify Authorization Within Handlers**
+   - **Company scope**: Must use `req.company._id` from auth context, NOT user input
+   - **Agent scope**: Must validate agent belongs to company via `resolveAssistantIdentifier()`
+   - **Team scope**: Must validate team belongs to company
+   - **Session scope**: Must validate session belongs to company via `validateSessionOwnership()`
+
+4. **Check for IDOR Vulnerabilities**
+   - User-provided IDs (scopeId, sessionId, agentId) must be validated for ownership
+   - Never trust `x-*` headers or query params without validation
+
+### Workspace Entry Points Reference
+
+| Entry Point | Route | Auth | Notes |
+|-------------|-------|------|-------|
+| MCP Tools | `/api/mcp` | JWT/API Key | companyId from auth context |
+| REST API | `/api/workspace` | JWT | Session scope needs validation |
+| Public | `/workspace` | None | Intentionally public (avatars) |
+| WebSocket | `/realtime` | JWT | Uses socket.id, not DB sessions |
+
+### Session Ownership Validation
+
+```typescript
+import { validateSessionOwnership } from '../services/session/session-resolver.service';
+
+// Before accessing session-scoped resources:
+await validateSessionOwnership(sessionId, companyId);
+```
+
+### Common Vulnerability Patterns
+
+1. **Missing scope validation**: Using user-provided `scopeId` without ownership check
+2. **Public endpoints**: Ensure only truly public assets are served without auth
+3. **Header trust**: Never trust `x-session-id` or similar headers without validation
+
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.

@@ -5,6 +5,7 @@ import { logger } from '../utils/logger';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { singleUpload } from '../middleware/file-upload.middleware';
 import { resolveAssistantIdentifier } from '../services/assistant/assistant-resolver.service';
+import { validateSessionOwnership } from '../services/session/session-resolver.service';
 import fs from 'fs/promises';
 
 const router = Router();
@@ -104,7 +105,14 @@ router.post('/set', async (req: AuthenticatedRequest, res: Response) => {
     if (scope === 'company') {
       scopedPath = `/company/${req.company._id}/${path}`;
     } else if (scope === 'session') {
-      const sessionId = req.headers['x-session-id'] || 'default';
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Session ID is required for session scope',
+        });
+      }
+      await validateSessionOwnership(sessionId, req.company._id.toString());
       scopedPath = `/session/${sessionId}/${path}`;
     } else if (scope === 'agent') {
       const agentIdentifier = metadata?.agentId || req.headers['x-agent-id'];
@@ -205,7 +213,14 @@ router.post(
       if (scope === 'company') {
         scopedPath = `/company/${req.company._id}/${filePath}`;
       } else if (scope === 'session') {
-        const sessionId = req.headers['x-session-id'] || 'default';
+        const sessionId = req.headers['x-session-id'] as string;
+        if (!sessionId) {
+          return res.status(400).json({
+            success: false,
+            error: 'Session ID is required for session scope',
+          });
+        }
+        await validateSessionOwnership(sessionId, req.company._id.toString());
         scopedPath = `/session/${sessionId}/${filePath}`;
       } else if (scope === 'agent') {
         const resolvedAgentId = agentId || req.headers['x-agent-id'];
@@ -367,7 +382,14 @@ router.get('/raw', async (req: AuthenticatedRequest, res: Response) => {
     if (scope === 'company') {
       scopedPath = `/company/${req.company._id}/${filePath}`;
     } else if (scope === 'session') {
-      const sessionId = req.headers['x-session-id'] || 'default';
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Session ID is required for session scope',
+        });
+      }
+      await validateSessionOwnership(sessionId, req.company._id.toString());
       scopedPath = `/session/${sessionId}/${filePath}`;
     } else if (scope === 'agent') {
       const resolvedAgentId = agentId || req.headers['x-agent-id'];
@@ -465,7 +487,14 @@ router.get('/get', async (req: AuthenticatedRequest, res: Response) => {
     if (scope === 'company') {
       scopedPath = `/company/${req.company._id}/${path}`;
     } else if (scope === 'session') {
-      const sessionId = req.headers['x-session-id'] || 'default';
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Session ID is required for session scope',
+        });
+      }
+      await validateSessionOwnership(sessionId, req.company._id.toString());
       scopedPath = `/session/${sessionId}/${path}`;
     } else if (scope === 'agent') {
       const agentIdentifier = agentId || req.headers['x-agent-id'];
@@ -587,7 +616,14 @@ router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
     let resolvedTeamId: string | undefined;
 
     if (scope === 'session') {
-      sessionId = (req.headers['x-session-id'] as string) || 'default';
+      sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Session ID is required for session scope',
+        });
+      }
+      await validateSessionOwnership(sessionId, req.company._id.toString());
     } else if (scope === 'agent') {
       const agentIdentifier = agentId || req.headers['x-agent-id'];
       if (!agentIdentifier) {
@@ -824,8 +860,15 @@ router.get('/search', async (req: AuthenticatedRequest, res: Response) => {
     // Search session scope
     if (requestedScopes.includes('session') || includeSession === 'true') {
       const t4 = Date.now();
-      const sessionId = (req.headers['x-session-id'] as string) || 'default';
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Session ID is required for session scope',
+        });
+      }
       try {
+        await validateSessionOwnership(sessionId, req.company._id.toString());
         const scopePrefix = buildScopePrefix('session', {
           sessionId,
         });
@@ -1031,7 +1074,14 @@ router.delete('/delete', async (req: AuthenticatedRequest, res: Response) => {
     if (scope === 'company') {
       scopedPath = `/company/${req.company._id}/${path}`;
     } else if (scope === 'session') {
-      const sessionId = req.headers['x-session-id'] || 'default';
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Session ID is required for session scope',
+        });
+      }
+      await validateSessionOwnership(sessionId, req.company._id.toString());
       scopedPath = `/session/${sessionId}/${path}`;
     } else if (scope === 'agent') {
       const agentIdentifier = agentId || req.headers['x-agent-id'];
@@ -1108,7 +1158,14 @@ router.get('/exists', async (req: AuthenticatedRequest, res: Response) => {
     if (scope === 'company') {
       scopedPath = `/company/${req.company._id}/${path}`;
     } else if (scope === 'session') {
-      const sessionId = req.headers['x-session-id'] || 'default';
+      const sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Session ID is required for session scope',
+        });
+      }
+      await validateSessionOwnership(sessionId, req.company._id.toString());
       scopedPath = `/session/${sessionId}/${path}`;
     } else if (scope === 'agent') {
       const agentIdentifier = agentId || req.headers['x-agent-id'];
@@ -1388,7 +1445,14 @@ router.delete(
       if (scope === 'company') {
         prefix = `/company/${req.company._id}`;
       } else if (scope === 'session') {
-        const sessionId = req.headers['x-session-id'] || 'default';
+        const sessionId = req.headers['x-session-id'] as string;
+        if (!sessionId) {
+          return res.status(400).json({
+            success: false,
+            error: 'Session ID is required for session scope',
+          });
+        }
+        await validateSessionOwnership(sessionId, req.company._id.toString());
         prefix = `/session/${sessionId}`;
       } else if (scope === 'agent') {
         const agentIdentifier = agentId || req.headers['x-agent-id'];

@@ -6,6 +6,7 @@
 
 import { z } from 'zod';
 import { resolveAssistantIdentifier } from '../../services/assistant/assistant-resolver.service';
+import { validateSessionOwnership } from '../../services/session/session-resolver.service';
 import { getWorkspaceService } from '../../services/unified-workspace.service';
 
 /**
@@ -70,6 +71,8 @@ export async function moveWorkspaceItem(
             'fromScopeId (sessionId) is required for session scope',
           );
         }
+        // Validate session belongs to the authenticated company
+        await validateSessionOwnership(input.fromScopeId, companyId);
         fromFullPath = `/session/${input.fromScopeId}${input.fromPath}`;
         fromScopeInfo.sessionId = input.fromScopeId;
         break;
@@ -114,6 +117,8 @@ export async function moveWorkspaceItem(
             'toScopeId (sessionId) is required for session scope',
           );
         }
+        // Validate session belongs to the authenticated company
+        await validateSessionOwnership(toScopeId, companyId);
         toFullPath = `/session/${toScopeId}${input.toPath}`;
         toScopeInfo.sessionId = toScopeId;
         break;

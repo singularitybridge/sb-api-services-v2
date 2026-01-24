@@ -248,7 +248,7 @@ app.use(
   integrationRouter,
 );
 app.use('/teams', verifyTokenMiddleware, verifyAccess(), teamRouter);
-app.use('/workspace', workspaceRouter); // Public access for workspace file serving (team avatars, etc.)
+app.use('/workspace', verifyTokenMiddleware, verifyAccess(), workspaceRouter); // Now requires authentication (was public, but not used by frontend)
 app.use('/memory', verifyTokenMiddleware, verifyAccess(), memoryRouter); // Added memory router
 app.use('/api', verifyTokenMiddleware, verifyAccess(), promptHistoryRouter); // Prompt history
 
