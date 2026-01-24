@@ -158,10 +158,11 @@ export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
       } else if (typeof result === 'object' && 'content' in result) {
         // Result already formatted by service
         // Optionally strip tool call data for backward compatibility
-        if (!shouldIncludeToolCalls && result.data) {
-          const { toolCalls, toolResults, ...restData } = result.data;
-          const filteredResult = {
-            ...result,
+        const formattedResult = result as Record<string, any>;
+        if (!shouldIncludeToolCalls && formattedResult.data) {
+          const { toolCalls, toolResults, ...restData } = formattedResult.data;
+          const filteredResult: Record<string, any> = {
+            ...formattedResult,
             data: Object.keys(restData).length > 0 ? restData : undefined,
           };
           // If message_type was 'tool_calls' but we're hiding them, change to 'text'
