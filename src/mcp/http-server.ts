@@ -241,6 +241,13 @@ import {
   type UpdateAgentActionsInput,
 } from './tools/update-agent-actions';
 
+import {
+  checkIntegrationStatusTool,
+  checkIntegrationStatusSchema,
+  checkIntegrationStatus,
+  type CheckIntegrationStatusInput,
+} from './tools/check-integration-status';
+
 // Session data stored per session ID
 interface MCPSession {
   createdAt: number;
@@ -508,6 +515,11 @@ export class MCPHttpServer {
           name: updateAgentActionsTool.name,
           description: updateAgentActionsTool.description,
           inputSchema: updateAgentActionsSchema,
+        },
+        {
+          name: checkIntegrationStatusTool.name,
+          description: checkIntegrationStatusTool.description,
+          inputSchema: checkIntegrationStatusSchema,
         },
       ],
     }));
@@ -845,6 +857,13 @@ export class MCPHttpServer {
             name: updateAgentActionsTool.name,
             description: updateAgentActionsTool.description,
             inputSchema: z.toJSONSchema(updateAgentActionsSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: checkIntegrationStatusTool.name,
+            description: checkIntegrationStatusTool.description,
+            inputSchema: z.toJSONSchema(checkIntegrationStatusSchema, {
               reused: 'inline',
             }),
           },
@@ -1365,6 +1384,21 @@ export class MCPHttpServer {
               }
               result = await updateAgentActions(
                 parseResult.data as UpdateAgentActionsInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'check_integration_status': {
+              const parseResult =
+                checkIntegrationStatusSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await checkIntegrationStatus(
+                parseResult.data as CheckIntegrationStatusInput,
                 companyId,
               );
               break;
