@@ -1,8 +1,10 @@
+import mongoose from 'mongoose';
 import { Session } from '../../models/Session';
 import { getUserById } from '../../services/user.service';
 import { getCompany } from '../../services/company.service';
 import {
   triggerAction,
+  triggerActionWithContext,
   getLeanIntegrationActions,
   getIntegrationById,
   discoverActionById as discoverActionByIdService,
@@ -13,6 +15,13 @@ import {
   SupportedLanguage,
   Integration,
 } from '../../services/discovery.service';
+
+/**
+ * Check if a string is a valid MongoDB ObjectId (and not the stateless marker)
+ */
+const isValidSessionId = (id: string): boolean => {
+  return mongoose.Types.ObjectId.isValid(id) && id !== 'stateless_execution';
+};
 
 export const getSessionInfo = async (
   sessionId: string,
@@ -67,6 +76,7 @@ export const triggerIntegrationAction = async (
   integrationName: string,
   service: string,
   data: any,
+  contextOverride?: Partial<ActionContext>,
 ): Promise<{ success: boolean; data?: any; error?: string }> => {
   try {
     // Use the original function name without sanitization
@@ -75,6 +85,39 @@ export const triggerIntegrationAction = async (
     // Include the full function name in allowedActions
     const allowedActions: string[] = [fullFunctionName];
 
+    // Determine if this is a stateless execution
+    const isStateless = contextOverride?.isStateless || !isValidSessionId(sessionId);
+
+    if (isStateless) {
+      // Stateless mode - build context from available data and use context-first path
+      console.log(`[triggerIntegrationAction] Using stateless execution path for sessionId: ${sessionId}`);
+
+      const context: ActionContext = {
+        sessionId,
+        companyId,
+        language: contextOverride?.language || 'en',
+        userId: contextOverride?.userId,
+        assistantId: contextOverride?.assistantId,
+        isStateless: true,
+        ...contextOverride,
+      };
+
+      const result = await triggerActionWithContext(
+        integrationName,
+        service,
+        data,
+        context,
+        allowedActions,
+      );
+
+      return {
+        success: result.success,
+        data: result.data,
+        error: result.error,
+      };
+    }
+
+    // Session mode - use legacy path which derives context from session lookup
     const result = await triggerAction(
       integrationName,
       service,

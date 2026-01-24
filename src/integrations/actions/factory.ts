@@ -8,7 +8,7 @@ import {
   FunctionCall,
 } from './types';
 import { createFunctionFactory } from './loaders';
-import { executeFunctionCall } from './executors';
+import { executeFunctionCall, executeFunctionCallWithContext } from './executors';
 import {
   sanitizeFunctionName,
   convertOpenAIFunctionName,
@@ -20,6 +20,7 @@ import { publishActionMessage } from './publishers';
 export {
   createFunctionFactory,
   executeFunctionCall,
+  executeFunctionCallWithContext,
   sanitizeFunctionName,
   convertOpenAIFunctionName,
   extractErrorDetails,

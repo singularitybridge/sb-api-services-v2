@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import mongoose from 'mongoose';
 import {
   FunctionFactory,
   ActionContext,
@@ -20,6 +21,13 @@ import {
   extractErrorDetails,
   DetailedError,
 } from './utils';
+
+/**
+ * Check if a string is a valid MongoDB ObjectId
+ */
+const isValidObjectId = (id: string): boolean => {
+  return mongoose.Types.ObjectId.isValid(id) && id !== 'stateless_execution';
+};
 
 const sendActionUpdate = async (
   sessionId: string,
@@ -97,75 +105,71 @@ const prepareActionExecution = async (
   };
 };
 
-export const executeFunctionCall = async (
+/**
+ * Execute a function call with an explicit ActionContext.
+ * This is the primary execution path - context is passed directly, no session lookup needed.
+ */
+export const executeFunctionCallWithContext = async (
   call: FunctionCall,
-  sessionId: string,
-  companyId: string,
+  context: ActionContext,
   allowedActions: string[],
 ): Promise<{ result?: unknown; error?: DetailedError }> => {
   console.log(
-    `[executeFunctionCall] Starting execution with sessionId: ${sessionId}, companyId: ${companyId}`,
+    `[executeFunctionCallWithContext] Starting execution with context:`,
+    {
+      sessionId: context.sessionId,
+      companyId: context.companyId,
+      isStateless: context.isStateless,
+      userId: context.userId,
+      assistantId: context.assistantId,
+    },
   );
-
-  // Get the current session to ensure we have the latest session ID
-  const session = await getSessionById(sessionId);
-  const currentSession = await getCurrentSession(session.userId, companyId);
-  const activeSessionId = currentSession
-    ? currentSession._id.toString()
-    : sessionId;
-
-  const updatedSession = await getSessionById(activeSessionId);
-  const sessionLanguage = updatedSession.language as SupportedLanguage;
-  const context: ActionContext = {
-    sessionId: activeSessionId,
-    companyId,
-    language: sessionLanguage,
-    assistantId: updatedSession.assistantId?.toString(),
-    userId: updatedSession.userId?.toString(),
-  };
 
   let functionFactory: FunctionFactory;
   try {
     functionFactory = await createFunctionFactory(context, allowedActions);
   } catch (error) {
     console.error(
-      '[executeFunctionCall] Critical error creating function factory:',
+      '[executeFunctionCallWithContext] Critical error creating function factory:',
       error,
     );
     // Return an empty factory to allow the assistant to continue working
     functionFactory = {};
   }
 
+  const activeSessionId = context.sessionId;
+  const sessionLanguage = context.language;
+
   console.log(
-    `[executeFunctionCall] Allowed actions for session ${activeSessionId}:`,
+    `[executeFunctionCallWithContext] Allowed actions for session ${activeSessionId}:`,
     JSON.stringify(allowedActions),
-  ); // Added logging
+  );
 
   const functionName = call.function.name;
   const originalActionId = functionName;
 
   console.log(
-    `[executeFunctionCall] Attempting to execute function: ${functionName}`,
+    `[executeFunctionCallWithContext] Attempting to execute function: ${functionName}`,
   );
   console.log(
-    `[executeFunctionCall] Raw arguments: ${call.function.arguments}`,
+    `[executeFunctionCallWithContext] Raw arguments: ${call.function.arguments}`,
   );
 
   if (functionName in functionFactory) {
-    let executionDetails: ExecutionDetails | undefined; // Initialize as undefined to fix TypeScript error
+    let executionDetails: ExecutionDetails | undefined;
 
     try {
       const args = JSON.parse(call.function.arguments) as Record<
         string,
         unknown
       >;
-      console.log(`[executeFunctionCall] Parsed arguments:`, args);
+      console.log(`[executeFunctionCallWithContext] Parsed arguments:`, args);
 
       const { executionId, convertedActionId, actionInfo, processedArgs } =
         await prepareActionExecution(
           functionName,
           args,
-          activeSessionId, // Changed to activeSessionId
+          activeSessionId,
           sessionLanguage,
         );
 
@@ -184,10 +188,13 @@ export const executeFunctionCall = async (
         input,
       };
 
-      console.log(
-        `[executeFunctionCall] Sending 'started' update for action ${convertedActionId} to session ${activeSessionId}`,
-      ); // Changed to activeSessionId
-      await sendActionUpdate(activeSessionId, 'started', executionDetails); // Changed to activeSessionId
+      // Only send Pusher updates for non-stateless sessions
+      if (!context.isStateless) {
+        console.log(
+          `[executeFunctionCallWithContext] Sending 'started' update for action ${convertedActionId} to session ${activeSessionId}`,
+        );
+        await sendActionUpdate(activeSessionId, 'started', executionDetails);
+      }
 
       // Improved file search detection
       const isFileSearch =
@@ -195,10 +202,9 @@ export const executeFunctionCall = async (
         actionInfo.actionTitle.toLowerCase().includes('file search') ||
         actionInfo.description.toLowerCase().includes('file search');
 
-      if (isFileSearch) {
+      if (isFileSearch && !context.isStateless) {
         // Publish a notification for file search detection
         await sendActionUpdate(activeSessionId, 'started', {
-          // Changed to activeSessionId
           id: uuidv4(),
           actionId: 'file_search_notification',
           serviceName: 'File Search Notification',
@@ -220,127 +226,166 @@ export const executeFunctionCall = async (
       )) as ActionResult;
 
       if (!result.success) {
-        // If the result is not successful, publish failed message and return error result (not throw)
-        // This ensures the LLM gets the error information as a tool result
         const errorDetails = extractErrorDetails(
           result.error || 'Unknown error',
         );
-        await sendActionUpdate(activeSessionId, 'failed', {
-          ...executionDetails,
-          output: result,
-          error: errorDetails,
-        }); // Changed to activeSessionId
+        if (!context.isStateless) {
+          await sendActionUpdate(activeSessionId, 'failed', {
+            ...executionDetails,
+            output: result,
+            error: errorDetails,
+          });
+        }
 
         const errorReturn = {
           result: `Error: ${result.error || 'Action failed'}`,
         };
         console.log(
-          `[executeFunctionCall] Returning error to AI SDK for ${functionName}:`,
+          `[executeFunctionCallWithContext] Returning error to AI SDK for ${functionName}:`,
           JSON.stringify(errorReturn, null, 2),
         );
         return errorReturn;
       } else {
-        // If success is true, publish completed message and return result
-        await sendActionUpdate(activeSessionId, 'completed', {
-          ...executionDetails,
-          output: result,
-        });
-        if (isFileSearch) {
-          // Complete the file search notification
+        if (!context.isStateless) {
           await sendActionUpdate(activeSessionId, 'completed', {
-            id: uuidv4(),
-            actionId: 'file_search_notification',
-            serviceName: 'File Search Notification',
-            actionTitle: 'File Search Completed',
-            actionDescription: 'File search operation completed',
-            icon: 'search',
-            args: {},
-            originalActionId: 'file_search_notification',
-            language: sessionLanguage,
-            input: {
-              message:
-                'File search completed. Results retrieved and incorporated into the response.',
-            },
+            ...executionDetails,
+            output: result,
           });
+          if (isFileSearch) {
+            await sendActionUpdate(activeSessionId, 'completed', {
+              id: uuidv4(),
+              actionId: 'file_search_notification',
+              serviceName: 'File Search Notification',
+              actionTitle: 'File Search Completed',
+              actionDescription: 'File search operation completed',
+              icon: 'search',
+              args: {},
+              originalActionId: 'file_search_notification',
+              language: sessionLanguage,
+              input: {
+                message:
+                  'File search completed. Results retrieved and incorporated into the response.',
+              },
+            });
+          }
         }
-        // Ensure result.data is never null or undefined
         const resultData = result.data ?? {
           message: 'Action completed successfully',
         };
         const successReturn = { result: resultData };
-        // console.log(`[executeFunctionCall] Returning success data to AI SDK for ${functionName}:`, JSON.stringify(successReturn, null, 2));
         return successReturn;
       }
     } catch (error) {
       console.error(
-        `[executeFunctionCall] Error executing function ${functionName}:`,
+        `[executeFunctionCallWithContext] Error executing function ${functionName}:`,
         error,
       );
 
       const errorDetails = extractErrorDetails(error);
 
-      // If executionDetails was set (error occurred after sending 'started'), reuse it
-      // Otherwise, create new execution details for the failed message
-      if (executionDetails) {
-        // Reuse the executionId from the started message to ensure update works properly
-        await sendActionUpdate(activeSessionId, 'failed', {
-          ...executionDetails, // Use the same execution details from the try block
-          // Include both output and error for consistency with the non-thrown error case
-          output: {
-            success: false,
-            error: errorDetails.message,
-            errorDetails: errorDetails, // Include full error details in output as well
-          },
-          error: errorDetails,
-        });
-      } else {
-        // Error occurred before executionDetails was set, create new details
-        const failedActionInfo = await discoverActionById(
-          convertOpenAIFunctionName(functionName),
-          sessionLanguage,
-        );
-        const args = JSON.parse(call.function.arguments);
-        const input = Object.keys(args).length > 0 ? args : {};
+      if (!context.isStateless) {
+        if (executionDetails) {
+          await sendActionUpdate(activeSessionId, 'failed', {
+            ...executionDetails,
+            output: {
+              success: false,
+              error: errorDetails.message,
+              errorDetails: errorDetails,
+            },
+            error: errorDetails,
+          });
+        } else {
+          const failedActionInfo = await discoverActionById(
+            convertOpenAIFunctionName(functionName),
+            sessionLanguage,
+          );
+          const args = JSON.parse(call.function.arguments);
+          const input = Object.keys(args).length > 0 ? args : {};
 
-        await sendActionUpdate(activeSessionId, 'failed', {
-          id: uuidv4(),
-          actionId: convertOpenAIFunctionName(functionName),
-          serviceName: failedActionInfo?.serviceName || 'unknown',
-          actionTitle: failedActionInfo?.actionTitle || 'unknown',
-          actionDescription: failedActionInfo?.description || 'unknown',
-          icon: failedActionInfo?.icon || '',
-          args,
-          originalActionId: functionName,
-          language: sessionLanguage,
-          input,
-          // Include both output and error for consistency with the non-thrown error case
-          output: {
-            success: false,
-            error: errorDetails.message,
-            errorDetails: errorDetails, // Include full error details in output as well
-          },
-          error: errorDetails,
-        });
+          await sendActionUpdate(activeSessionId, 'failed', {
+            id: uuidv4(),
+            actionId: convertOpenAIFunctionName(functionName),
+            serviceName: failedActionInfo?.serviceName || 'unknown',
+            actionTitle: failedActionInfo?.actionTitle || 'unknown',
+            actionDescription: failedActionInfo?.description || 'unknown',
+            icon: failedActionInfo?.icon || '',
+            args,
+            originalActionId: functionName,
+            language: sessionLanguage,
+            input,
+            output: {
+              success: false,
+              error: errorDetails.message,
+              errorDetails: errorDetails,
+            },
+            error: errorDetails,
+          });
+        }
       }
 
-      // Standardize the return to the AI SDK to always have a 'result' field for errors
-      // The Pusher message already contains the full 'errorDetails' object.
       const sdkErrorReturn = {
         result: `Error: ${errorDetails.name} - ${errorDetails.message}`,
       };
       console.log(
-        `[executeFunctionCall] Returning error to AI SDK for ${functionName} (from catch block):`,
+        `[executeFunctionCallWithContext] Returning error to AI SDK for ${functionName} (from catch block):`,
         JSON.stringify(sdkErrorReturn, null, 2),
       );
       return sdkErrorReturn;
     }
   } else {
-    // This case should also align with the { result: "Error: ..." } structure.
-    // For consistency with the above, let's use { result: "Error: ..." }
     const notImplementedError = {
       message: `Function ${functionName} not implemented in the factory`,
     };
-    console.warn(`[executeFunctionCall] ${notImplementedError.message}`);
+    console.warn(`[executeFunctionCallWithContext] ${notImplementedError.message}`);
     return { result: `Error: ${notImplementedError.message}` };
   }
+};
+
+/**
+ * Execute a function call by deriving context from a session lookup.
+ * This is the legacy path - use executeFunctionCallWithContext when context is already available.
+ */
+export const executeFunctionCall = async (
+  call: FunctionCall,
+  sessionId: string,
+  companyId: string,
+  allowedActions: string[],
+): Promise<{ result?: unknown; error?: DetailedError }> => {
+  console.log(
+    `[executeFunctionCall] Starting execution with sessionId: ${sessionId}, companyId: ${companyId}`,
+  );
+
+  // Check if sessionId is valid for database lookup
+  if (!isValidObjectId(sessionId)) {
+    console.error(
+      `[executeFunctionCall] Invalid sessionId "${sessionId}" - cannot derive context from session. Use executeFunctionCallWithContext instead.`,
+    );
+    return {
+      error: {
+        name: 'InvalidSessionError',
+        message: `Cannot execute function call: sessionId "${sessionId}" is not a valid session ID. For stateless execution, use executeFunctionCallWithContext with an explicit ActionContext.`,
+      },
+    };
+  }
+
+  // Get the current session to ensure we have the latest session ID
+  const session = await getSessionById(sessionId);
+  const currentSession = await getCurrentSession(session.userId, companyId);
+  const activeSessionId = currentSession
+    ? currentSession._id.toString()
+    : sessionId;
+
+  const updatedSession = await getSessionById(activeSessionId);
+  const sessionLanguage = updatedSession.language as SupportedLanguage;
+  const context: ActionContext = {
+    sessionId: activeSessionId,
+    companyId,
+    language: sessionLanguage,
+    assistantId: updatedSession.assistantId?.toString(),
+    userId: updatedSession.userId?.toString(),
+    isStateless: false,
+  };
+
+  // Delegate to the context-first implementation
+  return executeFunctionCallWithContext(call, context, allowedActions);
 };

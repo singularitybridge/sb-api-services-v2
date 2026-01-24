@@ -178,6 +178,7 @@ export const createDebugActions = (
             params.integrationName,
             params.service,
             parsedData,
+            context, // Pass full context for stateless execution support
           );
           // Adapt service response for executeAction: map 'error' to 'description'
           return {
