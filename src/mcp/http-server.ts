@@ -227,6 +227,13 @@ import {
   type TriggerIntegrationActionInput,
 } from './tools/trigger-integration-action';
 
+import {
+  listModelsTool,
+  listModelsSchema,
+  listModels,
+  type ListModelsInput,
+} from './tools/list-models';
+
 // Session data stored per session ID
 interface MCPSession {
   createdAt: number;
@@ -484,6 +491,11 @@ export class MCPHttpServer {
           name: triggerIntegrationActionTool.name,
           description: triggerIntegrationActionTool.description,
           inputSchema: triggerIntegrationActionSchema,
+        },
+        {
+          name: listModelsTool.name,
+          description: listModelsTool.description,
+          inputSchema: listModelsSchema,
         },
       ],
     }));
@@ -807,6 +819,13 @@ export class MCPHttpServer {
             name: triggerIntegrationActionTool.name,
             description: triggerIntegrationActionTool.description,
             inputSchema: z.toJSONSchema(triggerIntegrationActionSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: listModelsTool.name,
+            description: listModelsTool.description,
+            inputSchema: z.toJSONSchema(listModelsSchema, {
               reused: 'inline',
             }),
           },
@@ -1270,6 +1289,17 @@ export class MCPHttpServer {
                 companyId,
                 userId,
               );
+              break;
+            }
+
+            case 'list_models': {
+              const parseResult = listModelsSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await listModels(parseResult.data as ListModelsInput);
               break;
             }
 
