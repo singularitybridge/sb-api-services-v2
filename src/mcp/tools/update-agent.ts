@@ -35,7 +35,7 @@ export const updateAgentSchema = z.object({
     .string()
     .optional()
     .describe(
-      'LLM model name (e.g., gpt-4o-mini, claude-sonnet-4-20250514, gemini-2.0-flash)',
+      'LLM model name (e.g., gpt-5.1, claude-sonnet-4-20250514, gemini-2.0-flash)',
     ),
   maxTokens: z
     .number()
