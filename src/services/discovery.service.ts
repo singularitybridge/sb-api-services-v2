@@ -2,12 +2,27 @@ import { readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { getLeanResponse } from '../utils/leanResponse';
 
+/**
+ * Defines a required API key for an integration
+ */
+export interface RequiredApiKey {
+  key: string; // Key identifier (e.g., "jira_api_token")
+  label: string; // Display label (e.g., "API Token")
+  type: 'secret' | 'text'; // secret = password field, text = regular input
+  placeholder?: string; // Placeholder text for the input
+  description?: string; // Optional description for the field
+  helpUrl?: string; // Optional URL to help documentation
+}
+
 export interface Integration {
   id: string;
   name: string;
+  displayName?: string;
   description: string;
   icon: string;
   actions: ActionInfo[];
+  category?: string; // e.g., "project_management", "ai", "communication"
+  requiredApiKeys?: RequiredApiKey[];
 }
 
 export interface ActionInfo {
@@ -109,10 +124,17 @@ export const discoveryService = {
       const integration: Integration = {
         id: integrationId,
         name: translations?.serviceName || config.name || folder,
+        displayName:
+          config.displayName ||
+          translations?.serviceName ||
+          config.name ||
+          folder,
         description:
           translations?.serviceDescription || config.description || '',
         icon: config.icon || 'help-circle',
         actions: actions,
+        category: config.category,
+        requiredApiKeys: config.requiredApiKeys,
       };
 
       integrations.push(integration);
@@ -147,7 +169,7 @@ export const discoveryService = {
     const integrations = await discoveryService.discoverIntegrations(language);
     return getLeanResponse(
       integrations,
-      fields || ['id', 'name', 'description', 'icon', 'actions'],
+      fields || ['id', 'name', 'displayName', 'description', 'icon', 'actions'],
     ) as Partial<Integration>[];
   },
 };

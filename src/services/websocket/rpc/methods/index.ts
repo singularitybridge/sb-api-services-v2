@@ -2,7 +2,6 @@
 import './session';
 import './completion';
 import './speech';
-import './image';
 import './journal';
 import './workspace';
 

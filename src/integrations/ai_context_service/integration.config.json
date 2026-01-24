@@ -1,7 +1,25 @@
 {
   "name": "ai_context_service",
+  "displayName": "AI Context Service",
+  "description": "Context management for AI agents",
   "icon": "ai_context_service",
-  "apiKeyName": "ai_context_service_api_key",
+  "category": "ai",
   "actionCreator": "createAIContextServiceActions",
-  "actionsFile": "ai_context_service.actions.ts"
+  "actionsFile": "ai_context_service.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "ai_context_service_base_url",
+      "label": "Base URL",
+      "type": "text",
+      "placeholder": "https://...",
+      "description": "AI Context Service base URL"
+    },
+    {
+      "key": "ai_context_service_auth_token",
+      "label": "Auth Token",
+      "type": "secret",
+      "placeholder": "Your auth token",
+      "description": "Authentication token for the service"
+    }
+  ]
 }

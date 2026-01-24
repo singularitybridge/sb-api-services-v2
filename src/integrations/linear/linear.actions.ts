@@ -7,6 +7,7 @@ import * as linearService from './linear.service';
 import { executeAction, ExecuteActionOptions } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
 import {
+  LinearClient,
   Issue,
   IssuePayload,
   User,
@@ -14,6 +15,51 @@ import {
   WorkflowState,
   CommentPayload,
 } from '@linear/sdk';
+import { TestConnectionResult } from '../../services/integration-config.service';
+
+/**
+ * Validate Linear connection by getting current user
+ */
+export async function validateConnection(
+  apiKeys: Record<string, string>,
+): Promise<TestConnectionResult> {
+  const apiKey = apiKeys.linear_api_key;
+
+  if (!apiKey) {
+    return {
+      success: false,
+      error: 'Linear API key is not configured',
+    };
+  }
+
+  try {
+    const client = new LinearClient({ apiKey });
+    const viewer = await client.viewer;
+
+    if (viewer && viewer.displayName) {
+      return {
+        success: true,
+        message: `Connected as ${viewer.displayName} (${viewer.email || 'no email'})`,
+      };
+    }
+
+    return {
+      success: true,
+      message: 'Connected successfully to Linear',
+    };
+  } catch (error: any) {
+    if (error.message?.includes('401') || error.message?.includes('Invalid')) {
+      return {
+        success: false,
+        error: 'Invalid API key. Please check your Linear API key.',
+      };
+    }
+    return {
+      success: false,
+      error: error.message || 'Failed to connect to Linear',
+    };
+  }
+}
 
 // Define input argument interfaces
 interface FetchIssuesArgs {

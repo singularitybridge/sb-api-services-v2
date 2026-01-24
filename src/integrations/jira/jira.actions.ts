@@ -5,6 +5,8 @@ import {
   StandardActionResult,
 } from '../actions/types';
 import { executeAction } from '../actions/executor'; // Import executeAction
+import { Version3Client } from 'jira.js';
+import { TestConnectionResult } from '../../services/integration-config.service';
 import {
   // Existing service imports
   createJiraTicket,
@@ -45,6 +47,76 @@ import {
   listJiraProjects,
   // --- END NEW SERVICE IMPORTS ---
 } from './jira.service';
+
+/**
+ * Validate Jira connection by getting current user
+ */
+export async function validateConnection(
+  apiKeys: Record<string, string>,
+): Promise<TestConnectionResult> {
+  const apiToken = apiKeys.jira_api_token;
+  const domain = apiKeys.jira_domain;
+  const email = apiKeys.jira_email;
+
+  if (!apiToken || !domain || !email) {
+    const missing = [];
+    if (!apiToken) missing.push('API Token');
+    if (!domain) missing.push('Domain');
+    if (!email) missing.push('Email');
+    return {
+      success: false,
+      error: `Missing required fields: ${missing.join(', ')}`,
+    };
+  }
+
+  try {
+    const host = domain.endsWith('.atlassian.net')
+      ? `https://${domain}/`
+      : `https://${domain}.atlassian.net/`;
+
+    const client = new Version3Client({
+      host,
+      authentication: {
+        basic: {
+          email,
+          apiToken,
+        },
+      },
+    });
+
+    // Try to get current user - this validates all credentials
+    const user = await client.myself.getCurrentUser();
+
+    if (user && user.displayName) {
+      return {
+        success: true,
+        message: `Connected as ${user.displayName} (${user.emailAddress || email})`,
+      };
+    }
+
+    return {
+      success: true,
+      message: 'Connected successfully to Jira',
+    };
+  } catch (error: any) {
+    if (error.status === 401 || error.message?.includes('401')) {
+      return {
+        success: false,
+        error: 'Authentication failed. Please check your email and API token.',
+      };
+    }
+    if (error.status === 404 || error.message?.includes('404')) {
+      return {
+        success: false,
+        error: `Could not connect to Jira. Please verify your domain: ${domain}`,
+      };
+    }
+    return {
+      success: false,
+      error: error.message || 'Failed to connect to Jira',
+    };
+  }
+}
 
 // --- BEGIN EXISTING INTERFACES (condensed for brevity) ---
 interface CreateTicketArgs {

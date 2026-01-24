@@ -1,7 +1,18 @@
 {
   "name": "sendgrid",
+  "displayName": "SendGrid",
+  "description": "Email delivery and marketing platform",
   "icon": "mail",
-  "apiKeyName": "sendgrid_api_key",
+  "category": "communication",
   "actionCreator": "createSendGridActions",
-  "actionsFile": "sendgrid.actions.ts"
+  "actionsFile": "sendgrid.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "sendgrid_api_key",
+      "label": "API Key",
+      "type": "secret",
+      "placeholder": "SG...",
+      "description": "Your SendGrid API key"
+    }
+  ]
 }

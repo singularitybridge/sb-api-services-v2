@@ -1,7 +1,10 @@
 {
   "name": "file_processing",
-  "icon": "file_processing",
-  "apiKeyName": "file_processing_api_key",
+  "displayName": "File Processing",
+  "description": "File upload, processing, and management",
+  "icon": "file",
+  "category": "internal",
   "actionCreator": "createFileProcessingActions",
-  "actionsFile": "file_processing.actions.ts"
+  "actionsFile": "file_processing.actions.ts",
+  "requiredApiKeys": []
 }

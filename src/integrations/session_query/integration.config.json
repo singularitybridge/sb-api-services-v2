@@ -1,7 +1,10 @@
 {
   "name": "session_query",
-  "description": "Query session messages, state, and context for testing and debugging",
-  "actionsFile": "session_query.actions.ts",
+  "displayName": "Session Query",
+  "description": "Query session messages, state, and context",
+  "icon": "message-square",
+  "category": "internal",
   "actionCreator": "createSessionQueryActions",
-  "enabled": true
+  "actionsFile": "session_query.actions.ts",
+  "requiredApiKeys": []
 }

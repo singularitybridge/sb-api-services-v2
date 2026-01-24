@@ -1,30 +1,54 @@
 import { Company } from '../models/Company';
 import { decryptData } from './encryption.service';
 import NodeCache from 'node-cache';
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { getIntegrationApiKey } from './integration-config.service';
+
+/**
+ * Mapping from API key names to their integration IDs
+ * This allows getApiKey to check IntegrationConfigs first
+ */
+const API_KEY_TO_INTEGRATION: Record<string, string> = {
+  openai_api_key: 'openai',
+  anthropic_api_key: 'anthropic',
+  google_api_key: 'gemini',
+  perplexity_api_key: 'perplexity',
+  labs11_api_key: 'elevenlabs',
+  sendgrid_api_key: 'sendgrid',
+  linear_api_key: 'linear',
+  replicate_api_key: 'replicate',
+  mongodb_connection_string: 'mongodb',
+  jira_api_token: 'jira',
+  jira_domain: 'jira',
+  jira_email: 'jira',
+  ai_context_service_base_url: 'ai_context_service',
+  ai_context_service_auth_token: 'ai_context_service',
+  aws_access_key_id: 'aws_bedrock',
+  aws_secret_access_key: 'aws_bedrock',
+  aws_bedrock_kb_id: 'aws_bedrock',
+  aws_region: 'aws_bedrock',
+  nylas_api_key: 'nylas',
+  nylas_grant_id: 'nylas',
+  roomboss_username: 'roomboss',
+  roomboss_password: 'roomboss',
+};
 
 export type ApiKeyType =
   | 'openai_api_key'
   | 'labs11_api_key'
   | 'google_api_key'
-  | 'anthropic_api_key' // Added anthropic_api_key
-  | 'getimg_api_key'
+  | 'anthropic_api_key'
   | 'perplexity_api_key'
   | 'sendgrid_api_key'
-  | 'photoroom_api_key'
   | 'linear_api_key'
   | 'replicate_api_key'
-  | 'executor_agent_url'
-  | 'executor_agent_token'
+  | 'mongodb_connection_string'
   | 'jira_api_token'
   | 'jira_domain'
   | 'jira_email'
   | 'ai_context_service_base_url'
   | 'ai_context_service_auth_token'
-  | 'FLY_API_TOKEN'
-  | 'TERMINAL_TURTLE_API_KEY'
-  | 'TERMINAL_TURTLE_URL'
   | 'aws_access_key_id'
   | 'aws_secret_access_key'
   | 'aws_bedrock_kb_id'
@@ -49,7 +73,30 @@ export const getApiKey = async (
     return cachedKey;
   }
 
-  // If not in cache, fetch from database
+  // 1. Try to get from IntegrationConfig first (new system)
+  const integrationId = API_KEY_TO_INTEGRATION[keyType];
+  if (integrationId) {
+    try {
+      const integrationKey = await getIntegrationApiKey(
+        companyId,
+        integrationId,
+        keyType,
+      );
+      if (integrationKey) {
+        // Store in cache
+        apiKeyCache.set(cacheKey, integrationKey);
+        return integrationKey;
+      }
+    } catch (error) {
+      // If IntegrationConfig lookup fails, fall back to legacy
+      console.warn(
+        `[getApiKey] IntegrationConfig lookup failed for ${keyType}, falling back to legacy`,
+        error,
+      );
+    }
+  }
+
+  // 2. Fall back to legacy Company.api_keys
   const company = await Company.findById(companyId);
   if (!company) {
     throw new Error('Company not found');

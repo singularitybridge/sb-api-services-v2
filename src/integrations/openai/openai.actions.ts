@@ -10,6 +10,59 @@ import {
 } from '../../utils/actionErrors';
 import { generateText } from 'ai';
 import { openai, createOpenAI } from '@ai-sdk/openai';
+import { TestConnectionResult } from '../../services/integration-config.service';
+
+/**
+ * Validate OpenAI connection by listing models
+ */
+export async function validateConnection(
+  apiKeys: Record<string, string>,
+): Promise<TestConnectionResult> {
+  const apiKey = apiKeys.openai_api_key;
+
+  if (!apiKey) {
+    return {
+      success: false,
+      error: 'OpenAI API key is not configured',
+    };
+  }
+
+  try {
+    const client = new OpenAI({ apiKey });
+    // Try to list models - this validates the API key
+    const models = await client.models.list();
+
+    if (models.data && models.data.length > 0) {
+      return {
+        success: true,
+        message: `Connected successfully. Found ${models.data.length} available models.`,
+      };
+    }
+
+    return {
+      success: true,
+      message: 'Connected successfully to OpenAI API.',
+    };
+  } catch (error: any) {
+    if (error.status === 401) {
+      return {
+        success: false,
+        error: 'Invalid API key. Please check your OpenAI API key.',
+      };
+    }
+    if (error.status === 429) {
+      return {
+        success: false,
+        error:
+          'Rate limited. Your API key is valid but you have exceeded your rate limit.',
+      };
+    }
+    return {
+      success: false,
+      error: error.message || 'Failed to connect to OpenAI',
+    };
+  }
+}
 
 type OpenAIVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 type OpenAIModel = 'tts-1' | 'tts-1-hd';

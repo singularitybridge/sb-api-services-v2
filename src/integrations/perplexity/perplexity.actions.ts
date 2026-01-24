@@ -6,6 +6,76 @@ import {
 import { performPerplexitySearch as performPerplexitySearchService } from './perplexity.service';
 import { executeAction, ExecuteActionOptions } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
+import axios from 'axios';
+import { TestConnectionResult } from '../../services/integration-config.service';
+
+/**
+ * Validate Perplexity connection with a minimal API call
+ */
+export async function validateConnection(
+  apiKeys: Record<string, string>,
+): Promise<TestConnectionResult> {
+  const apiKey = apiKeys.perplexity_api_key;
+
+  if (!apiKey) {
+    return {
+      success: false,
+      error: 'Perplexity API key is not configured',
+    };
+  }
+
+  try {
+    // Make a minimal API call with very short prompt
+    const response = await axios.post(
+      'https://api.perplexity.ai/chat/completions',
+      {
+        model: 'sonar',
+        messages: [{ role: 'user', content: 'Hello' }],
+        max_tokens: 5,
+      },
+      {
+        headers: {
+          accept: 'application/json',
+          authorization: `Bearer ${apiKey}`,
+          'content-type': 'application/json',
+        },
+        timeout: 10000,
+      },
+    );
+
+    if (response.status === 200) {
+      return {
+        success: true,
+        message: 'Connected successfully to Perplexity API',
+      };
+    }
+
+    return {
+      success: false,
+      error: 'Unexpected response from Perplexity API',
+    };
+  } catch (error: any) {
+    if (error.response?.status === 401) {
+      return {
+        success: false,
+        error: 'Invalid API key. Please check your Perplexity API key.',
+      };
+    }
+    if (error.response?.status === 429) {
+      return {
+        success: true, // Key is valid, just rate limited
+        message: 'API key is valid (rate limit reached)',
+      };
+    }
+    return {
+      success: false,
+      error:
+        error.response?.data?.error?.message ||
+        error.message ||
+        'Failed to connect to Perplexity',
+    };
+  }
+}
 
 interface PerplexitySearchArgs {
   model:

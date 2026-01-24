@@ -3,6 +3,56 @@ import { generateAudio, listModels, listVoices } from './elevenlabs.service';
 import { getApiKey } from '../../services/api.key.service';
 import { executeAction } from '../actions/executor';
 import { ActionExecutionError } from '../../utils/actionErrors';
+import { TestConnectionResult } from '../../services/integration-config.service';
+import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
+
+/**
+ * Validate ElevenLabs connection by listing voices
+ */
+export async function validateConnection(
+  apiKeys: Record<string, string>,
+): Promise<TestConnectionResult> {
+  const apiKey = apiKeys.labs11_api_key;
+
+  if (!apiKey) {
+    return {
+      success: false,
+      error: 'ElevenLabs API key is not configured',
+    };
+  }
+
+  try {
+    const client = new ElevenLabsClient({ apiKey });
+    const voices = await client.voices.getAll();
+
+    if (voices && Array.isArray(voices)) {
+      return {
+        success: true,
+        message: `Connected successfully. Found ${voices.length} available voices.`,
+      };
+    }
+
+    return {
+      success: true,
+      message: 'Connected successfully to ElevenLabs.',
+    };
+  } catch (error: any) {
+    if (
+      error.statusCode === 401 ||
+      error.message?.includes('401') ||
+      error.message?.includes('Unauthorized')
+    ) {
+      return {
+        success: false,
+        error: 'Invalid API key. Please check your ElevenLabs API key.',
+      };
+    }
+    return {
+      success: false,
+      error: error.message || 'Failed to connect to ElevenLabs',
+    };
+  }
+}
 
 // Define expected data shapes for StandardActionResult for clarity
 interface GenerateAudioData {

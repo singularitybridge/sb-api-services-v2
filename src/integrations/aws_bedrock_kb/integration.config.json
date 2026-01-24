@@ -1,15 +1,39 @@
 {
   "name": "aws_bedrock_kb",
+  "displayName": "AWS Bedrock Knowledge Base",
+  "description": "Vector-based semantic search with AWS Bedrock",
   "icon": "database",
-  "apiKeyName": "aws_bedrock_kb_api_key",
+  "category": "ai",
   "actionCreator": "createAWSBedrockKBActions",
   "actionsFile": "aws_bedrock_kb.actions.ts",
-  "requiredKeys": [
-    "aws_access_key_id",
-    "aws_secret_access_key",
-    "aws_bedrock_kb_id",
-    "aws_region"
-  ],
-  "description": "AWS Bedrock Knowledge Base integration for vector-based semantic search",
-  "category": "ai"
+  "requiredApiKeys": [
+    {
+      "key": "aws_access_key_id",
+      "label": "Access Key ID",
+      "type": "secret",
+      "placeholder": "AKIA...",
+      "description": "AWS IAM Access Key ID"
+    },
+    {
+      "key": "aws_secret_access_key",
+      "label": "Secret Access Key",
+      "type": "secret",
+      "placeholder": "Your AWS secret key",
+      "description": "AWS IAM Secret Access Key"
+    },
+    {
+      "key": "aws_bedrock_kb_id",
+      "label": "Knowledge Base ID",
+      "type": "text",
+      "placeholder": "kb-...",
+      "description": "Your Bedrock Knowledge Base ID"
+    },
+    {
+      "key": "aws_region",
+      "label": "Region",
+      "type": "text",
+      "placeholder": "us-east-1",
+      "description": "AWS region for Bedrock"
+    }
+  ]
 }

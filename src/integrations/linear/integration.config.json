@@ -1,7 +1,18 @@
 {
   "name": "linear",
+  "displayName": "Linear",
+  "description": "Issue tracking and project management",
   "icon": "trello",
-  "apiKeyName": "linear_api_key",
+  "category": "project_management",
   "actionCreator": "createLinearActions",
-  "actionsFile": "linear.actions.ts"
+  "actionsFile": "linear.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "linear_api_key",
+      "label": "API Key",
+      "type": "secret",
+      "placeholder": "lin_api_...",
+      "description": "Your Linear API key from Settings > API"
+    }
+  ]
 }

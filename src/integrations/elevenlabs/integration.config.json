@@ -1,7 +1,18 @@
 {
   "name": "elevenlabs",
+  "displayName": "ElevenLabs",
+  "description": "AI voice generation and text-to-speech",
   "icon": "audio-waveform",
-  "apiKeyName": "labs11",
+  "category": "ai",
   "actionCreator": "createElevenLabsActions",
-  "actionsFile": "elevenlabs.actions.ts"
+  "actionsFile": "elevenlabs.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "labs11_api_key",
+      "label": "API Key",
+      "type": "secret",
+      "placeholder": "Your ElevenLabs API key",
+      "description": "Get from elevenlabs.io account settings"
+    }
+  ]
 }

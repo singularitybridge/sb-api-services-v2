@@ -6,37 +6,52 @@ interface ModelPricing {
   outputCost: number; // Cost per 1000 output tokens
 }
 
-// Pricing last validated: 2026-01-14 (source: LiteLLM - github.com/BerriAI/litellm)
+// Pricing last validated: 2026-01-24 (source: Perplexity research + official docs)
 // To update: run pricing-validator agent or check CLAUDE.md "Monthly Task: Pricing Validation"
 const MODEL_PRICING: Record<string, ModelPricing> = {
-  // OpenAI Models
+  // === OpenAI GPT-5.2 (Latest) ===
+  'gpt-5.2': { inputCost: 0.00175, outputCost: 0.014 },
+  'gpt-5.2-pro': { inputCost: 0.021, outputCost: 0.168 },
+
+  // === OpenAI GPT-5.1 ===
+  'gpt-5.1': { inputCost: 0.00125, outputCost: 0.01 },
+
+  // === OpenAI GPT-5 ===
+  'gpt-5': { inputCost: 0.00125, outputCost: 0.01 },
+  'gpt-5-mini': { inputCost: 0.00025, outputCost: 0.002 },
+  'gpt-5-nano': { inputCost: 0.00005, outputCost: 0.0004 },
+
+  // === OpenAI O-Series Reasoning ===
+  'o3': { inputCost: 0.002, outputCost: 0.008 },
+  'o3-pro': { inputCost: 0.02, outputCost: 0.08 },
+  'o4-mini': { inputCost: 0.0011, outputCost: 0.0044 },
+  'o3-mini': { inputCost: 0.0011, outputCost: 0.0044 },
+
+  // === OpenAI GPT-4.1 ===
+  'gpt-4.1': { inputCost: 0.0025, outputCost: 0.01 },
+  'gpt-4.1-mini': { inputCost: 0.00005, outputCost: 0.0002 },
+  'gpt-4.1-nano': { inputCost: 0.0001, outputCost: 0.0004 },
+
+  // === OpenAI GPT-4o (Legacy) ===
   'gpt-4o': { inputCost: 0.0025, outputCost: 0.01 },
   'gpt-4o-mini': { inputCost: 0.00015, outputCost: 0.0006 },
-  'gpt-4-turbo': { inputCost: 0.01, outputCost: 0.03 },
-  'gpt-4': { inputCost: 0.03, outputCost: 0.06 },
-  'gpt-3.5-turbo': { inputCost: 0.0005, outputCost: 0.0015 },
-  'gpt-4o-2024-08-06': { inputCost: 0.0025, outputCost: 0.01 },
 
-  // OpenAI O3 Models
-  'o3-mini': { inputCost: 0.0011, outputCost: 0.0044 },
-  'o3-mini-high': { inputCost: 0.0011, outputCost: 0.0044 },
-  o3: { inputCost: 0.002, outputCost: 0.008 },
+  // === Anthropic Claude 4.5 (Current) ===
+  'claude-opus-4-5-20251101': { inputCost: 0.005, outputCost: 0.025 },
+  'claude-sonnet-4-5-20250929': { inputCost: 0.003, outputCost: 0.015 },
+  'claude-haiku-4-5-20251001': { inputCost: 0.001, outputCost: 0.005 },
 
-  // Anthropic Models
-  'claude-3-5-sonnet-20241022': { inputCost: 0.003, outputCost: 0.015 },
-  'claude-3-5-haiku-20241022': { inputCost: 0.0008, outputCost: 0.004 },
-  'claude-3-opus-20240229': { inputCost: 0.015, outputCost: 0.075 },
-  'claude-3-sonnet-20240229': { inputCost: 0.003, outputCost: 0.015 },
-  'claude-3-haiku-20240307': { inputCost: 0.00025, outputCost: 0.00125 },
+  // === Anthropic Claude 4 (Legacy) ===
+  'claude-sonnet-4-20250514': { inputCost: 0.003, outputCost: 0.015 },
 
-  // Google Models
+  // === Google Gemini 3 (Preview) ===
+  'gemini-3-pro-preview': { inputCost: 0.00125, outputCost: 0.01 },
+  'gemini-3-flash-preview': { inputCost: 0.0003, outputCost: 0.0025 },
+
+  // === Google Gemini 2.5 (Stable) ===
   'gemini-2.5-pro': { inputCost: 0.00125, outputCost: 0.01 },
   'gemini-2.5-flash': { inputCost: 0.0003, outputCost: 0.0025 },
-  'gemini-2.0-flash': { inputCost: 0.0001, outputCost: 0.0004 },
-  'gemini-2.0-flash-exp': { inputCost: 0.0001, outputCost: 0.0004 },
-  'gemini-1.5-pro': { inputCost: 0.00125, outputCost: 0.005 },
-  'gemini-1.5-flash': { inputCost: 0.000075, outputCost: 0.0003 },
-  'gemini-1.5-flash-8b': { inputCost: 0.0000375, outputCost: 0.00015 },
+  'gemini-2.5-flash-lite': { inputCost: 0.00015, outputCost: 0.001 },
 
   // Default pricing for unknown models
   default: { inputCost: 0.001, outputCost: 0.002 },

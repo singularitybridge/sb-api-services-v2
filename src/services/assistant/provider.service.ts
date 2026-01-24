@@ -3,24 +3,37 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { ProviderKey } from '../../types/assistant.types';
 
-// Model configurations with built-in capabilities for v5
+// Model configurations - Updated January 2026
+// Based on latest available models from OpenAI, Anthropic, and Google
 const MODEL_CONFIGS: Record<string, any> = {
-  // === OpenAI GPT-5.x family ===
+  // === OpenAI GPT-5.2 (Latest - Late 2025) ===
   'gpt-5.2': { provider: 'openai', baseModel: 'gpt-5.2' },
+  'gpt-5.2-pro': { provider: 'openai', baseModel: 'gpt-5.2-pro' },
+
+  // === OpenAI GPT-5.1 ===
+  'gpt-5.1': { provider: 'openai', baseModel: 'gpt-5.1' },
+
+  // === OpenAI GPT-5 ===
   'gpt-5': { provider: 'openai', baseModel: 'gpt-5' },
   'gpt-5-mini': { provider: 'openai', baseModel: 'gpt-5-mini' },
   'gpt-5-nano': { provider: 'openai', baseModel: 'gpt-5-nano' },
 
-  // === OpenAI GPT-4.x family ===
+  // === OpenAI O-Series Reasoning ===
+  'o3': { provider: 'openai', baseModel: 'o3' },
+  'o3-pro': { provider: 'openai', baseModel: 'o3-pro' },
+  'o4-mini': { provider: 'openai', baseModel: 'o4-mini' },
+  'o3-mini': { provider: 'openai', baseModel: 'o3-mini' },
+
+  // === OpenAI GPT-4.1 (Non-reasoning, 1M context) ===
   'gpt-4.1': { provider: 'openai', baseModel: 'gpt-4.1' },
   'gpt-4.1-mini': { provider: 'openai', baseModel: 'gpt-4.1-mini' },
   'gpt-4.1-nano': { provider: 'openai', baseModel: 'gpt-4.1-nano' },
+
+  // === OpenAI GPT-4o (Legacy but still supported) ===
   'gpt-4o': { provider: 'openai', baseModel: 'gpt-4o' },
   'gpt-4o-mini': { provider: 'openai', baseModel: 'gpt-4o-mini' },
-  'gpt-4-turbo': { provider: 'openai', baseModel: 'gpt-4-turbo' },
-  'gpt-3.5-turbo': { provider: 'openai', baseModel: 'gpt-3.5-turbo' },
 
-  // === Google Gemini 3 (preview) ===
+  // === Google Gemini 3 (Latest - Preview) ===
   'gemini-3-pro-preview': {
     provider: 'google',
     baseModel: 'gemini-3-pro-preview',
@@ -30,7 +43,7 @@ const MODEL_CONFIGS: Record<string, any> = {
     baseModel: 'gemini-3-flash-preview',
   },
 
-  // === Google Gemini 2.5 (stable) ===
+  // === Google Gemini 2.5 (Stable - Retiring Jun-Jul 2026) ===
   'gemini-2.5-pro': { provider: 'google', baseModel: 'gemini-2.5-pro' },
   'gemini-2.5-flash': { provider: 'google', baseModel: 'gemini-2.5-flash' },
   'gemini-2.5-flash-lite': {
@@ -38,10 +51,11 @@ const MODEL_CONFIGS: Record<string, any> = {
     baseModel: 'gemini-2.5-flash-lite',
   },
 
-  // === Google Gemini 2.0 (legacy) ===
-  'gemini-2.0-flash': { provider: 'google', baseModel: 'gemini-2.0-flash' },
-
-  // === Anthropic Claude 4.5 ===
+  // === Anthropic Claude 4.5 (Latest - Current) ===
+  'claude-opus-4-5': {
+    provider: 'anthropic',
+    baseModel: 'claude-opus-4-5-20251101',
+  },
   'claude-sonnet-4-5': {
     provider: 'anthropic',
     baseModel: 'claude-sonnet-4-5-20250929',
@@ -50,41 +64,12 @@ const MODEL_CONFIGS: Record<string, any> = {
     provider: 'anthropic',
     baseModel: 'claude-haiku-4-5-20251001',
   },
-  'claude-opus-4-5': {
-    provider: 'anthropic',
-    baseModel: 'claude-opus-4-5-20251101',
-  },
 
-  // === Anthropic Claude 4.1 ===
-  'claude-opus-4-1': {
-    provider: 'anthropic',
-    baseModel: 'claude-opus-4-1-20250805',
-  },
-
-  // === Anthropic Claude 4 ===
+  // === Anthropic Claude 4 (Legacy - Retiring May 2026) ===
   'claude-sonnet-4-0': {
     provider: 'anthropic',
     baseModel: 'claude-sonnet-4-20250514',
   },
-  'claude-opus-4-0': {
-    provider: 'anthropic',
-    baseModel: 'claude-opus-4-20250514',
-  },
-
-  // === Anthropic Claude 3 (legacy) ===
-  'claude-3-haiku-20240307': {
-    provider: 'anthropic',
-    baseModel: 'claude-3-haiku-20240307',
-  },
-  'claude-3-5-sonnet': {
-    provider: 'anthropic',
-    baseModel: 'claude-3-5-sonnet-latest',
-  },
-  'claude-3-5-haiku': {
-    provider: 'anthropic',
-    baseModel: 'claude-3-5-haiku-latest',
-  },
-  'claude-3-opus': { provider: 'anthropic', baseModel: 'claude-3-opus-latest' },
 };
 
 export function getProvider(pk: ProviderKey, model: string, key: string) {

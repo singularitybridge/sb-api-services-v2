@@ -3,16 +3,13 @@ import express from 'express';
 import {
   createCompany,
   deleteCompany,
-  getCompanies,
   getCompany,
-  refreshCompanyToken,
   updateCompany,
 } from '../services/company.service';
 import {
   verifyAccess,
   AuthenticatedRequest,
 } from '../middleware/auth.middleware';
-import { Types } from 'mongoose';
 import { teardownCompany } from '../services/teardown.service';
 
 const companyRouter = express.Router();
@@ -59,21 +56,6 @@ companyRouter.delete(
         .status(500)
         .send({ message: 'Failed to delete company and related data' });
     }
-  },
-);
-
-companyRouter.put(
-  '/refresh-token',
-  verifyAccess(),
-  async (req: AuthenticatedRequest, res) => {
-    const companyId = req.user?.companyId;
-    if (!companyId) {
-      return res
-        .status(400)
-        .json({ message: 'Company ID not found in user session' });
-    }
-    const company = await refreshCompanyToken(companyId.toString(), req.body);
-    res.json(company);
   },
 );
 

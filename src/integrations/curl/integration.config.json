@@ -1,9 +1,10 @@
 {
   "name": "curl",
-  "title": "cURL",
-  "description": "Perform cURL requests to any API",
-  "category": "Development",
+  "displayName": "cURL",
+  "description": "Perform HTTP requests to any API",
   "icon": "square-terminal",
+  "category": "development",
   "actionCreator": "createCurlActions",
-  "actionsFile": "curl.actions.ts"
+  "actionsFile": "curl.actions.ts",
+  "requiredApiKeys": []
 }

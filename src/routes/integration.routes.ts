@@ -17,8 +17,12 @@ import {
 } from '../services/integration.service';
 import { SupportedLanguage, Integration } from '../services/discovery.service';
 import { sanitizeFunctionName } from '../integrations/actions/factory';
+import integrationConfigRouter from './integration-config.routes';
 
 const router = express.Router();
+
+// Mount integration config routes
+router.use('/', integrationConfigRouter);
 
 // Discover all integrations
 router.get(

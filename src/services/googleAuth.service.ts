@@ -127,7 +127,6 @@ export const googleLogin = async (
           name: `${payload['name']}'s Company`,
           description: 'New company created during Google login',
           api_keys: [],
-          identifiers: [{ key: 'email', value: payload['email'] }],
         };
 
         company = await createCompany(defaultCompany);

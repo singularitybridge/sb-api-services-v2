@@ -1,7 +1,10 @@
 {
   "name": "unified_workspace",
-  "icon": "database",
-  "apiKeyName": "workspace_api_key",
+  "displayName": "Workspace",
+  "description": "Unified file and document workspace management",
+  "icon": "folder",
+  "category": "internal",
   "actionCreator": "createWorkspaceActions",
-  "actionsFile": "unified_workspace.actions.ts"
+  "actionsFile": "unified_workspace.actions.ts",
+  "requiredApiKeys": []
 }

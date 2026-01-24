@@ -1,7 +1,25 @@
 {
   "name": "nylas",
+  "displayName": "Nylas",
+  "description": "Email, calendar, and contacts API",
   "icon": "mail",
-  "apiKeyName": "nylas_api_key",
+  "category": "communication",
   "actionCreator": "createNylasActions",
-  "actionsFile": "nylas.actions.ts"
+  "actionsFile": "nylas.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "nylas_api_key",
+      "label": "API Key",
+      "type": "secret",
+      "placeholder": "Your Nylas API key",
+      "description": "Your Nylas API key from dashboard"
+    },
+    {
+      "key": "nylas_grant_id",
+      "label": "Grant ID",
+      "type": "text",
+      "placeholder": "Your Nylas grant ID",
+      "description": "Grant ID for the connected account"
+    }
+  ]
 }

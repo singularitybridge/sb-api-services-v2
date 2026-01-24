@@ -1,7 +1,18 @@
 {
   "name": "openai",
+  "displayName": "OpenAI",
+  "description": "AI models for text, speech, and more",
   "icon": "brain",
-  "apiKeyName": "openai_api_key",
+  "category": "ai",
   "actionCreator": "createOpenAiActions",
-  "actionsFile": "openai.actions.ts"
+  "actionsFile": "openai.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "openai_api_key",
+      "label": "API Key",
+      "type": "secret",
+      "placeholder": "sk-...",
+      "description": "Your OpenAI API key from platform.openai.com"
+    }
+  ]
 }

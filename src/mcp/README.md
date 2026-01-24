@@ -178,7 +178,7 @@ Create a new AI agent.
       "name": "New Agent",
       "description": "A new AI assistant",
       "llmProvider": "anthropic",
-      "llmModel": "claude-3-5-sonnet-20241022",
+      "llmModel": "claude-sonnet-4-20250514",
       "systemPrompt": "You are a helpful assistant."
     }
   },

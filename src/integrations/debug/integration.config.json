@@ -1,6 +1,10 @@
 {
   "name": "debug",
+  "displayName": "Debug",
+  "description": "Debugging tools and utilities",
   "icon": "bug",
+  "category": "internal",
   "actionCreator": "createDebugActions",
-  "actionsFile": "debug.actions.ts"
+  "actionsFile": "debug.actions.ts",
+  "requiredApiKeys": []
 }

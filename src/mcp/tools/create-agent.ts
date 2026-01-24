@@ -21,7 +21,7 @@ export const createAgentSchema = z.object({
     .describe('LLM provider (openai, google, or anthropic)'),
   llmModel: z
     .string()
-    .describe('LLM model name (e.g., gpt-4o-mini, claude-3-5-sonnet-20241022)'),
+    .describe('LLM model name (e.g., gpt-4o-mini, claude-sonnet-4-20250514, gemini-2.0-flash)'),
   llmPrompt: z.string().optional().describe('System prompt for the agent'),
   maxTokens: z
     .number()

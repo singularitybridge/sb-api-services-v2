@@ -1,6 +1,10 @@
 {
   "name": "agent_hub_ui_context",
+  "displayName": "Agent Hub UI Context",
+  "description": "Access and control Agent Hub UI context",
   "icon": "monitor",
+  "category": "internal",
   "actionCreator": "createAgentHubUiContextActions",
-  "actionsFile": "agent_hub_ui_context.actions.ts"
+  "actionsFile": "agent_hub_ui_context.actions.ts",
+  "requiredApiKeys": []
 }

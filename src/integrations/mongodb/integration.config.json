@@ -1,7 +1,18 @@
 {
   "name": "mongodb",
+  "displayName": "MongoDB",
+  "description": "Direct MongoDB database operations",
   "icon": "database",
-  "apiKeyName": "mongodb_connection_string",
+  "category": "database",
   "actionCreator": "createMongoDbActions",
-  "actionsFile": "mongodb.actions.ts"
+  "actionsFile": "mongodb.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "mongodb_connection_string",
+      "label": "Connection String",
+      "type": "secret",
+      "placeholder": "mongodb+srv://...",
+      "description": "MongoDB connection string"
+    }
+  ]
 }

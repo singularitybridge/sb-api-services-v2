@@ -1,7 +1,10 @@
 {
   "name": "assistant",
+  "displayName": "Assistant",
+  "description": "AI assistant management and operations",
   "icon": "bot",
-  "apiKeyName": null,
+  "category": "internal",
   "actionCreator": "createAssistantActions",
-  "actionsFile": "assistant.actions.ts"
+  "actionsFile": "assistant.actions.ts",
+  "requiredApiKeys": []
 }

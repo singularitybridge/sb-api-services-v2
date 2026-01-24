@@ -1,0 +1,18 @@
+{
+  "name": "anthropic",
+  "displayName": "Anthropic Claude",
+  "description": "Anthropic's Claude AI models for text generation, analysis, and conversation",
+  "icon": "anthropic",
+  "category": "ai",
+  "actionCreator": "createAnthropicActions",
+  "actionsFile": "anthropic.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "anthropic_api_key",
+      "label": "API Key",
+      "type": "secret",
+      "placeholder": "sk-ant-...",
+      "description": "Your Anthropic API key from console.anthropic.com"
+    }
+  ]
+}

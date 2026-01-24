@@ -1,7 +1,18 @@
 {
   "name": "perplexity",
+  "displayName": "Perplexity",
+  "description": "AI-powered search and research assistant",
   "icon": "search",
-  "apiKeyName": "perplexity_api_key",
+  "category": "ai",
   "actionCreator": "createPerplexityActions",
-  "actionsFile": "perplexity.actions.ts"
+  "actionsFile": "perplexity.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "perplexity_api_key",
+      "label": "API Key",
+      "type": "secret",
+      "placeholder": "pplx-...",
+      "description": "Your Perplexity API key"
+    }
+  ]
 }

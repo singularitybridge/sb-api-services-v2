@@ -1,7 +1,10 @@
 {
   "name": "journal",
+  "displayName": "Journal",
+  "description": "Personal journal and note-taking",
   "icon": "book",
-  "apiKeyName": "journal_api_key",
+  "category": "internal",
   "actionCreator": "createJournalActions",
-  "actionsFile": "journal.actions.ts"
+  "actionsFile": "journal.actions.ts",
+  "requiredApiKeys": []
 }

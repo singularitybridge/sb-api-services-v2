@@ -1,7 +1,18 @@
 {
   "name": "replicate",
+  "displayName": "Replicate",
+  "description": "Run AI models in the cloud",
   "icon": "cpu",
-  "apiKeyName": "replicate_api_key",
+  "category": "ai",
   "actionCreator": "createReplicateActions",
-  "actionsFile": "replicate.actions.ts"
+  "actionsFile": "replicate.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "replicate_api_key",
+      "label": "API Token",
+      "type": "secret",
+      "placeholder": "r8_...",
+      "description": "Your Replicate API token from replicate.com"
+    }
+  ]
 }

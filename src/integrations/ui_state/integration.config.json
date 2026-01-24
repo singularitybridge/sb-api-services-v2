@@ -1,7 +1,10 @@
 {
   "name": "ui_state",
-  "description": "Query real-time UI state from Agent Hub web interface",
-  "actionsFile": "ui_state.actions.ts",
+  "displayName": "UI State",
+  "description": "Query real-time UI state from Agent Hub",
+  "icon": "eye",
+  "category": "internal",
   "actionCreator": "createUIStateActions",
-  "enabled": true
+  "actionsFile": "ui_state.actions.ts",
+  "requiredApiKeys": []
 }

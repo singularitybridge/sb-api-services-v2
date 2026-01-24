@@ -1,7 +1,10 @@
 {
   "name": "ui_control",
-  "description": "Control Agent Hub UI via bidirectional WebSocket commands",
-  "actionsFile": "ui_control.actions.ts",
+  "displayName": "UI Control",
+  "description": "Control Agent Hub UI via WebSocket commands",
+  "icon": "monitor",
+  "category": "internal",
   "actionCreator": "createUIControlActions",
-  "enabled": true
+  "actionsFile": "ui_control.actions.ts",
+  "requiredApiKeys": []
 }

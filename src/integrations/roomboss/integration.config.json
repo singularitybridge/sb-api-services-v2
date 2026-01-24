@@ -1,7 +1,25 @@
 {
   "name": "roomboss",
+  "displayName": "RoomBoss",
+  "description": "Hotel and property management system",
   "icon": "hotel",
-  "apiKeyName": "roomboss_username",
+  "category": "hospitality",
   "actionCreator": "createRoomBossActions",
-  "actionsFile": "roomboss.actions.ts"
+  "actionsFile": "roomboss.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "roomboss_username",
+      "label": "Username",
+      "type": "text",
+      "placeholder": "Your RoomBoss username",
+      "description": "RoomBoss API username"
+    },
+    {
+      "key": "roomboss_password",
+      "label": "Password",
+      "type": "secret",
+      "placeholder": "Your RoomBoss password",
+      "description": "RoomBoss API password"
+    }
+  ]
 }

@@ -1,7 +1,33 @@
 {
   "name": "jira",
+  "displayName": "JIRA",
+  "description": "Project management and issue tracking",
   "icon": "jira",
-  "apiKeyName": "jira_api_token",
+  "category": "project_management",
   "actionCreator": "createJiraActions",
-  "actionsFile": "jira.actions.ts"
+  "actionsFile": "jira.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "jira_api_token",
+      "label": "API Token",
+      "type": "secret",
+      "placeholder": "Your JIRA API token",
+      "description": "Generate from Atlassian account settings",
+      "helpUrl": "https://id.atlassian.com/manage-profile/security/api-tokens"
+    },
+    {
+      "key": "jira_domain",
+      "label": "Domain",
+      "type": "text",
+      "placeholder": "your-company",
+      "description": "Your Atlassian domain (e.g., your-company.atlassian.net)"
+    },
+    {
+      "key": "jira_email",
+      "label": "Email",
+      "type": "text",
+      "placeholder": "user@company.com",
+      "description": "Email associated with your JIRA account"
+    }
+  ]
 }

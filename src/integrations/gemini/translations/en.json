@@ -1,0 +1,20 @@
+{
+  "serviceName": "Google Gemini",
+  "serviceDescription": "Google's multimodal AI models for text generation, vision analysis, and embeddings",
+  "geminiGenerateText": {
+    "actionTitle": "Generate Text",
+    "description": "Generate text using Google Gemini models with customizable parameters"
+  },
+  "geminiAnalyzeImage": {
+    "actionTitle": "Analyze Image",
+    "description": "Analyze images using Gemini's vision capabilities - describe, extract text, or answer questions"
+  },
+  "geminiChat": {
+    "actionTitle": "Chat Conversation",
+    "description": "Have a multi-turn conversation with Gemini while maintaining context"
+  },
+  "geminiEmbedText": {
+    "actionTitle": "Generate Embeddings",
+    "description": "Generate text embeddings for semantic search and similarity matching"
+  }
+}

@@ -1,6 +1,10 @@
 {
   "name": "inbox",
+  "displayName": "Inbox",
+  "description": "Message inbox management",
   "icon": "inbox",
+  "category": "internal",
   "actionCreator": "createInboxActions",
-  "actionsFile": "inbox.actions.ts"
+  "actionsFile": "inbox.actions.ts",
+  "requiredApiKeys": []
 }

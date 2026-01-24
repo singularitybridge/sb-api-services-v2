@@ -7,10 +7,61 @@ import {
   runMongoDbQuery as runMongoDbQueryService,
   mongoDbService,
 } from './mongodb.service';
-import { executeAction, ExecuteActionOptions } from '../actions/executor'; // Corrected path
-import { ActionValidationError } from '../../utils/actionErrors';
+import { executeAction } from '../actions/executor';
+import {
+  ActionValidationError,
+  ActionExecutionError,
+} from '../../utils/actionErrors';
+import { getApiKey } from '../../services/api.key.service';
+import { TestConnectionResult } from '../../services/integration-config.service';
 
 const SERVICE_NAME = 'mongoDbService';
+
+/**
+ * Validate MongoDB connection using the stored connection string
+ */
+export async function validateConnection(
+  apiKeys: Record<string, string>,
+): Promise<TestConnectionResult> {
+  const connectionString = apiKeys.mongodb_connection_string;
+
+  if (!connectionString) {
+    return {
+      success: false,
+      error: 'MongoDB connection string is not configured',
+    };
+  }
+
+  try {
+    await mongoDbService.connectToDatabase(connectionString);
+    const dbName = await mongoDbService.getCurrentDatabase();
+
+    return {
+      success: true,
+      message: `Connected successfully to database: ${dbName}`,
+    };
+  } catch (error: any) {
+    if (error.message?.includes('authentication')) {
+      return {
+        success: false,
+        error: 'Authentication failed. Please check your credentials.',
+      };
+    }
+    if (
+      error.message?.includes('ECONNREFUSED') ||
+      error.message?.includes('ETIMEDOUT')
+    ) {
+      return {
+        success: false,
+        error: 'Connection refused. Please check the host and port.',
+      };
+    }
+    return {
+      success: false,
+      error: error.message || 'Failed to connect to MongoDB',
+    };
+  }
+}
 
 // Define R types for StandardActionResult<R>
 interface QueryResultData {
@@ -324,7 +375,8 @@ export const createMongoDbActions = (
   },
 
   connectToDatabase: {
-    description: 'Connect to a new MongoDB database instance',
+    description:
+      'Connect to a MongoDB database instance. Uses the stored connection string if not provided.',
     strict: true,
     parameters: {
       type: 'object',
@@ -332,24 +384,36 @@ export const createMongoDbActions = (
         connectionString: {
           type: 'string',
           description:
-            'The MongoDB connection string (e.g., mongodb://user:pass@host:port/db)',
+            'Optional: The MongoDB connection string. If not provided, uses the stored connection string.',
         },
       },
-      required: ['connectionString'],
+      required: [],
       additionalProperties: false,
     },
     function: async (params: {
-      connectionString: string;
+      connectionString?: string;
     }): Promise<StandardActionResult<MessageData>> => {
-      if (!params.connectionString)
-        throw new ActionValidationError(
-          'connectionString parameter is required.',
+      const actionName = 'connectToDatabase';
+
+      // Use provided connection string or fall back to stored one
+      let connString = params.connectionString;
+      if (!connString) {
+        connString = await getApiKey(
+          context.companyId,
+          'mongodb_connection_string',
         );
+        if (!connString) {
+          throw new ActionExecutionError(
+            'MongoDB connection string is not configured. Please set it in the integration settings.',
+            { actionName, statusCode: 400 },
+          );
+        }
+      }
 
       return executeAction<MessageData, ServiceLambdaResponse<MessageData>>(
-        'connectToDatabase',
+        actionName,
         async () => {
-          await mongoDbService.connectToDatabase(params.connectionString);
+          await mongoDbService.connectToDatabase(connString!);
           const dbName = await mongoDbService.getCurrentDatabase();
           return {
             success: true,

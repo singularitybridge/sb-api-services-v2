@@ -1,0 +1,20 @@
+{
+  "serviceName": "Anthropic Claude",
+  "serviceDescription": "Anthropic's Claude AI models for text generation, vision analysis, and intelligent conversation",
+  "claudeGenerateText": {
+    "actionTitle": "Generate Text",
+    "description": "Generate text using Claude models with customizable parameters"
+  },
+  "claudeAnalyzeImage": {
+    "actionTitle": "Analyze Image",
+    "description": "Analyze images using Claude's vision capabilities - describe, extract text, or answer questions"
+  },
+  "claudeChat": {
+    "actionTitle": "Chat Conversation",
+    "description": "Have a multi-turn conversation with Claude while maintaining context"
+  },
+  "claudeSummarize": {
+    "actionTitle": "Summarize Text",
+    "description": "Summarize documents or text with different formats: bullets, paragraph, or detailed"
+  }
+}
