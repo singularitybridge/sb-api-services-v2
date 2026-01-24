@@ -66,9 +66,26 @@ export const executeSchema = z.object({
     .describe(
       'Optional response format for structured JSON output. Use { type: "json_object" } to get JSON responses.',
     ),
+  includeToolCalls: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe(
+      'Include detailed tool call information in response. Defaults to true for MCP. Shows which tools were called and their results.',
+    ),
 });
 
 export type ExecuteInput = z.infer<typeof executeSchema>;
+
+/**
+ * Tool call information extracted from execution
+ */
+interface ToolCallInfo {
+  toolName: string;
+  args: Record<string, unknown>;
+  result?: unknown;
+  error?: string;
+}
 
 /**
  * Execute an AI assistant using direct service integration
@@ -79,6 +96,7 @@ export async function execute(
   userId: string,
 ): Promise<{
   content: Array<{ type: string; text: string }>;
+  toolCalls?: ToolCallInfo[];
   toolErrors?: Array<{ toolName: string; error: string }>;
   isError?: boolean;
 }> {
@@ -114,67 +132,149 @@ export async function execute(
       input.systemPromptOverride,
     );
 
-    // Extract tool errors if present
+    // Extract tool calls and errors if present
+    const toolCalls: ToolCallInfo[] = [];
     const toolErrors: Array<{ toolName: string; error: string }> = [];
-    if (
-      typeof result === 'object' &&
-      !('text' in result) &&
-      result.data?.toolResults
-    ) {
-      // Check each tool result for errors
-      for (const toolResult of result.data.toolResults) {
-        const resultContent =
-          typeof toolResult.result === 'string'
-            ? toolResult.result
-            : toolResult.result === undefined || toolResult.result === null
-              ? ''
-              : JSON.stringify(toolResult.result);
 
-        // Detect error patterns in tool results
-        if (
-          resultContent &&
-          (resultContent.startsWith('Error:') ||
-            resultContent.startsWith('Exception:'))
-        ) {
-          toolErrors.push({
-            toolName: toolResult.toolName,
-            error: resultContent,
+    // Extract tool calls from result.data (stateless execution response format)
+    const resultData = (result as any)?.data;
+    if (resultData) {
+      // Extract tool calls with their arguments
+      // Vercel AI SDK uses 'input' not 'args' for tool call parameters
+      if (resultData.toolCalls && Array.isArray(resultData.toolCalls)) {
+        for (const call of resultData.toolCalls) {
+          toolCalls.push({
+            toolName: call.toolName,
+            args: call.input || call.args || {},
           });
+        }
+      }
+
+      // Match tool results to tool calls and extract errors
+      // Vercel AI SDK uses 'output' not 'result' for tool results
+      if (resultData.toolResults && Array.isArray(resultData.toolResults)) {
+        for (const toolResult of resultData.toolResults) {
+          // Get the result content (Vercel AI SDK uses 'output')
+          const outputValue = toolResult.output ?? toolResult.result;
+          const resultContent =
+            typeof outputValue === 'string'
+              ? outputValue
+              : outputValue === undefined || outputValue === null
+                ? ''
+                : JSON.stringify(outputValue);
+
+          // Find the matching tool call and add result
+          const matchingCall = toolCalls.find(
+            (tc) => tc.toolName === toolResult.toolName,
+          );
+          if (matchingCall) {
+            matchingCall.result = outputValue;
+          } else {
+            // Tool result without a matching call (shouldn't happen, but handle it)
+            toolCalls.push({
+              toolName: toolResult.toolName,
+              args: toolResult.input || {},
+              result: outputValue,
+            });
+          }
+
+          // Detect error patterns in tool results
+          if (
+            resultContent &&
+            (resultContent.startsWith('Error:') ||
+              resultContent.startsWith('Exception:'))
+          ) {
+            toolErrors.push({
+              toolName: toolResult.toolName,
+              error: resultContent,
+            });
+            // Also mark the error on the tool call
+            if (matchingCall) {
+              matchingCall.error = resultContent;
+            }
+          }
         }
       }
     }
 
-    // Handle different response types
-    let responseText: string;
+    // Handle different response types - extract the assistant's text response
+    let responseText: string | null = null;
     if (typeof result === 'string') {
       responseText = result;
     } else if (typeof result === 'object' && 'text' in result) {
       // StreamTextResult
       responseText = JSON.stringify(result);
-    } else {
-      // Object result (from generateObject mode)
-      responseText = JSON.stringify(result);
+    } else if (
+      typeof result === 'object' &&
+      result.content &&
+      Array.isArray(result.content)
+    ) {
+      // Extract text from content array
+      const textContent = result.content.find(
+        (c: any) => c.type === 'text' && c.text?.value,
+      );
+      // Only use the text if it's not empty
+      if (textContent?.text?.value) {
+        responseText = textContent.text.value;
+      }
     }
 
     // Format the response for MCP
-    const response: {
-      content: Array<{ type: string; text: string }>;
-      toolErrors?: Array<{ toolName: string; error: string }>;
-    } = {
-      content: [
-        {
-          type: 'text',
-          text: responseText,
-        },
-      ],
-    };
+    const contentBlocks: Array<{ type: string; text: string }> = [];
 
-    // Add tool errors if any were detected
-    if (toolErrors.length > 0) {
-      response.toolErrors = toolErrors;
+    // Add main response text if present
+    if (responseText) {
+      contentBlocks.push({
+        type: 'text',
+        text: responseText,
+      });
     }
 
-    return response;
+    // Add tool calls summary if requested and present
+    if (input.includeToolCalls !== false && toolCalls.length > 0) {
+      const toolCallsSummary = toolCalls.map((tc) => ({
+        tool: tc.toolName,
+        args: tc.args,
+        ...(tc.result !== undefined && {
+          result:
+            typeof tc.result === 'string'
+              ? tc.result.length > 500
+                ? tc.result.substring(0, 500) + '... (truncated)'
+                : tc.result
+              : tc.result,
+        }),
+        ...(tc.error && { error: tc.error }),
+      }));
+
+      contentBlocks.push({
+        type: 'text',
+        text: `\n---\n**Tool Calls (${toolCalls.length}):**\n${JSON.stringify(toolCallsSummary, null, 2)}`,
+      });
+    }
+
+    // Add tool errors summary if present
+    if (toolErrors.length > 0) {
+      contentBlocks.push({
+        type: 'text',
+        text: `\n---\n**Tool Errors (${toolErrors.length}):**\n${JSON.stringify(toolErrors, null, 2)}`,
+      });
+    }
+
+    // Ensure we have at least one content block
+    if (contentBlocks.length === 0) {
+      contentBlocks.push({
+        type: 'text',
+        text: '(No response content)',
+      });
+    }
+
+    return {
+      content: contentBlocks,
+      // Also include structured data for programmatic access
+      ...(input.includeToolCalls !== false &&
+        toolCalls.length > 0 && { toolCalls }),
+      ...(toolErrors.length > 0 && { toolErrors }),
+    };
   } catch (error) {
     console.error('MCP execute assistant error:', error);
 
@@ -208,6 +308,6 @@ export async function execute(
 export const executeTool = {
   name: 'execute',
   description:
-    "Execute an AI assistant with a user prompt. Supports optional system prompt override and session context. Returns the assistant's response including any tool calls, thinking, or generated content.",
+    "Execute an AI assistant with a user prompt. Supports optional system prompt override and session context. Returns the assistant's response including any tool calls, thinking, or generated content. When includeToolCalls is true (default), the response includes a toolCalls array showing exactly which tools were invoked and their results.",
   inputSchema: executeSchema,
 };

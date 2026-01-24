@@ -786,6 +786,16 @@ export const executeAssistantStateless = async (
           result.usage.outputTokens || 0,
         );
 
+        // Count tool calls from all steps, not just the final step
+        let totalToolCallCount = 0;
+        if ((result as any).steps && Array.isArray((result as any).steps)) {
+          for (const step of (result as any).steps) {
+            totalToolCallCount += step.toolCalls?.length || 0;
+          }
+        } else {
+          totalToolCallCount = result.toolCalls?.length || 0;
+        }
+
         const costInfo: CostTrackingInfo = {
           companyId: companyId?.toString() || 'unknown',
           assistantId: assistant._id.toString(),
@@ -803,7 +813,7 @@ export const executeAssistantStateless = async (
           totalCost: costs.totalCost,
           timestamp: new Date(),
           duration,
-          toolCalls: result.toolCalls?.length || 0,
+          toolCalls: totalToolCallCount,
           cached: false,
           requestType: 'stateless',
         };
@@ -825,15 +835,40 @@ export const executeAssistantStateless = async (
         data: {},
       };
 
-      if (result.toolCalls && result.toolCalls.length > 0) {
-        responsePayload.message_type = 'tool_calls';
-        responsePayload.data.toolCalls = result.toolCalls;
+      // Aggregate tool calls and results from ALL steps (not just the final step)
+      // Vercel AI SDK v5 puts only the last step's tool calls in result.toolCalls
+      // For multi-step execution, we need to aggregate from result.steps
+      let allToolCalls: any[] = [];
+      let allToolResults: any[] = [];
+
+      if ((result as any).steps && Array.isArray((result as any).steps)) {
+        for (const step of (result as any).steps) {
+          if (step.toolCalls && Array.isArray(step.toolCalls)) {
+            allToolCalls = allToolCalls.concat(step.toolCalls);
+          }
+          if (step.toolResults && Array.isArray(step.toolResults)) {
+            allToolResults = allToolResults.concat(step.toolResults);
+          }
+        }
+      } else {
+        // Fallback to result.toolCalls/toolResults if steps not available
+        if (result.toolCalls && result.toolCalls.length > 0) {
+          allToolCalls = result.toolCalls as any[];
+        }
+        if (result.toolResults && result.toolResults.length > 0) {
+          allToolResults = result.toolResults as any[];
+        }
       }
-      if (result.toolResults && result.toolResults.length > 0) {
+
+      if (allToolCalls.length > 0) {
+        responsePayload.message_type = 'tool_calls';
+        responsePayload.data.toolCalls = allToolCalls;
+      }
+      if (allToolResults.length > 0) {
         if (responsePayload.message_type !== 'tool_calls') {
           responsePayload.message_type = 'tool_results';
         }
-        responsePayload.data.toolResults = result.toolResults;
+        responsePayload.data.toolResults = allToolResults;
       }
       return responsePayload;
     }

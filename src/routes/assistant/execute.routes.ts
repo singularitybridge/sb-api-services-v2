@@ -12,7 +12,10 @@ const generateMessageId = (): string => {
 
 export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
   const { assistantId } = req.params;
-  const { userInput, attachments, responseFormat, promptOverride } = req.body; // Add responseFormat and promptOverride
+  const { userInput, attachments, responseFormat, promptOverride, includeToolCalls } = req.body;
+
+  // includeToolCalls defaults to false for backward compatibility with existing API consumers
+  const shouldIncludeToolCalls = includeToolCalls === true;
 
   // Determine if client wants SSE
   const acceptHeader = req.get('Accept');
@@ -154,7 +157,21 @@ export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
         res.json(result);
       } else if (typeof result === 'object' && 'content' in result) {
         // Result already formatted by service
-        res.json(result);
+        // Optionally strip tool call data for backward compatibility
+        if (!shouldIncludeToolCalls && result.data) {
+          const { toolCalls, toolResults, ...restData } = result.data;
+          const filteredResult = {
+            ...result,
+            data: Object.keys(restData).length > 0 ? restData : undefined,
+          };
+          // If message_type was 'tool_calls' but we're hiding them, change to 'text'
+          if (filteredResult.message_type === 'tool_calls' || filteredResult.message_type === 'tool_results') {
+            filteredResult.message_type = 'text';
+          }
+          res.json(filteredResult);
+        } else {
+          res.json(result);
+        }
       } else if (typeof result === 'string') {
         // Format the response
         const response = {
