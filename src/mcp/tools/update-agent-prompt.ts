@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import { resolveAssistantIdentifier } from '../../services/assistant/assistant-resolver.service';
 import { Assistant } from '../../models/Assistant';
+import promptHistoryService from '../../services/prompt-history.service';
 
 /**
  * Input schema for the update_agent_prompt tool
@@ -56,6 +57,20 @@ export async function updateAgentPrompt(
     // Update the prompt
     agent.llmPrompt = input.prompt;
     await agent.save();
+
+    // Save to prompt history
+    try {
+      await promptHistoryService.savePromptVersion({
+        assistantId: agent._id.toString(),
+        companyId,
+        promptContent: input.prompt,
+        changeType: 'update',
+        changeDescription: 'Prompt updated via MCP',
+      });
+    } catch (historyError) {
+      console.error('Failed to save prompt history:', historyError);
+      // Don't fail the update if history save fails
+    }
 
     return {
       content: [

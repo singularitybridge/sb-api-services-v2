@@ -7,6 +7,7 @@
 
 import { z } from 'zod';
 import { resolveAssistantIdentifier } from '../../services/assistant/assistant-resolver.service';
+import promptHistoryService from '../../services/prompt-history.service';
 
 /**
  * Input schema for the update_agent tool
@@ -36,6 +37,10 @@ export const updateAgentSchema = z.object({
     .describe(
       'LLM model name (e.g., gpt-4o-mini, claude-sonnet-4-20250514, gemini-2.0-flash)',
     ),
+  maxTokens: z
+    .number()
+    .optional()
+    .describe('Maximum tokens for model output (default: 25000)'),
 });
 
 export type UpdateAgentInput = z.infer<typeof updateAgentSchema>;
@@ -98,6 +103,11 @@ export async function updateAgent(
       updates.push('llmModel');
     }
 
+    if (input.maxTokens !== undefined) {
+      agent.maxTokens = input.maxTokens;
+      updates.push('maxTokens');
+    }
+
     // Save the agent if any updates were made
     if (updates.length === 0) {
       return {
@@ -120,6 +130,22 @@ export async function updateAgent(
 
     await agent.save();
 
+    // Save to prompt history if prompt was updated
+    if (input.prompt !== undefined) {
+      try {
+        await promptHistoryService.savePromptVersion({
+          assistantId: agent._id.toString(),
+          companyId,
+          promptContent: input.prompt,
+          changeType: 'update',
+          changeDescription: 'Prompt updated via MCP',
+        });
+      } catch (historyError) {
+        console.error('Failed to save prompt history:', historyError);
+        // Don't fail the update if history save fails
+      }
+    }
+
     return {
       content: [
         {
@@ -133,6 +159,7 @@ export async function updateAgent(
                 description: agent.description,
                 llmProvider: agent.llmProvider,
                 llmModel: agent.llmModel,
+                maxTokens: agent.maxTokens,
                 prompt: agent.llmPrompt,
               },
               updatedFields: updates,
@@ -175,6 +202,6 @@ export async function updateAgent(
 export const updateAgentTool = {
   name: 'update_agent',
   description:
-    "Update an AI agent's core metadata including name, description, system prompt, LLM provider, and LLM model. Supports lookup by agent ID or name. Only updates the fields provided.",
+    "Update an AI agent's core metadata including name, description, system prompt, LLM provider, model, and max tokens. Supports lookup by agent ID or name. Only updates the fields provided.",
   inputSchema: updateAgentSchema,
 };

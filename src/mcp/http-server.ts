@@ -248,6 +248,27 @@ import {
   type CheckIntegrationStatusInput,
 } from './tools/check-integration-status';
 
+import {
+  listPromptHistoryTool,
+  listPromptHistorySchema,
+  listPromptHistory,
+  type ListPromptHistoryInput,
+} from './tools/prompt-history';
+
+import {
+  getPromptVersionTool,
+  getPromptVersionSchema,
+  getPromptVersion,
+  type GetPromptVersionInput,
+} from './tools/prompt-history';
+
+import {
+  getDailyCostsTool_metadata,
+  getDailyCostsSchema,
+  getDailyCostsTool,
+  type GetDailyCostsInput,
+} from './tools/get-daily-costs';
+
 // Session data stored per session ID
 interface MCPSession {
   createdAt: number;
@@ -520,6 +541,21 @@ export class MCPHttpServer {
           name: checkIntegrationStatusTool.name,
           description: checkIntegrationStatusTool.description,
           inputSchema: checkIntegrationStatusSchema,
+        },
+        {
+          name: listPromptHistoryTool.name,
+          description: listPromptHistoryTool.description,
+          inputSchema: listPromptHistorySchema,
+        },
+        {
+          name: getPromptVersionTool.name,
+          description: getPromptVersionTool.description,
+          inputSchema: getPromptVersionSchema,
+        },
+        {
+          name: getDailyCostsTool_metadata.name,
+          description: getDailyCostsTool_metadata.description,
+          inputSchema: getDailyCostsSchema,
         },
       ],
     }));
@@ -864,6 +900,27 @@ export class MCPHttpServer {
             name: checkIntegrationStatusTool.name,
             description: checkIntegrationStatusTool.description,
             inputSchema: z.toJSONSchema(checkIntegrationStatusSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: listPromptHistoryTool.name,
+            description: listPromptHistoryTool.description,
+            inputSchema: z.toJSONSchema(listPromptHistorySchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: getPromptVersionTool.name,
+            description: getPromptVersionTool.description,
+            inputSchema: z.toJSONSchema(getPromptVersionSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: getDailyCostsTool_metadata.name,
+            description: getDailyCostsTool_metadata.description,
+            inputSchema: z.toJSONSchema(getDailyCostsSchema, {
               reused: 'inline',
             }),
           },
@@ -1399,6 +1456,51 @@ export class MCPHttpServer {
               }
               result = await checkIntegrationStatus(
                 parseResult.data as CheckIntegrationStatusInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'list_prompt_history': {
+              const parseResult =
+                listPromptHistorySchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await listPromptHistory(
+                parseResult.data as ListPromptHistoryInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'get_prompt_version': {
+              const parseResult =
+                getPromptVersionSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await getPromptVersion(
+                parseResult.data as GetPromptVersionInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'get_daily_costs': {
+              const parseResult =
+                getDailyCostsSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await getDailyCostsTool(
+                parseResult.data as GetDailyCostsInput,
                 companyId,
               );
               break;
