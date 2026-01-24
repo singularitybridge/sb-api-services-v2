@@ -7,6 +7,7 @@
 
 import { z } from 'zod';
 import { MODEL_CONFIGS } from '../../services/assistant/provider.service';
+import { MODEL_PRICING } from '../../utils/cost-tracking';
 
 /**
  * Input schema for the list_models tool
@@ -25,6 +26,12 @@ interface ModelInfo {
   provider: 'openai' | 'anthropic' | 'google';
   baseModel: string;
   description: string;
+  pricing: {
+    inputCostPer1kTokens: number;
+    outputCostPer1kTokens: number;
+    inputCostFormatted: string;
+    outputCostFormatted: string;
+  };
 }
 
 // Model descriptions for better context
@@ -89,11 +96,23 @@ export async function listModels(
         continue;
       }
 
+      // Get pricing - try baseModel first (for full model names), then modelId, then default
+      const pricing =
+        MODEL_PRICING[config.baseModel] ||
+        MODEL_PRICING[modelId] ||
+        MODEL_PRICING['default'];
+
       models.push({
         id: modelId,
         provider: config.provider,
         baseModel: config.baseModel,
         description: MODEL_DESCRIPTIONS[modelId] || modelId,
+        pricing: {
+          inputCostPer1kTokens: pricing.inputCost,
+          outputCostPer1kTokens: pricing.outputCost,
+          inputCostFormatted: `$${pricing.inputCost.toFixed(5)}/1K tokens`,
+          outputCostFormatted: `$${pricing.outputCost.toFixed(5)}/1K tokens`,
+        },
       });
     }
 
@@ -159,6 +178,6 @@ export async function listModels(
 export const listModelsTool = {
   name: 'list_models',
   description:
-    'List all available LLM models that can be used when creating or updating agents. Returns models grouped by provider (OpenAI, Anthropic, Google) with their IDs, base model names, and descriptions. Use the model ID when setting an agent\'s llmModel field.',
+    'List all available LLM models that can be used when creating or updating agents. Returns models grouped by provider (OpenAI, Anthropic, Google) with their IDs, base model names, descriptions, and pricing (cost per 1K tokens for input/output). Use the model ID when setting an agent\'s llmModel field.',
   inputSchema: listModelsSchema,
 };

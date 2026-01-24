@@ -839,6 +839,40 @@ export class MCPHttpServer {
         return;
       }
 
+      // Handle list_models without auth (static data, no company context needed)
+      if (
+        jsonRpcRequest.method === 'tools/call' &&
+        jsonRpcRequest.params?.name === 'list_models'
+      ) {
+        try {
+          const parseResult = listModelsSchema.safeParse(
+            jsonRpcRequest.params?.arguments,
+          );
+          if (!parseResult.success) {
+            throw new Error(
+              `Invalid parameters: ${parseResult.error.message}`,
+            );
+          }
+          const result = await listModels(parseResult.data as ListModelsInput);
+          res.json({
+            jsonrpc: '2.0',
+            result,
+            id: jsonRpcRequest.id,
+          });
+          return;
+        } catch (toolError: any) {
+          res.status(400).json({
+            jsonrpc: '2.0',
+            error: {
+              code: -32602,
+              message: toolError.message || 'Tool execution failed',
+            },
+            id: jsonRpcRequest.id,
+          });
+          return;
+        }
+      }
+
       // All other methods require authentication
       if (!companyId || !userId) {
         // Return 401 with WWW-Authenticate header per RFC 9728

@@ -1,14 +1,14 @@
 // Cost tracking utility for AI model usage
 // Prices are in USD per 1000 tokens
 
-interface ModelPricing {
+export interface ModelPricing {
   inputCost: number; // Cost per 1000 input tokens
   outputCost: number; // Cost per 1000 output tokens
 }
 
 // Pricing last validated: 2026-01-24 (source: Perplexity research + official docs)
 // To update: run pricing-validator agent or check CLAUDE.md "Monthly Task: Pricing Validation"
-const MODEL_PRICING: Record<string, ModelPricing> = {
+export const MODEL_PRICING: Record<string, ModelPricing> = {
   // === OpenAI GPT-5.2 (Latest) ===
   'gpt-5.2': { inputCost: 0.00175, outputCost: 0.014 },
   'gpt-5.2-pro': { inputCost: 0.021, outputCost: 0.168 },
