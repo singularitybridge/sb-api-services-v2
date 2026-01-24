@@ -93,16 +93,17 @@ async function getLastUserMessage(sessionId: string): Promise<{
 export const createWorkspaceActions = (
   context: ActionContext,
 ): FunctionFactory => ({
-  // Store content at session or agent level
+  // Store content at session, agent, or company level
   storeContent: {
-    description: 'Store text or JSON content at session or agent scope',
+    description:
+      'Store text or JSON content at session, agent, or company scope. Company scope enables shared knowledge across all agents.',
     parameters: {
       type: 'object',
       properties: {
         path: {
           type: 'string',
           description:
-            'Path to store content (e.g., "settings/config.json", "prompts/main.txt")',
+            'Path to store content (e.g., "settings/config.json", "knowledge/policies.md")',
         },
         content: {
           type: ['object', 'string'],
@@ -110,9 +111,9 @@ export const createWorkspaceActions = (
         },
         scope: {
           type: 'string',
-          enum: ['session', 'agent'],
+          enum: ['session', 'agent', 'company'],
           description:
-            'Storage scope - session (session-specific) or agent (agent-specific)',
+            'Storage scope - session (session-specific), agent (agent-specific), or company (shared across all agents)',
         },
         agentId: {
           type: 'string',
@@ -131,8 +132,13 @@ export const createWorkspaceActions = (
     }: any): Promise<StandardActionResult> => {
       try {
         // Validate scope
-        if (scope !== 'session' && scope !== 'agent') {
-          throw new Error('Scope must be either "session" or "agent"');
+        if (scope !== 'session' && scope !== 'agent' && scope !== 'company') {
+          throw new Error('Scope must be "session", "agent", or "company"');
+        }
+
+        // Validate companyId for company scope
+        if (scope === 'company' && !context?.companyId) {
+          throw new Error('Company ID is required for company scope');
         }
 
         // Validate and resolve agent ID when scope is agent
@@ -193,6 +199,7 @@ export const createWorkspaceActions = (
             path,
             scope,
             agentId: scope === 'agent' ? resolvedAgentId : undefined,
+            companyId: scope === 'company' ? context?.companyId : undefined,
             version: result.version,
           },
         };
@@ -207,9 +214,10 @@ export const createWorkspaceActions = (
     },
   },
 
-  // Retrieve content from session or agent level
+  // Retrieve content from session, agent, or company level
   retrieveContent: {
-    description: 'Retrieve text or JSON content from session or agent scope',
+    description:
+      'Retrieve text or JSON content from session, agent, or company scope. Use company scope to read shared knowledge.',
     parameters: {
       type: 'object',
       properties: {
@@ -219,8 +227,8 @@ export const createWorkspaceActions = (
         },
         scope: {
           type: 'string',
-          enum: ['session', 'agent'],
-          description: 'Storage scope - session or agent',
+          enum: ['session', 'agent', 'company'],
+          description: 'Storage scope - session, agent, or company',
         },
         agentId: {
           type: 'string',
@@ -238,8 +246,13 @@ export const createWorkspaceActions = (
     }: any): Promise<StandardActionResult> => {
       try {
         // Validate scope
-        if (scope !== 'session' && scope !== 'agent') {
-          throw new Error('Scope must be either "session" or "agent"');
+        if (scope !== 'session' && scope !== 'agent' && scope !== 'company') {
+          throw new Error('Scope must be "session", "agent", or "company"');
+        }
+
+        // Validate companyId for company scope
+        if (scope === 'company' && !context?.companyId) {
+          throw new Error('Company ID is required for company scope');
         }
 
         // Validate and resolve agent ID when scope is agent
@@ -273,6 +286,7 @@ export const createWorkspaceActions = (
           sessionId,
           path,
           scope === 'agent' ? resolvedAgentId : undefined,
+          { scope, companyId: context?.companyId },
         );
 
         if (!result.found) {
@@ -303,6 +317,7 @@ export const createWorkspaceActions = (
             path,
             scope,
             agentId: scope === 'agent' ? resolvedAgentId : undefined,
+            companyId: scope === 'company' ? context?.companyId : undefined,
           },
         };
       } catch (error: any) {
@@ -316,21 +331,22 @@ export const createWorkspaceActions = (
     },
   },
 
-  // List content at session or agent level
+  // List content at session, agent, or company level
   listContent: {
-    description: 'List all stored paths at session or agent scope',
+    description:
+      'List all stored paths at session, agent, or company scope. Use company scope to list shared knowledge.',
     parameters: {
       type: 'object',
       properties: {
         prefix: {
           type: 'string',
           description:
-            'Optional prefix to filter paths (e.g., "settings/", "prompts/")',
+            'Optional prefix to filter paths (e.g., "knowledge/", "config/")',
         },
         scope: {
           type: 'string',
-          enum: ['session', 'agent'],
-          description: 'Storage scope - session or agent',
+          enum: ['session', 'agent', 'company'],
+          description: 'Storage scope - session, agent, or company',
         },
         agentId: {
           type: 'string',
@@ -348,8 +364,13 @@ export const createWorkspaceActions = (
     }: any): Promise<StandardActionResult> => {
       try {
         // Validate scope
-        if (scope !== 'session' && scope !== 'agent') {
-          throw new Error('Scope must be either "session" or "agent"');
+        if (scope !== 'session' && scope !== 'agent' && scope !== 'company') {
+          throw new Error('Scope must be "session", "agent", or "company"');
+        }
+
+        // Validate companyId for company scope
+        if (scope === 'company' && !context?.companyId) {
+          throw new Error('Company ID is required for company scope');
         }
 
         // Validate and resolve agent ID when scope is agent
@@ -383,6 +404,7 @@ export const createWorkspaceActions = (
           sessionId,
           prefix,
           scope === 'agent' ? resolvedAgentId : undefined,
+          { scope, companyId: context?.companyId },
         );
 
         logger.info(
@@ -405,6 +427,7 @@ export const createWorkspaceActions = (
             count: result.count,
             scope,
             agentId: scope === 'agent' ? resolvedAgentId : undefined,
+            companyId: scope === 'company' ? context?.companyId : undefined,
           },
         };
       } catch (error: any) {
@@ -418,10 +441,10 @@ export const createWorkspaceActions = (
     },
   },
 
-  // Delete content from session or agent level
+  // Delete content from session, agent, or company level
   deleteContent: {
     description:
-      'Delete content at a specific path from session or agent scope',
+      'Delete content at a specific path from session, agent, or company scope',
     parameters: {
       type: 'object',
       properties: {
@@ -431,8 +454,8 @@ export const createWorkspaceActions = (
         },
         scope: {
           type: 'string',
-          enum: ['session', 'agent'],
-          description: 'Storage scope - session or agent',
+          enum: ['session', 'agent', 'company'],
+          description: 'Storage scope - session, agent, or company',
         },
         agentId: {
           type: 'string',
@@ -450,8 +473,13 @@ export const createWorkspaceActions = (
     }: any): Promise<StandardActionResult> => {
       try {
         // Validate scope
-        if (scope !== 'session' && scope !== 'agent') {
-          throw new Error('Scope must be either "session" or "agent"');
+        if (scope !== 'session' && scope !== 'agent' && scope !== 'company') {
+          throw new Error('Scope must be "session", "agent", or "company"');
+        }
+
+        // Validate companyId for company scope
+        if (scope === 'company' && !context?.companyId) {
+          throw new Error('Company ID is required for company scope');
         }
 
         // Validate and resolve agent ID when scope is agent
@@ -481,10 +509,11 @@ export const createWorkspaceActions = (
 
         // Use the workspace service directly
         const sessionId = context?.sessionId || 'default';
-        const result = await workspaceService.deleteContent(
+        await workspaceService.deleteContent(
           sessionId,
           path,
           scope === 'agent' ? resolvedAgentId : undefined,
+          { scope, companyId: context?.companyId },
         );
 
         logger.info(`Workspace: Deleted content at ${path} in ${scope} scope`, {
@@ -503,6 +532,7 @@ export const createWorkspaceActions = (
             path,
             scope,
             agentId: scope === 'agent' ? resolvedAgentId : undefined,
+            companyId: scope === 'company' ? context?.companyId : undefined,
             deleted: true,
           },
         };

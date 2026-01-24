@@ -1135,6 +1135,7 @@ export class UnifiedWorkspaceService {
       sessionId,
       path,
       options.agentId,
+      options.companyId,
     );
 
     // Get existing metadata to track version and preserve creation context
@@ -1189,8 +1190,33 @@ export class UnifiedWorkspaceService {
     sessionId: string,
     path: string,
     agentId?: string,
+    options?: { scope?: string; companyId?: string },
   ): Promise<{ found: boolean; content?: any; metadata?: any }> {
-    // Try agent scope first if agentId provided
+    // If explicit scope is provided, use it directly
+    if (options?.scope) {
+      const scopePath = this.buildScopePath(
+        options.scope,
+        sessionId,
+        path,
+        agentId,
+        options.companyId,
+      );
+      try {
+        const result = await this.workspace.get(scopePath);
+        if (result !== undefined && result !== null) {
+          return {
+            found: true,
+            content: result,
+            metadata: { scope: options.scope, agentId, companyId: options.companyId },
+          };
+        }
+      } catch (error) {
+        // Not found
+      }
+      return { found: false };
+    }
+
+    // Legacy behavior: Try agent scope first if agentId provided
     if (agentId) {
       const agentPath = this.buildScopePath('agent', sessionId, path, agentId);
       try {
@@ -1237,9 +1263,11 @@ export class UnifiedWorkspaceService {
     sessionId: string,
     prefix?: string,
     agentId?: string,
+    options?: { scope?: string; companyId?: string },
   ): Promise<{ paths: string[]; count: number }> {
-    const scope = agentId ? 'agent' : 'session';
-    const basePath = this.buildScopePath(scope, sessionId, '', agentId);
+    // Determine scope: explicit > agentId inference > session default
+    const scope = options?.scope || (agentId ? 'agent' : 'session');
+    const basePath = this.buildScopePath(scope, sessionId, '', agentId, options?.companyId);
     const fullPrefix = prefix ? `${basePath}${prefix}` : basePath;
 
     const paths = await this.workspace.list(fullPrefix);
@@ -1257,9 +1285,11 @@ export class UnifiedWorkspaceService {
     sessionId: string,
     path: string,
     agentId?: string,
+    options?: { scope?: string; companyId?: string },
   ): Promise<{ deleted: boolean }> {
-    const scope = agentId ? 'agent' : 'session';
-    const fullPath = this.buildScopePath(scope, sessionId, path, agentId);
+    // Determine scope: explicit > agentId inference > session default
+    const scope = options?.scope || (agentId ? 'agent' : 'session');
+    const fullPath = this.buildScopePath(scope, sessionId, path, agentId, options?.companyId);
 
     const deleted = await this.workspace.delete(fullPath);
     return { deleted };
@@ -1273,10 +1303,13 @@ export class UnifiedWorkspaceService {
     sessionId: string,
     path: string,
     agentId?: string,
+    companyId?: string,
   ): string {
     const cleanPath = path.startsWith('/') ? path.slice(1) : path;
 
     switch (scope) {
+      case 'company':
+        return `company/${companyId}/${cleanPath}`;
       case 'agent':
         return `agent/${agentId}/${cleanPath}`;
       case 'session':
