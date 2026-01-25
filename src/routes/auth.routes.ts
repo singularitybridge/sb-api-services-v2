@@ -2,6 +2,7 @@
 import express from 'express';
 import { extractTokenFromHeader, verifyToken } from '../services/token.service';
 import { googleLogin } from '../services/googleAuth.service';
+import { clerkLogin } from '../services/clerkAuth.service';
 import { refreshApiKeyCache } from '../services/api.key.service';
 import { ApiKeyService } from '../services/apiKey.service';
 
@@ -64,6 +65,19 @@ authRouter.post('/google/login', async (req, res) => {
     res
       .status(500)
       .json({ error: 'Failed to login with Google', message: error.message });
+  }
+});
+
+authRouter.post('/clerk/login', async (req, res) => {
+  try {
+    const { user, company, sessionToken } = await clerkLogin(req.body.token);
+    await refreshApiKeyCache(company._id.toString());
+    res.json({ user, company, sessionToken });
+  } catch (error: any) {
+    console.error('Clerk login failed:', error.message);
+    res
+      .status(500)
+      .json({ error: 'Failed to login with Clerk', message: error.message });
   }
 });
 

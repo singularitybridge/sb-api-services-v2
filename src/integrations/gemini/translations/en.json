@@ -16,5 +16,9 @@
   "geminiEmbedText": {
     "actionTitle": "Generate Embeddings",
     "description": "Generate text embeddings for semantic search and similarity matching"
+  },
+  "geminiAnalyzeYouTubeVideo": {
+    "actionTitle": "Analyze YouTube Video",
+    "description": "Analyze YouTube videos using Gemini's multimodal capabilities - understand content, speaker energy, key points, and more"
   }
 }

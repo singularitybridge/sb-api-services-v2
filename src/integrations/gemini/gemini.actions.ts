@@ -4,6 +4,7 @@ import { executeAction } from '../actions/executor';
 import { ActionExecutionError } from '../../utils/actionErrors';
 import { generateText, embed } from 'ai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { GoogleGenAI } from '@google/genai';
 import { TestConnectionResult } from '../../services/integration-config.service';
 
 /**
@@ -84,6 +85,12 @@ interface ChatArgs {
 
 interface EmbedTextArgs {
   text: string;
+  model?: string;
+}
+
+interface AnalyzeYouTubeVideoArgs {
+  videoUrl: string;
+  prompt: string;
   model?: string;
 }
 
@@ -375,6 +382,105 @@ export const createGeminiActions = (
               embedding: result.embedding,
               dimensions: result.embedding.length,
               model,
+            },
+          };
+        },
+        { serviceName: 'GeminiService' },
+      );
+    },
+  },
+
+  geminiAnalyzeYouTubeVideo: {
+    description:
+      'Analyze a YouTube video using Gemini multimodal capabilities. Processes visual frames AND audio for comprehensive understanding. Use for: summarizing videos, extracting key points, understanding speaker energy/style, answering questions about video content. Only works with public YouTube videos.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        videoUrl: {
+          type: 'string',
+          description:
+            'Public YouTube URL to analyze (e.g., https://youtube.com/watch?v=xyz or https://youtu.be/xyz)',
+        },
+        prompt: {
+          type: 'string',
+          description:
+            'What to analyze or extract from the video. Be specific about what aspects you want (content, energy, style, timestamps, key points, etc.)',
+        },
+        model: {
+          type: 'string',
+          enum: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3-flash-preview', 'gemini-3-pro-preview'],
+          description:
+            'Gemini model to use. gemini-2.5-flash is recommended (fastest, stable). gemini-3-flash-preview for latest features. (default: gemini-2.5-flash)',
+          default: 'gemini-2.5-flash',
+        },
+      },
+      required: ['videoUrl', 'prompt'],
+      additionalProperties: false,
+    },
+    function: async ({
+      videoUrl,
+      prompt,
+      model = 'gemini-2.5-flash',
+    }: AnalyzeYouTubeVideoArgs) => {
+      const actionName = 'geminiAnalyzeYouTubeVideo';
+      const apiKey = await getApiKey(context.companyId, 'google_api_key');
+      if (!apiKey) {
+        throw new ActionExecutionError(
+          'Google API key is missing for this company.',
+          { actionName, statusCode: 400 },
+        );
+      }
+
+      // Validate YouTube URL
+      const youtubeRegex =
+        /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/|v\/)|youtu\.be\/)[\w-]+/;
+      if (!youtubeRegex.test(videoUrl)) {
+        throw new ActionExecutionError(
+          'Invalid YouTube URL. Please provide a valid public YouTube video URL.',
+          { actionName, statusCode: 400 },
+        );
+      }
+
+      return executeAction<{
+        analysis: string;
+        model: string;
+        videoUrl: string;
+      }>(
+        actionName,
+        async () => {
+          // Use native Google GenAI SDK for video support
+          // (Vercel AI SDK doesn't support video input)
+          const ai = new GoogleGenAI({ apiKey });
+
+          const response = await ai.models.generateContent({
+            model,
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  {
+                    fileData: {
+                      fileUri: videoUrl,
+                      mimeType: 'video/*',
+                    },
+                  },
+                  { text: prompt },
+                ],
+              },
+            ],
+          });
+
+          const analysisText =
+            response.candidates?.[0]?.content?.parts?.[0]?.text ||
+            'No analysis generated';
+
+          return {
+            success: true,
+            data: {
+              analysis: analysisText,
+              model,
+              videoUrl,
             },
           };
         },
