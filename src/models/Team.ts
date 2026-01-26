@@ -2,7 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface ITeam extends Document {
   name: string;
-  description: string;
+  description?: string;
   icon?: string;
   iconType?: 'emoji' | 'lucide' | 'workspace'; // Type of icon: emoji, Lucide component name, or workspace path
   companyId: mongoose.Schema.Types.ObjectId;
@@ -10,7 +10,7 @@ export interface ITeam extends Document {
 
 const TeamSchema: Schema = new Schema({
   name: { type: String, required: true },
-  description: { type: String, required: true },
+  description: { type: String, required: false, default: '' },
   icon: { type: String, required: false },
   iconType: {
     type: String,

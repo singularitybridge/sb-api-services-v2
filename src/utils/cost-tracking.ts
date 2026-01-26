@@ -22,7 +22,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'gpt-5-nano': { inputCost: 0.00005, outputCost: 0.0004 },
 
   // === OpenAI O-Series Reasoning ===
-  'o3': { inputCost: 0.002, outputCost: 0.008 },
+  o3: { inputCost: 0.002, outputCost: 0.008 },
   'o3-pro': { inputCost: 0.02, outputCost: 0.08 },
   'o4-mini': { inputCost: 0.0011, outputCost: 0.0044 },
   'o3-mini': { inputCost: 0.0011, outputCost: 0.0044 },

@@ -40,7 +40,11 @@ export async function triggerActionWithContext(
 ): Promise<IntegrationActionResult> {
   console.log(
     `[triggerActionWithContext] Entered. Integration: ${integrationName}, Service: ${service}, Context:`,
-    { sessionId: context.sessionId, companyId: context.companyId, isStateless: context.isStateless },
+    {
+      sessionId: context.sessionId,
+      companyId: context.companyId,
+      isStateless: context.isStateless,
+    },
   );
   try {
     const fullServiceId = sanitizeFunctionName(`${integrationName}.${service}`);

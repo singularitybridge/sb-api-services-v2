@@ -336,7 +336,9 @@ export const executeFunctionCallWithContext = async (
     const notImplementedError = {
       message: `Function ${functionName} not implemented in the factory`,
     };
-    console.warn(`[executeFunctionCallWithContext] ${notImplementedError.message}`);
+    console.warn(
+      `[executeFunctionCallWithContext] ${notImplementedError.message}`,
+    );
     return { result: `Error: ${notImplementedError.message}` };
   }
 };

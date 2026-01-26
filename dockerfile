@@ -23,8 +23,8 @@ RUN npm run build
 # Stage 2: Production stage  
 FROM node:21-slim
 
-# Update CA certificates for Google API calls
-RUN apt-get update && apt-get install -y ca-certificates && update-ca-certificates \
+# Update CA certificates for Google API calls and install curl for curl action
+RUN apt-get update && apt-get install -y ca-certificates curl && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

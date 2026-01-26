@@ -12,7 +12,13 @@ const generateMessageId = (): string => {
 
 export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
   const { assistantId } = req.params;
-  const { userInput, attachments, responseFormat, promptOverride, includeToolCalls } = req.body;
+  const {
+    userInput,
+    attachments,
+    responseFormat,
+    promptOverride,
+    includeToolCalls,
+  } = req.body;
 
   // includeToolCalls defaults to false for backward compatibility with existing API consumers
   const shouldIncludeToolCalls = includeToolCalls === true;
@@ -166,7 +172,10 @@ export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
             data: Object.keys(restData).length > 0 ? restData : undefined,
           };
           // If message_type was 'tool_calls' but we're hiding them, change to 'text'
-          if (filteredResult.message_type === 'tool_calls' || filteredResult.message_type === 'tool_results') {
+          if (
+            filteredResult.message_type === 'tool_calls' ||
+            filteredResult.message_type === 'tool_results'
+          ) {
             filteredResult.message_type = 'text';
           }
           res.json(filteredResult);

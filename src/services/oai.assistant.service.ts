@@ -1,8 +1,6 @@
 import OpenAI from 'openai';
 import { getOpenAIClient } from './assistant.service';
 import { ApiKey } from './verification.service';
-import { cleanupAssistantFiles } from './file.service';
-import { VectorStore } from '../models/VectorStore';
 import {
   createFunctionFactory,
   ActionContext,
@@ -98,7 +96,7 @@ export const updateAssistantById = async (
       name,
       description,
       model: baseModel, // Use the transformed model name for the API call
-      tools: [{ type: 'file_search' }, ...functionTools],
+      tools: [...functionTools],
     };
 
     // Add reasoning_effort parameter if applicable
@@ -137,8 +135,8 @@ export const updateAssistantById = async (
 
 export const createAssistant = async (
   apiKey: string,
-  companyId: string,
-  assistantId: string,
+  _companyId: string,
+  _assistantId: string,
   name: string,
   description: string,
   model: string,
@@ -162,7 +160,7 @@ export const createAssistant = async (
       description,
       instructions,
       model: baseModel, // Use the transformed model name for the API call
-      tools: [{ type: 'file_search' }, ...functionTools],
+      tools: [...functionTools],
     };
 
     // Add reasoning_effort parameter if applicable
@@ -171,19 +169,6 @@ export const createAssistant = async (
     }
 
     const assistant = await openaiClient.beta.assistants.create(createParams);
-
-    // Create a new vector store
-    const vectorStore = await openaiClient.vectorStores.create({
-      name: `${name} Vector Store`,
-    });
-
-    const newVectorStore = new VectorStore({
-      openaiId: vectorStore.id,
-      assistantId: assistantId,
-      companyId: companyId,
-      name: vectorStore.name,
-    });
-    await newVectorStore.save();
 
     return assistant;
   } catch (error) {
@@ -198,7 +183,6 @@ export const deleteAssistantById = async (
   _id: string,
 ) => {
   const openaiClient = getOpenAIClient(apiKey);
-  await cleanupAssistantFiles(_id, apiKey);
   const response = await openaiClient.beta.assistants.del(assistantId);
   return response.deleted;
 };

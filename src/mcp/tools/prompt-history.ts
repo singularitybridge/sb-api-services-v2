@@ -260,6 +260,6 @@ export const listPromptHistoryTool = {
 export const getPromptVersionTool = {
   name: 'get_prompt_version',
   description:
-    "Get the full content of a specific prompt version. Use list_prompt_history first to see available versions, then use this to retrieve the complete prompt text for a specific version.",
+    'Get the full content of a specific prompt version. Use list_prompt_history first to see available versions, then use this to retrieve the complete prompt text for a specific version.',
   inputSchema: getPromptVersionSchema,
 };

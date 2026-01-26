@@ -86,11 +86,14 @@ export const triggerIntegrationAction = async (
     const allowedActions: string[] = [fullFunctionName];
 
     // Determine if this is a stateless execution
-    const isStateless = contextOverride?.isStateless || !isValidSessionId(sessionId);
+    const isStateless =
+      contextOverride?.isStateless || !isValidSessionId(sessionId);
 
     if (isStateless) {
       // Stateless mode - build context from available data and use context-first path
-      console.log(`[triggerIntegrationAction] Using stateless execution path for sessionId: ${sessionId}`);
+      console.log(
+        `[triggerIntegrationAction] Using stateless execution path for sessionId: ${sessionId}`,
+      );
 
       const context: ActionContext = {
         sessionId,

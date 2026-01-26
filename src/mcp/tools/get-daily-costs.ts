@@ -31,9 +31,7 @@ export const getDailyCostsSchema = z.object({
   provider: z
     .string()
     .optional()
-    .describe(
-      'Filter by LLM provider (e.g., "openai", "anthropic", "google")',
-    ),
+    .describe('Filter by LLM provider (e.g., "openai", "anthropic", "google")'),
 });
 
 export type GetDailyCostsInput = z.infer<typeof getDailyCostsSchema>;

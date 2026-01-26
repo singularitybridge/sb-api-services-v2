@@ -29,7 +29,9 @@ export const clerkLogin = async (
   clerkToken: string,
 ): Promise<{ user: IUser; company: ICompany; sessionToken: string }> => {
   if (!clerkClient || !CLERK_SECRET_KEY) {
-    throw new Error('Clerk client not initialized. Clerk login is unavailable.');
+    throw new Error(
+      'Clerk client not initialized. Clerk login is unavailable.',
+    );
   }
 
   try {
@@ -105,7 +107,9 @@ export const clerkLogin = async (
           });
 
           company = inviteCompany.toObject() as unknown as ICompany;
-          console.log(`User ${email} joined company via invite: ${company.name}`);
+          console.log(
+            `User ${email} joined company via invite: ${company.name}`,
+          );
         } catch (error) {
           console.error('Failed to process invite acceptance:', error);
           throw error;

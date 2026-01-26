@@ -955,9 +955,7 @@ export class MCPHttpServer {
             jsonRpcRequest.params?.arguments,
           );
           if (!parseResult.success) {
-            throw new Error(
-              `Invalid parameters: ${parseResult.error.message}`,
-            );
+            throw new Error(`Invalid parameters: ${parseResult.error.message}`);
           }
           const result = await listModels(parseResult.data as ListModelsInput);
           res.json({
@@ -1473,8 +1471,7 @@ export class MCPHttpServer {
             }
 
             case 'list_prompt_history': {
-              const parseResult =
-                listPromptHistorySchema.safeParse(toolArgs);
+              const parseResult = listPromptHistorySchema.safeParse(toolArgs);
               if (!parseResult.success) {
                 throw new Error(
                   `Invalid parameters: ${parseResult.error.message}`,
@@ -1488,8 +1485,7 @@ export class MCPHttpServer {
             }
 
             case 'get_prompt_version': {
-              const parseResult =
-                getPromptVersionSchema.safeParse(toolArgs);
+              const parseResult = getPromptVersionSchema.safeParse(toolArgs);
               if (!parseResult.success) {
                 throw new Error(
                   `Invalid parameters: ${parseResult.error.message}`,
@@ -1503,8 +1499,7 @@ export class MCPHttpServer {
             }
 
             case 'get_daily_costs': {
-              const parseResult =
-                getDailyCostsSchema.safeParse(toolArgs);
+              const parseResult = getDailyCostsSchema.safeParse(toolArgs);
               if (!parseResult.success) {
                 throw new Error(
                   `Invalid parameters: ${parseResult.error.message}`,

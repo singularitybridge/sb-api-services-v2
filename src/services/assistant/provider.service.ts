@@ -19,7 +19,7 @@ const MODEL_CONFIGS: Record<string, any> = {
   'gpt-5-nano': { provider: 'openai', baseModel: 'gpt-5-nano' },
 
   // === OpenAI O-Series Reasoning ===
-  'o3': { provider: 'openai', baseModel: 'o3' },
+  o3: { provider: 'openai', baseModel: 'o3' },
   'o3-pro': { provider: 'openai', baseModel: 'o3-pro' },
   'o4-mini': { provider: 'openai', baseModel: 'o4-mini' },
   'o3-mini': { provider: 'openai', baseModel: 'o3-mini' },

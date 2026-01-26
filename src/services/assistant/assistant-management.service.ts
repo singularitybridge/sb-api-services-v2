@@ -1,7 +1,5 @@
 import { Assistant, IAssistant } from '../../models/Assistant';
-import { File } from '../../models/File';
 import mongoose from 'mongoose';
-import { getApiKey } from '../api.key.service';
 // OpenAI Assistant API calls removed as it's deprecated in favor of Vercel AI
 
 export const getAssistants = async (
@@ -9,31 +7,7 @@ export const getAssistants = async (
 ): Promise<IAssistant[]> => {
   try {
     const assistants = await Assistant.find({ companyId });
-
-    // Fetch all files for these assistants in one query
-    const assistantIds = assistants.map((assistant) => assistant._id);
-    const files = await File.find({
-      assistantId: { $in: assistantIds },
-    }).select('assistantId');
-
-    // Create a map of assistantId to hasFiles
-    const assistantHasFilesMap = new Map();
-    files.forEach((file) => {
-      assistantHasFilesMap.set(file.assistantId.toString(), true);
-    });
-
-    // Add 'knowledge & files' to allowedActions if assistant has files
-    const updatedAssistants = assistants.map((assistant) => {
-      const assistantObj = assistant.toObject();
-      if (assistantHasFilesMap.get(assistant._id.toString())) {
-        if (!assistantObj.allowedActions.includes('knowledge.searchFiles')) {
-          assistantObj.allowedActions.push('knowledge.searchFiles');
-        }
-      }
-      return assistantObj;
-    });
-
-    return updatedAssistants;
+    return assistants.map((assistant) => assistant.toObject());
   } catch (error) {
     console.error('Error retrieving assistants:', error);
     throw new Error('Error retrieving assistants');
@@ -83,7 +57,7 @@ export const updateAllowedActions = async (
 
 export async function deleteAssistant(
   id: string,
-  assistantId: string,
+  _assistantId: string,
 ): Promise<void> {
   try {
     const assistant = await Assistant.findById(id);
@@ -103,7 +77,7 @@ export async function deleteAssistant(
 
 export const createDefaultAssistant = async (
   companyId: string,
-  apiKey: string,
+  _apiKey: string,
 ): Promise<IAssistant> => {
   const defaultAssistantData = {
     name: 'Default Assistant',

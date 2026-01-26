@@ -409,7 +409,12 @@ export const createGeminiActions = (
         },
         model: {
           type: 'string',
-          enum: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3-flash-preview', 'gemini-3-pro-preview'],
+          enum: [
+            'gemini-2.5-flash',
+            'gemini-2.5-pro',
+            'gemini-3-flash-preview',
+            'gemini-3-pro-preview',
+          ],
           description:
             'Gemini model to use. gemini-2.5-flash is recommended (fastest, stable). gemini-3-flash-preview for latest features. (default: gemini-2.5-flash)',
           default: 'gemini-2.5-flash',

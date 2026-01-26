@@ -1207,7 +1207,11 @@ export class UnifiedWorkspaceService {
           return {
             found: true,
             content: result,
-            metadata: { scope: options.scope, agentId, companyId: options.companyId },
+            metadata: {
+              scope: options.scope,
+              agentId,
+              companyId: options.companyId,
+            },
           };
         }
       } catch (error) {
@@ -1267,7 +1271,13 @@ export class UnifiedWorkspaceService {
   ): Promise<{ paths: string[]; count: number }> {
     // Determine scope: explicit > agentId inference > session default
     const scope = options?.scope || (agentId ? 'agent' : 'session');
-    const basePath = this.buildScopePath(scope, sessionId, '', agentId, options?.companyId);
+    const basePath = this.buildScopePath(
+      scope,
+      sessionId,
+      '',
+      agentId,
+      options?.companyId,
+    );
     const fullPrefix = prefix ? `${basePath}${prefix}` : basePath;
 
     const paths = await this.workspace.list(fullPrefix);
@@ -1289,7 +1299,13 @@ export class UnifiedWorkspaceService {
   ): Promise<{ deleted: boolean }> {
     // Determine scope: explicit > agentId inference > session default
     const scope = options?.scope || (agentId ? 'agent' : 'session');
-    const fullPath = this.buildScopePath(scope, sessionId, path, agentId, options?.companyId);
+    const fullPath = this.buildScopePath(
+      scope,
+      sessionId,
+      path,
+      agentId,
+      options?.companyId,
+    );
 
     const deleted = await this.workspace.delete(fullPath);
     return { deleted };

@@ -8,7 +8,10 @@ import {
   FunctionCall,
 } from './types';
 import { createFunctionFactory } from './loaders';
-import { executeFunctionCall, executeFunctionCallWithContext } from './executors';
+import {
+  executeFunctionCall,
+  executeFunctionCallWithContext,
+} from './executors';
 import {
   sanitizeFunctionName,
   convertOpenAIFunctionName,

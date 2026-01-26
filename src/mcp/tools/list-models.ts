@@ -49,7 +49,7 @@ const MODEL_DESCRIPTIONS: Record<string, string> = {
   'gpt-5-nano': 'GPT-5 Nano - smallest, fastest',
 
   // OpenAI O-Series
-  'o3': 'O3 reasoning model',
+  o3: 'O3 reasoning model',
   'o3-pro': 'O3 Pro - advanced reasoning',
   'o4-mini': 'O4 Mini - fast reasoning',
   'o3-mini': 'O3 Mini - compact reasoning',
@@ -178,6 +178,6 @@ export async function listModels(
 export const listModelsTool = {
   name: 'list_models',
   description:
-    'List all available LLM models that can be used when creating or updating agents. Returns models grouped by provider (OpenAI, Anthropic, Google) with their IDs, base model names, descriptions, and pricing (cost per 1K tokens for input/output). Use the model ID when setting an agent\'s llmModel field.',
+    "List all available LLM models that can be used when creating or updating agents. Returns models grouped by provider (OpenAI, Anthropic, Google) with their IDs, base model names, descriptions, and pricing (cost per 1K tokens for input/output). Use the model ID when setting an agent's llmModel field.",
   inputSchema: listModelsSchema,
 };
