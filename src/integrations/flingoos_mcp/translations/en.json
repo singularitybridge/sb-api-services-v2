@@ -1,0 +1,57 @@
+{
+  "serviceName": "Flingoos MCP",
+  "listContexts": {
+    "actionTitle": "List Flingoos Contexts",
+    "description": "List all available workflows, projects, and knowledge bases from Flingoos",
+    "parameters": {
+      "limit": "Maximum number of contexts to return",
+      "scope": "Filter by ownership: all, mine, or public",
+      "kind": "Filter by type: all, project, or session",
+      "session_type": "Filter sessions by type: workflow_recording or teaching_session"
+    }
+  },
+  "searchContexts": {
+    "actionTitle": "Search Flingoos Contexts",
+    "description": "Search for workflows and knowledge bases using natural language queries",
+    "parameters": {
+      "q": "Natural language search query",
+      "top_k": "Number of results to return",
+      "min_confidence": "Minimum similarity score threshold",
+      "scope": "Filter by ownership scope"
+    }
+  },
+  "getContext": {
+    "actionTitle": "Get Flingoos Context",
+    "description": "Retrieve a specific workflow or knowledge base by its ID",
+    "parameters": {
+      "id": "The unique identifier of the context",
+      "detail": "Level of detail: summary or full"
+    }
+  },
+  "modifyContext": {
+    "actionTitle": "Modify Flingoos Context",
+    "description": "Edit workflow steps or knowledge items using natural language instructions",
+    "parameters": {
+      "id": "The unique identifier of the context to modify",
+      "action": "Type of modification: modify, add, or delete",
+      "target_type": "What to modify: step, phase, knowledge_item, or metadata",
+      "target_number": "Step or phase number to target",
+      "target_id": "Knowledge item ID to target",
+      "change_prompt": "Natural language description of the change",
+      "position": "Position for adding new content",
+      "auto_confirm": "Save changes immediately without preview"
+    }
+  },
+  "generateContext": {
+    "actionTitle": "Generate Flingoos Context",
+    "description": "Create a new workflow or teaching session from text content",
+    "parameters": {
+      "output_type": "Type of context to generate",
+      "content": "Text content to convert",
+      "name": "Name for the generated context",
+      "project_id": "Project to add the context to",
+      "visibility": "Visibility setting: private, org:view, or org:edit",
+      "output_language": "Output language code or auto"
+    }
+  }
+}

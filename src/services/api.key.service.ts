@@ -32,6 +32,7 @@ const API_KEY_TO_INTEGRATION: Record<string, string> = {
   nylas_grant_id: 'nylas',
   roomboss_username: 'roomboss',
   roomboss_password: 'roomboss',
+  flingoos_mcp_api_key: 'flingoos_mcp',
 };
 
 export type ApiKeyType =
@@ -56,7 +57,8 @@ export type ApiKeyType =
   | 'nylas_api_key'
   | 'nylas_grant_id'
   | 'roomboss_username'
-  | 'roomboss_password';
+  | 'roomboss_password'
+  | 'flingoos_mcp_api_key';
 
 // Initialize cache with a 15-minute TTL (time to live)
 const apiKeyCache = new NodeCache({ stdTTL: 900 });
