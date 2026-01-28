@@ -318,7 +318,7 @@ MCP server supports `list_changed` notifications to help clients detect when too
 # 1. Add/modify MCP tools in /src/mcp/tools/
 
 # 2. Update version in http-server.ts
-const TOOLS_VERSION = '2026-01-25-v1';  # Increment date or version
+const TOOLS_VERSION = '2026-01-28-v1';  # Increment date or version
 
 # 3. Commit and push
 git add . && git commit -m "Add new MCP tool X" && git push
@@ -326,8 +326,48 @@ git add . && git commit -m "Add new MCP tool X" && git push
 # 4. After deployment, clients will detect the version change
 ```
 
-#### Current Tools (36 total)
-Agent management, workspace, teams, integrations, costs, prompt history, and UI control tools. See `http-server.ts` for full list.
+#### Current Tools (42 total)
+Agent management, workspace, teams, integrations, costs, prompt history, session management, and UI control tools. See `http-server.ts` for full list.
+
+### MCP Session Management Tools (January 2025)
+
+#### Overview
+6 new MCP tools for programmatic AI agent testing without UI automation.
+
+#### Tools
+| Tool | Description |
+|------|-------------|
+| `create_session` | Start new session with agent (by ID or name) |
+| `send_message` | Send message and get assistant response |
+| `get_session_messages` | Retrieve message history with pagination |
+| `list_sessions` | List sessions with agent/status filters |
+| `clear_session` | Reset session (delete messages, keep session) |
+| `delete_session` | Permanently delete session and messages |
+
+#### Usage Example
+```javascript
+// Create session
+const session = await mcp.create_session({ agentId: "soho-reservations" });
+
+// Send message and get response
+const response = await mcp.send_message({
+  sessionId: session.sessionId,
+  message: "Book a table for 2",
+  waitForResponse: true
+});
+
+// Get conversation history
+const messages = await mcp.get_session_messages({
+  sessionId: session.sessionId,
+  limit: 10
+});
+
+// Cleanup
+await mcp.delete_session({ sessionId: session.sessionId });
+```
+
+#### Tool Result Correlation Fix
+When the same tool is called multiple times, results are matched by `toolCallId` (not `toolName`) to ensure correct correlation. This fix is in `/src/mcp/tools/execute.ts`.
 
 ## AI Context Service Integration
 
@@ -358,6 +398,34 @@ Agent management, workspace, teams, integrations, costs, prompt history, and UI 
 - **TypeScript Build**: Memory limited with NODE_OPTIONS='--max-old-space-size=2048'
 - **Auto-deploy**: GitHub push triggers Coolify deployment
 - **Important**: Always use capital 'D' Dockerfile, not lowercase
+
+### GitHub Repository Settings
+
+#### Repositories
+- `singularitybridge/sb-api-services-v2` (Backend API)
+- `singularitybridge/sb-chat-ui` (Frontend UI)
+
+#### Branch Protection (main & dev)
+| Setting | Value |
+|---------|-------|
+| Require PR before merging | ✓ Yes |
+| Required approvals | 1 |
+| Enforce for admins | ✓ Yes |
+| Allow deletions | ✗ No |
+| Allow force pushes | ✗ No |
+
+#### Security Features
+- **Secret Scanning**: ✓ Enabled - Scans for exposed API keys/tokens
+- **Push Protection**: ✓ Enabled - Blocks pushes containing secrets
+- **Auto-delete branches**: ✓ Enabled - Cleans up after PR merge
+
+#### Engineering Docs (Company Workspace)
+Stored in Agent Hub workspace at company scope:
+- `/engineering/code-review-rules.md` - Architecture compliance, code quality standards
+- `/engineering/github-repo-settings.md` - Branch protection, security settings
+- `/engineering/dev-vision.md` - Development vision/strategy
+
+Retrieve via recall agent: `Retrieve /engineering/[filename] from company scope`
 
 ### Known Issues & Solutions
 
