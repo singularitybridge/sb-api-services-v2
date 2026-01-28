@@ -7,7 +7,7 @@ import {
   getSessionOrCreate,
   getSessionLanguage,
 } from '../services/session.service';
-import { getApiKey, ApiKeyType } from '../services/api.key.service';
+import { getApiKey } from '../services/api.key.service';
 import {
   triggerAction,
   getActions,

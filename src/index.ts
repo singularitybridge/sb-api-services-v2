@@ -8,6 +8,7 @@ import { initializeWebSocket } from './services/websocket';
 import http from 'http';
 import { logger } from './utils/logger';
 import { Assistant } from './models/Assistant';
+import { initializeIntegrationRegistry } from './services/integration-registry.service';
 
 const initializeApp = async () => {
   try {
@@ -16,6 +17,10 @@ const initializeApp = async () => {
     const dbName = process.env.MONGODB_DB_NAME || 'dev';
     await mongoose.connect(dbUri, { dbName });
     logger.info(`Successfully connected to MongoDB database: ${dbName}`);
+
+    // Initialize integration registry (builds API key mapping from integration configs)
+    logger.info('Initializing integration registry...');
+    initializeIntegrationRegistry();
 
     // Create indexes for Assistant model
     logger.info('Creating database indexes...');

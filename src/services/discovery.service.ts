@@ -53,7 +53,8 @@ export const discoveryService = {
   discoverIntegrations: async (
     language: SupportedLanguage = 'en',
   ): Promise<Integration[]> => {
-    const integrationsPath = join(__dirname, '..', 'integrations');
+    // Use src path since JSON configs are not copied during TypeScript compilation
+    const integrationsPath = join(__dirname, '..', '..', 'src', 'integrations');
     const integrationFolders = readdirSync(integrationsPath).filter((folder) =>
       existsSync(join(integrationsPath, folder, 'integration.config.json')),
     );

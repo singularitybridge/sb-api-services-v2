@@ -2,7 +2,7 @@ import { Assistant } from '../models/Assistant';
 import { ISession, Session } from '../models/Session';
 import { CustomError, NotFoundError, BadRequestError } from '../utils/errors';
 // OpenAI thread service calls removed as it's deprecated in favor of Vercel AI
-import { getApiKey, ApiKeyType } from './api.key.service';
+import { getApiKey } from './api.key.service';
 import { SupportedLanguage } from './discovery.service';
 import mongoose from 'mongoose'; // Added for ObjectId generation
 
@@ -291,7 +291,7 @@ export async function getSessionLanguage(
   companyId: string,
 ): Promise<SupportedLanguage> {
   try {
-    const apiKey = await getApiKey(companyId, 'openai_api_key' as ApiKeyType);
+    const apiKey = await getApiKey(companyId, 'openai_api_key');
 
     if (!apiKey) {
       console.log('OpenAI API key not found, defaulting to English');
