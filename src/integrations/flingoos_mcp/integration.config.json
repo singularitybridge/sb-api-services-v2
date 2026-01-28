@@ -1,0 +1,18 @@
+{
+  "name": "flingoos_mcp",
+  "displayName": "Flingoos MCP",
+  "description": "Flingoos workflow and knowledge management platform",
+  "icon": "flingoos",
+  "category": "productivity",
+  "actionCreator": "createFlingoosMcpActions",
+  "actionsFile": "flingoos_mcp.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "flingoos_mcp_api_key",
+      "label": "API Key",
+      "type": "secret",
+      "placeholder": "Your Flingoos MCP API key",
+      "description": "Your company specific Flingoos MCP API authentication key"
+    }
+  ]
+}
