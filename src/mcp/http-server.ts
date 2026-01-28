@@ -269,6 +269,49 @@ import {
   type GetDailyCostsInput,
 } from './tools/get-daily-costs';
 
+// Session management tools
+import {
+  createSessionTool,
+  createSessionSchema,
+  createSession,
+  type CreateSessionInput,
+} from './tools/create-session';
+
+import {
+  sendMessageTool,
+  sendMessageSchema,
+  sendMessage,
+  type SendMessageInput,
+} from './tools/send-message';
+
+import {
+  getSessionMessagesTool,
+  getSessionMessagesSchema,
+  getSessionMessages,
+  type GetSessionMessagesInput,
+} from './tools/get-session-messages';
+
+import {
+  listSessionsTool,
+  listSessionsSchema,
+  listSessions,
+  type ListSessionsInput,
+} from './tools/list-sessions';
+
+import {
+  clearSessionTool,
+  clearSessionSchema,
+  clearSession,
+  type ClearSessionInput,
+} from './tools/clear-session';
+
+import {
+  deleteSessionTool,
+  deleteSessionSchema,
+  deleteSession,
+  type DeleteSessionInput,
+} from './tools/delete-session';
+
 // Session data stored per session ID
 interface MCPSession {
   createdAt: number;
@@ -284,7 +327,7 @@ const SESSION_TTL_MS = 60 * 60 * 1000;
 
 // Tools version - update this when tools change to trigger client refresh
 // Format: YYYY-MM-DD-vN (increment N for same-day changes)
-const TOOLS_VERSION = '2026-01-24-v1';
+const TOOLS_VERSION = '2026-01-28-v1';
 
 /**
  * MCP Server for HTTP transport
@@ -562,6 +605,37 @@ export class MCPHttpServer {
           name: getDailyCostsTool_metadata.name,
           description: getDailyCostsTool_metadata.description,
           inputSchema: getDailyCostsSchema,
+        },
+        // Session management tools
+        {
+          name: createSessionTool.name,
+          description: createSessionTool.description,
+          inputSchema: createSessionSchema,
+        },
+        {
+          name: sendMessageTool.name,
+          description: sendMessageTool.description,
+          inputSchema: sendMessageSchema,
+        },
+        {
+          name: getSessionMessagesTool.name,
+          description: getSessionMessagesTool.description,
+          inputSchema: getSessionMessagesSchema,
+        },
+        {
+          name: listSessionsTool.name,
+          description: listSessionsTool.description,
+          inputSchema: listSessionsSchema,
+        },
+        {
+          name: clearSessionTool.name,
+          description: clearSessionTool.description,
+          inputSchema: clearSessionSchema,
+        },
+        {
+          name: deleteSessionTool.name,
+          description: deleteSessionTool.description,
+          inputSchema: deleteSessionSchema,
         },
       ],
     }));
@@ -930,6 +1004,49 @@ export class MCPHttpServer {
             name: getDailyCostsTool_metadata.name,
             description: getDailyCostsTool_metadata.description,
             inputSchema: z.toJSONSchema(getDailyCostsSchema, {
+              reused: 'inline',
+            }),
+          },
+          // Session management tools
+          {
+            name: createSessionTool.name,
+            description: createSessionTool.description,
+            inputSchema: z.toJSONSchema(createSessionSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: sendMessageTool.name,
+            description: sendMessageTool.description,
+            inputSchema: z.toJSONSchema(sendMessageSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: getSessionMessagesTool.name,
+            description: getSessionMessagesTool.description,
+            inputSchema: z.toJSONSchema(getSessionMessagesSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: listSessionsTool.name,
+            description: listSessionsTool.description,
+            inputSchema: z.toJSONSchema(listSessionsSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: clearSessionTool.name,
+            description: clearSessionTool.description,
+            inputSchema: z.toJSONSchema(clearSessionSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: deleteSessionTool.name,
+            description: deleteSessionTool.description,
+            inputSchema: z.toJSONSchema(deleteSessionSchema, {
               reused: 'inline',
             }),
           },
@@ -1507,6 +1624,93 @@ export class MCPHttpServer {
               }
               result = await getDailyCostsTool(
                 parseResult.data as GetDailyCostsInput,
+                companyId,
+              );
+              break;
+            }
+
+            // Session management tools
+            case 'create_session': {
+              const parseResult = createSessionSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await createSession(
+                parseResult.data as CreateSessionInput,
+                companyId,
+                userId,
+              );
+              break;
+            }
+
+            case 'send_message': {
+              const parseResult = sendMessageSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await sendMessage(
+                parseResult.data as SendMessageInput,
+                companyId,
+                userId,
+              );
+              break;
+            }
+
+            case 'get_session_messages': {
+              const parseResult = getSessionMessagesSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await getSessionMessages(
+                parseResult.data as GetSessionMessagesInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'list_sessions': {
+              const parseResult = listSessionsSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await listSessions(
+                parseResult.data as ListSessionsInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'clear_session': {
+              const parseResult = clearSessionSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await clearSession(
+                parseResult.data as ClearSessionInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'delete_session': {
+              const parseResult = deleteSessionSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await deleteSession(
+                parseResult.data as DeleteSessionInput,
                 companyId,
               );
               break;
