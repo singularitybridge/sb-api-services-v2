@@ -81,6 +81,7 @@ export type ExecuteInput = z.infer<typeof executeSchema>;
  * Tool call information extracted from execution
  */
 interface ToolCallInfo {
+  toolCallId: string;
   toolName: string;
   args: Record<string, unknown>;
   result?: unknown;
@@ -141,9 +142,12 @@ export async function execute(
     if (resultData) {
       // Extract tool calls with their arguments
       // Vercel AI SDK uses 'input' not 'args' for tool call parameters
+      // Also capture toolCallId for proper result correlation
       if (resultData.toolCalls && Array.isArray(resultData.toolCalls)) {
         for (const call of resultData.toolCalls) {
           toolCalls.push({
+            toolCallId:
+              call.toolCallId || call.id || `call_${toolCalls.length}`,
             toolName: call.toolName,
             args: call.input || call.args || {},
           });
@@ -152,6 +156,7 @@ export async function execute(
 
       // Match tool results to tool calls and extract errors
       // Vercel AI SDK uses 'output' not 'result' for tool results
+      // Use toolCallId for proper correlation (fixes bug where same tool called multiple times)
       if (resultData.toolResults && Array.isArray(resultData.toolResults)) {
         for (const toolResult of resultData.toolResults) {
           // Get the result content (Vercel AI SDK uses 'output')
@@ -163,15 +168,18 @@ export async function execute(
                 ? ''
                 : JSON.stringify(outputValue);
 
-          // Find the matching tool call and add result
+          // Find the matching tool call by toolCallId (not toolName)
+          // This correctly correlates results when the same tool is called multiple times
+          const resultToolCallId = toolResult.toolCallId || toolResult.id;
           const matchingCall = toolCalls.find(
-            (tc) => tc.toolName === toolResult.toolName,
+            (tc) => tc.toolCallId === resultToolCallId,
           );
           if (matchingCall) {
             matchingCall.result = outputValue;
           } else {
             // Tool result without a matching call (shouldn't happen, but handle it)
             toolCalls.push({
+              toolCallId: resultToolCallId || `result_${toolCalls.length}`,
               toolName: toolResult.toolName,
               args: toolResult.input || {},
               result: outputValue,
