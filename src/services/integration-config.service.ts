@@ -6,7 +6,7 @@ import {
   IIntegrationApiKey,
 } from '../models/IntegrationConfig';
 import { encryptData, decryptData } from './encryption.service';
-import { getApiKey, ApiKeyType } from './api.key.service';
+import { getApiKey } from './api.key.service';
 
 // Cache with 15-minute TTL (same as api.key.service)
 const integrationConfigCache = new NodeCache({ stdTTL: 900 });
@@ -210,7 +210,7 @@ export async function getApiKeyWithFallback(
   }
 
   // 2. Fall back to legacy Company.api_keys
-  return getApiKey(companyId, keyName as ApiKeyType);
+  return getApiKey(companyId, keyName);
 }
 
 /**

@@ -4,66 +4,32 @@ import NodeCache from 'node-cache';
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { getIntegrationApiKey } from './integration-config.service';
+import { getIntegrationIdForApiKey } from './integration-registry.service';
 
 /**
- * Mapping from API key names to their integration IDs
- * This allows getApiKey to check IntegrationConfigs first
+ * API Key Service
+ *
+ * Handles retrieval of API keys with a two-tier lookup:
+ * 1. IntegrationConfig (new system) - checked first
+ * 2. Company.api_keys (legacy) - fallback
+ *
+ * The API key to integration mapping is built dynamically from
+ * integration.config.json files via integration-registry.service.
  */
-const API_KEY_TO_INTEGRATION: Record<string, string> = {
-  openai_api_key: 'openai',
-  anthropic_api_key: 'anthropic',
-  google_api_key: 'gemini',
-  perplexity_api_key: 'perplexity',
-  labs11_api_key: 'elevenlabs',
-  sendgrid_api_key: 'sendgrid',
-  linear_api_key: 'linear',
-  replicate_api_key: 'replicate',
-  mongodb_connection_string: 'mongodb',
-  jira_api_token: 'jira',
-  jira_domain: 'jira',
-  jira_email: 'jira',
-  ai_context_service_base_url: 'ai_context_service',
-  ai_context_service_auth_token: 'ai_context_service',
-  aws_access_key_id: 'aws_bedrock',
-  aws_secret_access_key: 'aws_bedrock',
-  aws_bedrock_kb_id: 'aws_bedrock',
-  aws_region: 'aws_bedrock',
-  nylas_api_key: 'nylas',
-  nylas_grant_id: 'nylas',
-  roomboss_username: 'roomboss',
-  roomboss_password: 'roomboss',
-};
-
-export type ApiKeyType =
-  | 'openai_api_key'
-  | 'labs11_api_key'
-  | 'google_api_key'
-  | 'anthropic_api_key'
-  | 'perplexity_api_key'
-  | 'sendgrid_api_key'
-  | 'linear_api_key'
-  | 'replicate_api_key'
-  | 'mongodb_connection_string'
-  | 'jira_api_token'
-  | 'jira_domain'
-  | 'jira_email'
-  | 'ai_context_service_base_url'
-  | 'ai_context_service_auth_token'
-  | 'aws_access_key_id'
-  | 'aws_secret_access_key'
-  | 'aws_bedrock_kb_id'
-  | 'aws_region'
-  | 'nylas_api_key'
-  | 'nylas_grant_id'
-  | 'roomboss_username'
-  | 'roomboss_password';
 
 // Initialize cache with a 15-minute TTL (time to live)
 const apiKeyCache = new NodeCache({ stdTTL: 900 });
 
+/**
+ * Get an API key for a company.
+ *
+ * @param companyId - The company ID
+ * @param keyType - The API key name (e.g., 'openai_api_key', 'jira_api_token')
+ * @returns The decrypted API key value, or null if not found
+ */
 export const getApiKey = async (
   companyId: string,
-  keyType: ApiKeyType,
+  keyType: string,
 ): Promise<string | null> => {
   const cacheKey = `${companyId}:${keyType}`;
 
@@ -74,7 +40,8 @@ export const getApiKey = async (
   }
 
   // 1. Try to get from IntegrationConfig first (new system)
-  const integrationId = API_KEY_TO_INTEGRATION[keyType];
+  // Uses dynamic mapping from integration configs
+  const integrationId = getIntegrationIdForApiKey(keyType);
   if (integrationId) {
     try {
       const integrationKey = await getIntegrationApiKey(
@@ -119,9 +86,13 @@ export const getApiKey = async (
   return decryptedKey;
 };
 
+/**
+ * Set an API key for a company (legacy system).
+ * Note: New integrations should use IntegrationConfig instead.
+ */
 export const setApiKey = async (
   companyId: string,
-  keyType: ApiKeyType,
+  keyType: string,
   apiKey: string,
 ): Promise<void> => {
   const company = await Company.findById(companyId);
@@ -139,23 +110,32 @@ export const setApiKey = async (
   updateApiKeyCache(companyId, keyType, apiKey);
 };
 
+/**
+ * Update the cached value for an API key
+ */
 export const updateApiKeyCache = (
   companyId: string,
-  keyType: ApiKeyType,
+  keyType: string,
   apiKey: string,
 ): void => {
   const cacheKey = `${companyId}:${keyType}`;
   apiKeyCache.set(cacheKey, apiKey);
 };
 
+/**
+ * Invalidate the cached value for an API key
+ */
 export const invalidateApiKeyCache = (
   companyId: string,
-  keyType: ApiKeyType,
+  keyType: string,
 ): void => {
   const cacheKey = `${companyId}:${keyType}`;
   apiKeyCache.del(cacheKey);
 };
 
+/**
+ * Refresh the cache for all API keys of a company (legacy system)
+ */
 export const refreshApiKeyCache = async (companyId: string): Promise<void> => {
   const company = await Company.findById(companyId);
   if (!company) {
@@ -163,7 +143,7 @@ export const refreshApiKeyCache = async (companyId: string): Promise<void> => {
   }
 
   for (const apiKey of company.api_keys) {
-    const keyType = apiKey.key as ApiKeyType;
+    const keyType = apiKey.key;
     const decryptedKey = decryptData({
       value: apiKey.value,
       iv: apiKey.iv,
@@ -173,13 +153,19 @@ export const refreshApiKeyCache = async (companyId: string): Promise<void> => {
   }
 };
 
-export const validateApiKeys = (requiredKeys: ApiKeyType[]) => {
+/**
+ * Express middleware to validate that required API keys are configured.
+ *
+ * @param requiredKeys - Array of API key names that must be present
+ * @returns Middleware function
+ */
+export const validateApiKeys = (requiredKeys: string[]) => {
   return async (
     req: AuthenticatedRequest,
     res: Response,
     next: NextFunction,
   ) => {
-    const missingKeys: ApiKeyType[] = [];
+    const missingKeys: string[] = [];
 
     for (const keyType of requiredKeys) {
       const apiKey = await getApiKey(req.company._id, keyType);
