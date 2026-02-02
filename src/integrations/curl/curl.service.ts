@@ -161,10 +161,15 @@ export async function performCurlRequest(
       };
     }
 
-    // Build fetch options
+    // Build fetch options with timeout (3 minutes for slow APIs like hotel search)
+    const FETCH_TIMEOUT_MS = 180000; // 3 minutes
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
     const fetchOptions: RequestInit = {
       method: parsed.method,
       headers: parsed.headers,
+      signal: controller.signal,
     };
 
     if (parsed.body && ['POST', 'PUT', 'PATCH'].includes(parsed.method)) {
@@ -172,7 +177,12 @@ export async function performCurlRequest(
     }
 
     // Execute the request using native fetch
-    const response = await fetch(parsed.url, fetchOptions);
+    let response: Response;
+    try {
+      response = await fetch(parsed.url, fetchOptions);
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     // Extract response headers
     const responseHeaders: Record<string, string> = {};

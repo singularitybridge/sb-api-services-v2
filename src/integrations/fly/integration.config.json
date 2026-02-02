@@ -1,0 +1,26 @@
+{
+  "name": "fly",
+  "displayName": "Fly.io",
+  "description": "Manage Fly.io apps and machines - list sandboxes, restart, start/stop, and monitor status",
+  "icon": "cloud",
+  "category": "development",
+  "actionCreator": "createFlyActions",
+  "actionsFile": "fly.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "fly_api_token",
+      "label": "API Token",
+      "type": "secret",
+      "placeholder": "FlyV1 fm2_...",
+      "description": "Fly.io API token (generate with 'fly tokens create')",
+      "helpUrl": "https://fly.io/docs/security/tokens/"
+    },
+    {
+      "key": "fly_org_slug",
+      "label": "Organization Slug",
+      "type": "secret",
+      "placeholder": "personal",
+      "description": "Your Fly.io organization slug (e.g., 'personal' or your org name)"
+    }
+  ]
+}

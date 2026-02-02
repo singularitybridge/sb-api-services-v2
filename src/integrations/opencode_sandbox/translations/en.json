@@ -1,0 +1,24 @@
+{
+  "serviceName": "OpenCode Sandbox",
+  "serviceDescription": "Execute code modifications and manage AI coding sessions via OpenCode API deployed on Fly.io",
+  "opencodeCreateSession": {
+    "actionTitle": "Create Session",
+    "description": "Create a new OpenCode sandbox session for AI-assisted code modifications"
+  },
+  "opencodeSendPrompt": {
+    "actionTitle": "Send Prompt",
+    "description": "Send a prompt/instruction to an OpenCode session for code modifications"
+  },
+  "opencodeGetMessages": {
+    "actionTitle": "Get Messages",
+    "description": "Get all messages from an OpenCode session to see the conversation history and AI responses"
+  },
+  "opencodeGetSession": {
+    "actionTitle": "Get Session",
+    "description": "Get details about a specific OpenCode session including stats and title"
+  },
+  "opencodeListSessions": {
+    "actionTitle": "List Sessions",
+    "description": "List all OpenCode sessions"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "opencode_sandbox",
+  "displayName": "OpenCode Sandbox",
+  "description": "Execute code modifications and manage AI coding sessions via OpenCode API deployed on Fly.io or Coolify",
+  "icon": "code",
+  "category": "development",
+  "actionCreator": "createOpencodeSandboxActions",
+  "actionsFile": "opencode_sandbox.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "opencode_server_url",
+      "label": "Server URL",
+      "type": "secret",
+      "placeholder": "https://dev-agent.singularitybridge.net/opencode",
+      "description": "OpenCode server base URL (without trailing slash)"
+    },
+    {
+      "key": "opencode_server_password",
+      "label": "Server Password",
+      "type": "secret",
+      "placeholder": "your-password",
+      "description": "OpenCode server basic auth password"
+    },
+    {
+      "key": "github_token",
+      "label": "GitHub Token",
+      "type": "secret",
+      "placeholder": "github_pat_xxx or ghp_xxx",
+      "description": "Fine-grained GitHub PAT for cloning private repos (optional). Create one at https://github.com/settings/tokens?type=beta with Contents (read/write) and Metadata (read) permissions.",
+      "optional": true,
+      "helpUrl": "https://github.com/settings/tokens?type=beta"
+    }
+  ]
+}

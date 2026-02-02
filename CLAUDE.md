@@ -73,6 +73,63 @@ The `alfred-agent-manager` is equipped to:
 - **Chat Viewer**: HTML viewer at `chat-viewer.html` for browser viewing
 - **Recent Resolution**: Fixed image attachment format - requires `data:image/png;base64,` prefix
 
+## Building Integrations (Plugin Architecture)
+
+Agent Hub uses a **plugin-based integration architecture** with automatic discovery. No hardcoded mappings or registry modifications required.
+
+### Quick Start
+1. Create folder: `src/integrations/your_service/`
+2. Add `integration.config.json` with metadata and API key definitions
+3. Add `your_service.actions.ts` with action creator function
+4. Restart server - integration is auto-discovered
+
+### Integration Structure
+```
+src/integrations/your_service/
+├── integration.config.json     # Required: Metadata and API keys
+├── your_service.actions.ts     # Required: Action definitions
+├── your_service.service.ts     # Optional: Business logic
+└── translations/               # Optional: i18n
+    ├── en.json
+    └── he.json
+```
+
+### Key Files
+| File | Purpose |
+|------|---------|
+| `src/services/discovery.service.ts` | Auto-discovers integrations at startup |
+| `src/services/integration-registry.service.ts` | API key to integration mapping |
+| `src/integrations/actions/types.ts` | TypeScript interfaces (ActionContext, FunctionFactory) |
+| `src/integrations/actions/executor.ts` | Action execution helper |
+
+### Action Creator Pattern
+```typescript
+export const createYourServiceActions = (context: ActionContext): FunctionFactory => ({
+  yourAction: {
+    description: 'What it does',
+    strict: true,
+    parameters: { type: 'object', properties: {...}, required: [...] },
+    function: async (args) => {
+      // Use context.companyId to fetch API keys
+      return { success: true, data: result };
+    }
+  }
+});
+
+// Optional: Test Connection button support
+export async function validateConnection(apiKeys: Record<string, string>): Promise<TestConnectionResult> {
+  // Verify credentials work
+}
+```
+
+### Reference Integrations
+- **Simple**: `src/integrations/perplexity/` (single API key, one action)
+- **Complex**: `src/integrations/jira/` (multiple credentials, multiple actions)
+- **With Service Layer**: `src/integrations/openai/`
+
+### Documentation
+Full guide: https://docs.singularitybridge.net/developers/integration-development
+
 ### User Invite System (October 2025)
 
 #### Overview

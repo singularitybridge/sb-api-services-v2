@@ -213,14 +213,11 @@ threadRouter.post(
               );
             }
 
-            // Check if stream was empty (likely due to API key issue)
+            // Check if stream was empty
             if (!hasContent && !res.writableEnded) {
               hasError = true;
-              const errorMsg = `Failed to generate response. Please check your ${providerDisplayName} API key configuration at http://localhost:5173/admin/companies/${companyId}.${
-                apiKeyDocsUrl
-                  ? ` Need help getting an API key? Visit ${apiKeyDocsUrl}`
-                  : ''
-              }`;
+              // Empty stream could be due to various reasons - provide a more helpful message
+              const errorMsg = `Failed to generate response. This could be due to: 1) Invalid API key, 2) Content too large for the model, or 3) Service issues. Please check your ${providerDisplayName} configuration.`;
               res.write(
                 `event:error\ndata:${JSON.stringify({
                   type: 'error',
@@ -240,15 +237,36 @@ threadRouter.post(
                 errorMessage.includes('invalid api key') ||
                 errorMessage.includes('unauthorized') ||
                 errorMessage.includes('401');
+              const isContextLengthError =
+                errorMessage.includes('context_length') ||
+                errorMessage.includes('context length') ||
+                errorMessage.includes('maximum context') ||
+                errorMessage.includes('token limit') ||
+                errorMessage.includes('too many tokens') ||
+                errorMessage.includes('max_tokens') ||
+                errorMessage.includes('request too large');
+              const isRateLimitError =
+                errorMessage.includes('rate limit') ||
+                errorMessage.includes('rate_limit') ||
+                errorMessage.includes('429') ||
+                errorMessage.includes('too many requests');
+
+              let userMessage: string;
+              if (isApiKeyError) {
+                userMessage = `Invalid ${providerDisplayName} API key. Please update your API key in the admin settings.`;
+              } else if (isContextLengthError) {
+                userMessage = `The conversation or content is too long for the model to process. Please start a new conversation or reduce the content size.`;
+              } else if (isRateLimitError) {
+                userMessage = `Rate limit exceeded. Please wait a moment and try again.`;
+              } else {
+                userMessage = `Error: ${error.message}`;
+              }
 
               res.write(
                 `event:error\ndata:${JSON.stringify({
                   type: 'error',
                   errorDetails: {
-                    message: isApiKeyError
-                      ? `Invalid ${providerDisplayName} API key. Please update your API key at http://localhost:5173/admin/companies/${companyId}`
-                      : 'An error occurred while generating the response: ' +
-                        error.message,
+                    message: userMessage,
                   },
                 })}\n\n`,
               );

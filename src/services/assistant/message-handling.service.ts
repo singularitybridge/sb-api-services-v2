@@ -931,32 +931,56 @@ export const handleSessionMessage = async (
           );
         }
 
-        // Check if this is an API key error
+        // Check error type and provide appropriate message
         const errorMessage = streamError.message?.toLowerCase() || '';
-        if (
+        const isApiKeyError =
           errorMessage.includes('invalid api key') ||
           errorMessage.includes('api key not valid') ||
           errorMessage.includes('incorrect api key') ||
           errorMessage.includes('unauthorized') ||
-          errorMessage.includes('401')
-        ) {
-          streamErrorOccurred = true;
-          streamErrorMessage = `Invalid ${providerKey} API key. Please check your API key configuration.`;
+          errorMessage.includes('401');
 
-          // Save a user-friendly error message
-          await saveSystemMessage(
-            new mongoose.Types.ObjectId(String(session._id)),
-            new mongoose.Types.ObjectId(String(assistant._id)),
-            new mongoose.Types.ObjectId(String(session.userId)),
-            streamErrorMessage,
-            'error',
-            {
-              error: 'invalid_api_key',
-              provider: providerKey,
-              originalError: streamError.message,
-            },
-          );
+        const isContextLengthError =
+          errorMessage.includes('context_length') ||
+          errorMessage.includes('context length') ||
+          errorMessage.includes('maximum context') ||
+          errorMessage.includes('token limit') ||
+          errorMessage.includes('too many tokens') ||
+          errorMessage.includes('max_tokens') ||
+          errorMessage.includes('request too large');
+
+        const isRateLimitError =
+          errorMessage.includes('rate limit') ||
+          errorMessage.includes('rate_limit') ||
+          errorMessage.includes('429') ||
+          errorMessage.includes('too many requests');
+
+        streamErrorOccurred = true;
+
+        if (isApiKeyError) {
+          streamErrorMessage = `Invalid ${providerKey} API key. Please check your API key configuration.`;
+        } else if (isContextLengthError) {
+          streamErrorMessage = `The conversation or content is too long for the model to process. Please start a new conversation or reduce the content size.`;
+        } else if (isRateLimitError) {
+          streamErrorMessage = `Rate limit exceeded. Please wait a moment and try again.`;
+        } else {
+          // Pass through the actual error message for debugging
+          streamErrorMessage = `Error from ${providerKey}: ${streamError.message}`;
         }
+
+        // Save a user-friendly error message
+        await saveSystemMessage(
+          new mongoose.Types.ObjectId(String(session._id)),
+          new mongoose.Types.ObjectId(String(assistant._id)),
+          new mongoose.Types.ObjectId(String(session.userId)),
+          streamErrorMessage,
+          'error',
+          {
+            error: isApiKeyError ? 'invalid_api_key' : isContextLengthError ? 'context_length_exceeded' : isRateLimitError ? 'rate_limit' : 'api_error',
+            provider: providerKey,
+            originalError: streamError.message,
+          },
+        );
 
         throw streamError; // Re-throw to be caught by the outer try-catch
       }
@@ -1044,12 +1068,14 @@ export const handleSessionMessage = async (
                 );
               }
 
-              // Save an error message to inform the user
+              // Save an error message to inform the user - use stored error if available
+              const errorMsg = streamErrorMessage ||
+                'Failed to generate response. This could be due to invalid API key, content too large, or service issues.';
               await saveSystemMessage(
                 new mongoose.Types.ObjectId(String(session._id)),
                 new mongoose.Types.ObjectId(String(assistant._id)),
                 new mongoose.Types.ObjectId(String(session.userId)),
-                'Failed to generate response. Please check your API key configuration.',
+                errorMsg,
                 'error',
                 {
                   error: 'empty_response',
@@ -1373,20 +1399,21 @@ export const handleSessionMessage = async (
       if (!hasToolCalls && !hasToolResults) {
         // No text and no tool activity - this is an error
         console.error(
-          `[handleSessionMessage] Empty response from LLM for session ${sessionId}. This might indicate an invalid API key.`,
+          `[handleSessionMessage] Empty response from LLM for session ${sessionId}. This could indicate an API issue.`,
         );
 
         // Save an error message to inform the user
+        const errorMsg = 'Failed to generate response. This could be due to invalid API key, content too large, or service issues.';
         await saveSystemMessage(
           new mongoose.Types.ObjectId(String(session._id)),
           new mongoose.Types.ObjectId(String(assistant._id)),
           new mongoose.Types.ObjectId(String(session.userId)),
-          'Failed to generate response. Please check your API key configuration.',
+          errorMsg,
           'error',
           { error: 'empty_response', provider: providerKey },
         );
 
-        return 'Failed to generate response. Please check your API key configuration.';
+        return errorMsg;
       } else {
         // Tools were executed but no final text - this is normal for tool-heavy responses
         console.log(

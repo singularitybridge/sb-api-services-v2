@@ -1,0 +1,24 @@
+{
+  "serviceName": "OpenCode Sandbox",
+  "serviceDescription": "ביצוע שינויים בקוד וניהול סשנים של סוכן AI לקידוד דרך OpenCode API",
+  "opencodeCreateSession": {
+    "actionTitle": "צור סשן",
+    "description": "צור סשן חדש ב-OpenCode sandbox לשינויי קוד בעזרת AI"
+  },
+  "opencodeSendPrompt": {
+    "actionTitle": "שלח פרומפט",
+    "description": "שלח הוראה לסשן OpenCode לביצוע שינויי קוד"
+  },
+  "opencodeGetMessages": {
+    "actionTitle": "קבל הודעות",
+    "description": "קבל את כל ההודעות מסשן OpenCode כדי לראות את היסטוריית השיחה ותשובות ה-AI"
+  },
+  "opencodeGetSession": {
+    "actionTitle": "קבל פרטי סשן",
+    "description": "קבל פרטים על סשן OpenCode ספציפי כולל סטטיסטיקות וכותרת"
+  },
+  "opencodeListSessions": {
+    "actionTitle": "רשימת סשנים",
+    "description": "הצג את כל הסשנים ב-OpenCode"
+  }
+}
