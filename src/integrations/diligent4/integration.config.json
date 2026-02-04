@@ -1,0 +1,19 @@
+{
+  "name": "diligent4",
+  "displayName": "Diligent4",
+  "description": "AI-powered workflow and knowledge management for business procedures",
+  "icon": "book-open",
+  "category": "knowledge",
+  "actionCreator": "createDiligent4Actions",
+  "actionsFile": "diligent4.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "diligent4_api_key",
+      "label": "API Key",
+      "type": "secret",
+      "placeholder": "fmcp_sing_...",
+      "description": "Diligent4/Flingoos MCP API key",
+      "helpUrl": "https://flingoos.diligent4.com"
+    }
+  ]
+}
