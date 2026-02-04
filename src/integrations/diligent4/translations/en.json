@@ -1,0 +1,24 @@
+{
+  "serviceName": "Diligent4",
+  "serviceDescription": "AI-powered workflow and knowledge management for business procedures",
+  "listContexts": {
+    "actionTitle": "List Workflows",
+    "description": "List available workflows and knowledge sessions"
+  },
+  "searchWorkflows": {
+    "actionTitle": "Search Workflows",
+    "description": "Search for workflows and procedures using natural language"
+  },
+  "getContext": {
+    "actionTitle": "Get Workflow Details",
+    "description": "Get full details of a workflow or knowledge session"
+  },
+  "generateWorkflow": {
+    "actionTitle": "Generate Workflow",
+    "description": "Generate a structured workflow from text description"
+  },
+  "modifyContext": {
+    "actionTitle": "Modify Workflow",
+    "description": "Modify a workflow using natural language instruction"
+  }
+}
