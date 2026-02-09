@@ -43,6 +43,19 @@ export async function tripOsPost(
   return response.data;
 }
 
+export async function tripOsPatch(
+  companyId: string,
+  path: string,
+  body: Record<string, any>,
+): Promise<any> {
+  const { baseUrl, apiKey } = await getConfig(companyId);
+  const response = await axios.patch(`${baseUrl}${path}`, body, {
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+    timeout: 15000,
+  });
+  return response.data;
+}
+
 export async function validateConnection(
   apiKeys: Record<string, string>,
 ): Promise<TestConnectionResult> {
