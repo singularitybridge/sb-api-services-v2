@@ -13,6 +13,13 @@
       "type": "secret",
       "placeholder": "https://trip-os.singularitybridge.net",
       "description": "Base URL of the Trip OS server (e.g. https://trip-os.singularitybridge.net or http://localhost:3052)"
+    },
+    {
+      "key": "trip_os_api_key",
+      "label": "Trip OS API Key",
+      "type": "secret",
+      "placeholder": "your-api-key",
+      "description": "API key for authenticating with the Trip OS data endpoints"
     }
   ]
 }
