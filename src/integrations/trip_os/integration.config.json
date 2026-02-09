@@ -1,0 +1,18 @@
+{
+  "name": "trip_os",
+  "displayName": "Trip OS",
+  "description": "Travel data integration — destinations, restaurants, attractions, hotels, flights, car rentals, insurance, shopping, transport, customers, and bookings for AI travel planning",
+  "icon": "plane",
+  "category": "hospitality",
+  "actionCreator": "createTripOsActions",
+  "actionsFile": "trip_os.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "trip_os_api_url",
+      "label": "Trip OS API URL",
+      "type": "secret",
+      "placeholder": "https://trip-os.singularitybridge.net",
+      "description": "Base URL of the Trip OS server (e.g. https://trip-os.singularitybridge.net or http://localhost:3052)"
+    }
+  ]
+}
