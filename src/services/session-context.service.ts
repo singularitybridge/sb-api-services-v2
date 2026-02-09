@@ -17,6 +17,13 @@ export interface SessionContextData {
     name: string;
     // Add other assistant properties as needed
   };
+  channel: string;
+  channelUserId: string;
+  channelMetadata: Record<string, any>;
+  contactIdentifier: string;
+  currentDate: string;
+  currentTime: string;
+  currentDateTime: string;
 }
 
 export const getSessionContextData = async (
@@ -42,6 +49,8 @@ export const getSessionContextData = async (
     throw new Error('Assistant not found');
   }
 
+  const now = new Date();
+
   return {
     user: {
       name: user.name,
@@ -56,5 +65,16 @@ export const getSessionContextData = async (
       name: assistant.name,
       // Add other assistant properties as needed
     },
+    channel: (session as any).channel || 'web',
+    channelUserId: (session as any).channelUserId || '',
+    channelMetadata: (session as any).channelMetadata || {},
+    contactIdentifier:
+      (session as any).channelMetadata?.telegramUserId ||
+      (session as any).channelMetadata?.phone ||
+      user.email ||
+      '',
+    currentDate: now.toISOString().split('T')[0],
+    currentTime: now.toISOString().split('T')[1].substring(0, 5),
+    currentDateTime: now.toISOString(),
   };
 };

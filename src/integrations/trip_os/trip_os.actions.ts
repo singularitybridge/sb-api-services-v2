@@ -5,7 +5,7 @@ import {
 } from '../actions/types';
 import { executeAction } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
-import { tripOsGet, tripOsPost, validateConnection } from './trip_os.service';
+import { tripOsGet, tripOsPost, tripOsPatch, validateConnection } from './trip_os.service';
 
 export { validateConnection };
 
@@ -385,6 +385,83 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
     },
   },
 
+  // ── Customer Lookup ──────────────────────────────────────────
+
+  lookupCustomerByChannel: {
+    description: 'Look up a TripOS customer by their contact identifier. Works across all channels: Telegram (by user ID), web (by email), WhatsApp (by phone).',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        channel: {
+          type: 'string',
+          enum: ['telegram', 'web', 'whatsapp'],
+          description: 'The channel type',
+        },
+        channelId: {
+          type: 'string',
+          description: 'The contact identifier (Telegram user ID, email, or phone number)',
+        },
+      },
+      required: ['channel', 'channelId'],
+      additionalProperties: false,
+    },
+    function: async (args: { channel: string; channelId: string }): Promise<StandardActionResult> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      if (!args.channelId) throw new ActionValidationError('channelId is required.');
+      const paramMap: Record<string, string> = { telegram: 'telegramId', web: 'email', whatsapp: 'phone' };
+      const paramKey = paramMap[args.channel];
+      if (!paramKey) throw new ActionValidationError(`Unsupported channel: ${args.channel}`);
+      return executeAction('lookupCustomerByChannel', async () => {
+        const data = await tripOsGet(context.companyId, '/api/data/customers', { [paramKey]: args.channelId });
+        const customer = data.results?.[0];
+        if (!customer) {
+          return { success: false, error: `No TripOS customer found for ${args.channel} ID: ${args.channelId}` };
+        }
+        return { success: true, data: customer, description: `Found customer: ${customer.firstName} ${customer.lastName}` };
+      }, { serviceName: 'tripOs' });
+    },
+  },
+
+  // ── Customer Creation ────────────────────────────────────────
+
+  createCustomer: {
+    description: 'Create a new TripOS customer profile. Use this when a new user (e.g., from Telegram) is not yet registered. Returns the created customer with their _id.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        firstName: { type: 'string', description: 'First name in English' },
+        lastName: { type: 'string', description: 'Last name in English' },
+        firstNameHe: { type: 'string', description: 'First name in Hebrew (if known)' },
+        lastNameHe: { type: 'string', description: 'Last name in Hebrew (if known)' },
+        email: { type: 'string', description: 'Email address (optional)' },
+        phone: { type: 'string', description: 'Phone number (optional)' },
+        telegramId: { type: 'string', description: 'Telegram user ID to link this customer to their Telegram account' },
+        preferredLanguage: { type: 'string', enum: ['he', 'en'], description: 'Preferred language (default: he)' },
+      },
+      required: ['firstName', 'lastName'],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      firstName: string;
+      lastName: string;
+      firstNameHe?: string;
+      lastNameHe?: string;
+      email?: string;
+      phone?: string;
+      telegramId?: string;
+      preferredLanguage?: string;
+    }): Promise<StandardActionResult> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      if (!args.firstName || !args.lastName) throw new ActionValidationError('firstName and lastName are required.');
+      return executeAction('createCustomer', async () => {
+        const data = await tripOsPost(context.companyId, '/api/data/customers', args);
+        return { success: true, data, description: `Created customer: ${args.firstName} ${args.lastName}` };
+      }, { serviceName: 'tripOs' });
+    },
+  },
+
   // ── Customers ─────────────────────────────────────────────────
 
   getCustomerProfile: {
@@ -427,6 +504,76 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
       return executeAction('getCustomerBookings', async () => {
         const data = await tripOsGet(context.companyId, `/api/data/customers/${args.customerId}/bookings`);
         return { success: true, data: data.results, description: `Found ${data.total} bookings` };
+      }, { serviceName: 'tripOs' });
+    },
+  },
+
+  // ── Customer Preferences ─────────────────────────────────────
+
+  updateCustomerPreferences: {
+    description: 'Update a customer\'s travel preferences (companion, pace, interests, dietary). All fields accept free text — store the customer\'s natural language answers. Only provided fields are updated; omitted fields are left unchanged.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        customerId: { type: 'string', description: 'Customer MongoDB _id' },
+        travelCompanion: {
+          type: 'string',
+          description: 'Who the customer travels with, free text (e.g. "Family with two kids aged 8 and 12", "Solo", "With my wife")',
+        },
+        pace: {
+          type: 'string',
+          description: 'Preferred travel pace, free text (e.g. "Pack it in — I want to see everything", "Take it easy, long cafe breaks")',
+        },
+        interests: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'List of interests/activities the customer enjoys (e.g. ["history", "food", "hiking", "nightlife"])',
+        },
+        dietaryType: {
+          type: 'string',
+          description: 'Dietary preference, free text (e.g. "I eat everything", "Kosher only", "Vegetarian", "Vegan, allergic to nuts")',
+        },
+        dietaryRestrictions: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Specific dietary restrictions (e.g. ["gluten-free", "nut allergy", "shellfish"])',
+        },
+        dietaryNotes: {
+          type: 'string',
+          description: 'Additional dietary notes, free text (e.g. "Wife is lactose intolerant", "Kids prefer familiar food")',
+        },
+      },
+      required: ['customerId'],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      customerId: string;
+      travelCompanion?: string;
+      pace?: string;
+      interests?: string[];
+      dietaryType?: string;
+      dietaryRestrictions?: string[];
+      dietaryNotes?: string;
+    }): Promise<StandardActionResult> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      if (!args.customerId) throw new ActionValidationError('customerId is required.');
+
+      // Build the PATCH body — map flat args to the API's expected shape
+      const body: Record<string, any> = {};
+      if (args.travelCompanion !== undefined) body.travelCompanion = args.travelCompanion;
+      if (args.pace !== undefined) body.pace = args.pace;
+      if (args.interests !== undefined) body.interests = args.interests;
+      if (args.dietaryType !== undefined || args.dietaryRestrictions !== undefined || args.dietaryNotes !== undefined) {
+        body.dietary = {};
+        if (args.dietaryType !== undefined) body.dietary.type = args.dietaryType;
+        if (args.dietaryRestrictions !== undefined) body.dietary.restrictions = args.dietaryRestrictions;
+        if (args.dietaryNotes !== undefined) body.dietary.notes = args.dietaryNotes;
+      }
+
+      return executeAction('updateCustomerPreferences', async () => {
+        const data = await tripOsPatch(context.companyId, `/api/data/customers/${args.customerId}`, body);
+        return { success: true, data: data.travelPreferences, description: 'Customer travel preferences updated' };
       }, { serviceName: 'tripOs' });
     },
   },
