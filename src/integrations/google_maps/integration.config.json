@@ -1,0 +1,18 @@
+{
+  "name": "google_maps",
+  "displayName": "Google Maps Platform",
+  "description": "Google Maps Platform integration — Places search, place details, photos, nearby search, directions, geocoding, static maps, street view, timezone, and distance matrix for location-aware AI agents",
+  "icon": "map-pin",
+  "category": "location",
+  "actionCreator": "createGoogleMapsActions",
+  "actionsFile": "google_maps.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "google_maps_api_key",
+      "label": "Google Maps API Key",
+      "type": "secret",
+      "placeholder": "AIzaSy...",
+      "description": "Google Maps Platform API key with Places, Routes, Geocoding, Static Maps, Street View, and Timezone APIs enabled"
+    }
+  ]
+}
