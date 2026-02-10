@@ -71,7 +71,7 @@ export const getSessionContextData = async (
     contactIdentifier:
       (session as any).channelMetadata?.telegramUserId ||
       (session as any).channelMetadata?.phone ||
-      user.email ||
+      (session as any).channelMetadata?.email ||
       '',
     currentDate: now.toISOString().split('T')[0],
     currentTime: now.toISOString().split('T')[1].substring(0, 5),

@@ -1,10 +1,14 @@
-import { Assistant } from '../models/Assistant';
 import { ISession, Session } from '../models/Session';
+import { Assistant } from '../models/Assistant';
+import { User } from '../models/User';
 import { CustomError, NotFoundError, BadRequestError } from '../utils/errors';
-// OpenAI thread service calls removed as it's deprecated in favor of Vercel AI
-import { getApiKey } from './api.key.service';
-import { SupportedLanguage } from './discovery.service';
-import mongoose from 'mongoose'; // Added for ObjectId generation
+import mongoose from 'mongoose';
+
+export interface ChannelInfo {
+  channel?: string;
+  channelUserId?: string;
+  channelMetadata?: Record<string, any>;
+}
 
 export const sessionFriendlyAggreationQuery = [
   {
@@ -50,7 +54,10 @@ export const sessionFriendlyAggreationQuery = [
       companyName: '$companyDetails.name',
       threadId: 1,
       active: 1,
-      language: 1,
+      channel: 1,
+      channelUserId: 1,
+      channelMetadata: 1,
+      lastActivityAt: 1,
     },
   },
 ];
@@ -63,23 +70,6 @@ export const updateSessionAssistant = async (
   const session = await Session.findOneAndUpdate(
     { _id: sessionId, companyId: companyId },
     { assistantId },
-    { new: true },
-  );
-
-  if (!session) {
-    throw new NotFoundError('Session not found');
-  }
-
-  return session;
-};
-
-export const updateSessionLanguage = async (
-  sessionId: string,
-  language: string,
-): Promise<ISession | null> => {
-  const session = await Session.findByIdAndUpdate(
-    sessionId,
-    { language },
     { new: true },
   );
 
@@ -114,6 +104,8 @@ export const activateSession = async (
       {
         userId: userObjectId,
         companyId: companyObjectId,
+        channel: targetSession.channel || 'web',
+        channelUserId: targetSession.channelUserId || '',
         active: true,
         _id: { $ne: sessionObjectId },
       },
@@ -138,11 +130,14 @@ export const getSessionById = async (sessionId: string): Promise<ISession> => {
 export const getCurrentSession = async (
   userId: string,
   companyId: string,
+  channelInfo?: ChannelInfo,
 ): Promise<ISession | null> => {
   return await Session.findOne({
     userId,
     companyId,
     active: true,
+    channel: channelInfo?.channel || 'web',
+    channelUserId: channelInfo?.channelUserId || '',
   });
 };
 
@@ -150,14 +145,19 @@ export const getSessionOrCreate = async (
   apiKey: string,
   userId: string,
   companyId: string,
-  language: string = 'en',
-  lastAssistantId?: string, // Added lastAssistantId parameter
+  lastAssistantId?: string,
+  channelInfo?: ChannelInfo,
 ) => {
+  const channel = channelInfo?.channel || 'web';
+  const channelUserId = channelInfo?.channelUserId || '';
+
   const findSession = async () => {
     const session = await Session.findOne({
       userId,
       companyId,
       active: true,
+      channel,
+      channelUserId,
     });
     if (session) {
       return session;
@@ -167,11 +167,36 @@ export const getSessionOrCreate = async (
 
   let session = await findSession();
 
+  // Check TTL expiry — if the assistant has sessionTtlHours configured
+  // and the session has been inactive longer than that, expire it
   if (session) {
+    const assistant = await Assistant.findById(session.assistantId);
+    if (assistant?.sessionTtlHours) {
+      const lastActivity = session.lastActivityAt || session.createdAt;
+      const ttlMs = assistant.sessionTtlHours * 60 * 60 * 1000;
+      const elapsed = Date.now() - lastActivity.getTime();
+      if (elapsed > ttlMs) {
+        console.log(
+          `Session ${session._id} expired (inactive ${Math.round(elapsed / 3600000)}h, TTL ${assistant.sessionTtlHours}h). Rotating.`,
+        );
+        // Carry over channelMetadata from expired session if not provided by caller
+        if (channelInfo && !channelInfo.channelMetadata && (session as any).channelMetadata) {
+          channelInfo.channelMetadata = (session as any).channelMetadata;
+        }
+        session.active = false;
+        await session.save();
+        session = null;
+      }
+    }
+  }
+
+  if (session) {
+    // Touch lastActivityAt to keep session alive
+    session.lastActivityAt = new Date();
+    await session.save();
     return {
       _id: session._id,
       assistantId: session.assistantId,
-      language: session.language,
     };
   }
 
@@ -206,14 +231,29 @@ export const getSessionOrCreate = async (
   // Generate a unique ID for threadId instead of getting it from OpenAI
   const threadId = new mongoose.Types.ObjectId().toString();
 
+  // Build channelMetadata — use provided data, or auto-populate for web from User model
+  let channelMetadata = channelInfo?.channelMetadata;
+  if (!channelMetadata && channel === 'web') {
+    const user = await User.findById(userId);
+    if (user) {
+      channelMetadata = {
+        name: user.name || '',
+        email: user.email || '',
+        phone: '',
+      };
+    }
+  }
+
   try {
     session = await Session.create({
       userId,
       companyId,
       assistantId: assistantToUseId, // Use determined assistantId
       active: true,
-      threadId, // Use the locally generated threadId
-      language,
+      threadId,
+      channel,
+      channelUserId,
+      ...(channelMetadata && { channelMetadata }),
     });
     console.log(
       `New session created: ${session._id} with assistant ${assistantToUseId}`,
@@ -242,7 +282,6 @@ export const getSessionOrCreate = async (
   return {
     _id: session._id,
     assistantId: session.assistantId,
-    language: session.language,
   };
 };
 
@@ -274,40 +313,39 @@ export const endSession = async (
 // Function to ensure the correct index is created
 export const ensureSessionIndex = async () => {
   try {
-    await Session.collection.dropIndexes();
+    // Backfill existing sessions missing channel fields
+    const backfillResult = await Session.updateMany(
+      { $or: [{ channel: { $exists: false } }, { channelUserId: { $exists: false } }] },
+      { $set: { channel: 'web', channelUserId: '' } },
+    );
+    if (backfillResult.modifiedCount > 0) {
+      console.log(`Backfilled ${backfillResult.modifiedCount} sessions with channel defaults`);
+    }
+
+    // Drop any stale indexes that don't match the target 4-field compound index
+    const indexes = await Session.collection.indexes();
+    for (const idx of indexes) {
+      if (!idx.unique || idx.name === '_id_') continue;
+      const keys = Object.keys(idx.key || {});
+      // Keep the correct 4-field index, drop any other unique indexes on companyId+userId
+      if (
+        idx.key?.companyId === 1 &&
+        idx.key?.userId === 1 &&
+        !(keys.length === 4 && idx.key?.channel === 1 && idx.key?.channelUserId === 1)
+      ) {
+        await Session.collection.dropIndex(idx.name!);
+        console.log(`Dropped stale session index: ${idx.name}`);
+      }
+    }
+
+    // Create new channel-aware unique index
     await Session.collection.createIndex(
-      { companyId: 1, userId: 1 },
+      { companyId: 1, userId: 1, channel: 1, channelUserId: 1 },
       { unique: true, partialFilterExpression: { active: true } },
     );
-    console.log('Session index updated successfully');
+    console.log('Session index updated successfully (channel-aware)');
   } catch (error) {
     console.error('Error updating session index:', error);
   }
 };
 
-// Moved from integration.routes.ts
-export async function getSessionLanguage(
-  userId: string,
-  companyId: string,
-): Promise<SupportedLanguage> {
-  try {
-    const apiKey = await getApiKey(companyId, 'openai_api_key');
-
-    if (!apiKey) {
-      console.log('OpenAI API key not found, defaulting to English');
-      return 'en';
-    }
-
-    const session = await getSessionOrCreate(
-      apiKey,
-      userId,
-      companyId,
-      'en', // Default language
-    );
-
-    return session.language as SupportedLanguage;
-  } catch (error) {
-    console.error('Error getting session language:', error);
-    return 'en'; // Default to English if there's an error
-  }
-}
