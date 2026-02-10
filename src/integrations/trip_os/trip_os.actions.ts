@@ -416,7 +416,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
         const data = await tripOsGet(context.companyId, '/api/data/customers', { [paramKey]: args.channelId });
         const customer = data.results?.[0];
         if (!customer) {
-          return { success: false, error: `No TripOS customer found for ${args.channel} ID: ${args.channelId}` };
+          return { success: true, data: null, description: `No TripOS customer found for ${args.channel} ID: ${args.channelId}` };
         }
         return { success: true, data: customer, description: `Found customer: ${customer.firstName} ${customer.lastName}` };
       }, { serviceName: 'tripOs' });
