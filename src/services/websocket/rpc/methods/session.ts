@@ -18,10 +18,9 @@ const processSessionMessage = async (
       'openai_api_key',
     )) as string; // Renamed variable
     const session = await getSessionOrCreate(
-      apiKeyForSession, // Use renamed variable
+      apiKeyForSession,
       userId,
       companyId,
-      'en',
     );
     socket.sessionId = session._id.toString();
   }
