@@ -7,95 +7,15 @@ import {
   getSessionOrCreate,
   sessionFriendlyAggreationQuery,
   updateSessionAssistant,
-  updateSessionLanguage,
   activateSession,
 } from '../services/session.service';
 import mongoose from 'mongoose';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { getApiKey, validateApiKeys } from '../services/api.key.service';
 import { BadRequestError } from '../utils/errors';
-import { SupportedLanguage } from '../services/discovery.service';
+import { resolveAssistantIdentifier } from '../services/assistant/assistant-resolver.service';
 
 const sessionRouter = Router();
-
-// Update active session language
-sessionRouter.put(
-  '/language',
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    const { language } = req.body;
-    const companyId = req.user?.companyId?.toString();
-    const userId = req.user?._id?.toString();
-
-    if (!companyId || !userId) {
-      return next(
-        new BadRequestError('User or Company ID not found in request.'),
-      );
-    }
-    if (!language || !['en', 'he'].includes(language)) {
-      return res.status(400).json({
-        error: 'Invalid language. Supported languages are "en" and "he".',
-      });
-    }
-
-    try {
-      const activeSession = await Session.findOne({
-        userId: new mongoose.Types.ObjectId(userId),
-        companyId: new mongoose.Types.ObjectId(companyId),
-        active: true,
-      });
-
-      if (!activeSession) {
-        return res.status(404).json({ error: 'Active session not found.' });
-      }
-
-      const updatedSession = await updateSessionLanguage(
-        activeSession._id.toString(),
-        language as SupportedLanguage,
-      );
-      if (updatedSession) {
-        res.status(200).json({
-          message: 'Active session language updated successfully',
-          language: updatedSession.language,
-        });
-      } else {
-        // This case should ideally not be hit if activeSession was found
-        res.status(404).json({ error: 'Session not found during update.' });
-      }
-    } catch (error) {
-      next(error);
-    }
-  },
-);
-
-// Get active session language
-sessionRouter.get(
-  '/language',
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    const companyId = req.user?.companyId?.toString();
-    const userId = req.user?._id?.toString();
-
-    if (!companyId || !userId) {
-      return next(
-        new BadRequestError('User or Company ID not found in request.'),
-      );
-    }
-
-    try {
-      const activeSession = await Session.findOne({
-        userId: new mongoose.Types.ObjectId(userId),
-        companyId: new mongoose.Types.ObjectId(companyId),
-        active: true,
-      });
-
-      if (!activeSession) {
-        return res.status(404).json({ error: 'Active session not found.' });
-      }
-      res.status(200).json({ language: activeSession.language });
-    } catch (error) {
-      next(error);
-    }
-  },
-);
 
 // Create session
 sessionRouter.post('/', async (req: AuthenticatedRequest, res: Response) => {
@@ -110,10 +30,24 @@ sessionRouter.post('/', async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
+    const { channel, channelUserId, channelMetadata, assistantId } = req.body || {};
+
+    // Resolve assistantId by name or ObjectId if provided (e.g., from Herald)
+    let resolvedAssistantId: string | undefined;
+    if (assistantId) {
+      const companyId = req.user?.companyId.toString() ?? '';
+      const assistant = await resolveAssistantIdentifier(assistantId, companyId);
+      if (assistant) {
+        resolvedAssistantId = assistant._id.toString();
+      }
+    }
+
     const session = await getSessionOrCreate(
-      apiKey, // This apiKey is for downstream services if needed by getSessionOrCreate, not for session creation itself.
+      apiKey,
       req.user?._id.toString() ?? '',
       req.user?.companyId.toString() ?? '',
+      resolvedAssistantId,
+      channel || channelUserId ? { channel, channelUserId, channelMetadata } : undefined,
     );
     res.status(200).json(session);
   } catch (error: unknown) {
@@ -149,22 +83,32 @@ sessionRouter.post(
         );
       }
 
-      // Find current active session for this user/company
-      const currentActiveSession = await Session.findOne({
+      const { channel, channelUserId, channelMetadata } = req.body || {};
+      const channelInfo = channel || channelUserId ? { channel, channelUserId, channelMetadata } : undefined;
+
+      // Find current active session for this user/company/channel
+      const query: Record<string, any> = {
         userId: new mongoose.Types.ObjectId(userId),
         companyId: new mongoose.Types.ObjectId(companyId),
         active: true,
-      });
+        channel: channelInfo?.channel || 'web',
+        channelUserId: channelInfo?.channelUserId || userId,
+      };
+      const currentActiveSession = await Session.findOne(query);
 
       let lastAssistantId: string | undefined = undefined;
-      let lastLanguage: string = 'en'; // Default language
 
       if (currentActiveSession) {
         console.log(
           `Clear Session: Ending existing active session ${currentActiveSession._id}`,
         );
         lastAssistantId = currentActiveSession.assistantId?.toString();
-        lastLanguage = currentActiveSession.language || 'en'; // Use session language or default
+
+        // Carry over channelMetadata from old session if caller didn't provide it
+        if (channelInfo && !channelInfo.channelMetadata && (currentActiveSession as any).channelMetadata) {
+          channelInfo.channelMetadata = (currentActiveSession as any).channelMetadata;
+        }
+
         await endSession(apiKey, currentActiveSession._id.toString());
       } else {
         console.log(
@@ -177,8 +121,8 @@ sessionRouter.post(
         apiKey,
         userId,
         companyId,
-        lastLanguage, // Pass the last language
-        lastAssistantId, // Pass the last assistantId
+        lastAssistantId,
+        channelInfo,
       );
 
       res.status(200).json(newSession);
@@ -209,10 +153,13 @@ sessionRouter.get(
     }
 
     try {
+      const { channel, channelUserId } = req.query as { channel?: string; channelUserId?: string };
       const activeSession = await Session.findOne({
         userId: new mongoose.Types.ObjectId(userId),
         companyId: new mongoose.Types.ObjectId(companyId),
         active: true,
+        channel: channel || 'web',
+        channelUserId: channelUserId || userId,
       });
 
       if (!activeSession) {
@@ -241,7 +188,7 @@ sessionRouter.get(
         return next(new BadRequestError('Company ID not found in request.'));
       }
 
-      const { limit: limitParam } = req.query as { limit?: string | string[] };
+      const { limit: limitParam, channel } = req.query as { limit?: string | string[]; channel?: string };
       let limit = 10;
       if (Array.isArray(limitParam)) {
         limit = parseInt(limitParam[0] ?? '', 10);
@@ -252,9 +199,14 @@ sessionRouter.get(
         limit = 10;
       }
 
-      const sessions = await Session.find({
+      const query: any = {
         companyId: new mongoose.Types.ObjectId(companyId),
-      })
+      };
+      if (channel) {
+        query.channel = channel;
+      }
+
+      const sessions = await Session.find(query)
         .sort({ createdAt: -1 })
         .limit(limit);
 

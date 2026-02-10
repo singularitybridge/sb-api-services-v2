@@ -7,7 +7,10 @@ export interface ISession extends Document {
   active: boolean;
   companyId: string;
   createdAt: Date;
-  language: string;
+  lastActivityAt: Date;
+  channel: string;
+  channelUserId: string;
+  channelMetadata?: Record<string, any>;
 }
 
 export interface ISessionExtended extends ISession {
@@ -23,11 +26,14 @@ export const SessionSchema: Schema = new Schema({
   active: { type: Boolean, required: true },
   companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
   createdAt: { type: Date, default: Date.now },
-  language: { type: String, required: true, default: 'en' },
+  lastActivityAt: { type: Date, default: Date.now },
+  channel: { type: String, default: 'web', index: true },
+  channelUserId: { type: String, default: '' },
+  channelMetadata: { type: Schema.Types.Mixed },
 });
 
 SessionSchema.index(
-  { companyId: 1, userId: 1 },
+  { companyId: 1, userId: 1, channel: 1, channelUserId: 1, assistantId: 1 },
   { unique: true, partialFilterExpression: { active: true } },
 );
 export const Session = mongoose.model<ISession>('Session', SessionSchema);

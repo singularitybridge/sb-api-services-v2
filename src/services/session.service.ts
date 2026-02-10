@@ -105,7 +105,8 @@ export const activateSession = async (
         userId: userObjectId,
         companyId: companyObjectId,
         channel: targetSession.channel || 'web',
-        channelUserId: targetSession.channelUserId || '',
+        channelUserId: targetSession.channelUserId || userId,
+        assistantId: targetSession.assistantId,
         active: true,
         _id: { $ne: sessionObjectId },
       },
@@ -137,7 +138,7 @@ export const getCurrentSession = async (
     companyId,
     active: true,
     channel: channelInfo?.channel || 'web',
-    channelUserId: channelInfo?.channelUserId || '',
+    channelUserId: channelInfo?.channelUserId || userId,
   });
 };
 
@@ -149,23 +150,21 @@ export const getSessionOrCreate = async (
   channelInfo?: ChannelInfo,
 ) => {
   const channel = channelInfo?.channel || 'web';
-  const channelUserId = channelInfo?.channelUserId || '';
+  const channelUserId = channelInfo?.channelUserId || userId;
 
-  const findSession = async () => {
-    const session = await Session.findOne({
+  const findSession = async (assistantId?: string) => {
+    const query: Record<string, any> = {
       userId,
       companyId,
       active: true,
       channel,
       channelUserId,
-    });
-    if (session) {
-      return session;
-    }
-    return null;
+    };
+    if (assistantId) query.assistantId = assistantId;
+    return await Session.findOne(query);
   };
 
-  let session = await findSession();
+  let session = await findSession(lastAssistantId);
 
   // Check TTL expiry — if the assistant has sessionTtlHours configured
   // and the session has been inactive longer than that, expire it
@@ -263,7 +262,7 @@ export const getSessionOrCreate = async (
       console.log(
         'Duplicate key error encountered. Attempting to fetch existing session.',
       );
-      session = await findSession();
+      session = await findSession(lastAssistantId);
       if (!session) {
         console.error('Failed to retrieve session after duplicate key error');
         throw new Error(
@@ -322,28 +321,51 @@ export const ensureSessionIndex = async () => {
       console.log(`Backfilled ${backfillResult.modifiedCount} sessions with channel defaults`);
     }
 
-    // Drop any stale indexes that don't match the target 4-field compound index
+    // Drop any stale unique indexes on companyId+userId that don't match the target 5-field index
+    // Must happen BEFORE backfills that may create temporary duplicates under the old index
     const indexes = await Session.collection.indexes();
+    const TARGET_KEYS = ['companyId', 'userId', 'channel', 'channelUserId', 'assistantId'];
     for (const idx of indexes) {
       if (!idx.unique || idx.name === '_id_') continue;
       const keys = Object.keys(idx.key || {});
-      // Keep the correct 4-field index, drop any other unique indexes on companyId+userId
-      if (
-        idx.key?.companyId === 1 &&
-        idx.key?.userId === 1 &&
-        !(keys.length === 4 && idx.key?.channel === 1 && idx.key?.channelUserId === 1)
-      ) {
-        await Session.collection.dropIndex(idx.name!);
-        console.log(`Dropped stale session index: ${idx.name}`);
+      if (idx.key?.companyId === 1 && idx.key?.userId === 1) {
+        const isTarget = keys.length === TARGET_KEYS.length && TARGET_KEYS.every(k => idx.key?.[k] === 1);
+        if (!isTarget) {
+          await Session.collection.dropIndex(idx.name!);
+          console.log(`Dropped stale session index: ${idx.name}`);
+        }
       }
     }
 
-    // Create new channel-aware unique index
+    // Backfill web sessions that have empty channelUserId → set to userId
+    const webBackfill = await Session.updateMany(
+      { channel: 'web', channelUserId: '' },
+      [{ $set: { channelUserId: { $toString: '$userId' } } }],
+    );
+    if (webBackfill.modifiedCount > 0) {
+      console.log(`Backfilled ${webBackfill.modifiedCount} web sessions with userId as channelUserId`);
+    }
+
+    // Strip :agentId suffix from Telegram channelUserIds (migration from composite to raw IDs)
+    const telegramSessions = await Session.find({
+      channel: 'telegram',
+      channelUserId: { $regex: ':' },
+    });
+    for (const s of telegramSessions) {
+      const rawId = s.channelUserId.split(':')[0];
+      s.channelUserId = rawId;
+      await s.save();
+    }
+    if (telegramSessions.length > 0) {
+      console.log(`Stripped agentId suffix from ${telegramSessions.length} Telegram session channelUserIds`);
+    }
+
+    // Create new 5-field unique index (includes assistantId for per-agent session isolation)
     await Session.collection.createIndex(
-      { companyId: 1, userId: 1, channel: 1, channelUserId: 1 },
+      { companyId: 1, userId: 1, channel: 1, channelUserId: 1, assistantId: 1 },
       { unique: true, partialFilterExpression: { active: true } },
     );
-    console.log('Session index updated successfully (channel-aware)');
+    console.log('Session index updated successfully (channel + assistant aware)');
   } catch (error) {
     console.error('Error updating session index:', error);
   }

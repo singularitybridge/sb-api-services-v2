@@ -61,6 +61,8 @@ async function getOrCreateSession(
     userId,
     companyId,
     active: true,
+    channel: 'web',
+    channelUserId: userId,
   }).sort({ createdAt: -1 });
 
   if (existingSession) {
@@ -84,7 +86,8 @@ async function getOrCreateSession(
     threadId: `mcp-debug-${Date.now()}`,
     active: true,
     companyId,
-    language: 'en',
+    channel: 'web',
+    channelUserId: userId,
   });
 
   return newSession._id.toString();
