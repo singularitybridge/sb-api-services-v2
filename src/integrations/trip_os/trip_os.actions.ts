@@ -62,7 +62,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
   // ── Restaurants ───────────────────────────────────────────────
 
   searchRestaurants: {
-    description: 'Search restaurants at a destination. Can filter by kosher, cuisine type, and price range. Returns name, address, cuisine, rating, kosher status, and opening hours.',
+    description: 'Search TripOS curated restaurants at a destination. Can filter by kosher, cuisine type, and price range. Returns name, address, cuisine, rating, kosher status, opening hours, and any active coupons/discounts. Each result includes a `coupons` array — if non-empty, the restaurant has TripOS exclusive deals (discount code, percentage/fixed discount, validity).',
     strict: true,
     parameters: {
       type: 'object',
@@ -110,7 +110,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
   // ── Attractions ───────────────────────────────────────────────
 
   searchAttractions: {
-    description: 'Search attractions and landmarks at a destination. Returns name, category, price, duration, rating, and description.',
+    description: 'Search TripOS curated attractions and landmarks at a destination. Returns name, category, price, duration, rating, description, and any active coupons/discounts. Each result includes a `coupons` array with TripOS exclusive deals if available.',
     strict: true,
     parameters: {
       type: 'object',
@@ -145,7 +145,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
   // ── Activities ────────────────────────────────────────────────
 
   searchActivities: {
-    description: 'Search bookable activities and experiences (tours, cooking classes, etc). Returns name, type, duration, price, family-friendliness, and provider.',
+    description: 'Search TripOS curated activities and experiences (tours, cooking classes, etc). Returns name, type, duration, price, family-friendliness, provider, and any active coupons/discounts. Each result includes a `coupons` array with TripOS exclusive deals if available.',
     strict: true,
     parameters: {
       type: 'object',
@@ -187,7 +187,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
   // ── Hotels ────────────────────────────────────────────────────
 
   searchHotels: {
-    description: 'Search hotels at a destination. Can filter by star rating and max price per night. Returns name, stars, price, amenities, kosher food availability, and rating.',
+    description: 'Search TripOS curated hotels at a destination. Can filter by star rating and max price per night. Returns name, stars, price, amenities, kosher food availability, rating, and any active coupons/discounts. Each result includes a `coupons` array with TripOS exclusive deals if available.',
     strict: true,
     parameters: {
       type: 'object',
@@ -318,7 +318,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
   // ── Shopping ──────────────────────────────────────────────────
 
   searchShopping: {
-    description: 'Search shopping destinations (malls, markets, luxury streets, outlets). Returns name, type, price range, address, and rating.',
+    description: 'Search TripOS curated shopping destinations (malls, markets, luxury streets, outlets). Returns name, type, price range, address, rating, and any active coupons/discounts. Each result includes a `coupons` array with TripOS exclusive deals if available.',
     strict: true,
     parameters: {
       type: 'object',
@@ -388,19 +388,19 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
   // ── Customer Lookup ──────────────────────────────────────────
 
   lookupCustomerByChannel: {
-    description: 'Look up a TripOS customer by their contact identifier. Works across all channels: Telegram (by user ID), web (by email), WhatsApp (by phone).',
+    description: 'Look up a TripOS customer by their contact identifier. Works across all channels: Telegram (by user ID), web (by email), WhatsApp (by phone), tripos-web (by visitor ID).',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
         channel: {
           type: 'string',
-          enum: ['telegram', 'web', 'whatsapp'],
+          enum: ['telegram', 'web', 'whatsapp', 'tripos-web'],
           description: 'The channel type',
         },
         channelId: {
           type: 'string',
-          description: 'The contact identifier (Telegram user ID, email, or phone number)',
+          description: 'The contact identifier (Telegram user ID, email, phone number, or TripOS visitor ID)',
         },
       },
       required: ['channel', 'channelId'],
@@ -409,7 +409,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
     function: async (args: { channel: string; channelId: string }): Promise<StandardActionResult> => {
       if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
       if (!args.channelId) throw new ActionValidationError('channelId is required.');
-      const paramMap: Record<string, string> = { telegram: 'telegramId', web: 'email', whatsapp: 'phone' };
+      const paramMap: Record<string, string> = { telegram: 'telegramId', web: 'email', whatsapp: 'phone', 'tripos-web': 'visitorId' };
       const paramKey = paramMap[args.channel];
       if (!paramKey) throw new ActionValidationError(`Unsupported channel: ${args.channel}`);
       return executeAction('lookupCustomerByChannel', async () => {
@@ -426,7 +426,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
   // ── Customer Creation ────────────────────────────────────────
 
   createCustomer: {
-    description: 'Create a new TripOS customer profile. Use this when a new user (e.g., from Telegram) is not yet registered. Returns the created customer with their _id.',
+    description: 'Create a new TripOS customer profile. Use this when a new user is not yet registered. Returns the created customer with their _id.',
     strict: true,
     parameters: {
       type: 'object',
@@ -438,6 +438,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
         email: { type: 'string', description: 'Email address (optional)' },
         phone: { type: 'string', description: 'Phone number (optional)' },
         telegramId: { type: 'string', description: 'Telegram user ID to link this customer to their Telegram account' },
+        visitorId: { type: 'string', description: 'TripOS web visitor ID to link this customer to their browser session' },
         preferredLanguage: { type: 'string', enum: ['he', 'en'], description: 'Preferred language (default: he)' },
       },
       required: ['firstName', 'lastName'],
@@ -451,6 +452,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
       email?: string;
       phone?: string;
       telegramId?: string;
+      visitorId?: string;
       preferredLanguage?: string;
     }): Promise<StandardActionResult> => {
       if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
@@ -465,7 +467,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
   // ── Customers ─────────────────────────────────────────────────
 
   getCustomerProfile: {
-    description: 'Get a customer profile by ID. Returns name, email, phone, passport, tier (standard/silver/gold/platinum), preferences (kosher, seat, room), and frequent flyer info.',
+    description: 'Get a customer profile by ID. Returns name, email, phone, passport, nationality, and bio (free-text field with all personal info, family members, dietary needs, travel style, and preferences).',
     strict: true,
     parameters: {
       type: 'object',
@@ -508,72 +510,33 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
     },
   },
 
-  // ── Customer Preferences ─────────────────────────────────────
+  // ── Customer Bio ─────────────────────────────────────────────
 
-  updateCustomerPreferences: {
-    description: 'Update a customer\'s travel preferences (companion, pace, interests, dietary). All fields accept free text — store the customer\'s natural language answers. Only provided fields are updated; omitted fields are left unchanged.',
+  updateCustomerBio: {
+    description: 'Update a customer\'s bio — a single free-text field containing all personal info, family members, preferences, dietary needs, and travel style. Write it as natural language.',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
         customerId: { type: 'string', description: 'Customer MongoDB _id' },
-        travelCompanion: {
+        bio: {
           type: 'string',
-          description: 'Who the customer travels with, free text (e.g. "Family with two kids aged 8 and 12", "Solo", "With my wife")',
-        },
-        pace: {
-          type: 'string',
-          description: 'Preferred travel pace, free text (e.g. "Pack it in — I want to see everything", "Take it easy, long cafe breaks")',
-        },
-        interests: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'List of interests/activities the customer enjoys (e.g. ["history", "food", "hiking", "nightlife"])',
-        },
-        dietaryType: {
-          type: 'string',
-          description: 'Dietary preference, free text (e.g. "I eat everything", "Kosher only", "Vegetarian", "Vegan, allergic to nuts")',
-        },
-        dietaryRestrictions: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Specific dietary restrictions (e.g. ["gluten-free", "nut allergy", "shellfish"])',
-        },
-        dietaryNotes: {
-          type: 'string',
-          description: 'Additional dietary notes, free text (e.g. "Wife is lactose intolerant", "Kids prefer familiar food")',
+          description: 'Free-text bio with all customer info: family members (names, ages), dietary needs, travel pace, interests, special notes. Write as natural prose.',
         },
       },
-      required: ['customerId'],
+      required: ['customerId', 'bio'],
       additionalProperties: false,
     },
     function: async (args: {
       customerId: string;
-      travelCompanion?: string;
-      pace?: string;
-      interests?: string[];
-      dietaryType?: string;
-      dietaryRestrictions?: string[];
-      dietaryNotes?: string;
+      bio: string;
     }): Promise<StandardActionResult> => {
       if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
       if (!args.customerId) throw new ActionValidationError('customerId is required.');
 
-      // Build the PATCH body — map flat args to the API's expected shape
-      const body: Record<string, any> = {};
-      if (args.travelCompanion !== undefined) body.travelCompanion = args.travelCompanion;
-      if (args.pace !== undefined) body.pace = args.pace;
-      if (args.interests !== undefined) body.interests = args.interests;
-      if (args.dietaryType !== undefined || args.dietaryRestrictions !== undefined || args.dietaryNotes !== undefined) {
-        body.dietary = {};
-        if (args.dietaryType !== undefined) body.dietary.type = args.dietaryType;
-        if (args.dietaryRestrictions !== undefined) body.dietary.restrictions = args.dietaryRestrictions;
-        if (args.dietaryNotes !== undefined) body.dietary.notes = args.dietaryNotes;
-      }
-
-      return executeAction('updateCustomerPreferences', async () => {
-        const data = await tripOsPatch(context.companyId, `/api/data/customers/${args.customerId}`, body);
-        return { success: true, data: data.travelPreferences, description: 'Customer travel preferences updated' };
+      return executeAction('updateCustomerBio', async () => {
+        const data = await tripOsPatch(context.companyId, `/api/data/customers/${args.customerId}`, { bio: args.bio });
+        return { success: true, data: { bio: data.bio }, description: 'Customer bio updated' };
       }, { serviceName: 'tripOs' });
     },
   },
