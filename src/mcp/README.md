@@ -90,7 +90,7 @@ Create a new AI agent/assistant with specified LLM provider and model.
 **Parameters:**
 - `name` (string, required): Agent name
 - `description` (string, optional): Agent description
-- `llmProvider` (string, required): LLM provider ("openai", "google", or "anthropic")
+- `llmProvider` (string, required): LLM provider ("openai", "google", "anthropic", or "openrouter")
 - `llmModel` (string, required): Model name (e.g., "gpt-5.1", "claude-sonnet-4-5", "gemini-2.5-flash")
 - `llmPrompt` (string, optional): System prompt
 - `maxTokens` (number, optional): Max tokens for responses (default: 25000)
@@ -104,7 +104,7 @@ Update an agent's core metadata. Only updates the fields you provide.
 - `name` (string, optional): New name
 - `description` (string, optional): New description
 - `prompt` (string, optional): New system prompt
-- `llmProvider` (string, optional): LLM provider ("openai", "google", or "anthropic")
+- `llmProvider` (string, optional): LLM provider ("openai", "google", "anthropic", or "openrouter")
 - `llmModel` (string, optional): Model name
 - `maxTokens` (number, optional): Max tokens (default: 25000)
 - `sessionTtlHours` (number or null, optional): Auto-expire sessions after this many hours of inactivity. Set to null to disable.

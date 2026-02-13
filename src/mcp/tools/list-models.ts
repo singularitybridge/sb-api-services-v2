@@ -18,7 +18,7 @@ import { MODEL_PRICING } from '../../utils/cost-tracking';
  */
 export const listModelsSchema = z.object({
   provider: z
-    .enum(['openai', 'anthropic', 'google', 'openrouter'])
+    .enum(['openai', 'anthropic', 'google', 'openrouter'] as const)
     .optional()
     .describe('Filter models by provider (optional)'),
 });
@@ -98,6 +98,7 @@ export async function listModels(
             openai: grouped.openai.length,
             anthropic: grouped.anthropic.length,
             google: grouped.google.length,
+            openrouter: grouped.openrouter.length,
           },
         };
 

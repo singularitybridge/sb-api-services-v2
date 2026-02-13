@@ -6,7 +6,7 @@ export interface ModelPricing {
   outputCost: number; // Cost per 1000 output tokens
 }
 
-// Pricing last validated: 2026-01-24 (source: Perplexity research + official docs)
+// Pricing last validated: 2026-02-13 (source: OpenRouter API + Perplexity research + official docs)
 // To update: run pricing-validator agent or check CLAUDE.md "Monthly Task: Pricing Validation"
 export const MODEL_PRICING: Record<string, ModelPricing> = {
   // === OpenAI GPT-5.2 (Latest) ===
@@ -64,15 +64,22 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'gemini-2.5-flash-lite': { inputCost: 0.00015, outputCost: 0.001 },
   'models/gemini-2.5-flash-lite': { inputCost: 0.00015, outputCost: 0.001 },
 
-  // === OpenRouter Models (prices include OR markup) ===
-  'meta-llama/llama-4-maverick': { inputCost: 0.0005, outputCost: 0.0022 },
-  'meta-llama/llama-4-scout': { inputCost: 0.00018, outputCost: 0.00053 },
-  'deepseek/deepseek-chat-v3-0324': { inputCost: 0.0003, outputCost: 0.00088 },
-  'deepseek/deepseek-r1': { inputCost: 0.0008, outputCost: 0.0023 },
+  // === OpenRouter Models (verified 2026-02-13 against openrouter.ai/api/v1/models) ===
+  'meta-llama/llama-4-maverick': { inputCost: 0.00015, outputCost: 0.0006 },
+  'meta-llama/llama-4-scout': { inputCost: 0.00008, outputCost: 0.0003 },
+  'deepseek/deepseek-v3.2': { inputCost: 0.00025, outputCost: 0.00038 },
+  'deepseek/deepseek-r1-0528': { inputCost: 0.0004, outputCost: 0.00175 },
+  'deepseek/deepseek-chat-v3-0324': { inputCost: 0.00019, outputCost: 0.00087 },
+  'deepseek/deepseek-r1': { inputCost: 0.0007, outputCost: 0.0025 },
+  'mistralai/mistral-large-2512': { inputCost: 0.0005, outputCost: 0.0015 },
+  'mistralai/codestral-2508': { inputCost: 0.0003, outputCost: 0.0009 },
   'mistralai/mistral-large': { inputCost: 0.002, outputCost: 0.006 },
   'mistralai/codestral': { inputCost: 0.0003, outputCost: 0.0009 },
   'qwen/qwen3-235b-a22b': { inputCost: 0.0003, outputCost: 0.0012 },
-  'qwen/qwen3-30b-a3b': { inputCost: 0.0002, outputCost: 0.0005 },
+  'qwen/qwen3-30b-a3b': { inputCost: 0.00006, outputCost: 0.00022 },
+  'qwen/qwen3-coder': { inputCost: 0.00022, outputCost: 0.001 },
+  'moonshotai/kimi-k2.5': { inputCost: 0.00045, outputCost: 0.00225 },
+  'z-ai/glm-5': { inputCost: 0.0008, outputCost: 0.00256 },
 
   // Default pricing for unknown models
   default: { inputCost: 0.001, outputCost: 0.002 },
@@ -98,12 +105,17 @@ export interface CostTrackingInfo {
   requestType?: 'streaming' | 'non-streaming' | 'stateless';
 }
 
+// Dynamic pricing overrides (populated from OpenRouter API at startup)
+const dynamicPricing: Record<string, ModelPricing> = {};
+
 export function calculateCost(
   model: string,
   inputTokens: number,
   outputTokens: number,
 ): { inputCost: number; outputCost: number; totalCost: number } {
-  const pricing = MODEL_PRICING[model] || MODEL_PRICING['default'];
+  // Dynamic pricing (from OpenRouter API) takes priority over hardcoded
+  const pricing =
+    dynamicPricing[model] || MODEL_PRICING[model] || MODEL_PRICING['default'];
 
   const inputCost = (inputTokens / 1000) * pricing.inputCost;
   const outputCost = (outputTokens / 1000) * pricing.outputCost;
@@ -116,19 +128,57 @@ export function calculateCost(
   };
 }
 
+/**
+ * Fetch live pricing from OpenRouter's /api/v1/models endpoint.
+ * Updates dynamicPricing map for all OpenRouter models.
+ * Called at startup and refreshed every 24 hours.
+ */
+export async function refreshOpenRouterPricing(): Promise<void> {
+  try {
+    const axios = (await import('axios')).default;
+    const response = await axios.get('https://openrouter.ai/api/v1/models', {
+      timeout: 15000,
+    });
+
+    const models = response.data?.data;
+    if (!Array.isArray(models)) return;
+
+    let updated = 0;
+    for (const m of models) {
+      const pricing = m.pricing;
+      if (!pricing?.prompt || !pricing?.completion) continue;
+
+      // OpenRouter returns per-token pricing; convert to per-1K tokens
+      const inputCost = parseFloat(pricing.prompt) * 1000;
+      const outputCost = parseFloat(pricing.completion) * 1000;
+
+      if (inputCost >= 0 && outputCost >= 0) {
+        dynamicPricing[m.id] = { inputCost, outputCost };
+        updated++;
+      }
+    }
+
+    console.log(
+      `[COST_TRACKING] OpenRouter pricing refreshed: ${updated} models updated`,
+    );
+  } catch (error: any) {
+    console.warn(
+      `[COST_TRACKING] Failed to fetch OpenRouter pricing: ${error.message}`,
+    );
+    // Non-fatal — hardcoded prices will be used as fallback
+  }
+}
+
+export function startPricingRefresh(): void {
+  // Initial fetch
+  refreshOpenRouterPricing();
+  // Refresh every 24h
+  setInterval(refreshOpenRouterPricing, 24 * 60 * 60 * 1000);
+}
+
 import { saveCostTracking } from '../services/cost-tracking.service';
 
 export async function logCostTracking(info: CostTrackingInfo): Promise<void> {
-  const costInfo = {
-    ...info,
-    inputCostFormatted: `$${info.inputCost.toFixed(6)}`,
-    outputCostFormatted: `$${info.outputCost.toFixed(6)}`,
-    totalCostFormatted: `$${info.totalCost.toFixed(6)}`,
-    durationSeconds: info.duration
-      ? (info.duration / 1000).toFixed(2)
-      : undefined,
-  };
-
   // Simplified cost tracking log - single line, less verbose
   console.log(
     `[COST] ${info.model}: $${info.totalCost.toFixed(4)} (${info.totalTokens} tokens)`,

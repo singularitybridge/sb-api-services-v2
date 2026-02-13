@@ -3,8 +3,9 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { ProviderKey } from '../../types/assistant.types';
 
-// Model configurations - Updated February 2026
+// Model configurations - Updated February 13, 2026
 // Based on latest available models from OpenAI, Anthropic, Google, and OpenRouter
+// OpenRouter pricing verified against openrouter.ai/api/v1/models
 const MODEL_CONFIGS: Record<string, any> = {
   // === OpenAI GPT-5.2 (Latest - Late 2025) ===
   'gpt-5.2': { provider: 'openai', baseModel: 'gpt-5.2' },
@@ -86,6 +87,14 @@ const MODEL_CONFIGS: Record<string, any> = {
   },
 
   // === OpenRouter — DeepSeek ===
+  'deepseek/deepseek-v3.2': {
+    provider: 'openrouter',
+    baseModel: 'deepseek/deepseek-v3.2',
+  },
+  'deepseek/deepseek-r1-0528': {
+    provider: 'openrouter',
+    baseModel: 'deepseek/deepseek-r1-0528',
+  },
   'deepseek/deepseek-chat-v3-0324': {
     provider: 'openrouter',
     baseModel: 'deepseek/deepseek-chat-v3-0324',
@@ -96,6 +105,14 @@ const MODEL_CONFIGS: Record<string, any> = {
   },
 
   // === OpenRouter — Mistral ===
+  'mistralai/mistral-large-2512': {
+    provider: 'openrouter',
+    baseModel: 'mistralai/mistral-large-2512',
+  },
+  'mistralai/codestral-2508': {
+    provider: 'openrouter',
+    baseModel: 'mistralai/codestral-2508',
+  },
   'mistralai/mistral-large': {
     provider: 'openrouter',
     baseModel: 'mistralai/mistral-large',
@@ -113,6 +130,22 @@ const MODEL_CONFIGS: Record<string, any> = {
   'qwen/qwen3-30b-a3b': {
     provider: 'openrouter',
     baseModel: 'qwen/qwen3-30b-a3b',
+  },
+  'qwen/qwen3-coder': {
+    provider: 'openrouter',
+    baseModel: 'qwen/qwen3-coder',
+  },
+
+  // === OpenRouter — Moonshot Kimi ===
+  'moonshotai/kimi-k2.5': {
+    provider: 'openrouter',
+    baseModel: 'moonshotai/kimi-k2.5',
+  },
+
+  // === OpenRouter — Zhipu GLM ===
+  'z-ai/glm-5': {
+    provider: 'openrouter',
+    baseModel: 'z-ai/glm-5',
   },
 };
 
@@ -216,20 +249,31 @@ export const MODEL_DESCRIPTIONS: Record<string, string> = {
   'claude-sonnet-4-0': 'Claude Sonnet 4.0 (Legacy, retiring May 2026)',
 
   // OpenRouter — Meta Llama 4
-  'meta-llama/llama-4-maverick': 'Llama 4 Maverick - 400B MoE, multimodal',
-  'meta-llama/llama-4-scout': 'Llama 4 Scout - 109B MoE, 10M context',
+  'meta-llama/llama-4-maverick': 'Llama 4 Maverick - 400B MoE, 1M context',
+  'meta-llama/llama-4-scout': 'Llama 4 Scout - 109B MoE, 327K context',
 
   // OpenRouter — DeepSeek
-  'deepseek/deepseek-chat-v3-0324': 'DeepSeek V3 - strong general model',
-  'deepseek/deepseek-r1': 'DeepSeek R1 - reasoning model',
+  'deepseek/deepseek-v3.2': 'DeepSeek V3.2 - latest, best value general model',
+  'deepseek/deepseek-r1-0528': 'DeepSeek R1 0528 - latest reasoning model',
+  'deepseek/deepseek-chat-v3-0324': 'DeepSeek V3 0324 (legacy)',
+  'deepseek/deepseek-r1': 'DeepSeek R1 (legacy)',
 
   // OpenRouter — Mistral
-  'mistralai/mistral-large': 'Mistral Large - 123B flagship',
-  'mistralai/codestral': 'Codestral - code-specialized',
+  'mistralai/mistral-large-2512': 'Mistral Large 3 - 675B MoE flagship',
+  'mistralai/codestral-2508': 'Codestral - code-specialized',
+  'mistralai/mistral-large': 'Mistral Large (legacy)',
+  'mistralai/codestral': 'Codestral (legacy)',
 
   // OpenRouter — Qwen
   'qwen/qwen3-235b-a22b': 'Qwen3 235B - largest Qwen model',
   'qwen/qwen3-30b-a3b': 'Qwen3 30B - efficient MoE',
+  'qwen/qwen3-coder': 'Qwen3 Coder - 480B code specialist',
+
+  // OpenRouter — Moonshot Kimi
+  'moonshotai/kimi-k2.5': 'Kimi K2.5 - multimodal, agentic',
+
+  // OpenRouter — Zhipu GLM
+  'z-ai/glm-5': 'GLM-5 - Zhipu flagship, 202K context',
 };
 
 // Default model per provider
@@ -271,12 +315,19 @@ export const MODEL_LABELS: Record<string, string> = {
   // OpenRouter
   'meta-llama/llama-4-maverick': 'Llama 4 Maverick',
   'meta-llama/llama-4-scout': 'Llama 4 Scout',
-  'deepseek/deepseek-chat-v3-0324': 'DeepSeek V3',
-  'deepseek/deepseek-r1': 'DeepSeek R1',
-  'mistralai/mistral-large': 'Mistral Large',
-  'mistralai/codestral': 'Codestral',
+  'deepseek/deepseek-v3.2': 'DeepSeek V3.2',
+  'deepseek/deepseek-r1-0528': 'DeepSeek R1',
+  'deepseek/deepseek-chat-v3-0324': 'DeepSeek V3 (old)',
+  'deepseek/deepseek-r1': 'DeepSeek R1 (old)',
+  'mistralai/mistral-large-2512': 'Mistral Large 3',
+  'mistralai/codestral-2508': 'Codestral',
+  'mistralai/mistral-large': 'Mistral Large (old)',
+  'mistralai/codestral': 'Codestral (old)',
   'qwen/qwen3-235b-a22b': 'Qwen3 235B',
   'qwen/qwen3-30b-a3b': 'Qwen3 30B',
+  'qwen/qwen3-coder': 'Qwen3 Coder',
+  'moonshotai/kimi-k2.5': 'Kimi K2.5',
+  'z-ai/glm-5': 'GLM-5',
 };
 
 // Models kept in MODEL_CONFIGS for backward compatibility (existing assistants)
@@ -285,6 +336,10 @@ export const LEGACY_MODELS = new Set([
   'gpt-4o',
   'gpt-4o-mini',
   'claude-sonnet-4-0',
+  'deepseek/deepseek-chat-v3-0324',
+  'deepseek/deepseek-r1',
+  'mistralai/mistral-large',
+  'mistralai/codestral',
 ]);
 
 // Export model configs for use in message handling

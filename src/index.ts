@@ -23,6 +23,10 @@ const initializeApp = async () => {
     logger.info('Initializing integration registry...');
     initializeIntegrationRegistry();
 
+    // Start dynamic pricing refresh (fetches live OpenRouter model pricing)
+    const { startPricingRefresh } = await import('./utils/cost-tracking');
+    startPricingRefresh();
+
     // Create indexes for Assistant model
     logger.info('Creating database indexes...');
     try {

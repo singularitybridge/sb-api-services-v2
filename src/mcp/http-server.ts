@@ -334,7 +334,7 @@ const SESSION_TTL_MS = 60 * 60 * 1000;
 
 // Tools version - update this when tools change to trigger client refresh
 // Format: YYYY-MM-DD-vN (increment N for same-day changes)
-const TOOLS_VERSION = '2026-02-08-v2';
+const TOOLS_VERSION = '2026-02-13-v1';
 
 /**
  * MCP Server for HTTP transport
