@@ -3,7 +3,7 @@ import { SupportedLanguage } from '../../services/discovery.service';
 export interface ActionContext {
   sessionId: string;
   companyId: string;
-  language: SupportedLanguage;
+  language?: SupportedLanguage;
   userId?: string;
   assistantId?: string; // ID of the assistant executing the action
   isStateless?: boolean;

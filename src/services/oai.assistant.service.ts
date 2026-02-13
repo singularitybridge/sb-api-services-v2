@@ -8,7 +8,6 @@ import {
   FunctionDefinition,
   sanitizeFunctionName,
 } from '../integrations/actions/factory';
-import { SupportedLanguage } from './discovery.service';
 
 // Helper function to extract o3-mini model info for API calls
 // This preserves the original model name in the database while transforming it for API calls
@@ -50,7 +49,6 @@ const createFunctionDefinitions = async (allowedActions: string[]) => {
   const dummyContext: ActionContext = {
     sessionId: 'dummy-session-id',
     companyId: 'dummy-company-id',
-    language: 'en' as SupportedLanguage,
   };
 
   // Use original allowedActions without sanitization

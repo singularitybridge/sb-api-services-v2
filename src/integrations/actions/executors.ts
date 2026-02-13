@@ -9,10 +9,7 @@ import {
 } from './types';
 import { processTemplate } from '../../services/template.service';
 import { discoverActionById } from '../../services/integration.service';
-import {
-  getCurrentSession,
-  getSessionById,
-} from '../../services/session.service';
+import { getSessionById } from '../../services/session.service';
 import { SupportedLanguage } from '../../services/discovery.service';
 import { createFunctionFactory } from './loaders';
 import { publishActionMessage } from './publishers';
@@ -138,7 +135,7 @@ export const executeFunctionCallWithContext = async (
   }
 
   const activeSessionId = context.sessionId;
-  const sessionLanguage = context.language;
+  const sessionLanguage = context.language || 'en';
 
   console.log(
     `[executeFunctionCallWithContext] Allowed actions for session ${activeSessionId}:`,
@@ -370,21 +367,14 @@ export const executeFunctionCall = async (
     };
   }
 
-  // Get the current session to ensure we have the latest session ID
+  // Use the provided sessionId directly — it's already the correct session
+  // (may be a channel-scoped session like Telegram, not necessarily the web session)
   const session = await getSessionById(sessionId);
-  const currentSession = await getCurrentSession(session.userId, companyId);
-  const activeSessionId = currentSession
-    ? currentSession._id.toString()
-    : sessionId;
-
-  const updatedSession = await getSessionById(activeSessionId);
-  const sessionLanguage = updatedSession.language as SupportedLanguage;
   const context: ActionContext = {
-    sessionId: activeSessionId,
+    sessionId,
     companyId,
-    language: sessionLanguage,
-    assistantId: updatedSession.assistantId?.toString(),
-    userId: updatedSession.userId?.toString(),
+    assistantId: session.assistantId?.toString(),
+    userId: session.userId?.toString(),
     isStateless: false,
   };
 

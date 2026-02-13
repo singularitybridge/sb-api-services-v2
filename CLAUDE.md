@@ -383,7 +383,7 @@ git add . && git commit -m "Add new MCP tool X" && git push
 # 4. After deployment, clients will detect the version change
 ```
 
-#### Current Tools (42 total)
+#### Current Tools (43 total)
 Agent management, workspace, teams, integrations, costs, prompt history, session management, and UI control tools. See `http-server.ts` for full list.
 
 ### MCP Session Management Tools (January 2025)
@@ -397,7 +397,7 @@ Agent management, workspace, teams, integrations, costs, prompt history, session
 | `create_session` | Start new session with agent (by ID or name) |
 | `send_message` | Send message and get assistant response |
 | `get_session_messages` | Retrieve message history with pagination |
-| `list_sessions` | List sessions with agent/status filters |
+| `list_sessions` | List sessions with agent/status filters. Supports `channel` and `channelUserId` filter params to filter by origin channel (e.g., `web`, `whatsapp`) and channel-specific user ID |
 | `clear_session` | Reset session (delete messages, keep session) |
 | `delete_session` | Permanently delete session and messages |
 
@@ -476,13 +476,55 @@ When the same tool is called multiple times, results are matched by `toolCallId`
 - **Push Protection**: ✓ Enabled - Blocks pushes containing secrets
 - **Auto-delete branches**: ✓ Enabled - Cleans up after PR merge
 
-#### Engineering Docs (Company Workspace)
-Stored in Agent Hub workspace at company scope:
-- `/engineering/code-review-rules.md` - Architecture compliance, code quality standards
-- `/engineering/github-repo-settings.md` - Branch protection, security settings
-- `/engineering/dev-vision.md` - Development vision/strategy
+#### Agent Hub Workspace — Knowledge Persistence Across Sessions
 
-Retrieve via recall agent: `Retrieve /engineering/[filename] from company scope`
+**IMPORTANT:** Multiple Claude Code sessions run in parallel on the SB project. Use the Agent Hub workspace (via local MCP tools) to persist and retrieve knowledge so all sessions stay in sync.
+
+**MCP tools available:**
+- `mcp__agent-hub-sb__add_workspace_item` — Store a document
+- `mcp__agent-hub-sb__get_workspace_item` — Retrieve by path
+- `mcp__agent-hub-sb__vector_search_workspace` — Semantic search across all docs
+- `mcp__agent-hub-sb__list_workspace_items` — List items at a path/scope
+
+**Scopes:**
+- `company` — shared knowledge (engineering docs, plans, research, product docs)
+- `agent` — agent-specific docs (per-assistant workspace)
+
+**When to store:**
+- Research findings, deep investigations, architecture decisions
+- Implementation plans before starting work
+- Feature specs and design docs
+- Anything that would be useful to another session or a future session
+
+**When to retrieve:**
+- Before starting work on a feature, search workspace for existing plans/research
+- When making architecture decisions, check `/engineering/` and `/products/` for prior decisions
+- Use vector search with the query topic to discover relevant docs you might not know about
+
+**Workspace structure (company scope):**
+```
+/engineering/
+  /plans/          — Implementation plans and proposals
+  /code-review-rules.md
+  /github-repo-settings.md
+  /dev-vision.md
+/products/
+  /shmutzi/        — Shmutzi product (workspace containers)
+    /README.md
+    /decisions.md
+    /vision/       — Architecture vision docs
+    /research/     — Research on channels, integrations, competitors
+    /tasks/        — Implementation tasks
+  /agent-hub/      — Agent Hub product docs
+    /features/
+    /tasks/
+```
+
+**Best practices:**
+- Use markdown format with clear title, date, status, and tags
+- Link related docs (e.g., "See also: /products/shmutzi/research/...")
+- Update existing docs rather than creating duplicates — search first
+- Keep paths consistent with existing structure above
 
 ### Known Issues & Solutions
 

@@ -1,5 +1,4 @@
 import { IAssistant } from '../../models/Assistant';
-import { SupportedLanguage } from '../discovery.service';
 import { createFunctionFactory } from '../../integrations/actions/loaders';
 import { getApiKey } from '../api.key.service';
 import { downloadFile } from '../file-downloader.service';
@@ -317,7 +316,6 @@ export const executeAssistantStateless = async (
   const actionContext = {
     sessionId: 'stateless_execution',
     companyId,
-    language: 'en' as SupportedLanguage,
     userId, // Pass userId
     assistantId: assistant._id.toString(),
     isStateless: true,

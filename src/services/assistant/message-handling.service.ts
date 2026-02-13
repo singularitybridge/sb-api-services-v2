@@ -2,7 +2,6 @@ import { Session } from '../../models/Session';
 import { Assistant } from '../../models/Assistant';
 import { Message, IMessage } from '../../models/Message'; // Added IMessage
 import { processTemplate } from '../template.service';
-import { SupportedLanguage } from '../discovery.service'; // Added import
 import mongoose from 'mongoose';
 import { getMessagesBySessionId } from '../../services/message.service';
 import { createFunctionFactory } from '../../integrations/actions/loaders';
@@ -394,7 +393,6 @@ export const handleSessionMessage = async (
   const actionContext = {
     sessionId: sessionId.toString(),
     companyId: session.companyId.toString(),
-    language: 'en' as SupportedLanguage,
     userId: session.userId.toString(),
     assistantId: assistant._id.toString(),
   };

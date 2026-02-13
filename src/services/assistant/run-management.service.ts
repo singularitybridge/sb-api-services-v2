@@ -1,7 +1,6 @@
 import { getOpenAIClient } from './openai-client.service';
 // import { submitToolOutputs } from '../oai.thread.service'; // Removed, OpenAI specific
 import { publishActionMessage } from '../../integrations/actions/publishers';
-import { getSessionById } from '../../services/session.service';
 import { SupportedLanguage } from '../../services/discovery.service';
 import { v4 as uuidv4 } from 'uuid';
 import heKnowledgeRetrieval from '../../translations/he-knowledge-retrieval';
@@ -138,10 +137,6 @@ export const pollRunStatus = async (
   const knowledgeRetrievalNotificationId = uuidv4();
   let knowledgeRetrievalNotificationSent = false;
 
-  // Get session language
-  const session = await getSessionById(sessionId);
-  const sessionLanguage = session.language as SupportedLanguage;
-
   // Create status logger
   const logger = new StatusLogger();
 
@@ -163,24 +158,24 @@ export const pollRunStatus = async (
       await publishActionMessage(sessionId, 'started', {
         id: knowledgeRetrievalNotificationId,
         actionId: 'knowledge_retrieval_notification',
-        serviceName: getTranslation(sessionLanguage, 'knowledge', 'Knowledge'),
+        serviceName: getTranslation('en', 'knowledge', 'Knowledge'),
         actionTitle: getTranslation(
-          sessionLanguage,
+          'en',
           'knowledge_retrieval_in_progress',
           'Knowledge Retrieval In Progress',
         ),
         actionDescription: getTranslation(
-          sessionLanguage,
+          'en',
           'knowledge_retrieval_in_progress_description',
           'Knowledge retrieval operation in progress',
         ),
         icon: 'book-text',
         args: {},
         originalActionId: 'knowledge_retrieval_notification',
-        language: sessionLanguage,
+        language: 'en',
         input: {
           message: getTranslation(
-            sessionLanguage,
+            'en',
             'knowledge_retrieval_in_progress_message',
             'Knowledge retrieval in progress. Retrieving relevant information...',
           ),
@@ -195,28 +190,24 @@ export const pollRunStatus = async (
         await publishActionMessage(sessionId, 'completed', {
           id: knowledgeRetrievalNotificationId,
           actionId: 'knowledge_retrieval_notification',
-          serviceName: getTranslation(
-            sessionLanguage,
-            'knowledge',
-            'Knowledge',
-          ),
+          serviceName: getTranslation('en', 'knowledge', 'Knowledge'),
           actionTitle: getTranslation(
-            sessionLanguage,
+            'en',
             'knowledge_retrieval_completed',
             'Knowledge Retrieval Completed',
           ),
           actionDescription: getTranslation(
-            sessionLanguage,
+            'en',
             'knowledge_retrieval_completed_description',
             'Knowledge retrieval operation completed',
           ),
           icon: 'book-text',
           args: {},
           originalActionId: 'knowledge_retrieval_notification',
-          language: sessionLanguage,
+          language: 'en',
           input: {
             message: getTranslation(
-              sessionLanguage,
+              'en',
               'knowledge_retrieval_completed_message',
               'Knowledge retrieval completed. Results retrieved.',
             ),
