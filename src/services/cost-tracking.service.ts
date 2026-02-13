@@ -176,7 +176,10 @@ export async function getCostRecords(
       filter.timestamp.$gte = query.startDate;
     }
     if (query.endDate) {
-      filter.timestamp.$lte = query.endDate;
+      // Set to end-of-day so date-only strings like "2026-02-13" include the full day
+      const endOfDay = new Date(query.endDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+      filter.timestamp.$lte = endOfDay;
     }
   }
 
@@ -225,7 +228,9 @@ export async function getCostSummary(
       filter.timestamp.$gte = startDate;
     }
     if (endDate) {
-      filter.timestamp.$lte = endDate;
+      const endOfDay = new Date(endDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+      filter.timestamp.$lte = endOfDay;
     }
   }
 
@@ -337,7 +342,9 @@ export async function getDailyCosts(
       matchFilter.timestamp.$gte = startDate;
     }
     if (endDate) {
-      matchFilter.timestamp.$lte = endDate;
+      const endOfDay = new Date(endDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+      matchFilter.timestamp.$lte = endOfDay;
     }
   } else {
     const defaultStartDate = new Date();
