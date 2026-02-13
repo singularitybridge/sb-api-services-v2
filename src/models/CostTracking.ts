@@ -5,7 +5,7 @@ export interface ICostTracking extends Document {
   assistantId: mongoose.Types.ObjectId;
   sessionId?: mongoose.Types.ObjectId;
   userId: mongoose.Types.ObjectId;
-  provider: 'openai' | 'anthropic' | 'google';
+  provider: 'openai' | 'anthropic' | 'google' | 'openrouter';
   modelName: string;
   inputTokens: number;
   outputTokens: number;
@@ -49,7 +49,7 @@ const CostTrackingSchema: Schema = new Schema(
     },
     provider: {
       type: String,
-      enum: ['openai', 'anthropic', 'google'],
+      enum: ['openai', 'anthropic', 'google', 'openrouter'],
       required: true,
     },
     modelName: {

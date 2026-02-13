@@ -28,9 +28,9 @@ export const updateAgentSchema = z.object({
     .optional()
     .describe('New system prompt/instructions for the agent'),
   llmProvider: z
-    .enum(['openai', 'google', 'anthropic'])
+    .enum(['openai', 'google', 'anthropic', 'openrouter'])
     .optional()
-    .describe('LLM provider (openai, google, or anthropic)'),
+    .describe('LLM provider (openai, google, anthropic, or openrouter)'),
   llmModel: z
     .string()
     .optional()

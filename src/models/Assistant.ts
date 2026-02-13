@@ -17,7 +17,7 @@ export interface IAssistant extends Document {
   conversationStarters: IIdentifier[];
   llmModel: string; // Existing field, will now be the primary model identifier
   llmPrompt: string;
-  llmProvider: 'openai' | 'google' | 'anthropic'; // New field for provider
+  llmProvider: 'openai' | 'google' | 'anthropic' | 'openrouter';
   maxTokens?: number; // Token limit for input/prompt window
   companyId: string;
   allowedActions: string[];
@@ -41,7 +41,7 @@ const AssistantSchema: Schema = new Schema({
   llmProvider: {
     // New field for provider
     type: String,
-    enum: ['openai', 'google', 'anthropic'],
+    enum: ['openai', 'google', 'anthropic', 'openrouter'],
     default: 'openai', // Default provider
     required: true,
   },

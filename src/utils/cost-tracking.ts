@@ -64,6 +64,16 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'gemini-2.5-flash-lite': { inputCost: 0.00015, outputCost: 0.001 },
   'models/gemini-2.5-flash-lite': { inputCost: 0.00015, outputCost: 0.001 },
 
+  // === OpenRouter Models (prices include OR markup) ===
+  'meta-llama/llama-4-maverick': { inputCost: 0.0005, outputCost: 0.0022 },
+  'meta-llama/llama-4-scout': { inputCost: 0.00018, outputCost: 0.00053 },
+  'deepseek/deepseek-chat-v3-0324': { inputCost: 0.0003, outputCost: 0.00088 },
+  'deepseek/deepseek-r1': { inputCost: 0.0008, outputCost: 0.0023 },
+  'mistralai/mistral-large': { inputCost: 0.002, outputCost: 0.006 },
+  'mistralai/codestral': { inputCost: 0.0003, outputCost: 0.0009 },
+  'qwen/qwen3-235b-a22b': { inputCost: 0.0003, outputCost: 0.0012 },
+  'qwen/qwen3-30b-a3b': { inputCost: 0.0002, outputCost: 0.0005 },
+
   // Default pricing for unknown models
   default: { inputCost: 0.001, outputCost: 0.002 },
 };

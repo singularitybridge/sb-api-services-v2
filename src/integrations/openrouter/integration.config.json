@@ -1,0 +1,16 @@
+{
+  "name": "openrouter",
+  "displayName": "OpenRouter",
+  "description": "Access 400+ AI models from Meta, DeepSeek, Mistral, Qwen and more through a single API",
+  "icon": "route",
+  "category": "ai",
+  "requiredApiKeys": [
+    {
+      "key": "openrouter_api_key",
+      "label": "API Key",
+      "type": "secret",
+      "placeholder": "sk-or-...",
+      "description": "Your OpenRouter API key from openrouter.ai/keys"
+    }
+  ]
+}

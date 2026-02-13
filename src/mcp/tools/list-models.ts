@@ -18,7 +18,7 @@ import { MODEL_PRICING } from '../../utils/cost-tracking';
  */
 export const listModelsSchema = z.object({
   provider: z
-    .enum(['openai', 'anthropic', 'google'])
+    .enum(['openai', 'anthropic', 'google', 'openrouter'])
     .optional()
     .describe('Filter models by provider (optional)'),
 });
@@ -27,7 +27,7 @@ export type ListModelsInput = z.infer<typeof listModelsSchema>;
 
 interface ModelInfo {
   id: string;
-  provider: 'openai' | 'anthropic' | 'google';
+  provider: 'openai' | 'anthropic' | 'google' | 'openrouter';
   baseModel: string;
   description: string;
   pricing: {
@@ -81,6 +81,7 @@ export async function listModels(
       openai: models.filter((m) => m.provider === 'openai'),
       anthropic: models.filter((m) => m.provider === 'anthropic'),
       google: models.filter((m) => m.provider === 'google'),
+      openrouter: models.filter((m) => m.provider === 'openrouter'),
     };
 
     // Build response based on filter

@@ -17,8 +17,8 @@ export const createAgentSchema = z.object({
     .optional()
     .describe("Description of the agent's purpose"),
   llmProvider: z
-    .enum(['openai', 'google', 'anthropic'])
-    .describe('LLM provider (openai, google, or anthropic)'),
+    .enum(['openai', 'google', 'anthropic', 'openrouter'])
+    .describe('LLM provider (openai, google, anthropic, or openrouter)'),
   llmModel: z
     .string()
     .describe(

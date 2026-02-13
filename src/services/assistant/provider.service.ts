@@ -3,8 +3,8 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { ProviderKey } from '../../types/assistant.types';
 
-// Model configurations - Updated January 2026
-// Based on latest available models from OpenAI, Anthropic, and Google
+// Model configurations - Updated February 2026
+// Based on latest available models from OpenAI, Anthropic, Google, and OpenRouter
 const MODEL_CONFIGS: Record<string, any> = {
   // === OpenAI GPT-5.2 (Latest - Late 2025) ===
   'gpt-5.2': { provider: 'openai', baseModel: 'gpt-5.2' },
@@ -74,6 +74,46 @@ const MODEL_CONFIGS: Record<string, any> = {
     provider: 'anthropic',
     baseModel: 'claude-sonnet-4-20250514',
   },
+
+  // === OpenRouter — Meta Llama 4 ===
+  'meta-llama/llama-4-maverick': {
+    provider: 'openrouter',
+    baseModel: 'meta-llama/llama-4-maverick',
+  },
+  'meta-llama/llama-4-scout': {
+    provider: 'openrouter',
+    baseModel: 'meta-llama/llama-4-scout',
+  },
+
+  // === OpenRouter — DeepSeek ===
+  'deepseek/deepseek-chat-v3-0324': {
+    provider: 'openrouter',
+    baseModel: 'deepseek/deepseek-chat-v3-0324',
+  },
+  'deepseek/deepseek-r1': {
+    provider: 'openrouter',
+    baseModel: 'deepseek/deepseek-r1',
+  },
+
+  // === OpenRouter — Mistral ===
+  'mistralai/mistral-large': {
+    provider: 'openrouter',
+    baseModel: 'mistralai/mistral-large',
+  },
+  'mistralai/codestral': {
+    provider: 'openrouter',
+    baseModel: 'mistralai/codestral',
+  },
+
+  // === OpenRouter — Qwen ===
+  'qwen/qwen3-235b-a22b': {
+    provider: 'openrouter',
+    baseModel: 'qwen/qwen3-235b-a22b',
+  },
+  'qwen/qwen3-30b-a3b': {
+    provider: 'openrouter',
+    baseModel: 'qwen/qwen3-30b-a3b',
+  },
 };
 
 export function getProvider(pk: ProviderKey, model: string, key: string) {
@@ -87,6 +127,15 @@ export function getProvider(pk: ProviderKey, model: string, key: string) {
         return createGoogleGenerativeAI({ apiKey: key })(config.baseModel);
       case 'anthropic':
         return createAnthropic({ apiKey: key })(config.baseModel);
+      case 'openrouter':
+        return createOpenAI({
+          apiKey: key,
+          baseURL: 'https://openrouter.ai/api/v1',
+          headers: {
+            'HTTP-Referer': 'https://singularitybridge.net',
+            'X-Title': 'Agent Hub',
+          },
+        })(config.baseModel);
       case 'openai':
       default:
         return createOpenAI({ apiKey: key })(config.baseModel);
@@ -99,6 +148,15 @@ export function getProvider(pk: ProviderKey, model: string, key: string) {
       return createGoogleGenerativeAI({ apiKey: key })(model);
     case 'anthropic':
       return createAnthropic({ apiKey: key })(model);
+    case 'openrouter':
+      return createOpenAI({
+        apiKey: key,
+        baseURL: 'https://openrouter.ai/api/v1',
+        headers: {
+          'HTTP-Referer': 'https://singularitybridge.net',
+          'X-Title': 'Agent Hub',
+        },
+      })(model);
     case 'openai':
     default:
       // For unknown o3-mini variants, convert to base o3-mini
@@ -156,6 +214,22 @@ export const MODEL_DESCRIPTIONS: Record<string, string> = {
   // Anthropic Claude 4
   'claude-opus-4-1': 'Claude Opus 4.1 - powerful reasoning',
   'claude-sonnet-4-0': 'Claude Sonnet 4.0 (Legacy, retiring May 2026)',
+
+  // OpenRouter — Meta Llama 4
+  'meta-llama/llama-4-maverick': 'Llama 4 Maverick - 400B MoE, multimodal',
+  'meta-llama/llama-4-scout': 'Llama 4 Scout - 109B MoE, 10M context',
+
+  // OpenRouter — DeepSeek
+  'deepseek/deepseek-chat-v3-0324': 'DeepSeek V3 - strong general model',
+  'deepseek/deepseek-r1': 'DeepSeek R1 - reasoning model',
+
+  // OpenRouter — Mistral
+  'mistralai/mistral-large': 'Mistral Large - 123B flagship',
+  'mistralai/codestral': 'Codestral - code-specialized',
+
+  // OpenRouter — Qwen
+  'qwen/qwen3-235b-a22b': 'Qwen3 235B - largest Qwen model',
+  'qwen/qwen3-30b-a3b': 'Qwen3 30B - efficient MoE',
 };
 
 // Default model per provider
@@ -163,6 +237,7 @@ export const DEFAULT_MODELS: Record<string, string> = {
   openai: 'gpt-5.1',
   google: 'gemini-3-flash-preview',
   anthropic: 'claude-sonnet-4-5',
+  openrouter: 'meta-llama/llama-4-maverick',
 };
 
 // Model display labels
@@ -192,6 +267,16 @@ export const MODEL_LABELS: Record<string, string> = {
   'claude-haiku-4-5': 'Claude Haiku 4.5',
   'claude-opus-4-1': 'Claude Opus 4.1',
   'claude-sonnet-4-0': 'Claude Sonnet 4',
+
+  // OpenRouter
+  'meta-llama/llama-4-maverick': 'Llama 4 Maverick',
+  'meta-llama/llama-4-scout': 'Llama 4 Scout',
+  'deepseek/deepseek-chat-v3-0324': 'DeepSeek V3',
+  'deepseek/deepseek-r1': 'DeepSeek R1',
+  'mistralai/mistral-large': 'Mistral Large',
+  'mistralai/codestral': 'Codestral',
+  'qwen/qwen3-235b-a22b': 'Qwen3 235B',
+  'qwen/qwen3-30b-a3b': 'Qwen3 30B',
 };
 
 // Models kept in MODEL_CONFIGS for backward compatibility (existing assistants)

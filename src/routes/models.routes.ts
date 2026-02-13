@@ -27,6 +27,7 @@ modelsRouter.get('/', (req: Request, res: Response) => {
     openai: [],
     google: [],
     anthropic: [],
+    openrouter: [],
   };
 
   for (const [modelId, config] of Object.entries(MODEL_CONFIGS)) {
