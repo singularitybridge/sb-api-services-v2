@@ -5,10 +5,7 @@
  */
 
 import { z } from 'zod';
-import { Session } from '../../models/Session';
-import { Message } from '../../models/Message';
-import { Assistant } from '../../models/Assistant';
-import { resolveAssistantIdentifier } from '../../services/assistant/assistant-resolver.service';
+import { listSessionsEnriched } from '../../services/session.service';
 
 /**
  * Input schema for the list_sessions tool
@@ -52,74 +49,14 @@ export async function listSessions(
     const limit = input.limit || 20;
     const offset = input.offset || 0;
 
-    // Build query
-    const query: any = { companyId };
-
-    // Filter by agent if provided
-    if (input.agentId) {
-      const assistant = await resolveAssistantIdentifier(
-        input.agentId,
-        companyId,
-      );
-      if (!assistant) {
-        throw new Error(`Assistant not found: ${input.agentId}`);
-      }
-      query.assistantId = assistant._id;
-    }
-
-    // Filter by status if provided
-    if (input.status) {
-      query.active = input.status === 'active';
-    }
-
-    // Filter by channel if provided
-    if (input.channel) {
-      query.channel = input.channel;
-    }
-
-    // Filter by channelUserId if provided
-    if (input.channelUserId) {
-      query.channelUserId = input.channelUserId;
-    }
-
-    // Get sessions with pagination
-    const sessions = await Session.find(query)
-      .sort({ createdAt: -1 }) // Newest first
-      .skip(offset)
-      .limit(limit)
-      .lean();
-
-    // Get total count
-    const total = await Session.countDocuments(query);
-
-    // Enrich with assistant names and message counts
-    const enrichedSessions = await Promise.all(
-      sessions.map(async (session) => {
-        // Get assistant name
-        const assistant = await Assistant.findById(session.assistantId).lean();
-
-        // Get message count and last message
-        const messageCount = await Message.countDocuments({
-          sessionId: session._id,
-        });
-        const lastMessage = await Message.findOne({ sessionId: session._id })
-          .sort({ timestamp: -1 })
-          .lean();
-
-        return {
-          sessionId: session._id.toString(),
-          agentId: session.assistantId?.toString() || '',
-          agentName: assistant?.name || 'Unknown',
-          active: session.active,
-          channel: session.channel || 'web',
-          channelUserId: session.channelUserId || '',
-          messageCount,
-          lastMessageAt: lastMessage?.timestamp?.toISOString() || null,
-          createdAt:
-            session.createdAt?.toISOString() || new Date().toISOString(),
-        };
-      }),
-    );
+    const { sessions, total } = await listSessionsEnriched(companyId, {
+      agentId: input.agentId,
+      status: input.status,
+      channel: input.channel,
+      channelUserId: input.channelUserId,
+      limit,
+      offset,
+    });
 
     return {
       content: [
@@ -127,7 +64,7 @@ export async function listSessions(
           type: 'text',
           text: JSON.stringify(
             {
-              sessions: enrichedSessions,
+              sessions,
               pagination: {
                 total,
                 limit,

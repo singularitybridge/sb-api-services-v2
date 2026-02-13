@@ -10,7 +10,11 @@ import fs from 'fs/promises';
 
 const router = Router();
 
-// Helper function to resolve agent ID from name or ID
+// In-memory cache for agent ID resolution (avoids repeated DB lookups)
+const agentIdCache = new Map<string, { id: string; expiresAt: number }>();
+const AGENT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Helper function to resolve agent ID from name or ID (with caching)
 async function resolveAgentId(
   identifier: string | undefined,
   companyId?: string,
@@ -22,12 +26,24 @@ async function resolveAgentId(
     return identifier;
   }
 
+  // Check cache
+  const cacheKey = `${companyId || ''}:${identifier}`;
+  const cached = agentIdCache.get(cacheKey);
+  if (cached) {
+    if (cached.expiresAt > Date.now()) {
+      return cached.id;
+    }
+    agentIdCache.delete(cacheKey); // Evict expired entry
+  }
+
   // Otherwise, try to resolve it as a name
   try {
     const assistant = await resolveAssistantIdentifier(identifier, companyId);
     if (assistant) {
-      logger.debug(`Resolved agent '${identifier}' to ID: ${assistant._id}`);
-      return assistant._id.toString();
+      const id = assistant._id.toString();
+      agentIdCache.set(cacheKey, { id, expiresAt: Date.now() + AGENT_CACHE_TTL });
+      logger.debug(`Resolved agent '${identifier}' to ID: ${id}`);
+      return id;
     } else {
       logger.debug(`Could not resolve agent '${identifier}', using as-is`);
       return identifier;
@@ -683,6 +699,8 @@ router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
       }));
 
       logger.debug(`Total list request took ${Date.now() - startTime}ms`);
+      // Allow short browser caching for list responses (file trees rarely change mid-session)
+      res.setHeader('Cache-Control', 'private, max-age=30');
       res.json({
         success: true,
         scope: scope as string,
@@ -699,6 +717,7 @@ router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
       const cleanPaths = paths.map((p) => stripScopePrefix(p, scopePrefix));
 
       logger.debug(`Total list request took ${Date.now() - startTime}ms`);
+      res.setHeader('Cache-Control', 'private, max-age=30');
       res.json({
         success: true,
         scope: scope as string,

@@ -34,18 +34,25 @@ const transformMessageToOpenAIFormat = (mongoMessage: IMessage) => {
   };
 };
 
-export async function getSessionMessages(sessionId: string) {
+export async function getSessionMessages(
+  sessionId: string,
+  options?: { limit?: number; offset?: number },
+) {
   const session = await Session.findById(sessionId);
   if (!session) {
     throw new Error('Session not found');
   }
+
+  const limit = options?.limit ?? 20;
+  const offset = options?.offset ?? 0;
 
   // Fetch messages from MongoDB
   const mongoMessages = await Message.find({
     sessionId: new mongoose.Types.ObjectId(sessionId),
   })
     .sort({ timestamp: -1 }) // Sort by timestamp descending (newest first)
-    .limit(20) // Limit to 20 messages to match OpenAI default
+    .skip(offset)
+    .limit(limit)
     .lean<IMessage[]>(); // Use .lean() for better performance as we are transforming the data
 
   console.log(
@@ -56,11 +63,55 @@ export async function getSessionMessages(sessionId: string) {
     return [];
   }
 
-  const formattedMessages = await Promise.all(
-    mongoMessages.map(async (msg) => {
-      return transformMessageToOpenAIFormat(msg);
-    }),
-  );
+  const formattedMessages = mongoMessages.map((msg) => {
+    return transformMessageToOpenAIFormat(msg);
+  });
 
   return formattedMessages;
+}
+
+export async function getSessionMessagesWithCount(
+  sessionId: string,
+  options: { limit: number; offset: number },
+): Promise<{ messages: any[]; total: number }> {
+  const session = await Session.findById(sessionId);
+  if (!session) {
+    throw new Error('Session not found');
+  }
+
+  const sessionOid = new mongoose.Types.ObjectId(sessionId);
+
+  // Single aggregation to get both paginated messages and total count
+  const result = await Message.aggregate([
+    { $match: { sessionId: sessionOid } },
+    {
+      $facet: {
+        metadata: [{ $count: 'total' }],
+        messages: [
+          { $sort: { timestamp: -1 } },
+          { $skip: options.offset },
+          { $limit: options.limit },
+        ],
+      },
+    },
+  ]);
+
+  const total = result[0]?.metadata[0]?.total || 0;
+  const mongoMessages: IMessage[] = result[0]?.messages || [];
+
+  console.log(
+    `Retrieved ${mongoMessages.length} of ${total} messages for session ${sessionId}`,
+  );
+
+  const formattedMessages = mongoMessages.map((msg) =>
+    transformMessageToOpenAIFormat(msg as IMessage),
+  );
+
+  return { messages: formattedMessages, total };
+}
+
+export async function getSessionMessageCount(sessionId: string): Promise<number> {
+  return Message.countDocuments({
+    sessionId: new mongoose.Types.ObjectId(sessionId),
+  });
 }

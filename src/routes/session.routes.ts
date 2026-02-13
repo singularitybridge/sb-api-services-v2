@@ -1,6 +1,6 @@
 // File: src/routes/session.routes.ts
 import { Router, Response, NextFunction } from 'express';
-import { getSessionMessages } from '../services/assistant.service';
+import { getSessionMessages, getSessionMessagesWithCount } from '../services/assistant.service';
 import { Session } from '../models/Session';
 import {
   endSession,
@@ -8,6 +8,7 @@ import {
   sessionFriendlyAggreationQuery,
   updateSessionAssistant,
   activateSession,
+  listSessionsEnriched,
 } from '../services/session.service';
 import mongoose from 'mongoose';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
@@ -180,29 +181,56 @@ sessionRouter.get(
         return next(new BadRequestError('Company ID not found in request.'));
       }
 
-      const { limit: limitParam, channel } = req.query as { limit?: string | string[]; channel?: string };
-      let limit = 10;
-      if (Array.isArray(limitParam)) {
-        limit = parseInt(limitParam[0] ?? '', 10);
-      } else if (typeof limitParam === 'string') {
+      const {
+        limit: limitParam,
+        channel,
+        agentId,
+        status,
+        channelUserId,
+        offset: offsetParam,
+      } = req.query as {
+        limit?: string;
+        channel?: string;
+        agentId?: string;
+        status?: string;
+        channelUserId?: string;
+        offset?: string;
+      };
+
+      let limit = 20;
+      if (typeof limitParam === 'string') {
         limit = parseInt(limitParam, 10);
       }
       if (!Number.isFinite(limit) || limit <= 0) {
-        limit = 10;
+        limit = 20;
       }
 
-      const query: any = {
-        companyId: new mongoose.Types.ObjectId(companyId),
-      };
-      if (channel) {
-        query.channel = channel;
+      let offset = 0;
+      if (typeof offsetParam === 'string') {
+        offset = parseInt(offsetParam, 10);
+      }
+      if (!Number.isFinite(offset) || offset < 0) {
+        offset = 0;
       }
 
-      const sessions = await Session.find(query)
-        .sort({ createdAt: -1 })
-        .limit(limit);
+      const { sessions, total } = await listSessionsEnriched(companyId, {
+        agentId,
+        status: status as 'active' | 'inactive' | undefined,
+        channel,
+        channelUserId,
+        limit,
+        offset,
+      });
 
-      res.status(200).send(sessions);
+      res.status(200).json({
+        sessions,
+        pagination: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + limit < total,
+        },
+      });
     } catch (error) {
       next(error);
     }
@@ -363,8 +391,40 @@ sessionRouter.get(
           .status(404)
           .send({ error: 'Session not found or access denied' });
       }
-      const messages = await getSessionMessages(id);
-      res.status(200).send(messages);
+
+      const { limit: limitParam, offset: offsetParam } = req.query as {
+        limit?: string;
+        offset?: string;
+      };
+
+      const hasPaginationParams =
+        limitParam !== undefined || offsetParam !== undefined;
+
+      let limit = 20;
+      if (typeof limitParam === 'string') {
+        limit = parseInt(limitParam, 10);
+      }
+      if (!Number.isFinite(limit) || limit <= 0) {
+        limit = 20;
+      }
+
+      let offset = 0;
+      if (typeof offsetParam === 'string') {
+        offset = parseInt(offsetParam, 10);
+      }
+      if (!Number.isFinite(offset) || offset < 0) {
+        offset = 0;
+      }
+
+      if (hasPaginationParams) {
+        // Single aggregation for messages + count
+        const result = await getSessionMessagesWithCount(id, { limit, offset });
+        res.status(200).json(result);
+      } else {
+        // Backward compatible: return array directly
+        const messages = await getSessionMessages(id, { limit, offset });
+        res.status(200).send(messages);
+      }
     } catch (error) {
       next(error);
     }

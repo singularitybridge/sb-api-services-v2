@@ -2,6 +2,7 @@ import { ISession, Session } from '../models/Session';
 import { Assistant } from '../models/Assistant';
 import { User } from '../models/User';
 import { CustomError, NotFoundError, BadRequestError } from '../utils/errors';
+import { resolveAssistantIdentifier } from './assistant/assistant-resolver.service';
 import mongoose from 'mongoose';
 
 export interface ChannelInfo {
@@ -306,6 +307,134 @@ export const endSession = async (
     throw new CustomError('Failed to end session', 500);
   }
 };
+
+export interface EnrichedSession {
+  sessionId: string;
+  agentId: string;
+  agentName: string;
+  active: boolean;
+  channel: string;
+  channelUserId: string;
+  messageCount: number;
+  lastMessageAt: string | null;
+  createdAt: string;
+}
+
+export async function listSessionsEnriched(
+  companyId: string,
+  filters: {
+    agentId?: string;
+    status?: 'active' | 'inactive';
+    channel?: string;
+    channelUserId?: string;
+    limit?: number;
+    offset?: number;
+  },
+): Promise<{ sessions: EnrichedSession[]; total: number }> {
+  const limit = filters.limit || 20;
+  const offset = filters.offset || 0;
+
+  // Build match stage
+  const match: any = { companyId: new mongoose.Types.ObjectId(companyId) };
+
+  if (filters.agentId) {
+    const assistant = await resolveAssistantIdentifier(filters.agentId, companyId);
+    if (!assistant) {
+      throw new Error(`Assistant not found: ${filters.agentId}`);
+    }
+    match.assistantId = assistant._id;
+  }
+
+  if (filters.status) {
+    match.active = filters.status === 'active';
+  }
+
+  if (filters.channel) {
+    match.channel = filters.channel;
+  }
+
+  if (filters.channelUserId) {
+    match.channelUserId = filters.channelUserId;
+  }
+
+  // Single aggregation: $facet for count + paginated data with $lookup joins
+  const result = await Session.aggregate([
+    { $match: match },
+    {
+      $facet: {
+        metadata: [{ $count: 'total' }],
+        sessions: [
+          { $sort: { createdAt: -1 } },
+          { $skip: offset },
+          { $limit: limit },
+          // Join assistant name
+          {
+            $lookup: {
+              from: 'assistants',
+              localField: 'assistantId',
+              foreignField: '_id',
+              pipeline: [{ $project: { name: 1 } }],
+              as: '_assistant',
+            },
+          },
+          // Join message stats (count + last message timestamp)
+          {
+            $lookup: {
+              from: 'messages',
+              localField: '_id',
+              foreignField: 'sessionId',
+              pipeline: [
+                {
+                  $group: {
+                    _id: null,
+                    count: { $sum: 1 },
+                    lastTimestamp: { $max: '$timestamp' },
+                  },
+                },
+              ],
+              as: '_messageStats',
+            },
+          },
+          // Project final shape
+          {
+            $project: {
+              sessionId: { $toString: '$_id' },
+              agentId: { $toString: '$assistantId' },
+              agentName: {
+                $ifNull: [{ $arrayElemAt: ['$_assistant.name', 0] }, 'Unknown'],
+              },
+              active: 1,
+              channel: { $ifNull: ['$channel', 'web'] },
+              channelUserId: { $ifNull: ['$channelUserId', ''] },
+              messageCount: {
+                $ifNull: [{ $arrayElemAt: ['$_messageStats.count', 0] }, 0],
+              },
+              lastMessageAt: {
+                $arrayElemAt: ['$_messageStats.lastTimestamp', 0],
+              },
+              createdAt: '$createdAt',
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  const total = result[0]?.metadata[0]?.total || 0;
+  const sessions: EnrichedSession[] = (result[0]?.sessions || []).map((s: any) => ({
+    sessionId: s.sessionId,
+    agentId: s.agentId || '',
+    agentName: s.agentName,
+    active: s.active,
+    channel: s.channel,
+    channelUserId: s.channelUserId,
+    messageCount: s.messageCount,
+    lastMessageAt: s.lastMessageAt ? new Date(s.lastMessageAt).toISOString() : null,
+    createdAt: s.createdAt ? new Date(s.createdAt).toISOString() : new Date().toISOString(),
+  }));
+
+  return { sessions, total };
+}
 
 // Function to ensure the correct index is created
 export const ensureSessionIndex = async () => {

@@ -39,6 +39,7 @@ const MessageSchema: Schema = new Schema({
 // Add indexes for better query performance
 MessageSchema.index({ sessionId: 1 });
 MessageSchema.index({ sessionId: 1, messageType: 1 });
+MessageSchema.index({ sessionId: 1, timestamp: -1 }); // Compound index for sorted message queries
 MessageSchema.index({ timestamp: 1 });
 MessageSchema.index({ 'data.id': 1 }); // Index for action execution queries
 

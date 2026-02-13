@@ -7,7 +7,7 @@ import {
   deleteAssistant,
   createDefaultAssistant,
 } from './assistant/assistant-management.service';
-import { getSessionMessages } from './assistant/session-management.service';
+import { getSessionMessages, getSessionMessagesWithCount } from './assistant/session-management.service';
 import { handleSessionMessage } from './assistant/message-handling.service';
 
 export {
@@ -18,7 +18,8 @@ export {
   deleteAssistant,
   createDefaultAssistant,
   getSessionMessages,
-  handleSessionMessage, // Add this line to export handleSessionMessage
+  getSessionMessagesWithCount,
+  handleSessionMessage,
 };
 
 export const sendMessageToAgent = async (
