@@ -3,7 +3,8 @@ import { TestConnectionResult } from '../../services/integration-config.service'
 import axios from 'axios';
 
 /**
- * Validate OpenRouter connection by listing models.
+ * Validate OpenRouter connection by checking API key via /auth/key endpoint.
+ * The /models endpoint is public, so we use /auth/key to actually verify the key.
  */
 export async function validateConnection(
   apiKeys: Record<string, string>,
@@ -18,21 +19,23 @@ export async function validateConnection(
   }
 
   try {
-    const response = await axios.get('https://openrouter.ai/api/v1/models', {
+    const response = await axios.get('https://openrouter.ai/api/v1/auth/key', {
       headers: { Authorization: `Bearer ${apiKey}` },
       timeout: 10000,
     });
 
-    if (response.status === 200 && response.data?.data?.length > 0) {
+    if (response.status === 200 && response.data?.data) {
+      const label = response.data.data.label || 'API key';
       return {
         success: true,
-        message: `Connected — ${response.data.data.length} models available`,
+        message: `Connected — key "${label}" verified`,
       };
     }
 
     return { success: false, error: 'Unexpected response from OpenRouter API' };
   } catch (error: any) {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    if (status === 401 || status === 502) {
       return {
         success: false,
         error: 'Invalid API key. Please check your OpenRouter API key.',
