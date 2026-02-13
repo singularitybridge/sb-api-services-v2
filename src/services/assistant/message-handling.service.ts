@@ -1,7 +1,6 @@
 import { Session } from '../../models/Session';
 import { Assistant } from '../../models/Assistant';
 import { Message, IMessage } from '../../models/Message'; // Added IMessage
-import { processTemplate } from '../template.service';
 import mongoose from 'mongoose';
 import { getMessagesBySessionId } from '../../services/message.service';
 import { createFunctionFactory } from '../../integrations/actions/loaders';
@@ -657,16 +656,7 @@ export const handleSessionMessage = async (
   // shouldStream = false; // DIAGNOSTIC: Force non-streaming // REVERTED
   // console.log(`Forced shouldStream: ${shouldStream}`);
 
-  console.log(
-    `[handleSessionMessage] About to process system prompt template for session ${sessionId}`,
-  );
-  const systemPrompt = await processTemplate(
-    assistant.llmPrompt,
-    sessionId.toString(),
-  );
-  console.log(
-    `[handleSessionMessage] System prompt processed for session ${sessionId}`,
-  );
+  const systemPrompt = assistant.llmPrompt;
 
   // Construct user message content for LLM
   // The userMessageForLlm will now use the userMessageContentParts array
@@ -1121,15 +1111,11 @@ export const handleSessionMessage = async (
           }
 
           const cleanedText = cleanActionAnnotations(finalText);
-          const processedResponse = await processTemplate(
-            cleanedText,
-            sessionId.toString(),
-          );
 
           const assistantMessageData: Partial<IMessage> = {
             sessionId: new mongoose.Types.ObjectId(String(session._id)),
             sender: 'assistant',
-            content: processedResponse,
+            content: cleanedText,
             assistantId: new mongoose.Types.ObjectId(String(assistant._id)),
             userId: new mongoose.Types.ObjectId(String(session.userId)),
             timestamp: new Date(),
@@ -1436,15 +1422,11 @@ export const handleSessionMessage = async (
     }
 
     const cleanedResponse = cleanActionAnnotations(aggregatedResponse);
-    const processedResponse = await processTemplate(
-      cleanedResponse,
-      sessionId.toString(),
-    );
 
     const assistantMessageData: Partial<IMessage> = {
       sessionId: new mongoose.Types.ObjectId(String(session._id)),
       sender: 'assistant',
-      content: processedResponse,
+      content: cleanedResponse,
       assistantId: new mongoose.Types.ObjectId(String(assistant._id)),
       userId: new mongoose.Types.ObjectId(String(session.userId)),
       timestamp: new Date(),
@@ -1474,10 +1456,10 @@ export const handleSessionMessage = async (
 
     const totalDuration = Date.now() - requestStartTime;
     console.log(
-      `[AI_REQUEST_COMPLETE] Total duration: ${totalDuration}ms | Session: ${sessionId} | Mode: non-streaming | Response length: ${processedResponse.length} chars`,
+      `[AI_REQUEST_COMPLETE] Total duration: ${totalDuration}ms | Session: ${sessionId} | Mode: non-streaming | Response length: ${cleanedResponse.length} chars`,
     );
 
-    return processedResponse;
+    return cleanedResponse;
   }
 
   if (shouldStream) {

@@ -6,7 +6,11 @@
  */
 
 import { z } from 'zod';
-import { MODEL_CONFIGS } from '../../services/assistant/provider.service';
+import {
+  MODEL_CONFIGS,
+  MODEL_DESCRIPTIONS as SHARED_DESCRIPTIONS,
+  LEGACY_MODELS,
+} from '../../services/assistant/provider.service';
 import { MODEL_PRICING } from '../../utils/cost-tracking';
 
 /**
@@ -34,52 +38,7 @@ interface ModelInfo {
   };
 }
 
-// Model descriptions for better context
-const MODEL_DESCRIPTIONS: Record<string, string> = {
-  // OpenAI GPT-5.2
-  'gpt-5.2': 'Latest GPT-5.2 model (Late 2025)',
-  'gpt-5.2-pro': 'GPT-5.2 Pro - enhanced capabilities',
-
-  // OpenAI GPT-5.1
-  'gpt-5.1': 'GPT-5.1 model',
-
-  // OpenAI GPT-5
-  'gpt-5': 'GPT-5 base model',
-  'gpt-5-mini': 'GPT-5 Mini - faster, cheaper',
-  'gpt-5-nano': 'GPT-5 Nano - smallest, fastest',
-
-  // OpenAI O-Series
-  o3: 'O3 reasoning model',
-  'o3-pro': 'O3 Pro - advanced reasoning',
-  'o4-mini': 'O4 Mini - fast reasoning',
-  'o3-mini': 'O3 Mini - compact reasoning',
-
-  // OpenAI GPT-4.1
-  'gpt-4.1': 'GPT-4.1 with 1M context',
-  'gpt-4.1-mini': 'GPT-4.1 Mini',
-  'gpt-4.1-nano': 'GPT-4.1 Nano',
-
-  // OpenAI GPT-4o (Legacy)
-  'gpt-4o': 'GPT-4o (legacy, still supported)',
-  'gpt-4o-mini': 'GPT-4o Mini (legacy, still supported)',
-
-  // Google Gemini 3
-  'gemini-3-pro-preview': 'Gemini 3 Pro (Preview)',
-  'gemini-3-flash-preview': 'Gemini 3 Flash (Preview) - fast',
-
-  // Google Gemini 2.5
-  'gemini-2.5-pro': 'Gemini 2.5 Pro (Stable)',
-  'gemini-2.5-flash': 'Gemini 2.5 Flash (Stable) - fast',
-  'gemini-2.5-flash-lite': 'Gemini 2.5 Flash Lite - fastest',
-
-  // Anthropic Claude 4.5
-  'claude-opus-4-5': 'Claude Opus 4.5 - most capable',
-  'claude-sonnet-4-5': 'Claude Sonnet 4.5 - balanced',
-  'claude-haiku-4-5': 'Claude Haiku 4.5 - fast',
-
-  // Anthropic Claude 4 (Legacy)
-  'claude-sonnet-4-0': 'Claude Sonnet 4.0 (Legacy, retiring May 2026)',
-};
+const MODEL_DESCRIPTIONS = SHARED_DESCRIPTIONS;
 
 /**
  * List all available LLM models
@@ -91,6 +50,7 @@ export async function listModels(
     const models: ModelInfo[] = [];
 
     for (const [modelId, config] of Object.entries(MODEL_CONFIGS)) {
+      if (LEGACY_MODELS.has(modelId)) continue;
       // Filter by provider if specified
       if (input.provider && config.provider !== input.provider) {
         continue;

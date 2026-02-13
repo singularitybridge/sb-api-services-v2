@@ -77,7 +77,6 @@ export async function deleteAssistant(
 
 export const createDefaultAssistant = async (
   companyId: string,
-  _apiKey: string,
 ): Promise<IAssistant> => {
   const defaultAssistantData = {
     name: 'Default Assistant',

@@ -7,7 +7,6 @@ import {
   ActionInfo,
   ExecutionDetails,
 } from './types';
-import { processTemplate } from '../../services/template.service';
 import { discoverActionById } from '../../services/integration.service';
 import { getSessionById } from '../../services/session.service';
 import { SupportedLanguage } from '../../services/discovery.service';
@@ -71,28 +70,7 @@ const prepareActionExecution = async (
     throw new Error(`Action info not found for ${convertedActionId}`);
   }
 
-  const processedArgs = await Promise.all(
-    Object.entries(args).map(async ([key, value]) => {
-      if (typeof value === 'string') {
-        return [key, await processTemplate(value, sessionId)];
-      }
-      // Preserve arrays as-is (don't treat them as objects to recurse into)
-      if (Array.isArray(value)) {
-        return [key, value];
-      }
-      if (typeof value === 'object' && value !== null) {
-        // Recursively process nested objects
-        const nestedProcessedArgs = await prepareActionExecution(
-          functionName,
-          value as Record<string, unknown>,
-          sessionId,
-          sessionLanguage,
-        );
-        return [key, nestedProcessedArgs.processedArgs];
-      }
-      return [key, value];
-    }),
-  );
+  const processedArgs = Object.entries(args).map(([key, value]) => [key, value]);
 
   return {
     executionId,

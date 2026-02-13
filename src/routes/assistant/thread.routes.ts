@@ -1,7 +1,6 @@
 import express from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
-import { validateApiKeys } from '../../services/api.key.service';
-// import { getApiKey } from '../../services/api.key.service'; // Not used after removing OpenAI specific routes
+// validateApiKeys removed — no longer needed
 // import { createNewThread, deleteThread, getMessages } from '../../services/oai.thread.service'; // Removed, OpenAI specific
 import { Session } from '../../models/Session';
 import { Message } from '../../models/Message'; // Added for Step 5
@@ -51,7 +50,6 @@ threadRouter.get(
 
 threadRouter.post(
   '/user-input',
-  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     const { userInput, attachments, sessionId } = req.body;
     // const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string; // apiKey is likely handled within handleSessionMessage or streamText
@@ -88,7 +86,7 @@ threadRouter.post(
         }
         activeSessionId = sessionData._id.toString();
       } else {
-        const created = await getSessionOrCreate('', userId, companyId);
+        const created = await getSessionOrCreate(userId, companyId);
         if (!created || !created._id) {
           return res
             .status(404)

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
-import { validateApiKeys, getApiKey } from '../../services/api.key.service';
+// validateApiKeys and getApiKey removed — no longer needed
 import { Assistant } from '../../models/Assistant';
 import { updateAllowedActions } from '../../services/allowed-actions.service';
 import { validateObjectId } from '../../utils/validation';
@@ -18,8 +18,6 @@ const router = Router();
 
 router.put(
   '/:id',
-  // Remove validateObjectId since we now accept names too
-  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;
@@ -49,11 +47,6 @@ router.put(
           });
         }
       }
-
-      const apiKey = (await getApiKey(
-        req.company._id,
-        'openai_api_key',
-      )) as string;
 
       // Update using the resolved assistant's _id
       const assistant = await Assistant.findOneAndUpdate(

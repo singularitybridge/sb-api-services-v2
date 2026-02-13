@@ -93,6 +93,7 @@ import oauthMcpRouter from './routes/oauth-mcp.routes';
 import { getBaseUrl } from './services/oauth-mcp.service';
 import uiStateRouter from './routes/ui-state.routes';
 import { inviteRouter } from './routes/invite.routes';
+import { modelsRouter } from './routes/models.routes';
 
 // Read package.json at startup
 let packageJson: { version: string; name: string };
@@ -194,6 +195,7 @@ app.use(
 ); // Unified Workspace (before generic /api)
 app.use('/api/ui-state', verifyTokenMiddleware, verifyAccess(), uiStateRouter); // UI State tracking (before generic /api)
 app.use('/api/invites', verifyTokenMiddleware, verifyAccess(), inviteRouter); // User invite system
+app.use('/api/models', verifyTokenMiddleware, verifyAccess(), modelsRouter); // Dynamic model listing
 // MCP Server - custom auth that attempts to authenticate but doesn't block on failure
 // The MCP handler returns proper JSON-RPC format 401 errors itself
 app.use(

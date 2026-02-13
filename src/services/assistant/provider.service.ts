@@ -65,7 +65,11 @@ const MODEL_CONFIGS: Record<string, any> = {
     baseModel: 'claude-haiku-4-5-20251001',
   },
 
-  // === Anthropic Claude 4 (Legacy - Retiring May 2026) ===
+  // === Anthropic Claude 4 ===
+  'claude-opus-4-1': {
+    provider: 'anthropic',
+    baseModel: 'claude-opus-4-1-20250514',
+  },
   'claude-sonnet-4-0': {
     provider: 'anthropic',
     baseModel: 'claude-sonnet-4-20250514',
@@ -105,6 +109,98 @@ export function getProvider(pk: ProviderKey, model: string, key: string) {
       return createOpenAI({ apiKey: key })(actualModel);
   }
 }
+
+// Model descriptions for API/UI display
+export const MODEL_DESCRIPTIONS: Record<string, string> = {
+  // OpenAI GPT-5.2
+  'gpt-5.2': 'Latest GPT-5.2 model (Late 2025)',
+  'gpt-5.2-pro': 'GPT-5.2 Pro - enhanced capabilities',
+
+  // OpenAI GPT-5.1
+  'gpt-5.1': 'GPT-5.1 model',
+
+  // OpenAI GPT-5
+  'gpt-5': 'GPT-5 base model',
+  'gpt-5-mini': 'GPT-5 Mini - faster, cheaper',
+  'gpt-5-nano': 'GPT-5 Nano - smallest, fastest',
+
+  // OpenAI O-Series
+  o3: 'O3 reasoning model',
+  'o3-pro': 'O3 Pro - advanced reasoning',
+  'o4-mini': 'O4 Mini - fast reasoning',
+  'o3-mini': 'O3 Mini - compact reasoning',
+
+  // OpenAI GPT-4.1
+  'gpt-4.1': 'GPT-4.1 with 1M context',
+  'gpt-4.1-mini': 'GPT-4.1 Mini',
+  'gpt-4.1-nano': 'GPT-4.1 Nano',
+
+  // OpenAI GPT-4o (Legacy)
+  'gpt-4o': 'GPT-4o (legacy, still supported)',
+  'gpt-4o-mini': 'GPT-4o Mini (legacy, still supported)',
+
+  // Google Gemini 3
+  'gemini-3-pro-preview': 'Gemini 3 Pro (Preview)',
+  'gemini-3-flash-preview': 'Gemini 3 Flash (Preview) - fast',
+
+  // Google Gemini 2.5
+  'gemini-2.5-pro': 'Gemini 2.5 Pro (Stable)',
+  'gemini-2.5-flash': 'Gemini 2.5 Flash (Stable) - fast',
+  'gemini-2.5-flash-lite': 'Gemini 2.5 Flash Lite - fastest',
+
+  // Anthropic Claude 4.5
+  'claude-opus-4-5': 'Claude Opus 4.5 - most capable',
+  'claude-sonnet-4-5': 'Claude Sonnet 4.5 - balanced',
+  'claude-haiku-4-5': 'Claude Haiku 4.5 - fast',
+
+  // Anthropic Claude 4
+  'claude-opus-4-1': 'Claude Opus 4.1 - powerful reasoning',
+  'claude-sonnet-4-0': 'Claude Sonnet 4.0 (Legacy, retiring May 2026)',
+};
+
+// Default model per provider
+export const DEFAULT_MODELS: Record<string, string> = {
+  openai: 'gpt-5.1',
+  google: 'gemini-3-flash-preview',
+  anthropic: 'claude-sonnet-4-5',
+};
+
+// Model display labels
+export const MODEL_LABELS: Record<string, string> = {
+  'gpt-5.2': 'GPT-5.2',
+  'gpt-5.2-pro': 'GPT-5.2 Pro',
+  'gpt-5.1': 'GPT-5.1',
+  'gpt-5': 'GPT-5',
+  'gpt-5-mini': 'GPT-5 Mini',
+  'gpt-5-nano': 'GPT-5 Nano',
+  o3: 'O3',
+  'o3-pro': 'O3 Pro',
+  'o4-mini': 'O4 Mini',
+  'o3-mini': 'O3 Mini',
+  'gpt-4.1': 'GPT-4.1',
+  'gpt-4.1-mini': 'GPT-4.1 Mini',
+  'gpt-4.1-nano': 'GPT-4.1 Nano',
+  'gpt-4o': 'GPT-4o',
+  'gpt-4o-mini': 'GPT-4o Mini',
+  'gemini-3-pro-preview': 'Gemini 3 Pro (preview)',
+  'gemini-3-flash-preview': 'Gemini 3 Flash (preview)',
+  'gemini-2.5-pro': 'Gemini 2.5 Pro',
+  'gemini-2.5-flash': 'Gemini 2.5 Flash',
+  'gemini-2.5-flash-lite': 'Gemini 2.5 Flash-Lite',
+  'claude-opus-4-5': 'Claude Opus 4.5',
+  'claude-sonnet-4-5': 'Claude Sonnet 4.5',
+  'claude-haiku-4-5': 'Claude Haiku 4.5',
+  'claude-opus-4-1': 'Claude Opus 4.1',
+  'claude-sonnet-4-0': 'Claude Sonnet 4',
+};
+
+// Models kept in MODEL_CONFIGS for backward compatibility (existing assistants)
+// but excluded from the /api/models listing and UI dropdowns.
+export const LEGACY_MODELS = new Set([
+  'gpt-4o',
+  'gpt-4o-mini',
+  'claude-sonnet-4-0',
+]);
 
 // Export model configs for use in message handling
 export { MODEL_CONFIGS };

@@ -1,4 +1,4 @@
-import { verifyOpenAiKey } from './oai.assistant.service';
+import OpenAI from 'openai';
 import { verifyElevenLabsKey } from '../integrations/elevenlabs/elevenlabs.service';
 import { verifyPerplexityKey } from '../integrations/perplexity/perplexity.service';
 import axios from 'axios';
@@ -6,6 +6,26 @@ import axios from 'axios';
 export type ApiKey = string;
 
 type VerificationFunction = (key: ApiKey) => Promise<boolean>;
+
+/**
+ * Verify OpenAI API key by listing available models
+ */
+export const verifyOpenAiKey = async (apiKey: ApiKey): Promise<boolean> => {
+  if (typeof apiKey !== 'string') {
+    throw new Error('Invalid API key type for OpenAI verification');
+  }
+
+  const openaiClient = new OpenAI({
+    apiKey: apiKey,
+  });
+
+  try {
+    await openaiClient.models.list();
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
 
 /**
  * Verify Google Gemini API key by listing available models

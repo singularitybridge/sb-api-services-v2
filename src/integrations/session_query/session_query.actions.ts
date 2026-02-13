@@ -304,6 +304,9 @@ export const createSessionQueryActions = (
             company: {
               id: session.companyId.toString(),
             },
+            currentDate: new Date().toISOString().split('T')[0],
+            currentTime: new Date().toISOString().split('T')[1].substring(0, 5),
+            currentDateTime: new Date().toISOString(),
           },
         };
       } catch (error: any) {

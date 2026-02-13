@@ -11,7 +11,6 @@ import {
 } from '../services/session.service';
 import mongoose from 'mongoose';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
-import { getApiKey, validateApiKeys } from '../services/api.key.service';
 import { BadRequestError } from '../utils/errors';
 import { resolveAssistantIdentifier } from '../services/assistant/assistant-resolver.service';
 
@@ -20,16 +19,6 @@ const sessionRouter = Router();
 // Create session
 sessionRouter.post('/', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const apiKey = await getApiKey(req.company._id, 'openai_api_key');
-
-    if (!apiKey) {
-      return res.status(200).json({
-        message:
-          'OpenAI API key is not set. Please configure the API key to use this feature.',
-        keyMissing: true,
-      });
-    }
-
     const { channel, channelUserId, channelMetadata, assistantId } = req.body || {};
 
     // Resolve assistantId by name or ObjectId if provided (e.g., from Herald)
@@ -49,7 +38,6 @@ sessionRouter.post('/', async (req: AuthenticatedRequest, res: Response) => {
     }
 
     const session = await getSessionOrCreate(
-      apiKey,
       req.user?._id.toString() ?? '',
       req.user?.companyId.toString() ?? '',
       resolvedAssistantId,
@@ -72,7 +60,6 @@ sessionRouter.post('/', async (req: AuthenticatedRequest, res: Response) => {
 // Clear current session and start a new one
 sessionRouter.post(
   '/clear',
-  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
       const companyId = req.user?.companyId?.toString();
@@ -80,13 +67,6 @@ sessionRouter.post(
 
       if (!companyId || !userId) {
         throw new BadRequestError('User or Company ID not found in request.');
-      }
-
-      const apiKey = await getApiKey(companyId, 'openai_api_key');
-      if (!apiKey) {
-        throw new BadRequestError(
-          'Required API key (e.g., openai_api_key) not found for the company.',
-        );
       }
 
       const { channel, channelUserId, channelMetadata, assistantId } = req.body || {};
@@ -130,7 +110,7 @@ sessionRouter.post(
           channelInfo.channelMetadata = (currentActiveSession as any).channelMetadata;
         }
 
-        await endSession(apiKey, currentActiveSession._id.toString());
+        await endSession(currentActiveSession._id.toString());
       } else {
         console.log(
           `Clear Session: No existing active session found for user ${userId} in company ${companyId}.`,
@@ -139,7 +119,6 @@ sessionRouter.post(
 
       // Create a new session
       const newSession = await getSessionOrCreate(
-        apiKey,
         userId,
         companyId,
         lastAssistantId,
@@ -156,7 +135,6 @@ sessionRouter.post(
 // Get active session messages
 sessionRouter.get(
   '/messages',
-  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const companyId = req.user?.companyId?.toString();
     const userId = req.user?._id?.toString();
@@ -165,12 +143,6 @@ sessionRouter.get(
       return next(
         new BadRequestError('User or Company ID not found in request.'),
       );
-    }
-
-    const apiKey = await getApiKey(companyId, 'openai_api_key');
-    if (!apiKey) {
-      // Forward to error handler if API key is missing
-      return next(new BadRequestError('API key not found for company.'));
     }
 
     try {
@@ -188,7 +160,6 @@ sessionRouter.get(
       }
 
       const messages = await getSessionMessages(
-        apiKey,
         activeSession._id.toString(),
       );
       res.status(200).send(messages);
@@ -271,7 +242,6 @@ sessionRouter.post(
 
 sessionRouter.put(
   '/:id/assistant',
-  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const { id } = req.params;
     const { assistantId } = req.body;
@@ -301,18 +271,11 @@ sessionRouter.put(
 // End session
 sessionRouter.delete(
   '/:id',
-  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const { id } = req.params;
 
     try {
-      const apiKey = await getApiKey(req.company._id, 'openai_api_key');
-
-      if (!apiKey) {
-        throw new BadRequestError('OpenAI API key not found');
-      }
-
-      await endSession(apiKey, id);
+      await endSession(id);
       res.status(200).json({ message: 'Session ended successfully' });
     } catch (error) {
       next(error);
@@ -379,17 +342,12 @@ sessionRouter.get('/:id', async (req: AuthenticatedRequest, res: Response) => {
 // Get session messages by specific ID (keeping this for direct access if needed, e.g. admin or specific use cases)
 sessionRouter.get(
   '/:id/messages',
-  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const { id } = req.params;
     const companyId = req.user?.companyId?.toString(); // Get companyId from authenticated user
 
     if (!companyId) {
       return next(new BadRequestError('Company ID not found in request.'));
-    }
-    const apiKey = await getApiKey(companyId, 'openai_api_key');
-    if (!apiKey) {
-      return next(new BadRequestError('API key not found for company.'));
     }
 
     try {
@@ -405,7 +363,7 @@ sessionRouter.get(
           .status(404)
           .send({ error: 'Session not found or access denied' });
       }
-      const messages = await getSessionMessages(apiKey, id);
+      const messages = await getSessionMessages(id);
       res.status(200).send(messages);
     } catch (error) {
       next(error);

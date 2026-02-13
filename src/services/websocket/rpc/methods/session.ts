@@ -2,7 +2,6 @@ import { AuthenticatedSocket } from '../../types';
 import { handleSessionMessage } from '../../../assistant/message-handling.service';
 import { getSessionOrCreate } from '../../../session.service';
 import { registerRpcMethod } from '../utils';
-import { getApiKey } from '../../../api.key.service';
 import { publishSessionMessage } from '../../../session-messaging.service';
 
 const processSessionMessage = async (
@@ -13,12 +12,7 @@ const processSessionMessage = async (
 
   // Get or create session if not already set
   if (!socket.sessionId) {
-    const apiKeyForSession = (await getApiKey(
-      companyId,
-      'openai_api_key',
-    )) as string; // Renamed variable
     const session = await getSessionOrCreate(
-      apiKeyForSession,
       userId,
       companyId,
     );

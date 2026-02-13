@@ -1,8 +1,6 @@
 import { Router } from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import {
-  validateApiKeys,
-  getApiKey,
   refreshApiKeyCache,
 } from '../../services/api.key.service';
 import { Assistant } from '../../models/Assistant';
@@ -21,7 +19,6 @@ const router = Router();
 
 router.post(
   '/',
-  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     try {
       await refreshApiKeyCache(req.company._id.toString());
@@ -100,19 +97,12 @@ router.post(
 
 router.post(
   '/default',
-  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     try {
       const companyId = req.company._id;
-      const apiKey = (await getApiKey(companyId, 'openai_api_key')) as string;
-
-      if (!apiKey) {
-        return res.status(400).json({ message: 'OpenAI API key not found' });
-      }
 
       const defaultAssistant = await createDefaultAssistant(
         companyId.toString(),
-        apiKey,
       );
       res.status(201).json(defaultAssistant);
     } catch (error) {

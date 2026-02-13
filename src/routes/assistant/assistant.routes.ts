@@ -1,6 +1,6 @@
 import express from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
-import { validateApiKeys, getApiKey } from '../../services/api.key.service';
+// validateApiKeys and getApiKey removed — no longer needed
 import { Assistant } from '../../models/Assistant';
 import { deleteAssistant } from '../../services/assistant.service';
 import { updateAllowedActions } from '../../services/allowed-actions.service';
@@ -20,8 +20,6 @@ assistantRouter.use('/', postRoutes);
 
 assistantRouter.delete(
   '/:id',
-  // Remove validateObjectId since we now accept names too
-  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     const { id } = req.params;
 
@@ -58,8 +56,6 @@ assistantRouter.delete(
 
 assistantRouter.patch(
   '/:id/allowed-actions',
-  // Remove validateObjectId since we now accept names too
-  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     try {
       const { id } = req.params;

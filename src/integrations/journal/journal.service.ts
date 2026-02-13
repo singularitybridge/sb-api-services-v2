@@ -30,7 +30,6 @@ export async function createJournalEntry(
 
     // Get or create a session
     const session = await getSessionOrCreate(
-      apiKey,
       journalData.userId.toString(),
       journalData.companyId.toString(),
     );

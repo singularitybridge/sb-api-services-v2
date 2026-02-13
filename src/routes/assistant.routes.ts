@@ -4,7 +4,7 @@ import { assistantRouter } from './assistant/assistant.routes';
 import { completionRouter } from './assistant/completion.routes';
 import { executeHandler } from './assistant/execute.routes'; // Import the handler function
 import workspaceExecuteRouter from './assistant/workspace-execute.routes'; // Import workspace execute router
-import { validateApiKeys } from '../services/api.key.service';
+// validateApiKeys removed — no longer needed
 import { validateObjectId } from '../utils/validation';
 
 const router = express.Router();
@@ -20,7 +20,6 @@ router.use('/completion', completionRouter);
 // Removed validateObjectId since we now accept names too
 router.post(
   '/:assistantId/execute',
-  validateApiKeys(['openai_api_key']),
   executeHandler,
 );
 

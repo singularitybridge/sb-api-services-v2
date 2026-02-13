@@ -587,9 +587,7 @@ export const executeAssistantStateless = async (
     (responseFormat.type === 'json_object' ||
       responseFormat.type === 'json_schema');
 
-  // For stateless execution, we'll use the prompt directly without template processing
-  // or provide basic context if needed
-  // Use promptOverride if provided, otherwise use the assistant's default prompt
+  // Use promptOverride if provided, otherwise use the assistant's default prompt.
   const systemPrompt =
     promptOverride || assistant.llmPrompt || 'You are a helpful assistant.';
 

@@ -143,7 +143,6 @@ export const getCurrentSession = async (
 };
 
 export const getSessionOrCreate = async (
-  apiKey: string,
   userId: string,
   companyId: string,
   lastAssistantId?: string,
@@ -285,7 +284,6 @@ export const getSessionOrCreate = async (
 };
 
 export const endSession = async (
-  apiKey: string,
   sessionId: string,
 ): Promise<boolean> => {
   const session = await Session.findOne({ _id: sessionId, active: true });

@@ -6,7 +6,7 @@ import {
 import {
   getSessionOrCreate,
 } from '../services/session.service';
-import { getApiKey } from '../services/api.key.service';
+// getApiKey removed — no longer needed for session creation
 import {
   triggerAction,
   getActions,
@@ -154,17 +154,8 @@ router.post(
           .json({ error: 'Unauthorized: User ID is required' });
       }
 
-      // Get API key
-      const apiKey = await getApiKey(companyId.toString(), 'openai_api_key');
-      if (!apiKey) {
-        return res
-          .status(500)
-          .json({ error: 'OpenAI API key not found for the company' });
-      }
-
       // Get or create session
       const session = await getSessionOrCreate(
-        apiKey,
         userId.toString(),
         companyId.toString(),
       );

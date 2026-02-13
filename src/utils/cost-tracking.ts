@@ -44,7 +44,9 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'claude-haiku-4-5-20251001': { inputCost: 0.001, outputCost: 0.005 },
   'claude-haiku-4-5': { inputCost: 0.001, outputCost: 0.005 },
 
-  // === Anthropic Claude 4 (Legacy) ===
+  // === Anthropic Claude 4 ===
+  'claude-opus-4-1-20250514': { inputCost: 0.005, outputCost: 0.025 },
+  'claude-opus-4-1': { inputCost: 0.005, outputCost: 0.025 },
   'claude-sonnet-4-20250514': { inputCost: 0.003, outputCost: 0.015 },
   'claude-sonnet-4': { inputCost: 0.003, outputCost: 0.015 },
 

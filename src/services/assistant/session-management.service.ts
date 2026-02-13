@@ -1,6 +1,5 @@
 import { Session } from '../../models/Session';
 import { Message, IMessage } from '../../models/Message'; // Import Message model and IMessage interface
-import { processTemplate } from '../template.service';
 import mongoose from 'mongoose';
 
 // Helper function to transform MongoDB message to OpenAI-like format
@@ -35,7 +34,7 @@ const transformMessageToOpenAIFormat = (mongoMessage: IMessage) => {
   };
 };
 
-export async function getSessionMessages(apiKey: string, sessionId: string) {
+export async function getSessionMessages(sessionId: string) {
   const session = await Session.findById(sessionId);
   if (!session) {
     throw new Error('Session not found');
@@ -59,27 +58,7 @@ export async function getSessionMessages(apiKey: string, sessionId: string) {
 
   const formattedMessages = await Promise.all(
     mongoMessages.map(async (msg) => {
-      const openAIFormattedMessage = transformMessageToOpenAIFormat(msg);
-
-      // Apply template processing for assistant messages
-      if (
-        openAIFormattedMessage.role === 'assistant' &&
-        openAIFormattedMessage.content
-      ) {
-        const processedContent = await Promise.all(
-          openAIFormattedMessage.content.map(async (contentItem: any) => {
-            if (contentItem.type === 'text' && contentItem.text) {
-              contentItem.text.value = await processTemplate(
-                contentItem.text.value,
-                sessionId,
-              );
-            }
-            return contentItem;
-          }),
-        );
-        openAIFormattedMessage.content = processedContent;
-      }
-      return openAIFormattedMessage;
+      return transformMessageToOpenAIFormat(msg);
     }),
   );
 

@@ -1,13 +1,12 @@
 import express from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
-import { validateApiKeys, getApiKey } from '../../services/api.key.service';
+import { getApiKey } from '../../services/api.key.service';
 import { getCompletionResponse } from '../../services/oai.completion.service';
 
 const completionRouter = express.Router();
 
 completionRouter.post(
   '/',
-  validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
     const {
       systemPrompt,
