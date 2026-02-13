@@ -36,22 +36,31 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'gpt-4o': { inputCost: 0.0025, outputCost: 0.01 },
   'gpt-4o-mini': { inputCost: 0.00015, outputCost: 0.0006 },
 
-  // === Anthropic Claude 4.5 (Current) ===
+  // === Anthropic Claude 4.5 (Current) — both date-stamped and short names ===
   'claude-opus-4-5-20251101': { inputCost: 0.005, outputCost: 0.025 },
+  'claude-opus-4-5': { inputCost: 0.005, outputCost: 0.025 },
   'claude-sonnet-4-5-20250929': { inputCost: 0.003, outputCost: 0.015 },
+  'claude-sonnet-4-5': { inputCost: 0.003, outputCost: 0.015 },
   'claude-haiku-4-5-20251001': { inputCost: 0.001, outputCost: 0.005 },
+  'claude-haiku-4-5': { inputCost: 0.001, outputCost: 0.005 },
 
   // === Anthropic Claude 4 (Legacy) ===
   'claude-sonnet-4-20250514': { inputCost: 0.003, outputCost: 0.015 },
+  'claude-sonnet-4': { inputCost: 0.003, outputCost: 0.015 },
 
-  // === Google Gemini 3 (Preview) ===
+  // === Google Gemini 3 (Preview) — both plain and models/-prefixed ===
   'gemini-3-pro-preview': { inputCost: 0.00125, outputCost: 0.01 },
+  'models/gemini-3-pro-preview': { inputCost: 0.00125, outputCost: 0.01 },
   'gemini-3-flash-preview': { inputCost: 0.0003, outputCost: 0.0025 },
+  'models/gemini-3-flash-preview': { inputCost: 0.0003, outputCost: 0.0025 },
 
-  // === Google Gemini 2.5 (Stable) ===
+  // === Google Gemini 2.5 (Stable) — both plain and models/-prefixed ===
   'gemini-2.5-pro': { inputCost: 0.00125, outputCost: 0.01 },
+  'models/gemini-2.5-pro': { inputCost: 0.00125, outputCost: 0.01 },
   'gemini-2.5-flash': { inputCost: 0.0003, outputCost: 0.0025 },
+  'models/gemini-2.5-flash': { inputCost: 0.0003, outputCost: 0.0025 },
   'gemini-2.5-flash-lite': { inputCost: 0.00015, outputCost: 0.001 },
+  'models/gemini-2.5-flash-lite': { inputCost: 0.00015, outputCost: 0.001 },
 
   // Default pricing for unknown models
   default: { inputCost: 0.001, outputCost: 0.002 },

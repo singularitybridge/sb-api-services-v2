@@ -382,7 +382,8 @@ export const handleSessionMessage = async (
     .filter(
       (msg) =>
         (msg.sender === 'user' || msg.sender === 'assistant') &&
-        typeof msg.content === 'string',
+        typeof msg.content === 'string' &&
+        msg.content.length > 0,
     )
     .map((msg: IMessage) => ({
       role: msg.sender as 'user' | 'assistant',
@@ -393,15 +394,16 @@ export const handleSessionMessage = async (
   const actionContext = {
     sessionId: sessionId.toString(),
     companyId: session.companyId.toString(),
-    language: session.language as SupportedLanguage,
+    language: 'en' as SupportedLanguage,
     userId: session.userId.toString(),
     assistantId: assistant._id.toString(),
   };
 
-  // Cache key MUST include userId because tools close over actionContext at creation time.
-  // Without userId in the key, User A's cached tools (with User A's context) would be
-  // returned to User B, causing incorrect user identification.
-  const cacheKey = `${assistant._id.toString()}-${session.userId.toString()}-${JSON.stringify(
+  // Cache key MUST include sessionId because tools close over sessionId at creation time.
+  // Without sessionId in the key, a new session for the same user+assistant would reuse
+  // cached tools that save action_execution messages to the OLD session, so the UI
+  // for the current session would never see action status updates.
+  const cacheKey = `${assistant._id.toString()}-${sessionId.toString()}-${JSON.stringify(
     assistant.allowedActions.slice().sort(),
   )}`;
   let toolsForSdk: Record<string, Tool<any, any>>;
@@ -793,7 +795,7 @@ export const handleSessionMessage = async (
         messages: trimmedMessages, // This now contains correctly formatted multimodal messages
         tools: relevantTools,
         maxRetries: 2,
-        stopWhen: stepCountIs(10), // Stop after 10 tool steps
+        stopWhen: stepCountIs(25), // Stop after 25 tool steps
       };
       if (systemPrompt !== undefined) {
         streamCallOptions.system = systemPrompt;
@@ -947,7 +949,8 @@ export const handleSessionMessage = async (
           errorMessage.includes('token limit') ||
           errorMessage.includes('too many tokens') ||
           errorMessage.includes('max_tokens') ||
-          errorMessage.includes('request too large');
+          errorMessage.includes('request too large') ||
+          errorMessage.includes('prompt is too long');
 
         const isRateLimitError =
           errorMessage.includes('rate limit') ||
@@ -992,10 +995,10 @@ export const handleSessionMessage = async (
           const toolCalls = await streamResult.toolCalls;
           const toolResults = await streamResult.toolResults;
 
-          // Get usage data for cost tracking
+          // Get usage data for cost tracking — use totalUsage to aggregate across all steps
           let usage: any;
           try {
-            usage = await streamResult.usage;
+            usage = await (streamResult as any).totalUsage || await streamResult.usage;
           } catch (e) {
             console.log(
               `[handleSessionMessage] Could not get usage data: ${e}`,
@@ -1059,7 +1062,7 @@ export const handleSessionMessage = async (
 
               // Log streamResult properties for debugging
               try {
-                const usage = await streamResult.usage;
+                const usage = await (streamResult as any).totalUsage || await streamResult.usage;
                 console.error(`[handleSessionMessage] Stream usage:`, usage);
               } catch (e) {
                 console.error(
@@ -1273,7 +1276,7 @@ export const handleSessionMessage = async (
         messages: trimmedMessages, // This now contains correctly formatted multimodal messages
         tools: relevantTools,
         maxRetries: 2,
-        stopWhen: stepCountIs(10), // Stop after 10 tool steps
+        stopWhen: stepCountIs(25), // Stop after 25 tool steps
       };
       if (systemPrompt !== undefined) {
         generateCallOptions.system = systemPrompt;
@@ -1307,13 +1310,27 @@ export const handleSessionMessage = async (
       aggregatedResponse = result.text;
       finalLlmResult = result;
 
-      // Log cost tracking for non-streaming generateText
-      if (result.usage) {
-        const costs = calculateCost(
-          modelIdentifier,
-          result.usage.inputTokens || 0,
-          result.usage.outputTokens || 0,
-        );
+      // Aggregate token usage from ALL steps (not just result.usage which may only reflect last step)
+      let aggInputTokens = 0;
+      let aggOutputTokens = 0;
+      let totalToolCallCount = 0;
+      const steps = (result as any).steps;
+      if (steps && Array.isArray(steps)) {
+        for (const step of steps) {
+          aggInputTokens += step.usage?.inputTokens || 0;
+          aggOutputTokens += step.usage?.outputTokens || 0;
+          totalToolCallCount += step.toolCalls?.length || 0;
+        }
+      }
+      if (aggInputTokens === 0 && aggOutputTokens === 0 && result.usage) {
+        aggInputTokens = result.usage.inputTokens || 0;
+        aggOutputTokens = result.usage.outputTokens || 0;
+        totalToolCallCount = finalLlmResult.toolCalls?.length || 0;
+      }
+      const aggTotalTokens = aggInputTokens + aggOutputTokens;
+
+      if (aggTotalTokens > 0) {
+        const costs = calculateCost(modelIdentifier, aggInputTokens, aggOutputTokens);
 
         const costInfo: CostTrackingInfo = {
           companyId: session.companyId?.toString() || 'unknown',
@@ -1322,17 +1339,15 @@ export const handleSessionMessage = async (
           userId: session.userId?.toString() || 'unknown',
           provider: providerKey,
           model: modelIdentifier,
-          inputTokens: result.usage.inputTokens || 0,
-          outputTokens: result.usage.outputTokens || 0,
-          totalTokens:
-            result.usage.totalTokens ||
-            (result.usage.inputTokens || 0) + (result.usage.outputTokens || 0),
+          inputTokens: aggInputTokens,
+          outputTokens: aggOutputTokens,
+          totalTokens: aggTotalTokens,
           inputCost: costs.inputCost,
           outputCost: costs.outputCost,
           totalCost: costs.totalCost,
           timestamp: new Date(),
           duration,
-          toolCalls: finalLlmResult.toolCalls?.length || 0,
+          toolCalls: totalToolCallCount,
           cached: false,
           requestType: 'non-streaming' as any,
         };

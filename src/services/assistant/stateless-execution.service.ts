@@ -317,7 +317,7 @@ export const executeAssistantStateless = async (
   const actionContext = {
     sessionId: 'stateless_execution',
     companyId,
-    language: assistant.language as SupportedLanguage,
+    language: 'en' as SupportedLanguage,
     userId, // Pass userId
     assistantId: assistant._id.toString(),
     isStateless: true,
@@ -466,6 +466,30 @@ export const executeAssistantStateless = async (
       toolsForSdk[currentFuncName] = (tool as any)({
         description: funcDef.description,
         inputSchema: zodSchema as z.ZodType<any>,
+        // Strip Hebrew duplicate fields and MongoDB internals from tool output sent to model.
+        // Full data is still available to the application via toolResults.
+        toModelOutput: ({ output }: { toolCallId: string; input: any; output: any }) => {
+          if (output == null || typeof output === 'string') {
+            return { type: 'text' as const, value: String(output ?? '') };
+          }
+          try {
+            const stripHebrew = (item: any): any => {
+              if (!item || typeof item !== 'object') return item;
+              const out: Record<string, any> = {};
+              for (const [key, val] of Object.entries(item)) {
+                if (key.endsWith('He') && typeof val === 'string') continue;
+                if (key === '__v') continue;
+                if (key === '_id') { out.id = String(val); continue; }
+                out[key] = val;
+              }
+              return out;
+            };
+            const result = Array.isArray(output) ? output.map(stripHebrew) : stripHebrew(output);
+            return { type: 'json' as const, value: result };
+          } catch {
+            return { type: 'json' as const, value: output };
+          }
+        },
         execute: async (args: any) => {
           console.log(
             `[Stateless Tool Execution] Attempting to execute function: ${currentFuncName} with args:`,
@@ -610,12 +634,19 @@ export const executeAssistantStateless = async (
     const llm = getProvider(providerKey, modelIdentifier, llmApiKey as string);
     const relevantTools = toolsForSdk; // For stateless, all tools of the assistant are relevant
 
+    // Use higher step count for agents with many tools (e.g., trip generators that need multiple API calls)
+    const maxToolSteps = Object.keys(toolsForSdk).length > 5 ? 8 : 5;
+
     if (shouldStream) {
       const streamCallOptions: Parameters<typeof streamText>[0] = {
         model: llm,
         messages: trimmedMessages,
         tools: relevantTools,
-        stopWhen: stepCountIs(3), // Consider making this configurable per assistant or request
+        stopWhen: stepCountIs(maxToolSteps),
+        maxRetries: 2,
+        onStepFinish: ({ toolCalls, finishReason, usage }) => {
+          console.log(`[Stateless Stream Step] reason=${finishReason} tools=${toolCalls?.length || 0} tokens=${usage?.totalTokens || 0} assistant=${assistant.name || assistant._id}`);
+        },
       };
       if (systemPrompt !== undefined && providerKey !== 'anthropic') {
         // Anthropic handles system prompt in messages
@@ -660,8 +691,13 @@ export const executeAssistantStateless = async (
           model: llm,
           messages: trimmedMessages,
           tools: relevantTools,
-          stopWhen: stepCountIs(3),
+          stopWhen: stepCountIs(maxToolSteps),
+          maxRetries: 2,
           system: providerKey !== 'anthropic' ? systemPrompt : undefined,
+          abortSignal: AbortSignal.timeout(5 * 60 * 1000), // 5-minute total timeout (provider-agnostic)
+          onStepFinish: ({ toolCalls, finishReason, usage }) => {
+            console.log(`[Stateless JSON Step] reason=${finishReason} tools=${toolCalls?.length || 0} tokens=${usage?.totalTokens || 0} assistant=${assistant.name || assistant._id}`);
+          },
         };
 
         if (providerKey === 'openai') {
@@ -673,17 +709,33 @@ export const executeAssistantStateless = async (
         // Anthropic typically uses tool calling for structured JSON, which `generateObject` handles.
         // Google's Gemini can be instructed via prompt or might have a responseMimeType config.
 
+        console.log(`[Stateless JSON] Starting generateText for ${assistant.name || assistant._id} (${providerKey}/${modelIdentifier}) maxSteps=${maxToolSteps}`);
         const startTime = Date.now();
         const result = await generateText(generateTextOptions);
         const duration = Date.now() - startTime;
+        console.log(`[Stateless JSON] Completed in ${duration}ms, text length=${result.text?.length || 0}, steps=${(result as any).steps?.length || 0}`);
 
-        // Log cost tracking for JSON format
-        if (result.usage) {
-          const costs = calculateCost(
-            modelIdentifier,
-            result.usage.inputTokens || 0,
-            result.usage.outputTokens || 0,
-          );
+        // Aggregate token usage and tool calls from ALL steps (not just result.usage which may only reflect last step)
+        let aggInputTokens = 0;
+        let aggOutputTokens = 0;
+        let totalToolCallCount = 0;
+        const steps = (result as any).steps;
+        if (steps && Array.isArray(steps)) {
+          for (const step of steps) {
+            aggInputTokens += step.usage?.inputTokens || 0;
+            aggOutputTokens += step.usage?.outputTokens || 0;
+            totalToolCallCount += step.toolCalls?.length || 0;
+          }
+        }
+        // Fall back to result.usage if no steps data
+        if (aggInputTokens === 0 && aggOutputTokens === 0 && result.usage) {
+          aggInputTokens = result.usage.inputTokens || 0;
+          aggOutputTokens = result.usage.outputTokens || 0;
+        }
+        const aggTotalTokens = aggInputTokens + aggOutputTokens;
+
+        if (aggTotalTokens > 0) {
+          const costs = calculateCost(modelIdentifier, aggInputTokens, aggOutputTokens);
 
           const costInfo: CostTrackingInfo = {
             companyId: companyId?.toString() || 'unknown',
@@ -692,18 +744,15 @@ export const executeAssistantStateless = async (
             userId: userId || 'unknown',
             provider: providerKey,
             model: modelIdentifier,
-            inputTokens: result.usage.inputTokens || 0,
-            outputTokens: result.usage.outputTokens || 0,
-            totalTokens:
-              result.usage.totalTokens ||
-              (result.usage.inputTokens || 0) +
-                (result.usage.outputTokens || 0),
+            inputTokens: aggInputTokens,
+            outputTokens: aggOutputTokens,
+            totalTokens: aggTotalTokens,
             inputCost: costs.inputCost,
             outputCost: costs.outputCost,
             totalCost: costs.totalCost,
             timestamp: new Date(),
             duration,
-            toolCalls: 0,
+            toolCalls: totalToolCallCount,
             cached: false,
             requestType: 'stateless',
           };
@@ -769,32 +818,44 @@ export const executeAssistantStateless = async (
         model: llm,
         messages: trimmedMessages,
         tools: relevantTools,
-        stopWhen: stepCountIs(3),
+        stopWhen: stepCountIs(maxToolSteps),
+        maxRetries: 2,
+        abortSignal: AbortSignal.timeout(5 * 60 * 1000), // 5-minute total timeout (provider-agnostic)
+        onStepFinish: ({ toolCalls, finishReason, usage }) => {
+          console.log(`[Stateless Text Step] reason=${finishReason} tools=${toolCalls?.length || 0} tokens=${usage?.totalTokens || 0} assistant=${assistant.name || assistant._id}`);
+        },
       };
       if (systemPrompt !== undefined && providerKey !== 'anthropic') {
         generateCallOptions.system = systemPrompt;
       }
+      console.log(`[Stateless Text] Starting generateText for ${assistant.name || assistant._id} (${providerKey}/${modelIdentifier}) maxSteps=${maxToolSteps}`);
       const startTime = Date.now();
       const result = await generateText(generateCallOptions);
       const duration = Date.now() - startTime;
+      console.log(`[Stateless Text] Completed in ${duration}ms, text length=${result.text?.length || 0}, steps=${(result as any).steps?.length || 0}`);
 
-      // Log cost tracking for stateless execution
-      if (result.usage) {
-        const costs = calculateCost(
-          modelIdentifier,
-          result.usage.inputTokens || 0,
-          result.usage.outputTokens || 0,
-        );
-
-        // Count tool calls from all steps, not just the final step
-        let totalToolCallCount = 0;
-        if ((result as any).steps && Array.isArray((result as any).steps)) {
-          for (const step of (result as any).steps) {
-            totalToolCallCount += step.toolCalls?.length || 0;
-          }
-        } else {
-          totalToolCallCount = result.toolCalls?.length || 0;
+      // Aggregate token usage and tool calls from ALL steps
+      let aggInputTokens = 0;
+      let aggOutputTokens = 0;
+      let totalToolCallCount = 0;
+      const steps = (result as any).steps;
+      if (steps && Array.isArray(steps)) {
+        for (const step of steps) {
+          aggInputTokens += step.usage?.inputTokens || 0;
+          aggOutputTokens += step.usage?.outputTokens || 0;
+          totalToolCallCount += step.toolCalls?.length || 0;
         }
+      }
+      // Fall back to result.usage if no steps data
+      if (aggInputTokens === 0 && aggOutputTokens === 0 && result.usage) {
+        aggInputTokens = result.usage.inputTokens || 0;
+        aggOutputTokens = result.usage.outputTokens || 0;
+        totalToolCallCount = result.toolCalls?.length || 0;
+      }
+      const aggTotalTokens = aggInputTokens + aggOutputTokens;
+
+      if (aggTotalTokens > 0) {
+        const costs = calculateCost(modelIdentifier, aggInputTokens, aggOutputTokens);
 
         const costInfo: CostTrackingInfo = {
           companyId: companyId?.toString() || 'unknown',
@@ -803,11 +864,9 @@ export const executeAssistantStateless = async (
           userId: userId || 'unknown',
           provider: providerKey,
           model: modelIdentifier,
-          inputTokens: result.usage.inputTokens || 0,
-          outputTokens: result.usage.outputTokens || 0,
-          totalTokens:
-            result.usage.totalTokens ||
-            (result.usage.inputTokens || 0) + (result.usage.outputTokens || 0),
+          inputTokens: aggInputTokens,
+          outputTokens: aggOutputTokens,
+          totalTokens: aggTotalTokens,
           inputCost: costs.inputCost,
           outputCost: costs.outputCost,
           totalCost: costs.totalCost,
