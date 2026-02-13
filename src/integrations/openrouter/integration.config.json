@@ -4,6 +4,8 @@
   "description": "Access 400+ AI models from Meta, DeepSeek, Mistral, Qwen and more through a single API",
   "icon": "route",
   "category": "ai",
+  "actionCreator": "createOpenRouterActions",
+  "actionsFile": "openrouter.actions.ts",
   "requiredApiKeys": [
     {
       "key": "openrouter_api_key",
