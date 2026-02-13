@@ -135,7 +135,7 @@ export function getProvider(pk: ProviderKey, model: string, key: string) {
             'HTTP-Referer': 'https://singularitybridge.net',
             'X-Title': 'Agent Hub',
           },
-        })(config.baseModel);
+        }).chat(config.baseModel);
       case 'openai':
       default:
         return createOpenAI({ apiKey: key })(config.baseModel);
@@ -156,7 +156,7 @@ export function getProvider(pk: ProviderKey, model: string, key: string) {
           'HTTP-Referer': 'https://singularitybridge.net',
           'X-Title': 'Agent Hub',
         },
-      })(model);
+      }).chat(model);
     case 'openai':
     default:
       // For unknown o3-mini variants, convert to base o3-mini
