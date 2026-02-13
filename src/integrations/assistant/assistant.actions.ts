@@ -148,18 +148,6 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
           minLength: 10,
           maxLength: 10000,
         },
-        language: {
-          type: 'string',
-          description: 'Primary language code for the assistant',
-          enum: ['en', 'he'],
-          default: 'en',
-        },
-        voice: {
-          type: 'string',
-          description:
-            'Voice identifier for text-to-speech (e.g., "alloy", "echo", "nova" for OpenAI voices)',
-          default: 'alloy',
-        },
         conversation_starters: {
           type: 'array',
           description: 'Suggested conversation starters to guide users',
@@ -183,14 +171,12 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
           maxItems: 10,
         },
       },
-      required: ['name', 'description', 'prompt', 'language', 'voice'],
+      required: ['name', 'description', 'prompt'],
     },
     function: async (args: {
       name: string;
       description: string;
       prompt: string;
-      language: string;
-      voice: string;
       conversation_starters?: IIdentifier[];
     }): Promise<StandardActionResult<CreateNewAssistantData>> => {
       return executeAction<CreateNewAssistantData>(
@@ -201,8 +187,6 @@ const createAssistantActions = (context: ActionContext): FunctionFactory => ({
             args.name,
             args.description,
             args.prompt,
-            args.language,
-            args.voice,
             args.conversation_starters || [],
           ),
         {

@@ -23,14 +23,136 @@ import {
 
 export { validateConnection };
 
-const DEFAULT_FIELD_MASK = 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.types,places.primaryType,places.editorialSummary,places.regularOpeningHours,places.priceLevel,places.photos,places.websiteUri,places.googleMapsUri';
+// Lean field mask for search results — includes photos for auto-resolving first image URL per place
+const DEFAULT_SEARCH_FIELD_MASK = 'places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.types,places.websiteUri,places.nationalPhoneNumber,places.currentOpeningHours.openNow,places.location,places.photos';
+
+// Richer field mask when user explicitly wants more detail
+const RICH_FIELD_MASK = 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.types,places.primaryType,places.editorialSummary,places.regularOpeningHours,places.priceLevel,places.photos,places.websiteUri,places.googleMapsUri';
+
+// ── Response trimming helpers ────────────────────────────────────
+
+/** Trim a single place object: keep first photo name for URL resolution, shorten editorial, drop verbose nested data */
+function trimPlaceForSearch(place: any): any {
+  if (!place) return place;
+  const trimmed = { ...place };
+
+  // Keep first photo name for URL resolution, drop the rest
+  if (trimmed.photos && Array.isArray(trimmed.photos) && trimmed.photos.length > 0) {
+    trimmed._photoName = trimmed.photos[0].name;
+  }
+  delete trimmed.photos;
+
+  // Shorten editorialSummary to 200 chars max
+  if (trimmed.editorialSummary?.text && trimmed.editorialSummary.text.length > 200) {
+    trimmed.editorialSummary = { text: trimmed.editorialSummary.text.slice(0, 200) + '...' };
+  }
+
+  // Strip reviews (should not be in search results but just in case)
+  delete trimmed.reviews;
+
+  // Strip addressComponents
+  delete trimmed.addressComponents;
+
+  // Flatten regularOpeningHours to just weekday text if present
+  if (trimmed.regularOpeningHours) {
+    trimmed.openingHours = trimmed.regularOpeningHours.weekdayDescriptions || trimmed.regularOpeningHours;
+    delete trimmed.regularOpeningHours;
+  }
+
+  // Flatten currentOpeningHours to just openNow boolean
+  if (trimmed.currentOpeningHours) {
+    trimmed.openNow = trimmed.currentOpeningHours.openNow ?? null;
+    delete trimmed.currentOpeningHours;
+  }
+
+  return trimmed;
+}
+
+/** Trim place details: cap reviews at 3, strip addressComponents, trim review text */
+function trimPlaceDetails(place: any): any {
+  if (!place) return place;
+  const trimmed = { ...place };
+
+  // Cap reviews at 3, and trim each review text to 300 chars
+  if (trimmed.reviews && Array.isArray(trimmed.reviews)) {
+    trimmed.reviews = trimmed.reviews.slice(0, 3).map((r: any) => ({
+      authorName: r.authorAttribution?.displayName || r.authorName,
+      rating: r.rating,
+      relativePublishTimeDescription: r.relativePublishTimeDescription,
+      text: r.text?.text
+        ? (r.text.text.length > 300 ? r.text.text.slice(0, 300) + '...' : r.text.text)
+        : r.text,
+    }));
+  }
+
+  // Strip addressComponents (verbose, rarely needed for travel planning)
+  delete trimmed.addressComponents;
+
+  // Replace photos array with count + first photo name (for later retrieval)
+  if (trimmed.photos && Array.isArray(trimmed.photos)) {
+    trimmed.photoCount = trimmed.photos.length;
+    trimmed.firstPhotoName = trimmed.photos[0]?.name || null;
+    delete trimmed.photos;
+  }
+
+  // Flatten regularOpeningHours to weekday text
+  if (trimmed.regularOpeningHours) {
+    trimmed.openingHours = trimmed.regularOpeningHours.weekdayDescriptions || null;
+    delete trimmed.regularOpeningHours;
+  }
+
+  // Flatten currentOpeningHours to openNow boolean + weekday text
+  if (trimmed.currentOpeningHours) {
+    trimmed.openNow = trimmed.currentOpeningHours.openNow ?? null;
+    if (!trimmed.openingHours && trimmed.currentOpeningHours.weekdayDescriptions) {
+      trimmed.openingHours = trimmed.currentOpeningHours.weekdayDescriptions;
+    }
+    delete trimmed.currentOpeningHours;
+  }
+
+  // Shorten editorialSummary
+  if (trimmed.editorialSummary?.text && trimmed.editorialSummary.text.length > 300) {
+    trimmed.editorialSummary = { text: trimmed.editorialSummary.text.slice(0, 300) + '...' };
+  }
+
+  return trimmed;
+}
+
+/** Trim route response: strip polyline data, keep only useful navigation info */
+function trimRouteResponse(route: any): any {
+  if (!route) return route;
+  const trimmed: any = {
+    distanceMeters: route.distanceMeters,
+    duration: route.duration,
+    description: route.description,
+  };
+
+  if (route.legs && Array.isArray(route.legs)) {
+    trimmed.legs = route.legs.map((leg: any) => ({
+      distanceMeters: leg.distanceMeters,
+      duration: leg.duration,
+      startLocation: leg.startLocation?.latLng || leg.startLocation,
+      endLocation: leg.endLocation?.latLng || leg.endLocation,
+      steps: (leg.steps || []).map((step: any) => ({
+        distanceMeters: step.distanceMeters,
+        staticDuration: step.staticDuration,
+        instruction: step.navigationInstruction?.instructions || null,
+        travelMode: step.travelMode,
+        // Deliberately omit: step.polyline, step.startLocation, step.endLocation (encoded geometry)
+      })),
+    }));
+  }
+
+  // Deliberately omit: route.polyline (encoded geometry string, very large, useless for AI)
+  return trimmed;
+}
 
 export const createGoogleMapsActions = (context: ActionContext): FunctionFactory => ({
 
   // ── Places: Text Search ─────────────────────────────────────
 
   searchPlaces: {
-    description: 'Search for places using a text query (e.g. "kosher restaurants in Rome", "museums near Central Park"). Returns place names, addresses, ratings, photos, opening hours, and more. Use the fieldMask parameter to control which fields are returned.',
+    description: 'Search for places using a text query (e.g. "kosher restaurants in Rome", "museums near Central Park"). Returns place names, addresses, ratings, and key info. Default returns 5 lean results — use fieldMask for richer data.',
     strict: true,
     parameters: {
       type: 'object',
@@ -41,7 +163,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
         },
         maxResults: {
           type: 'number',
-          description: 'Maximum number of results (1-20, default 10)',
+          description: 'Maximum number of results (1-20, default 5)',
         },
         language: {
           type: 'string',
@@ -53,7 +175,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
         },
         fieldMask: {
           type: 'string',
-          description: 'Comma-separated fields to return. Default includes id, displayName, formattedAddress, location, rating, types, editorialSummary, openingHours, photos, websiteUri. Add "places.reviews" for reviews, "places.currentOpeningHours" for live hours.',
+          description: 'Comma-separated fields to return. Default is lean (id, name, address, rating, price, types, phone, openNow, location). Use "rich" for more detail (adds photos, editorial, hours, googleMapsUri). Or specify custom comma-separated fields like "places.reviews,places.photos".',
         },
       },
       required: ['query'],
@@ -69,13 +191,31 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
       if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
       if (!args.query) throw new ActionValidationError('query is required.');
       return executeAction('searchPlaces', async () => {
-        const fieldMask = args.fieldMask || DEFAULT_FIELD_MASK;
+        let fieldMask: string;
+        if (args.fieldMask === 'rich') {
+          fieldMask = RICH_FIELD_MASK;
+        } else {
+          fieldMask = args.fieldMask || DEFAULT_SEARCH_FIELD_MASK;
+        }
         const data = await placesTextSearch(context.companyId, args.query, fieldMask, {
-          maxResultCount: args.maxResults || 10,
+          maxResultCount: args.maxResults || 5,
           languageCode: args.language || 'en',
           includedType: args.type,
         });
-        const places = data.places || [];
+        const places = (data.places || []).map(trimPlaceForSearch);
+
+        // Auto-resolve first photo URL for each place (parallel, fast)
+        await Promise.all(places.map(async (place: any) => {
+          if (place._photoName) {
+            try {
+              place.photoUrl = await getPlacePhoto(context.companyId, place._photoName, 400);
+            } catch {
+              // Photo resolution failed — skip silently
+            }
+            delete place._photoName;
+          }
+        }));
+
         return { success: true, data: places, description: `Found ${places.length} places` };
       }, { serviceName: 'googleMaps' });
     },
@@ -84,7 +224,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
   // ── Places: Get Details ─────────────────────────────────────
 
   getPlaceDetails: {
-    description: 'Get full details for a place by its Google Place ID. Returns name, address, rating, reviews, photos, opening hours, phone, website, price level, and more.',
+    description: 'Get full details for a place by its Google Place ID. Returns name, address, rating, top 3 reviews, opening hours, phone, website, price level, and service options. Photos are summarized as count + first photo name.',
     strict: true,
     parameters: {
       type: 'object',
@@ -99,7 +239,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
         },
         fieldMask: {
           type: 'string',
-          description: 'Comma-separated fields to return. Default includes core fields. Add "reviews" for user reviews, "currentOpeningHours" for live hours.',
+          description: 'Comma-separated fields to return. Default includes core fields + reviews + service options. Provide custom fields to override.',
         },
       },
       required: ['placeId'],
@@ -115,7 +255,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
       return executeAction('getPlaceDetails', async () => {
         const fieldMask = args.fieldMask || 'id,displayName,formattedAddress,location,rating,userRatingCount,types,primaryType,editorialSummary,regularOpeningHours,currentOpeningHours,priceLevel,photos,websiteUri,googleMapsUri,internationalPhoneNumber,reviews,servesVegetarianFood,servesBeer,servesWine,dineIn,takeout,delivery,reservable';
         const data = await getPlaceDetailsSvc(context.companyId, args.placeId, fieldMask, args.language);
-        return { success: true, data };
+        return { success: true, data: trimPlaceDetails(data) };
       }, { serviceName: 'googleMaps' });
     },
   },
@@ -177,7 +317,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
   // ── Places: Nearby Search ───────────────────────────────────
 
   searchNearby: {
-    description: 'Search for places near a specific location (lat/lng) within a given radius. Useful for finding nearby restaurants, attractions, etc. around a known point.',
+    description: 'Search for places near a specific location (lat/lng) within a given radius. Returns lean results by default (5 places). Use fieldMask="rich" for more detail.',
     strict: true,
     parameters: {
       type: 'object',
@@ -201,11 +341,11 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
         },
         maxResults: {
           type: 'number',
-          description: 'Maximum number of results (1-20, default 10)',
+          description: 'Maximum number of results (1-20, default 5)',
         },
         fieldMask: {
           type: 'string',
-          description: 'Comma-separated fields to return (same options as searchPlaces)',
+          description: 'Comma-separated fields to return. Default is lean. Use "rich" for photos, editorial, hours, googleMapsUri.',
         },
       },
       required: ['latitude', 'longitude', 'radius', 'types'],
@@ -221,7 +361,12 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
     }): Promise<StandardActionResult> => {
       if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
       return executeAction('searchNearby', async () => {
-        const fieldMask = args.fieldMask || DEFAULT_FIELD_MASK;
+        let fieldMask: string;
+        if (args.fieldMask === 'rich') {
+          fieldMask = RICH_FIELD_MASK;
+        } else {
+          fieldMask = args.fieldMask || DEFAULT_SEARCH_FIELD_MASK;
+        }
         const data = await searchNearbySvc(
           context.companyId,
           args.latitude,
@@ -229,9 +374,22 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
           args.radius,
           args.types,
           fieldMask,
-          args.maxResults || 10,
+          args.maxResults || 5,
         );
-        const places = data.places || [];
+        const places = (data.places || []).map(trimPlaceForSearch);
+
+        // Auto-resolve first photo URL for each place (parallel, fast)
+        await Promise.all(places.map(async (place: any) => {
+          if (place._photoName) {
+            try {
+              place.photoUrl = await getPlacePhoto(context.companyId, place._photoName, 400);
+            } catch {
+              // Photo resolution failed — skip silently
+            }
+            delete place._photoName;
+          }
+        }));
+
         return { success: true, data: places, description: `Found ${places.length} nearby places` };
       }, { serviceName: 'googleMaps' });
     },
@@ -240,7 +398,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
   // ── Routes: Get Directions ──────────────────────────────────
 
   getDirections: {
-    description: 'Get directions and route between two points. Returns distance, duration, and step-by-step directions. Supports driving, walking, bicycling, and transit.',
+    description: 'Get directions between two points. Returns distance, duration, and step-by-step text instructions. Polyline geometry is stripped to keep responses lean.',
     strict: true,
     parameters: {
       type: 'object',
@@ -286,9 +444,10 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
           args.travelMode || 'DRIVE',
         );
         const route = data.routes?.[0];
+        const trimmed = route ? trimRouteResponse(route) : null;
         return {
           success: true,
-          data: route || data,
+          data: trimmed || data,
           description: route
             ? `Route: ${route.distanceMeters}m, ${route.duration}`
             : 'No route found',

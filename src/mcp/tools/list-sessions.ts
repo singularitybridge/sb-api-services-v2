@@ -19,12 +19,20 @@ export const listSessionsSchema = z.object({
     .enum(['active', 'inactive'])
     .optional()
     .describe('Filter by session status'),
-  limit: z
+  channel: z
+    .string()
+    .optional()
+    .describe('Filter by channel (e.g., "web", "telegram", "whatsapp")'),
+  channelUserId: z
+    .string()
+    .optional()
+    .describe('Filter by channel user ID'),
+  limit: z.coerce
     .number()
     .optional()
     .default(20)
     .describe('Maximum number of sessions to return (default: 20)'),
-  offset: z
+  offset: z.coerce
     .number()
     .optional()
     .default(0)
@@ -64,6 +72,16 @@ export async function listSessions(
       query.active = input.status === 'active';
     }
 
+    // Filter by channel if provided
+    if (input.channel) {
+      query.channel = input.channel;
+    }
+
+    // Filter by channelUserId if provided
+    if (input.channelUserId) {
+      query.channelUserId = input.channelUserId;
+    }
+
     // Get sessions with pagination
     const sessions = await Session.find(query)
       .sort({ createdAt: -1 }) // Newest first
@@ -93,6 +111,8 @@ export async function listSessions(
           agentId: session.assistantId?.toString() || '',
           agentName: assistant?.name || 'Unknown',
           active: session.active,
+          channel: session.channel || 'web',
+          channelUserId: session.channelUserId || '',
           messageCount,
           lastMessageAt: lastMessage?.timestamp?.toISOString() || null,
           createdAt:

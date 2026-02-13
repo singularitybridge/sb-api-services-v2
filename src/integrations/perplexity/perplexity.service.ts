@@ -1,6 +1,14 @@
 import axios from 'axios';
 import { getApiKey } from '../../services/api.key.service';
 
+interface PerplexityImage {
+  image_url: string;
+  origin_url: string;
+  height: number;
+  width: number;
+  title?: string;
+}
+
 interface PerplexityResponse {
   id: string;
   model: string;
@@ -18,6 +26,7 @@ interface PerplexityResponse {
     };
   }[];
   related_questions?: string[];
+  images?: PerplexityImage[];
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -77,7 +86,8 @@ export async function performPerplexitySearch(
   searchMode: 'academic' | 'sec' | 'web' = 'web',
   returnRelatedQuestions: boolean = false,
   reasoningEffort: 'low' | 'medium' | 'high' = 'medium',
-): Promise<{ searchResult: string; relatedQuestions?: string[] }> {
+  returnImages: boolean = false,
+): Promise<{ searchResult: string; relatedQuestions?: string[]; images?: PerplexityImage[]; imageMarkdown?: string }> {
   const apiKey = await getApiKey(companyId, 'perplexity_api_key');
   if (!apiKey) {
     throw new Error('Perplexity API key not found');
@@ -110,6 +120,7 @@ export async function performPerplexitySearch(
       ],
       search_mode: searchMode,
       return_related_questions: returnRelatedQuestions,
+      ...(returnImages && { return_images: true }),
     };
 
     // Add reasoning_effort only for sonar-deep-research model
@@ -129,13 +140,23 @@ export async function performPerplexitySearch(
       cleanContent = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     }
 
-    const result: { searchResult: string; relatedQuestions?: string[] } = {
+    const result: { searchResult: string; relatedQuestions?: string[]; images?: PerplexityImage[]; imageMarkdown?: string } = {
       searchResult: cleanContent,
     };
 
     // Include related questions if they were requested and returned
     if (returnRelatedQuestions && data.related_questions) {
       result.relatedQuestions = data.related_questions;
+    }
+
+    // Include images if requested and returned
+    if (returnImages && data.images && data.images.length > 0) {
+      result.images = data.images;
+      // Pre-format as markdown for easy agent use
+      result.imageMarkdown = data.images
+        .slice(0, 5)
+        .map((img) => `![${img.title || 'Photo'}](${img.image_url})`)
+        .join('\n');
     }
 
     return result;

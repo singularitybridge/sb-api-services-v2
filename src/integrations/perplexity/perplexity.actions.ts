@@ -87,13 +87,24 @@ interface PerplexitySearchArgs {
   query: string;
   search_mode?: 'academic' | 'sec' | 'web';
   return_related_questions?: boolean;
+  return_images?: boolean;
   reasoning_effort?: 'low' | 'medium' | 'high';
+}
+
+interface PerplexityImage {
+  image_url: string;
+  origin_url: string;
+  height: number;
+  width: number;
+  title?: string;
 }
 
 // R type for StandardActionResult<R>
 interface PerplexityResponseData {
   searchResult: string;
   relatedQuestions?: string[];
+  images?: PerplexityImage[];
+  imageMarkdown?: string;
 }
 
 // S type for serviceCall lambda's response
@@ -140,6 +151,10 @@ export const createPerplexityActions = (
           type: 'boolean',
           description: 'Return related follow-up questions. Default: false',
         },
+        return_images: {
+          type: 'boolean',
+          description: 'Return relevant images from search results (up to 30). Default: false',
+        },
         reasoning_effort: {
           type: 'string',
           enum: ['low', 'medium', 'high'],
@@ -158,6 +173,7 @@ export const createPerplexityActions = (
         query,
         search_mode = 'web',
         return_related_questions = false,
+        return_images = false,
         reasoning_effort = 'medium',
       } = args;
 
@@ -179,6 +195,7 @@ export const createPerplexityActions = (
         'query',
         'search_mode',
         'return_related_questions',
+        'return_images',
         'reasoning_effort',
       ];
       const extraProps = argKeys.filter((prop) => !allowedProps.includes(prop));
@@ -211,6 +228,7 @@ export const createPerplexityActions = (
             search_mode,
             return_related_questions,
             reasoning_effort,
+            return_images,
           );
           return { success: true, data: result };
         },

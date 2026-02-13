@@ -2,7 +2,7 @@ import axios from 'axios';
 import { getApiKey } from '../../services/api.key.service';
 
 // Types
-export interface OpenCodeSession {
+export interface GolemSession {
   id: string;
   title?: string;
   stats?: {
@@ -12,7 +12,7 @@ export interface OpenCodeSession {
   [key: string]: any;
 }
 
-export interface OpenCodeMessage {
+export interface GolemMessage {
   role: 'user' | 'assistant';
   parts: Array<{
     type: string;
@@ -56,19 +56,15 @@ function isInternalUrl(url: string): boolean {
 }
 
 // Helper to get credentials
-// If sandboxUrl is provided, use it instead of the stored URL (for multi-sandbox support)
 async function getCredentials(
   companyId: string,
   sandboxUrl?: string
-): Promise<{ baseUrl: string; password: string; githubToken?: string }> {
-  const password = await getApiKey(companyId, 'opencode_server_password');
+): Promise<{ baseUrl: string; password: string }> {
+  const password = await getApiKey(companyId, 'golem_server_password');
 
   if (!password) {
-    throw new Error('Missing OpenCode configuration. Please configure opencode_server_password.');
+    throw new Error('Missing Golem configuration. Please configure golem_server_password.');
   }
-
-  // Get optional GitHub token
-  const githubToken = await getApiKey(companyId, 'github_token');
 
   let baseUrl: string;
 
@@ -80,9 +76,9 @@ async function getCredentials(
     baseUrl = sandboxUrl;
   } else {
     // Fall back to stored URL
-    const storedUrl = await getApiKey(companyId, 'opencode_server_url');
+    const storedUrl = await getApiKey(companyId, 'golem_server_url');
     if (!storedUrl) {
-      throw new Error('Missing OpenCode configuration. Please provide sandboxUrl or configure opencode_server_url.');
+      throw new Error('Missing Golem configuration. Please provide sandboxUrl or configure golem_server_url.');
     }
     baseUrl = storedUrl;
   }
@@ -90,19 +86,12 @@ async function getCredentials(
   // Remove trailing slash if present
   const cleanUrl = baseUrl.replace(/\/$/, '');
 
-  return { baseUrl: cleanUrl, password, githubToken: githubToken || undefined };
+  return { baseUrl: cleanUrl, password };
 }
 
 /**
- * Get the configured GitHub token for a company
- */
-export async function getGitHubToken(companyId: string): Promise<string | null> {
-  return getApiKey(companyId, 'github_token');
-}
-
-/**
- * Clone a GitHub repository using the configured token
- * Sends a prompt to the OpenCode agent to clone the repo with proper authentication
+ * Clone a GitHub repository into the sandbox workspace
+ * The Golem sandbox is pre-configured with GitHub credentials
  */
 export async function cloneRepository(
   companyId: string,
@@ -112,30 +101,20 @@ export async function cloneRepository(
   branch?: string,
   sandboxUrl?: string
 ): Promise<SendPromptResult> {
-  const { baseUrl, password, githubToken } = await getCredentials(companyId, sandboxUrl);
+  const { baseUrl, password } = await getCredentials(companyId, sandboxUrl);
 
-  // Build clone command with token authentication if available
-  let cloneCommand: string;
   const targetPath = targetDir || repoUrl.split('/').pop()?.replace('.git', '') || 'repo';
-
-  if (githubToken && repoUrl.includes('github.com')) {
-    // Use token for authentication (HTTPS with token)
-    const authUrl = repoUrl.replace('https://github.com/', `https://x-access-token:${githubToken}@github.com/`);
-    cloneCommand = `git clone ${authUrl} ${targetPath}`;
-  } else {
-    cloneCommand = `git clone ${repoUrl} ${targetPath}`;
-  }
+  let cloneCommand = `git clone ${repoUrl} ${targetPath}`;
 
   if (branch) {
     cloneCommand += ` -b ${branch}`;
   }
 
-  // Build the full prompt
   const prompt = `Run the following commands:
 1. cd /data/workspace
 2. ${cloneCommand}
 3. cd ${targetPath} && npm install (if package.json exists)
-4. Configure git user: git config user.email "agent@singularitybridge.ai" && git config user.name "OpenCode Agent"
+4. Configure git user: git config user.email "agent@singularitybridge.ai" && git config user.name "Golem Agent"
 
 Report what was cloned and installed.`;
 
@@ -144,7 +123,7 @@ Report what was cloned and installed.`;
       `${baseUrl}/session/${sessionId}/prompt_async`,
       { parts: [{ type: 'text', text: prompt }] },
       {
-        auth: { username: 'opencode', password },
+        auth: { username: 'golem', password },
         headers: { 'Content-Type': 'application/json' },
         timeout: 60000,
       }
@@ -159,13 +138,12 @@ Report what was cloned and installed.`;
 }
 
 /**
- * Create a new OpenCode session
- * @param sandboxUrl - Optional URL of the sandbox (e.g., https://my-app.fly.dev). If not provided, uses stored URL.
+ * Create a new Golem session
  */
 export async function createSession(
   companyId: string,
   sandboxUrl?: string
-): Promise<OpenCodeSession> {
+): Promise<GolemSession> {
   const { baseUrl, password } = await getCredentials(companyId, sandboxUrl);
 
   try {
@@ -173,16 +151,16 @@ export async function createSession(
       `${baseUrl}/session`,
       {},
       {
-        auth: { username: 'opencode', password },
+        auth: { username: 'golem', password },
         headers: { 'Content-Type': 'application/json' },
         timeout: 30000,
       }
     );
     return response.data;
   } catch (error: any) {
-    console.error('Error creating OpenCode session:', error.message);
+    console.error('Error creating Golem session:', error.message);
     if (error.response?.status === 502) {
-      throw new Error('OpenCode server is waking up. Please retry in a few seconds.');
+      throw new Error('Golem server is waking up. Please retry in a few seconds.');
     }
     throw new Error(
       error.response?.data?.error || error.message || 'Failed to create session'
@@ -191,8 +169,7 @@ export async function createSession(
 }
 
 /**
- * Send a prompt to an OpenCode session (async - recommended)
- * @param sandboxUrl - Optional URL of the sandbox (e.g., https://my-app.fly.dev). If not provided, uses stored URL.
+ * Send a prompt to a Golem session (async)
  */
 export async function sendPrompt(
   companyId: string,
@@ -207,16 +184,16 @@ export async function sendPrompt(
       `${baseUrl}/session/${sessionId}/prompt_async`,
       { parts: [{ type: 'text', text: prompt }] },
       {
-        auth: { username: 'opencode', password },
+        auth: { username: 'golem', password },
         headers: { 'Content-Type': 'application/json' },
         timeout: 60000,
       }
     );
     return { success: true, result: response.data };
   } catch (error: any) {
-    console.error('Error sending prompt to OpenCode:', error.message);
+    console.error('Error sending prompt to Golem:', error.message);
     if (error.response?.status === 502) {
-      throw new Error('OpenCode server is waking up. Please retry in a few seconds.');
+      throw new Error('Golem server is waking up. Please retry in a few seconds.');
     }
     throw new Error(
       error.response?.data?.error || error.message || 'Failed to send prompt'
@@ -225,29 +202,28 @@ export async function sendPrompt(
 }
 
 /**
- * Get all messages from an OpenCode session
- * @param sandboxUrl - Optional URL of the sandbox (e.g., https://my-app.fly.dev). If not provided, uses stored URL.
+ * Get all messages from a Golem session
  */
 export async function getMessages(
   companyId: string,
   sessionId: string,
   sandboxUrl?: string
-): Promise<OpenCodeMessage[]> {
+): Promise<GolemMessage[]> {
   const { baseUrl, password } = await getCredentials(companyId, sandboxUrl);
 
   try {
     const response = await axios.get(
       `${baseUrl}/session/${sessionId}/message`,
       {
-        auth: { username: 'opencode', password },
+        auth: { username: 'golem', password },
         timeout: 30000,
       }
     );
     return response.data;
   } catch (error: any) {
-    console.error('Error fetching OpenCode messages:', error.message);
+    console.error('Error fetching Golem messages:', error.message);
     if (error.response?.status === 502) {
-      throw new Error('OpenCode server is waking up. Please retry in a few seconds.');
+      throw new Error('Golem server is waking up. Please retry in a few seconds.');
     }
     throw new Error(
       error.response?.data?.error || error.message || 'Failed to fetch messages'
@@ -257,28 +233,27 @@ export async function getMessages(
 
 /**
  * Get session details
- * @param sandboxUrl - Optional URL of the sandbox (e.g., https://my-app.fly.dev). If not provided, uses stored URL.
  */
 export async function getSession(
   companyId: string,
   sessionId: string,
   sandboxUrl?: string
-): Promise<OpenCodeSession> {
+): Promise<GolemSession> {
   const { baseUrl, password } = await getCredentials(companyId, sandboxUrl);
 
   try {
     const response = await axios.get(
       `${baseUrl}/session/${sessionId}`,
       {
-        auth: { username: 'opencode', password },
+        auth: { username: 'golem', password },
         timeout: 30000,
       }
     );
     return response.data;
   } catch (error: any) {
-    console.error('Error fetching OpenCode session:', error.message);
+    console.error('Error fetching Golem session:', error.message);
     if (error.response?.status === 502) {
-      throw new Error('OpenCode server is waking up. Please retry in a few seconds.');
+      throw new Error('Golem server is waking up. Please retry in a few seconds.');
     }
     throw new Error(
       error.response?.data?.error || error.message || 'Failed to fetch session'
@@ -288,27 +263,26 @@ export async function getSession(
 
 /**
  * List all sessions
- * @param sandboxUrl - Optional URL of the sandbox (e.g., https://my-app.fly.dev). If not provided, uses stored URL.
  */
 export async function listSessions(
   companyId: string,
   sandboxUrl?: string
-): Promise<OpenCodeSession[]> {
+): Promise<GolemSession[]> {
   const { baseUrl, password } = await getCredentials(companyId, sandboxUrl);
 
   try {
     const response = await axios.get(
       `${baseUrl}/session`,
       {
-        auth: { username: 'opencode', password },
+        auth: { username: 'golem', password },
         timeout: 30000,
       }
     );
     return response.data;
   } catch (error: any) {
-    console.error('Error listing OpenCode sessions:', error.message);
+    console.error('Error listing Golem sessions:', error.message);
     if (error.response?.status === 502) {
-      throw new Error('OpenCode server is waking up. Please retry in a few seconds.');
+      throw new Error('Golem server is waking up. Please retry in a few seconds.');
     }
     throw new Error(
       error.response?.data?.error || error.message || 'Failed to list sessions'
@@ -317,45 +291,7 @@ export async function listSessions(
 }
 
 /**
- * Validate GitHub token by calling the GitHub API
- */
-async function validateGitHubToken(
-  token: string
-): Promise<{ valid: boolean; username?: string; scopes?: string; error?: string }> {
-  try {
-    const response = await axios.get('https://api.github.com/user', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-      timeout: 10000,
-    });
-
-    if (response.status === 200) {
-      const scopes = response.headers['x-oauth-scopes'] || 'fine-grained (no scopes header)';
-      return {
-        valid: true,
-        username: response.data.login,
-        scopes,
-      };
-    }
-
-    return { valid: false, error: `Unexpected response: ${response.status}` };
-  } catch (error: any) {
-    if (error.response?.status === 401) {
-      return { valid: false, error: 'Invalid or expired GitHub token' };
-    }
-    if (error.response?.status === 403) {
-      return { valid: false, error: 'GitHub token lacks required permissions' };
-    }
-    return { valid: false, error: error.message || 'Failed to validate GitHub token' };
-  }
-}
-
-/**
  * Run/switch to a different app in the sandbox
- * Updates /data/active-app.json and restarts the app process via supervisord
  */
 export async function runApp(
   companyId: string,
@@ -366,24 +302,16 @@ export async function runApp(
 ): Promise<SendPromptResult> {
   const { baseUrl, password } = await getCredentials(companyId, sandboxUrl);
 
-  // Build the app config JSON
-  const appConfig = {
-    directory: appDirectory,
-    command: command || 'npm start',
-  };
+  const startCmd = command || 'npm start';
 
-  // Build the prompt to update config and restart
   const prompt = `Run the following commands to switch the running app:
 
-1. Update the app config:
-   echo '${JSON.stringify(appConfig)}' > /data/active-app.json
+1. cd ${appDirectory}
+2. If package.json exists and node_modules doesn't, run: npm install
+3. Restart the app process: pm2 restart app --update-env
+4. Wait 3 seconds and check status: sleep 3 && pm2 status app
 
-2. Restart the app process:
-   supervisorctl -c /etc/supervisor/conf.d/supervisord.conf restart app
-
-3. Wait 3 seconds and check the app is running:
-   sleep 3 && supervisorctl -c /etc/supervisor/conf.d/supervisord.conf status app
-
+The app should start with: ${startCmd}
 Report the result.`;
 
   try {
@@ -391,7 +319,7 @@ Report the result.`;
       `${baseUrl}/session/${sessionId}/prompt_async`,
       { parts: [{ type: 'text', text: prompt }] },
       {
-        auth: { username: 'opencode', password },
+        auth: { username: 'golem', password },
         headers: { 'Content-Type': 'application/json' },
         timeout: 60000,
       }
@@ -400,7 +328,7 @@ Report the result.`;
   } catch (error: any) {
     console.error('Error running app:', error.message);
     if (error.response?.status === 502) {
-      throw new Error('OpenCode server is waking up. Please retry in a few seconds.');
+      throw new Error('Golem server is waking up. Please retry in a few seconds.');
     }
     throw new Error(
       error.response?.data?.error || error.message || 'Failed to run app'
@@ -409,71 +337,40 @@ Report the result.`;
 }
 
 /**
- * Validate connection to OpenCode server and optionally GitHub (for Test Connection button)
+ * Validate connection to Golem server (for Test Connection button)
  */
 export async function validateConnection(
   apiKeys: Record<string, string>
 ): Promise<{ success: boolean; message?: string; error?: string }> {
-  const { opencode_server_url, opencode_server_password, github_token } = apiKeys || {};
+  const { golem_server_url, golem_server_password } = apiKeys || {};
 
-  if (!opencode_server_url || !opencode_server_password) {
+  if (!golem_server_url || !golem_server_password) {
     return {
       success: false,
       error: 'Missing server URL or password',
     };
   }
 
-  const cleanUrl = opencode_server_url.replace(/\/$/, '');
-  const results: string[] = [];
-  let hasError = false;
+  const cleanUrl = golem_server_url.replace(/\/$/, '');
 
-  // Test OpenCode connection
   try {
     const response = await axios.get(
       `${cleanUrl}/global/health`,
       {
-        auth: { username: 'opencode', password: opencode_server_password },
+        auth: { username: 'golem', password: golem_server_password },
         timeout: 10000,
       }
     );
 
     if (response.status === 200) {
-      results.push('✓ OpenCode server connected');
-    } else {
-      results.push(`✗ OpenCode: Unexpected response ${response.status}`);
-      hasError = true;
+      return { success: true, message: '✓ Golem server connected' };
     }
+
+    return { success: false, error: `✗ Golem: Unexpected response ${response.status}` };
   } catch (error: any) {
     if (error.response?.status === 502) {
-      results.push('✗ OpenCode: Server waking up, retry in a few seconds');
-    } else {
-      results.push(`✗ OpenCode: ${error.message || 'Connection failed'}`);
+      return { success: false, error: '✗ Golem: Server waking up, retry in a few seconds' };
     }
-    hasError = true;
+    return { success: false, error: `✗ Golem: ${error.message || 'Connection failed'}` };
   }
-
-  // Test GitHub token if provided
-  if (github_token) {
-    const ghResult = await validateGitHubToken(github_token);
-    if (ghResult.valid) {
-      results.push(`✓ GitHub authenticated as @${ghResult.username}`);
-    } else {
-      results.push(`✗ GitHub: ${ghResult.error}`);
-      hasError = true;
-    }
-  } else {
-    results.push('○ GitHub token not configured (optional)');
-  }
-
-  if (hasError) {
-    return {
-      success: false,
-      error: results.join('\n'),
-    };
-  }
-
-  return {
-    success: true,
-    message: results.join('\n'),
-  };
 }

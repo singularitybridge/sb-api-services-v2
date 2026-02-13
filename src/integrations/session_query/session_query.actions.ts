@@ -408,7 +408,7 @@ export const createSessionQueryActions = (
    */
   getCurrentUser: {
     description:
-      'Get information about the current logged-in user including name, email, role, organization, and session language',
+      'Get information about the current logged-in user including name, email, role, and organization',
     parameters: {
       type: 'object',
       properties: {},

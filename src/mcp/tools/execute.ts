@@ -217,13 +217,20 @@ export async function execute(
       result.content &&
       Array.isArray(result.content)
     ) {
-      // Extract text from content array
-      const textContent = result.content.find(
-        (c: any) => c.type === 'text' && c.text?.value,
-      );
-      // Only use the text if it's not empty
-      if (textContent?.text?.value) {
-        responseText = textContent.text.value;
+      // Check for JSON data first (from json_object responseFormat)
+      if (resultData?.json) {
+        responseText = typeof resultData.json === 'string'
+          ? resultData.json
+          : JSON.stringify(resultData.json, null, 2);
+      } else {
+        // Extract text from content array
+        const textContent = result.content.find(
+          (c: any) => c.type === 'text' && c.text?.value,
+        );
+        // Only use the text if it's not empty and not a placeholder
+        if (textContent?.text?.value && !textContent.text.value.includes("See 'data' field")) {
+          responseText = textContent.text.value;
+        }
       }
     }
 

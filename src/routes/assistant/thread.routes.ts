@@ -3,7 +3,7 @@ import { AuthenticatedRequest } from '../../middleware/auth.middleware';
 import { validateApiKeys } from '../../services/api.key.service';
 // import { getApiKey } from '../../services/api.key.service'; // Not used after removing OpenAI specific routes
 // import { createNewThread, deleteThread, getMessages } from '../../services/oai.thread.service'; // Removed, OpenAI specific
-import { Session, ISession } from '../../models/Session'; // ISession added
+import { Session } from '../../models/Session';
 import { Message } from '../../models/Message'; // Added for Step 5
 import { handleSessionMessage } from '../../services/assistant.service';
 import { getSessionOrCreate } from '../../services/session.service'; // Added
@@ -53,7 +53,7 @@ threadRouter.post(
   '/user-input',
   validateApiKeys(['openai_api_key']),
   async (req: AuthenticatedRequest, res) => {
-    const { userInput, attachments } = req.body; // Added attachments
+    const { userInput, attachments, sessionId } = req.body;
     // const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string; // apiKey is likely handled within handleSessionMessage or streamText
 
     // Determine clientWantsSSE before the try block for wider scope
@@ -73,34 +73,30 @@ threadRouter.post(
           .json({ error: 'User or Company ID not found in request.' });
       }
 
-      // Using the default web channel for this endpoint. If additional channels are introduced, revisit this logic.
-      // The getSessionOrCreate function expects an API key, but it's not directly used for session retrieval logic itself,
-      // rather it was a prerequisite for OpenAI calls. Since we are moving away from direct OpenAI calls in session.service for thread creation,
-      // and api.key.service.getApiKey is called within session.service.getSessionLanguage,
-      // we can pass a placeholder or handle it if getSessionOrCreate strictly needs it for other paths.
-      // For now, let's assume it's primarily for downstream services and might not be strictly needed here if we're just getting/creating a session.
-      // However, looking at getSessionOrCreate, it does take an apiKey. Let's pass an empty string for now and see if it breaks.
-      // A better approach would be to refactor getSessionOrCreate if apiKey is not always needed.
-      // For now, let's retrieve it as it was done in other routes.
-      // const apiKey = (await getApiKey(companyId, 'openai_api_key')) as string; // This was how it was done in session.routes.ts
-      // The apiKey is not directly used by getSessionOrCreate for finding/creating session, but passed along.
-      // Let's pass a dummy value or handle it properly.
-      // The validateApiKeys middleware should ensure 'openai_api_key' is available if needed by downstream.
-      // The `getSessionOrCreate` function in `session.service.ts` does not actually use the apiKey parameter for its core logic of finding or creating a session.
-      // It was originally passed for potential OpenAI calls which are now removed.
-      // We can pass an empty string or a placeholder.
-      const sessionData = await getSessionOrCreate(
-        '', // Placeholder for apiKey, as it's not used for session creation/retrieval itself
-        userId,
-        companyId,
-      );
+      // If sessionId is provided (e.g. from Herald or other channel integrations),
+      // validate it belongs to this company and use it directly.
+      // Otherwise, fall back to get-or-create for web channel.
+      let activeSessionId: string;
+      let sessionData: any = null;
 
-      if (!sessionData || !sessionData._id) {
-        return res
-          .status(404)
-          .json({ error: 'Active session could not be found or created.' });
+      if (sessionId) {
+        sessionData = await Session.findOne({ _id: sessionId, companyId });
+        if (!sessionData) {
+          return res
+            .status(404)
+            .json({ error: 'Session not found or does not belong to this company.' });
+        }
+        activeSessionId = sessionData._id.toString();
+      } else {
+        const created = await getSessionOrCreate('', userId, companyId);
+        if (!created || !created._id) {
+          return res
+            .status(404)
+            .json({ error: 'Active session could not be found or created.' });
+        }
+        sessionData = created;
+        activeSessionId = created._id.toString();
       }
-      const activeSessionId = sessionData._id.toString();
 
       // Step 3: Streaming is determined by client's Accept header.
       // The 406 error for a global disable flag is removed.
@@ -244,7 +240,8 @@ threadRouter.post(
                 errorMessage.includes('token limit') ||
                 errorMessage.includes('too many tokens') ||
                 errorMessage.includes('max_tokens') ||
-                errorMessage.includes('request too large');
+                errorMessage.includes('request too large') ||
+                errorMessage.includes('prompt is too long');
               const isRateLimitError =
                 errorMessage.includes('rate limit') ||
                 errorMessage.includes('rate_limit') ||

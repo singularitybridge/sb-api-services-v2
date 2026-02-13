@@ -39,6 +39,12 @@ sessionRouter.post('/', async (req: AuthenticatedRequest, res: Response) => {
       const assistant = await resolveAssistantIdentifier(assistantId, companyId);
       if (assistant) {
         resolvedAssistantId = assistant._id.toString();
+      } else {
+        // If caller explicitly requested an assistant that doesn't exist, fail
+        // rather than silently falling back to a default assistant
+        return res.status(400).json({
+          message: `Assistant '${assistantId}' not found`,
+        });
       }
     }
 
@@ -83,8 +89,17 @@ sessionRouter.post(
         );
       }
 
-      const { channel, channelUserId, channelMetadata } = req.body || {};
+      const { channel, channelUserId, channelMetadata, assistantId } = req.body || {};
       const channelInfo = channel || channelUserId ? { channel, channelUserId, channelMetadata } : undefined;
+
+      // Resolve assistantId if provided (e.g., from Herald)
+      let resolvedAssistantId: string | undefined;
+      if (assistantId) {
+        const assistant = await resolveAssistantIdentifier(assistantId, companyId);
+        if (assistant) {
+          resolvedAssistantId = assistant._id.toString();
+        }
+      }
 
       // Find current active session for this user/company/channel
       const query: Record<string, any> = {
@@ -94,15 +109,21 @@ sessionRouter.post(
         channel: channelInfo?.channel || 'web',
         channelUserId: channelInfo?.channelUserId || userId,
       };
+      // If we know which assistant, scope the search to that assistant's session
+      if (resolvedAssistantId) {
+        query.assistantId = new mongoose.Types.ObjectId(resolvedAssistantId);
+      }
       const currentActiveSession = await Session.findOne(query);
 
-      let lastAssistantId: string | undefined = undefined;
+      let lastAssistantId: string | undefined = resolvedAssistantId;
 
       if (currentActiveSession) {
         console.log(
           `Clear Session: Ending existing active session ${currentActiveSession._id}`,
         );
-        lastAssistantId = currentActiveSession.assistantId?.toString();
+        if (!lastAssistantId) {
+          lastAssistantId = currentActiveSession.assistantId?.toString();
+        }
 
         // Carry over channelMetadata from old session if caller didn't provide it
         if (channelInfo && !channelInfo.channelMetadata && (currentActiveSession as any).channelMetadata) {

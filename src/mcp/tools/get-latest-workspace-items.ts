@@ -1,7 +1,7 @@
 /**
- * List Workspace Items Tool
+ * Get Latest Workspace Items Tool
  *
- * Lists workspace items for a specific agent
+ * Retrieves the most recently updated workspace items sorted by modification time.
  */
 
 import { z } from 'zod';
@@ -10,14 +10,22 @@ import { validateSessionOwnership } from '../../services/session/session-resolve
 import { getWorkspaceService } from '../../services/unified-workspace.service';
 
 /**
- * Input schema for the list_workspace_items tool
+ * Input schema for the get_latest_workspace_items tool
  */
-export const listWorkspaceItemsSchema = z.object({
+export const getLatestWorkspaceItemsSchema = z.object({
+  limit: z.coerce
+    .number()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe(
+      'Maximum number of items to return (1-100, default: 10)',
+    ),
   scope: z
     .enum(['company', 'session', 'agent'])
     .optional()
     .describe(
-      'Storage scope: "company", "session", or "agent" (default: "agent")',
+      'Storage scope: "company", "session", or "agent" (default: "company")',
     ),
   scopeId: z
     .string()
@@ -33,23 +41,23 @@ export const listWorkspaceItemsSchema = z.object({
     ),
 });
 
-export type ListWorkspaceItemsInput = z.infer<typeof listWorkspaceItemsSchema>;
+export type GetLatestWorkspaceItemsInput = z.infer<typeof getLatestWorkspaceItemsSchema>;
 
 /**
- * List workspace items
+ * Get the most recently updated workspace items
  */
-export async function listWorkspaceItems(
-  input: ListWorkspaceItemsInput,
+export async function getLatestWorkspaceItems(
+  input: GetLatestWorkspaceItemsInput,
   companyId: string,
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   try {
-    const scope = input.scope || 'agent';
+    const scope = input.scope || 'company';
+    const limit = input.limit || 10;
     const workspace = getWorkspaceService();
 
     let basePath: string;
     const scopeInfo: any = { scope };
 
-    // Build the base path based on scope
     switch (scope) {
       case 'company':
         basePath = `/company/${companyId}`;
@@ -60,7 +68,6 @@ export async function listWorkspaceItems(
         if (!input.scopeId) {
           throw new Error('scopeId (sessionId) is required for session scope');
         }
-        // Validate session belongs to the authenticated company
         await validateSessionOwnership(input.scopeId, companyId);
         basePath = `/session/${input.scopeId}`;
         scopeInfo.sessionId = input.scopeId;
@@ -74,7 +81,6 @@ export async function listWorkspaceItems(
           );
         }
 
-        // Resolve agent by ID or name
         const agent = await resolveAssistantIdentifier(
           input.scopeId,
           companyId,
@@ -89,20 +95,19 @@ export async function listWorkspaceItems(
         break;
     }
 
-    const prefix = input.prefix
-      ? input.prefix.startsWith('/')
-        ? input.prefix
-        : `/${input.prefix}`
-      : undefined;
-    const fullPrefix = prefix ? `${basePath}${prefix}` : basePath;
+    const fullPrefix = input.prefix ? `${basePath}${input.prefix}` : basePath;
 
-    // List all workspace items with the prefix
-    const items = await workspace.list(fullPrefix);
+    const items = await workspace.listLatest(fullPrefix, limit);
 
-    // Remove the base path prefix from results for cleaner display
-    const cleanedItems = items.map((item) => {
-      return item.startsWith(basePath) ? item.substring(basePath.length) : item;
-    });
+    // Strip base path prefix for cleaner display
+    const cleanedItems = items.map((item) => ({
+      path: item.path.startsWith(basePath)
+        ? item.path.substring(basePath.length)
+        : item.path,
+      metadata: item.metadata || {},
+      type: item.type,
+      size: item.size,
+    }));
 
     return {
       content: [
@@ -111,6 +116,7 @@ export async function listWorkspaceItems(
           text: JSON.stringify(
             {
               scope: scopeInfo,
+              limit,
               items: cleanedItems,
               count: cleanedItems.length,
               prefix: input.prefix || '/',
@@ -122,7 +128,7 @@ export async function listWorkspaceItems(
       ],
     };
   } catch (error) {
-    console.error('MCP list workspace items error:', error);
+    console.error('MCP get latest workspace items error:', error);
 
     return {
       content: [
@@ -134,8 +140,8 @@ export async function listWorkspaceItems(
               message:
                 error instanceof Error
                   ? error.message
-                  : 'Failed to list workspace items',
-              scope: input.scope || 'agent',
+                  : 'Failed to get latest workspace items',
+              scope: input.scope || 'company',
             },
             null,
             2,
@@ -149,9 +155,9 @@ export async function listWorkspaceItems(
 /**
  * Tool metadata for registration
  */
-export const listWorkspaceItemsTool = {
-  name: 'list_workspace_items',
+export const getLatestWorkspaceItemsTool = {
+  name: 'get_latest_workspace_items',
   description:
-    'List all workspace items at company, session, or agent level. Default is agent level. Supports filtering by path prefix. Returns an array of workspace paths.',
-  inputSchema: listWorkspaceItemsSchema,
+    'Get the most recently updated workspace items sorted by modification time. Returns items with metadata (path, timestamps, size, type) but excludes full content. Useful for seeing what has changed recently in the workspace.',
+  inputSchema: getLatestWorkspaceItemsSchema,
 };

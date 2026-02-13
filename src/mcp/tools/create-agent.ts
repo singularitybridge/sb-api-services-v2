@@ -29,8 +29,6 @@ export const createAgentSchema = z.object({
     .number()
     .optional()
     .describe('Maximum tokens for the model (default: 25000)'),
-  voice: z.string().optional().describe('Voice identifier (default: alloy)'),
-  language: z.string().optional().describe('Language code (default: en)'),
   teamIds: z
     .array(z.string())
     .optional()
@@ -54,8 +52,6 @@ export async function createAgent(
       llmModel: input.llmModel,
       llmPrompt: input.llmPrompt || '',
       maxTokens: input.maxTokens || 25000,
-      voice: input.voice || 'alloy',
-      language: input.language || 'en',
       companyId,
       allowedActions: [],
       conversationStarters: [],

@@ -66,6 +66,17 @@ export interface WorkspaceService {
       size?: number;
     }>
   >;
+  listLatest: (
+    prefix?: string,
+    limit?: number,
+  ) => Promise<
+    Array<{
+      path: string;
+      metadata?: any;
+      type?: 'embedded' | 'external';
+      size?: number;
+    }>
+  >;
   findByPattern: (pattern: RegExp) => Promise<string[]>;
   clear: (prefix?: string) => Promise<void>;
   export: (prefix?: string) => Promise<Record<string, any>>;
@@ -820,6 +831,38 @@ export const createWorkspaceService = (
     }
   };
 
+  const listLatest = async (
+    prefix?: string,
+    limit = 10,
+  ): Promise<
+    Array<{
+      path: string;
+      metadata?: any;
+      type?: 'embedded' | 'external';
+      size?: number;
+    }>
+  > => {
+    try {
+      // Fetch all items and sort in memory (keyv stores JSON-wrapped values,
+      // so DB-level sorting would require $function which Atlas restricts)
+      const allItems = await listWithMetadata(prefix);
+      return allItems
+        .sort((a, b) => {
+          const aTime = a.metadata?.updatedAt
+            ? new Date(a.metadata.updatedAt).getTime()
+            : 0;
+          const bTime = b.metadata?.updatedAt
+            ? new Date(b.metadata.updatedAt).getTime()
+            : 0;
+          return bTime - aTime;
+        })
+        .slice(0, limit);
+    } catch (error) {
+      logger.error('Workspace: Failed to list latest items', error);
+      return [];
+    }
+  };
+
   const clear = async (prefix?: string): Promise<void> => {
     try {
       if (prefix) {
@@ -1057,6 +1100,7 @@ export const createWorkspaceService = (
     delete: deleteItem,
     list,
     listWithMetadata,
+    listLatest,
     findByPattern,
     clear,
     export: exportData,

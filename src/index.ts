@@ -9,6 +9,7 @@ import http from 'http';
 import { logger } from './utils/logger';
 import { Assistant } from './models/Assistant';
 import { initializeIntegrationRegistry } from './services/integration-registry.service';
+import { ensureSessionIndex } from './services/session.service';
 
 const initializeApp = async () => {
   try {
@@ -44,6 +45,9 @@ const initializeApp = async () => {
         logger.error('Error creating indexes:', indexError);
       }
     }
+
+    // Ensure Session index with channel-aware uniqueness (runs its own error handling)
+    await ensureSessionIndex();
   } catch (error: any) {
     logger.error('Error during initialization:', {
       error: error.message,

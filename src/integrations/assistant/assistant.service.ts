@@ -44,8 +44,6 @@ export const getCurrentAssistant = async (
         llmPrompt: assistant.llmPrompt,
         llmProvider: assistant.llmProvider,
         llmModel: assistant.llmModel,
-        language: assistant.language,
-        voice: assistant.voice,
         conversationStarters: assistant.conversationStarters,
         allowedActions: assistant.allowedActions,
         avatarImage: assistant.avatarImage,
@@ -91,8 +89,6 @@ export const getAssistantById = async (
         llmPrompt: assistant.llmPrompt,
         llmProvider: assistant.llmProvider,
         llmModel: assistant.llmModel,
-        language: assistant.language,
-        voice: assistant.voice,
         conversationStarters: assistant.conversationStarters,
         allowedActions: assistant.allowedActions,
         avatarImage: assistant.avatarImage,
@@ -182,8 +178,6 @@ export const updateAssistantById = async (
         llmModel: assistant.llmModel,
         llmProvider: assistant.llmProvider,
         llmPrompt: assistant.llmPrompt, // Return updated llmPrompt
-        language: assistant.language,
-        voice: assistant.voice,
       },
     };
   } catch (error) {
@@ -285,8 +279,6 @@ export const createNewAssistant = async (
   name: string,
   description: string,
   prompt: string,
-  language: string,
-  voice: string,
   conversationStarters: IIdentifier[] = [],
 ): Promise<{ success: boolean; description: string; data?: any }> => {
   try {
@@ -302,8 +294,6 @@ export const createNewAssistant = async (
       name,
       description,
       prompt,
-      language,
-      voice,
       conversationStarters,
       companyId: session.companyId,
     });
@@ -314,8 +304,6 @@ export const createNewAssistant = async (
       _id: newAssistant._id,
       name: newAssistant.name,
       description: newAssistant.description,
-      language: newAssistant.language,
-      voice: newAssistant.voice,
       conversationStarters: newAssistant.conversationStarters,
     });
 
@@ -326,8 +314,6 @@ export const createNewAssistant = async (
         _id: newAssistant._id,
         name: newAssistant.name,
         description: newAssistant.description,
-        language: newAssistant.language,
-        voice: newAssistant.voice,
         conversationStarters: newAssistant.conversationStarters,
       },
     };

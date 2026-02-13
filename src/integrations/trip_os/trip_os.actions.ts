@@ -5,7 +5,7 @@ import {
 } from '../actions/types';
 import { executeAction } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
-import { tripOsGet, tripOsPost, tripOsPatch, validateConnection } from './trip_os.service';
+import { tripOsGet, tripOsPost, tripOsPatch, validateConnection, getBaseUrl } from './trip_os.service';
 
 export { validateConnection };
 
@@ -537,6 +537,73 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
       return executeAction('updateCustomerBio', async () => {
         const data = await tripOsPatch(context.companyId, `/api/data/customers/${args.customerId}`, { bio: args.bio });
         return { success: true, data: { bio: data.bio }, description: 'Customer bio updated' };
+      }, { serviceName: 'tripOs' });
+    },
+  },
+
+  // ── Trip Generation ─────────────────────────────────────────
+
+  generateTrip: {
+    description: 'Generate a detailed trip plan asynchronously. Creates a trip with "generating" status and triggers background AI generation. Returns tripId and tripUrl so the user can view the trip immediately (it will show a loading state until generation completes). Use this after collecting destination, dates, travelers, and preferences from the user.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        prompt: {
+          type: 'string',
+          description: 'Detailed trip generation prompt including destination, dates, travelers, preferences, dietary needs, and any special requests. Write in Hebrew.',
+        },
+        visitorId: {
+          type: 'string',
+          description: 'TripOS web visitor ID (from session context) to link the trip to the user',
+        },
+        customerId: {
+          type: 'string',
+          description: 'TripOS customer MongoDB _id if the user is a known customer',
+        },
+        destination: {
+          type: 'string',
+          description: 'Destination name (e.g. "rome", "paris", "new-york")',
+        },
+        startDate: {
+          type: 'string',
+          description: 'Trip start date (YYYY-MM-DD)',
+        },
+        endDate: {
+          type: 'string',
+          description: 'Trip end date (YYYY-MM-DD)',
+        },
+      },
+      required: ['prompt'],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      prompt: string;
+      visitorId?: string;
+      customerId?: string;
+      destination?: string;
+      startDate?: string;
+      endDate?: string;
+    }): Promise<StandardActionResult> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      if (!args.prompt) throw new ActionValidationError('prompt is required.');
+      return executeAction('generateTrip', async () => {
+        const body: Record<string, unknown> = { prompt: args.prompt };
+        if (args.visitorId) body.visitorId = args.visitorId;
+        if (args.customerId) body.customerId = args.customerId;
+        if (args.destination) body.destination = args.destination;
+        if (args.startDate) body.startDate = args.startDate;
+        if (args.endDate) body.endDate = args.endDate;
+        const data = await tripOsPost(context.companyId, '/api/trips/generate', body as Record<string, any>);
+        const tripId = data.tripId;
+        // Build trip URL from the API base URL
+        const baseUrl = await getBaseUrl(context.companyId);
+        const tripUrl = `${baseUrl}/trips/${tripId}`;
+        return {
+          success: true,
+          data: { tripId, tripUrl },
+          description: `Trip generation started. Trip ID: ${tripId}. The trip is being generated in the background — share this link with the user: ${tripUrl}`,
+        };
       }, { serviceName: 'tripOs' });
     },
   },

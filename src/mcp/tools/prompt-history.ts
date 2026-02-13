@@ -139,7 +139,7 @@ export const getPromptVersionSchema = z.object({
     .describe(
       'The ID or name of the agent (e.g., "681b41850f470a9a746f280e" or "workspace-agent")',
     ),
-  version: z.number().describe('The version number to retrieve'),
+  version: z.coerce.number().describe('The version number to retrieve'),
 });
 
 export type GetPromptVersionInput = z.infer<typeof getPromptVersionSchema>;

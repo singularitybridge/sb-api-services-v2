@@ -56,6 +56,11 @@ export async function tripOsPatch(
   return response.data;
 }
 
+export async function getBaseUrl(companyId: string): Promise<string> {
+  const { baseUrl } = await getConfig(companyId);
+  return baseUrl;
+}
+
 export async function validateConnection(
   apiKeys: Record<string, string>,
 ): Promise<TestConnectionResult> {

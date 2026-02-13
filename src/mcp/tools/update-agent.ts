@@ -37,10 +37,14 @@ export const updateAgentSchema = z.object({
     .describe(
       'LLM model name (e.g., gpt-5.1, claude-sonnet-4-20250514, gemini-2.0-flash)',
     ),
-  maxTokens: z
+  maxTokens: z.coerce
     .number()
     .optional()
     .describe('Maximum tokens for model output (default: 25000)'),
+  sessionTtlHours: z.preprocess(
+    (val) => (val === undefined ? undefined : val === null || val === 'null' || val === '' ? null : Number(val)),
+    z.number().nullable().optional(),
+  ).describe('Auto-expire sessions after this many hours of inactivity. Set to null to disable.'),
 });
 
 export type UpdateAgentInput = z.infer<typeof updateAgentSchema>;
@@ -108,6 +112,11 @@ export async function updateAgent(
       updates.push('maxTokens');
     }
 
+    if (input.sessionTtlHours !== undefined) {
+      agent.sessionTtlHours = input.sessionTtlHours ?? undefined;
+      updates.push('sessionTtlHours');
+    }
+
     // Save the agent if any updates were made
     if (updates.length === 0) {
       return {
@@ -160,6 +169,7 @@ export async function updateAgent(
                 llmProvider: agent.llmProvider,
                 llmModel: agent.llmModel,
                 maxTokens: agent.maxTokens,
+                sessionTtlHours: agent.sessionTtlHours,
                 prompt: agent.llmPrompt,
               },
               updatedFields: updates,
@@ -202,6 +212,6 @@ export async function updateAgent(
 export const updateAgentTool = {
   name: 'update_agent',
   description:
-    "Update an AI agent's core metadata including name, description, system prompt, LLM provider, model, and max tokens. Supports lookup by agent ID or name. Only updates the fields provided.",
+    "Update an AI agent's core metadata including name, description, system prompt, LLM provider, model, max tokens, and session TTL. Supports lookup by agent ID or name. Only updates the fields provided.",
   inputSchema: updateAgentSchema,
 };

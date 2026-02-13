@@ -717,6 +717,104 @@ router.get('/list', async (req: AuthenticatedRequest, res: Response) => {
 });
 
 /**
+ * @route GET /api/workspace/latest
+ * @desc Get the most recently updated workspace items, sorted by updatedAt descending
+ * @query limit - Number of items (default: 10, max: 100)
+ * @query scope - Storage scope: 'company', 'session', 'agent', 'team' (default: 'company')
+ * @query agentId - Agent ID or name (required for agent scope)
+ * @query teamId - Team ID (required for team scope)
+ */
+router.get('/latest', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const startTime = Date.now();
+    const {
+      limit: limitStr,
+      scope = 'company',
+      agentId,
+      teamId,
+    } = req.query;
+
+    const limit = Math.min(Math.max(parseInt(limitStr as string) || 10, 1), 100);
+
+    // Resolve scope IDs (same pattern as /list)
+    let sessionId: string | undefined;
+    let resolvedAgentId: string | undefined;
+    let resolvedTeamId: string | undefined;
+
+    if (scope === 'session') {
+      sessionId = req.headers['x-session-id'] as string;
+      if (!sessionId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Session ID is required for session scope',
+        });
+      }
+      await validateSessionOwnership(sessionId, req.company._id.toString());
+    } else if (scope === 'agent') {
+      const agentIdentifier = agentId || req.headers['x-agent-id'];
+      if (!agentIdentifier) {
+        return res.status(400).json({
+          success: false,
+          error: 'Agent ID is required for agent scope',
+        });
+      }
+      resolvedAgentId =
+        (await resolveAgentId(
+          agentIdentifier as string,
+          req.company?._id?.toString(),
+        )) || undefined;
+      if (!resolvedAgentId) {
+        return res.status(400).json({
+          success: false,
+          error: `Could not resolve agent: ${agentIdentifier}`,
+        });
+      }
+    } else if (scope === 'team') {
+      resolvedTeamId = (teamId || req.headers['x-team-id']) as string;
+      if (!resolvedTeamId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Team ID is required for team scope',
+        });
+      }
+    }
+
+    const scopePrefix = buildScopePrefix(scope as string, {
+      companyId: req.company._id.toString(),
+      sessionId,
+      agentId: resolvedAgentId,
+      teamId: resolvedTeamId,
+    });
+
+    const workspace = getWorkspaceService();
+    const items = await workspace.listLatest(scopePrefix, limit);
+
+    // Strip scope prefix from paths
+    const cleanItems = items.map((item) => ({
+      path: stripScopePrefix(item.path, scopePrefix),
+      metadata: item.metadata || {},
+      type: item.type,
+      size: item.size,
+    }));
+
+    logger.debug(`Workspace latest took ${Date.now() - startTime}ms`);
+    res.json({
+      success: true,
+      scope: scope as string,
+      limit,
+      items: cleanItems,
+      count: cleanItems.length,
+    });
+  } catch (error: any) {
+    logger.error('Workspace latest error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
  * @route GET /api/workspace/search
  * @desc Search workspace items across multiple scopes with metadata
  * Supports searching across multiple agents, teams, or other scopes

@@ -89,8 +89,6 @@ export const createDefaultAssistant = async (
           "Hello {{user.name}}! I'm your default AI assistant for {{company.name}}. How can I help you today?",
       },
     ],
-    voice: 'en-US-Standard-C',
-    language: 'en',
     llmModel: 'gpt-5.1',
     llmPrompt:
       'You are a helpful AI assistant for {{company.name}}. Your name is {{assistant.name}}. Provide friendly and professional assistance to {{user.name}}. When referring to the user, use their name {{user.name}} or their email {{user.email}}. Always include placeholders like {{user.name}} or {{company.name}} in your responses, as they will be automatically replaced with the actual values.',

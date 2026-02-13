@@ -55,13 +55,21 @@ export async function moveWorkspaceItem(
     const toScope = input.toScope || fromScope;
     const workspace = getWorkspaceService();
 
+    // Ensure paths start with /
+    const fromPath = input.fromPath.startsWith('/')
+      ? input.fromPath
+      : `/${input.fromPath}`;
+    const toPath = input.toPath.startsWith('/')
+      ? input.toPath
+      : `/${input.toPath}`;
+
     // Build source path
     let fromFullPath: string;
     const fromScopeInfo: any = { scope: fromScope };
 
     switch (fromScope) {
       case 'company':
-        fromFullPath = `/company/${companyId}${input.fromPath}`;
+        fromFullPath = `/company/${companyId}${fromPath}`;
         fromScopeInfo.companyId = companyId;
         break;
 
@@ -73,7 +81,7 @@ export async function moveWorkspaceItem(
         }
         // Validate session belongs to the authenticated company
         await validateSessionOwnership(input.fromScopeId, companyId);
-        fromFullPath = `/session/${input.fromScopeId}${input.fromPath}`;
+        fromFullPath = `/session/${input.fromScopeId}${fromPath}`;
         fromScopeInfo.sessionId = input.fromScopeId;
         break;
 
@@ -94,7 +102,7 @@ export async function moveWorkspaceItem(
           throw new Error(`Source agent not found: ${input.fromScopeId}`);
         }
 
-        fromFullPath = `/agent/${fromAgent._id.toString()}${input.fromPath}`;
+        fromFullPath = `/agent/${fromAgent._id.toString()}${fromPath}`;
         fromScopeInfo.agentId = fromAgent._id.toString();
         fromScopeInfo.agentName = fromAgent.name;
         break;
@@ -107,7 +115,7 @@ export async function moveWorkspaceItem(
 
     switch (toScope) {
       case 'company':
-        toFullPath = `/company/${companyId}${input.toPath}`;
+        toFullPath = `/company/${companyId}${toPath}`;
         toScopeInfo.companyId = companyId;
         break;
 
@@ -119,7 +127,7 @@ export async function moveWorkspaceItem(
         }
         // Validate session belongs to the authenticated company
         await validateSessionOwnership(toScopeId, companyId);
-        toFullPath = `/session/${toScopeId}${input.toPath}`;
+        toFullPath = `/session/${toScopeId}${toPath}`;
         toScopeInfo.sessionId = toScopeId;
         break;
 
@@ -137,7 +145,7 @@ export async function moveWorkspaceItem(
           throw new Error(`Destination agent not found: ${toScopeId}`);
         }
 
-        toFullPath = `/agent/${toAgent._id.toString()}${input.toPath}`;
+        toFullPath = `/agent/${toAgent._id.toString()}${toPath}`;
         toScopeInfo.agentId = toAgent._id.toString();
         toScopeInfo.agentName = toAgent.name;
         break;

@@ -67,6 +67,13 @@ import {
 } from './tools/list-workspace-items';
 
 import {
+  getLatestWorkspaceItemsTool,
+  getLatestWorkspaceItemsSchema,
+  getLatestWorkspaceItems,
+  type GetLatestWorkspaceItemsInput,
+} from './tools/get-latest-workspace-items';
+
+import {
   getWorkspaceItemTool,
   getWorkspaceItemSchema,
   getWorkspaceItem,
@@ -327,7 +334,7 @@ const SESSION_TTL_MS = 60 * 60 * 1000;
 
 // Tools version - update this when tools change to trigger client refresh
 // Format: YYYY-MM-DD-vN (increment N for same-day changes)
-const TOOLS_VERSION = '2026-01-28-v1';
+const TOOLS_VERSION = '2026-02-08-v2';
 
 /**
  * MCP Server for HTTP transport
@@ -465,6 +472,11 @@ export class MCPHttpServer {
           name: listWorkspaceItemsTool.name,
           description: listWorkspaceItemsTool.description,
           inputSchema: listWorkspaceItemsSchema,
+        },
+        {
+          name: getLatestWorkspaceItemsTool.name,
+          description: getLatestWorkspaceItemsTool.description,
+          inputSchema: getLatestWorkspaceItemsSchema,
         },
         {
           name: getWorkspaceItemTool.name,
@@ -803,6 +815,13 @@ export class MCPHttpServer {
             name: listWorkspaceItemsTool.name,
             description: listWorkspaceItemsTool.description,
             inputSchema: z.toJSONSchema(listWorkspaceItemsSchema, {
+              reused: 'inline',
+            }),
+          },
+          {
+            name: getLatestWorkspaceItemsTool.name,
+            description: getLatestWorkspaceItemsTool.description,
+            inputSchema: z.toJSONSchema(getLatestWorkspaceItemsSchema, {
               reused: 'inline',
             }),
           },
@@ -1218,6 +1237,21 @@ export class MCPHttpServer {
               }
               result = await listWorkspaceItems(
                 parseResult.data as ListWorkspaceItemsInput,
+                companyId,
+              );
+              break;
+            }
+
+            case 'get_latest_workspace_items': {
+              const parseResult =
+                getLatestWorkspaceItemsSchema.safeParse(toolArgs);
+              if (!parseResult.success) {
+                throw new Error(
+                  `Invalid parameters: ${parseResult.error.message}`,
+                );
+              }
+              result = await getLatestWorkspaceItems(
+                parseResult.data as GetLatestWorkspaceItemsInput,
                 companyId,
               );
               break;

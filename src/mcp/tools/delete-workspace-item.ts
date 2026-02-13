@@ -50,10 +50,15 @@ export async function deleteWorkspaceItem(
     let fullPath: string;
     const scopeInfo: any = { scope };
 
+    // Ensure itemPath starts with /
+    const itemPath = input.itemPath.startsWith('/')
+      ? input.itemPath
+      : `/${input.itemPath}`;
+
     // Build the full path based on scope
     switch (scope) {
       case 'company':
-        fullPath = `/company/${companyId}${input.itemPath}`;
+        fullPath = `/company/${companyId}${itemPath}`;
         scopeInfo.companyId = companyId;
         break;
 
@@ -63,7 +68,7 @@ export async function deleteWorkspaceItem(
         }
         // Validate session belongs to the authenticated company
         await validateSessionOwnership(input.scopeId, companyId);
-        fullPath = `/session/${input.scopeId}${input.itemPath}`;
+        fullPath = `/session/${input.scopeId}${itemPath}`;
         scopeInfo.sessionId = input.scopeId;
         break;
 
@@ -84,7 +89,7 @@ export async function deleteWorkspaceItem(
           throw new Error(`Agent not found: ${input.scopeId}`);
         }
 
-        fullPath = `/agent/${agent._id.toString()}${input.itemPath}`;
+        fullPath = `/agent/${agent._id.toString()}${itemPath}`;
         scopeInfo.agentId = agent._id.toString();
         scopeInfo.agentName = agent.name;
         break;

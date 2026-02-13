@@ -91,10 +91,15 @@ export async function addWorkspaceItem(
       scopeInfo.agentName = agent.name;
     }
 
+    // Ensure itemPath starts with /
+    const itemPath = input.itemPath.startsWith('/')
+      ? input.itemPath
+      : `/${input.itemPath}`;
+
     // Build the full path based on scope
     switch (scope) {
       case 'company':
-        fullPath = `/company/${companyId}${input.itemPath}`;
+        fullPath = `/company/${companyId}${itemPath}`;
         scopeInfo.companyId = companyId;
         break;
 
@@ -104,7 +109,7 @@ export async function addWorkspaceItem(
         }
         // Validate session belongs to the authenticated company
         await validateSessionOwnership(input.scopeId, companyId);
-        fullPath = `/session/${input.scopeId}${input.itemPath}`;
+        fullPath = `/session/${input.scopeId}${itemPath}`;
         scopeInfo.sessionId = input.scopeId;
         break;
 
@@ -115,7 +120,7 @@ export async function addWorkspaceItem(
             'scopeId (agentId or agent name) is required for agent scope',
           );
         }
-        fullPath = `/agent/${resolvedScopeId}${input.itemPath}`;
+        fullPath = `/agent/${resolvedScopeId}${itemPath}`;
         break;
     }
 

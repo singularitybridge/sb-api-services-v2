@@ -1,0 +1,25 @@
+{
+  "name": "golem",
+  "displayName": "Golem",
+  "description": "AI coding agent sandbox - create sessions, send prompts, clone repos, and manage applications deployed on Fly.io",
+  "icon": "code",
+  "category": "development",
+  "actionCreator": "createGolemActions",
+  "actionsFile": "golem.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "golem_server_url",
+      "label": "Server URL",
+      "type": "secret",
+      "placeholder": "https://your-golem-instance.example.com",
+      "description": "Golem server base URL (without trailing slash)"
+    },
+    {
+      "key": "golem_server_password",
+      "label": "Server Password",
+      "type": "secret",
+      "placeholder": "your-password",
+      "description": "Golem server auth password"
+    }
+  ]
+}

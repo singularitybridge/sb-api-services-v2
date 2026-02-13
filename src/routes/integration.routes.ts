@@ -5,7 +5,6 @@ import {
 } from '../middleware/auth.middleware';
 import {
   getSessionOrCreate,
-  getSessionLanguage,
 } from '../services/session.service';
 import { getApiKey } from '../services/api.key.service';
 import {
@@ -35,7 +34,7 @@ router.get(
       if (!userId || !companyId) {
         throw new Error('User ID or Company ID not found');
       }
-      const language = await getSessionLanguage(userId, companyId);
+      const language = 'en' as SupportedLanguage;
       const actions = await getActions(language);
       res.json(actions);
     } catch (error) {
@@ -57,7 +56,7 @@ router.get(
       if (!userId || !companyId) {
         throw new Error('User ID or Company ID not found');
       }
-      const language = await getSessionLanguage(userId, companyId);
+      const language = 'en' as SupportedLanguage;
       const action = await discoverActionById(actionId, language);
       if (action) {
         res.json(action);
@@ -81,12 +80,12 @@ router.get(
       if (!userId || !companyId) {
         throw new Error('User ID or Company ID not found');
       }
-      // Support explicit lang query param, fall back to session language
+      // Support explicit lang query param, default to 'en'
       const langParam = req.query.lang as string | undefined;
       const language: SupportedLanguage =
         langParam === 'en' || langParam === 'he'
           ? langParam
-          : await getSessionLanguage(userId, companyId);
+          : 'en' as SupportedLanguage;
       const fieldsParam = req.query.fields as string | undefined;
       const fields = fieldsParam
         ? (fieldsParam.split(',') as (keyof Integration)[])
@@ -114,7 +113,7 @@ router.get(
       if (!userId || !companyId) {
         throw new Error('User ID or Company ID not found');
       }
-      const language = await getSessionLanguage(userId, companyId);
+      const language = 'en' as SupportedLanguage;
       const integration = await getIntegrationById(integrationId, language);
       if (integration) {
         res.json(integration);

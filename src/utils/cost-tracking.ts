@@ -51,8 +51,8 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   // === Google Gemini 3 (Preview) — both plain and models/-prefixed ===
   'gemini-3-pro-preview': { inputCost: 0.00125, outputCost: 0.01 },
   'models/gemini-3-pro-preview': { inputCost: 0.00125, outputCost: 0.01 },
-  'gemini-3-flash-preview': { inputCost: 0.0003, outputCost: 0.0025 },
-  'models/gemini-3-flash-preview': { inputCost: 0.0003, outputCost: 0.0025 },
+  'gemini-3-flash-preview': { inputCost: 0.0005, outputCost: 0.003 },
+  'models/gemini-3-flash-preview': { inputCost: 0.0005, outputCost: 0.003 },
 
   // === Google Gemini 2.5 (Stable) — both plain and models/-prefixed ===
   'gemini-2.5-pro': { inputCost: 0.00125, outputCost: 0.01 },

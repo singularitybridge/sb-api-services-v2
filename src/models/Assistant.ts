@@ -15,8 +15,6 @@ export interface IAssistant extends Document {
   name: string;
   description: string;
   conversationStarters: IIdentifier[];
-  voice: string;
-  language: string;
   llmModel: string; // Existing field, will now be the primary model identifier
   llmPrompt: string;
   llmProvider: 'openai' | 'google' | 'anthropic'; // New field for provider
@@ -26,6 +24,7 @@ export interface IAssistant extends Document {
   avatarImage?: string;
   teams?: mongoose.Schema.Types.ObjectId[];
   lastAccessedAt?: Date;
+  sessionTtlHours?: number;
 }
 
 const AssistantSchema: Schema = new Schema({
@@ -37,8 +36,6 @@ const AssistantSchema: Schema = new Schema({
     required: true,
     default: [],
   },
-  voice: { type: String, required: true },
-  language: { type: String, required: true },
   llmModel: { type: String, required: false }, // Existing field, will store model name like 'gpt-4.1-mini'
   llmPrompt: { type: String, required: false },
   llmProvider: {
@@ -56,6 +53,7 @@ const AssistantSchema: Schema = new Schema({
     { type: mongoose.Schema.Types.ObjectId, ref: 'Team', required: false },
   ],
   lastAccessedAt: { type: Date, required: false },
+  sessionTtlHours: { type: Number, required: false },
 });
 
 // Note: maxOutputTokens was renamed to maxTokens
