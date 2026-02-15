@@ -12,8 +12,12 @@ import {
   validateConnection as validateConnectionService,
   cloneRepository as cloneRepositoryService,
   runApp as runAppService,
+  deleteSession as deleteSessionService,
+  cancelQuery as cancelQueryService,
+  getStatus as getStatusService,
   GolemSession,
   GolemMessage,
+  GolemStatus,
 } from './golem.service';
 import { executeAction } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
@@ -57,7 +61,6 @@ interface CloneRepoArgs {
   sandboxUrl?: string;
   sessionId: string;
   repoUrl: string;
-  targetDir?: string;
   branch?: string;
 }
 
@@ -66,6 +69,20 @@ interface RunAppArgs {
   sessionId: string;
   appDirectory: string;
   command?: string;
+}
+
+interface DeleteSessionArgs {
+  sandboxUrl?: string;
+  sessionId: string;
+}
+
+interface CancelQueryArgs {
+  sandboxUrl?: string;
+  sessionId: string;
+}
+
+interface GetStatusArgs {
+  sandboxUrl?: string;
 }
 
 // Response data types
@@ -84,6 +101,14 @@ interface MessagesResponseData {
 
 interface SessionsListResponseData {
   sessions: GolemSession[];
+}
+
+interface StatusResponseData {
+  status: GolemStatus;
+}
+
+interface CancelQueryResponseData {
+  status: string;
 }
 
 // Service call response type
@@ -333,7 +358,7 @@ export const createGolemActions = (
   },
 
   golemCloneRepo: {
-    description: 'Clone a GitHub repository into the Golem workspace. Uses configured GitHub token for private repos. Automatically runs npm install if package.json exists.',
+    description: 'Deploy a GitHub repository to the Golem sandbox. Stops the current app, replaces the workspace with the cloned repo, and restarts. Uses configured GitHub token for private repos.',
     strict: true,
     parameters: {
       type: 'object',
@@ -350,10 +375,6 @@ export const createGolemActions = (
           type: 'string',
           description: 'GitHub repository URL (e.g., https://github.com/org/repo)',
         },
-        targetDir: {
-          type: 'string',
-          description: 'Target directory name in /data/workspace/ (optional, defaults to repo name)',
-        },
         branch: {
           type: 'string',
           description: 'Branch to clone (optional, defaults to default branch)',
@@ -365,7 +386,7 @@ export const createGolemActions = (
     function: async (
       args: CloneRepoArgs,
     ): Promise<StandardActionResult<PromptResponseData>> => {
-      const { sandboxUrl, sessionId, repoUrl, targetDir, branch } = args;
+      const { sandboxUrl, sessionId, repoUrl, branch } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -386,7 +407,7 @@ export const createGolemActions = (
             context.companyId!,
             sessionId.trim(),
             repoUrl.trim(),
-            targetDir?.trim(),
+            undefined,
             branch?.trim(),
             sandboxUrl,
           );
@@ -401,7 +422,7 @@ export const createGolemActions = (
   },
 
   golemRunApp: {
-    description: 'Switch the sandbox to run a different app. Updates /data/active-app.json and restarts the app process. Use this after cloning a repo to run it instead of the default app.',
+    description: 'Switch the sandbox to run a different app directory. Changes to the specified directory, installs dependencies if needed, and restarts the app via PM2.',
     strict: true,
     parameters: {
       type: 'object',
@@ -458,6 +479,136 @@ export const createGolemActions = (
         {
           serviceName: SERVICE_NAME,
           successMessage: `App switch initiated. Use golemGetMessages to check the result.`,
+        },
+      );
+    },
+  },
+
+  golemDeleteSession: {
+    description: 'Delete a Golem session and its conversation history',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        sandboxUrl: {
+          type: 'string',
+          description: 'URL of the Golem sandbox (e.g., https://my-app.fly.dev). If not provided, uses the default configured URL.',
+        },
+        sessionId: {
+          type: 'string',
+          description: 'The Golem session ID to delete',
+        },
+      },
+      required: ['sessionId'],
+      additionalProperties: false,
+    },
+    function: async (
+      args: DeleteSessionArgs,
+    ): Promise<StandardActionResult<{ deleted: boolean }>> => {
+      const { sandboxUrl, sessionId } = args;
+
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      if (!sessionId || typeof sessionId !== 'string' || sessionId.trim() === '') {
+        throw new ActionValidationError('sessionId must be a non-empty string.');
+      }
+
+      return executeAction<{ deleted: boolean }, ServiceCallResponse<void>>(
+        'golemDeleteSession',
+        async (): Promise<ServiceCallResponse<void>> => {
+          await deleteSessionService(context.companyId!, sessionId.trim(), sandboxUrl);
+          return { success: true, data: undefined as any };
+        },
+        {
+          serviceName: SERVICE_NAME,
+          dataExtractor: () => ({ deleted: true }),
+          successMessage: `Session ${sessionId} deleted successfully.`,
+        },
+      );
+    },
+  },
+
+  golemCancelQuery: {
+    description: 'Cancel a currently running query/prompt in a Golem session. Use this to stop a long-running AI operation.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        sandboxUrl: {
+          type: 'string',
+          description: 'URL of the Golem sandbox (e.g., https://my-app.fly.dev). If not provided, uses the default configured URL.',
+        },
+        sessionId: {
+          type: 'string',
+          description: 'The Golem session ID with the running query',
+        },
+      },
+      required: ['sessionId'],
+      additionalProperties: false,
+    },
+    function: async (
+      args: CancelQueryArgs,
+    ): Promise<StandardActionResult<CancelQueryResponseData>> => {
+      const { sandboxUrl, sessionId } = args;
+
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      if (!sessionId || typeof sessionId !== 'string' || sessionId.trim() === '') {
+        throw new ActionValidationError('sessionId must be a non-empty string.');
+      }
+
+      return executeAction<CancelQueryResponseData, ServiceCallResponse<{ status: string }>>(
+        'golemCancelQuery',
+        async (): Promise<ServiceCallResponse<{ status: string }>> => {
+          const result = await cancelQueryService(context.companyId!, sessionId.trim(), sandboxUrl);
+          return { success: true, data: result };
+        },
+        {
+          serviceName: SERVICE_NAME,
+          dataExtractor: (result) => ({ status: result.data.status }),
+          successMessage: `Query cancelled in session ${sessionId}.`,
+        },
+      );
+    },
+  },
+
+  golemGetStatus: {
+    description: 'Get the status of a Golem sandbox including auth configuration, MCP servers, volume info, and configured API keys.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        sandboxUrl: {
+          type: 'string',
+          description: 'URL of the Golem sandbox (e.g., https://my-app.fly.dev). If not provided, uses the default configured URL.',
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    function: async (
+      args: GetStatusArgs = {},
+    ): Promise<StandardActionResult<StatusResponseData>> => {
+      const { sandboxUrl } = args;
+
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      return executeAction<StatusResponseData, ServiceCallResponse<GolemStatus>>(
+        'golemGetStatus',
+        async (): Promise<ServiceCallResponse<GolemStatus>> => {
+          const status = await getStatusService(context.companyId!, sandboxUrl);
+          return { success: true, data: status };
+        },
+        {
+          serviceName: SERVICE_NAME,
+          dataExtractor: (result) => ({ status: result.data }),
+          successMessage: `Sandbox status retrieved successfully${sandboxUrl ? ` from ${sandboxUrl}` : ''}.`,
         },
       );
     },

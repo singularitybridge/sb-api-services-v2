@@ -22,6 +22,21 @@ export interface GolemMessage {
   [key: string]: any;
 }
 
+export interface GolemStatus {
+  status: string;
+  urls?: { app: string | null; control: string | null };
+  checks: {
+    authMethod: string;
+    claudeAuthConfigured: boolean;
+    githubToken: boolean;
+    volumeMounted: boolean;
+    workspaceFiles: number;
+    mcpServers: string[];
+    settingsConfigured: boolean;
+  };
+  keys?: Record<string, { configured: boolean; source: string; label: string }>;
+}
+
 export interface SendPromptResult {
   success: boolean;
   result: any;
@@ -90,33 +105,35 @@ async function getCredentials(
 }
 
 /**
- * Clone a GitHub repository into the sandbox workspace
- * The Golem sandbox is pre-configured with GitHub credentials
+ * Clone a GitHub repository into the sandbox workspace.
+ * Follows the proper deploy flow: stop app, replace workspace, restart.
+ * The Golem sandbox is pre-configured with GitHub credentials.
  */
 export async function cloneRepository(
   companyId: string,
   sessionId: string,
   repoUrl: string,
-  targetDir?: string,
+  _targetDir?: string,
   branch?: string,
   sandboxUrl?: string
 ): Promise<SendPromptResult> {
   const { baseUrl, password } = await getCredentials(companyId, sandboxUrl);
 
-  const targetPath = targetDir || repoUrl.split('/').pop()?.replace('.git', '') || 'repo';
-  let cloneCommand = `git clone ${repoUrl} ${targetPath}`;
+  const branchFlag = branch ? ` -b ${branch}` : '';
 
-  if (branch) {
-    cloneCommand += ` -b ${branch}`;
-  }
+  const prompt = `Deploy a new app by cloning a repository. Follow these steps exactly:
 
-  const prompt = `Run the following commands:
-1. cd /data/workspace
-2. ${cloneCommand}
-3. cd ${targetPath} && npm install (if package.json exists)
-4. Configure git user: git config user.email "agent@singularitybridge.ai" && git config user.name "Golem Agent"
+1. Stop the current app: pm2 stop app
+2. Backup current workspace: cd /data && rm -rf workspace.old 2>/dev/null && mv workspace workspace.old
+3. Clone the repo DIRECTLY to /data/workspace (NOT a subdirectory): git clone --depth 1${branchFlag} ${repoUrl} /data/workspace
+4. Remove conflicting PM2 config if present: rm -f /data/workspace/ecosystem.config.js
+5. Configure git: cd /data/workspace && git config user.email "agent@singularitybridge.ai" && git config user.name "Golem Agent"
+6. Restart the app (npm install runs automatically): pm2 restart app
+7. Wait a few seconds and check: sleep 5 && pm2 logs app --lines 15 --nostream
 
-Report what was cloned and installed.`;
+IMPORTANT: Clone directly to /data/workspace, NOT to a subdirectory. The PM2 config expects the app at /data/workspace root.
+
+Report what was cloned and whether the app started successfully.`;
 
   try {
     const response = await axios.post(
@@ -332,6 +349,99 @@ Report the result.`;
     }
     throw new Error(
       error.response?.data?.error || error.message || 'Failed to run app'
+    );
+  }
+}
+
+/**
+ * Delete a session
+ */
+export async function deleteSession(
+  companyId: string,
+  sessionId: string,
+  sandboxUrl?: string
+): Promise<void> {
+  const { baseUrl, password } = await getCredentials(companyId, sandboxUrl);
+
+  try {
+    await axios.delete(
+      `${baseUrl}/session/${sessionId}`,
+      {
+        auth: { username: 'golem', password },
+        timeout: 30000,
+      }
+    );
+  } catch (error: any) {
+    console.error('Error deleting Golem session:', error.message);
+    if (error.response?.status === 502) {
+      throw new Error('Golem server is waking up. Please retry in a few seconds.');
+    }
+    throw new Error(
+      error.response?.data?.error || error.message || 'Failed to delete session'
+    );
+  }
+}
+
+/**
+ * Cancel a running query in a session
+ */
+export async function cancelQuery(
+  companyId: string,
+  sessionId: string,
+  sandboxUrl?: string
+): Promise<{ status: string }> {
+  const { baseUrl, password } = await getCredentials(companyId, sandboxUrl);
+
+  try {
+    const response = await axios.post(
+      `${baseUrl}/session/${sessionId}/cancel`,
+      {},
+      {
+        auth: { username: 'golem', password },
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 15000,
+      }
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error('Error cancelling Golem query:', error.message);
+    if (error.response?.status === 404) {
+      throw new Error('No active query found for this session.');
+    }
+    if (error.response?.status === 502) {
+      throw new Error('Golem server is waking up. Please retry in a few seconds.');
+    }
+    throw new Error(
+      error.response?.data?.error || error.message || 'Failed to cancel query'
+    );
+  }
+}
+
+/**
+ * Get sandbox status (auth mode, MCP servers, volume info)
+ */
+export async function getStatus(
+  companyId: string,
+  sandboxUrl?: string
+): Promise<GolemStatus> {
+  const { baseUrl, password } = await getCredentials(companyId, sandboxUrl);
+
+  try {
+    const response = await axios.get(
+      `${baseUrl}/api/status`,
+      {
+        auth: { username: 'golem', password },
+        timeout: 15000,
+      }
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching Golem status:', error.message);
+    if (error.response?.status === 502) {
+      throw new Error('Golem server is waking up. Please retry in a few seconds.');
+    }
+    throw new Error(
+      error.response?.data?.error || error.message || 'Failed to fetch status'
     );
   }
 }
