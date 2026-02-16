@@ -7,6 +7,9 @@ export interface ActionContext {
   userId?: string;
   assistantId?: string; // ID of the assistant executing the action
   isStateless?: boolean;
+  channel?: string;
+  channelUserId?: string;
+  channelMetadata?: Record<string, any>;
 }
 
 // New interface for a standardized successful action result

@@ -354,6 +354,9 @@ export const executeFunctionCall = async (
     assistantId: session.assistantId?.toString(),
     userId: session.userId?.toString(),
     isStateless: false,
+    channel: session.channel,
+    channelUserId: session.channelUserId,
+    channelMetadata: session.channelMetadata,
   };
 
   // Delegate to the context-first implementation

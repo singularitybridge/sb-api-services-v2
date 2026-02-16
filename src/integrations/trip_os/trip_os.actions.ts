@@ -387,6 +387,50 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
 
   // ── Customer Lookup ──────────────────────────────────────────
 
+  resolveCurrentCustomer: {
+    description: 'Look up the current user\'s TripOS customer profile automatically based on their session channel. Zero parameters — reads channel and channelUserId from session context. Returns customer profile if found, or guidance to create one if not found.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    },
+    function: async (): Promise<StandardActionResult> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      if (!context.channel || !context.channelUserId) {
+        return {
+          success: true,
+          data: { found: false, message: 'Session does not have channel identity information' },
+        };
+      }
+      const paramMap: Record<string, string> = {
+        telegram: 'telegramId',
+        web: 'email',
+        whatsapp: 'phone',
+        'tripos-web': 'visitorId',
+      };
+      const paramKey = paramMap[context.channel];
+      if (!paramKey) {
+        return {
+          success: true,
+          data: { found: false, channel: context.channel, channelUserId: context.channelUserId, message: `Unsupported channel: ${context.channel}` },
+        };
+      }
+      return executeAction('resolveCurrentCustomer', async () => {
+        const data = await tripOsGet(context.companyId, '/api/data/customers', { [paramKey]: context.channelUserId });
+        const customer = data.results?.[0];
+        if (!customer) {
+          return {
+            success: true,
+            data: { found: false, channel: context.channel, channelUserId: context.channelUserId, message: `No TripOS customer found for ${context.channel} user ${context.channelUserId}` },
+          };
+        }
+        return { success: true, data: { found: true, customer }, description: `Found customer: ${customer.firstName} ${customer.lastName}` };
+      }, { serviceName: 'tripOs' });
+    },
+  },
+
   lookupCustomerByChannel: {
     description: 'Look up a TripOS customer by their contact identifier. Works across all channels: Telegram (by user ID), web (by email), WhatsApp (by phone), tripos-web (by Clerk ID).',
     strict: true,
@@ -424,6 +468,67 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
   },
 
   // ── Customer Creation ────────────────────────────────────────
+
+  createOrLinkCustomer: {
+    description: 'Create or link a TripOS customer for the current user. Automatically links to the user\'s session channel (Telegram/WhatsApp/Web/TripOS-Web). Accepts optional personal details (name, email, phone, nationality, language) — if not provided, falls back to session metadata. TripOS API handles upsert (creates if new, links if exists). Returns the customer profile.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        firstName: { type: 'string', description: 'First name (optional, falls back to channelMetadata)' },
+        lastName: { type: 'string', description: 'Last name (optional, falls back to channelMetadata)' },
+        email: { type: 'string', description: 'Email address (optional, falls back to channelMetadata)' },
+        phone: { type: 'string', description: 'Phone number (optional, falls back to channelMetadata)' },
+        nationality: { type: 'string', description: 'Nationality (optional)' },
+        preferredLanguage: { type: 'string', enum: ['he', 'en'], description: 'Preferred language (default: he)' },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      firstName?: string;
+      lastName?: string;
+      email?: string;
+      phone?: string;
+      nationality?: string;
+      preferredLanguage?: string;
+    }): Promise<StandardActionResult> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      if (!context.channel || !context.channelUserId) {
+        throw new ActionValidationError('Session does not have channel identity information');
+      }
+      return executeAction('createOrLinkCustomer', async () => {
+        const customerData: Record<string, any> = {
+          firstName: args.firstName || context.channelMetadata?.name?.split(' ')[0] || 'User',
+          lastName: args.lastName || context.channelMetadata?.name?.split(' ').slice(1).join(' ') || '',
+          preferredLanguage: args.preferredLanguage || 'he',
+        };
+        // Auto-populate channel identifier
+        const channelFieldMap: Record<string, string> = {
+          telegram: 'telegramId',
+          web: 'email',
+          whatsapp: 'phone',
+          'tripos-web': 'visitorId',
+        };
+        const channelField = channelFieldMap[context.channel];
+        if (channelField) {
+          customerData[channelField] = context.channelUserId;
+        }
+        // Add optional fields
+        if (args.email || context.channelMetadata?.email) {
+          customerData.email = args.email || context.channelMetadata.email;
+        }
+        if (args.phone || context.channelMetadata?.phone) {
+          customerData.phone = args.phone || context.channelMetadata.phone;
+        }
+        if (args.nationality) {
+          customerData.nationality = args.nationality;
+        }
+        const data = await tripOsPost(context.companyId, '/api/data/customers', customerData);
+        return { success: true, data, description: `Customer created/linked: ${data.firstName} ${data.lastName}` };
+      }, { serviceName: 'tripOs' });
+    },
+  },
 
   createCustomer: {
     description: 'Create a new TripOS customer profile. Use this when a new user is not yet registered. Returns the created customer with their _id.',
@@ -544,6 +649,70 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
   },
 
   // ── Trip Generation ─────────────────────────────────────────
+
+  generateTripForCurrentUser: {
+    description: 'Generate a trip plan for the current user. Automatically links the trip to the user\'s session (tripos-web or web channel users). Takes a detailed prompt with trip preferences, plus optional destination and dates. Returns tripId and tripUrl for the user to view their trip.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        prompt: {
+          type: 'string',
+          description: 'Detailed trip generation prompt including destination, dates, travelers, preferences, dietary needs, and any special requests. Write in Hebrew.',
+        },
+        destination: {
+          type: 'string',
+          description: 'Destination name (e.g. "rome", "paris", "new-york")',
+        },
+        startDate: {
+          type: 'string',
+          description: 'Trip start date (YYYY-MM-DD)',
+        },
+        endDate: {
+          type: 'string',
+          description: 'Trip end date (YYYY-MM-DD)',
+        },
+        travelers: {
+          type: 'string',
+          description: 'Number and composition of travelers (e.g. "2 adults, 1 child")',
+        },
+      },
+      required: ['prompt'],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      prompt: string;
+      destination?: string;
+      startDate?: string;
+      endDate?: string;
+      travelers?: string;
+    }): Promise<StandardActionResult> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      if (!args.prompt) throw new ActionValidationError('prompt is required.');
+      return executeAction('generateTripForCurrentUser', async () => {
+        const body: Record<string, any> = { prompt: args.prompt };
+        // Auto-inject visitorId for tripos-web and web channels
+        if (context.channel === 'tripos-web' || context.channel === 'web') {
+          if (context.channelUserId) {
+            body.visitorId = context.channelUserId;
+          }
+        }
+        if (args.destination) body.destination = args.destination;
+        if (args.startDate) body.startDate = args.startDate;
+        if (args.endDate) body.endDate = args.endDate;
+        if (args.travelers) body.travelers = args.travelers;
+        const data = await tripOsPost(context.companyId, '/api/trips/generate', body);
+        const tripId = data.tripId;
+        const baseUrl = await getBaseUrl(context.companyId);
+        const tripUrl = `${baseUrl}/trips/${tripId}`;
+        return {
+          success: true,
+          data: { tripId, tripUrl },
+          description: `Trip generation started. Trip ID: ${tripId}. Share this link: ${tripUrl}`,
+        };
+      }, { serviceName: 'tripOs' });
+    },
+  },
 
   generateTrip: {
     description: 'Generate a detailed trip plan asynchronously. Creates a trip with "generating" status and triggers background AI generation. Returns tripId and tripUrl so the user can view the trip immediately (it will show a loading state until generation completes). Use this after collecting destination, dates, travelers, and preferences from the user.',
