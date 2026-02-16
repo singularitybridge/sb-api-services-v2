@@ -37,6 +37,7 @@
     "@aws-sdk/client-bedrock-agent-runtime": "^3.873.0",
     "@aws-sdk/client-s3": "^3.896.0",
     "@clerk/backend": "^2.29.5",
+    "@composio/core": "^0.6.3",
     "@dqbd/tiktoken": "^1.0.17",
     "@elevenlabs/elevenlabs-js": "^2.2.0",
     "@google-cloud/speech": "^6.1.0",

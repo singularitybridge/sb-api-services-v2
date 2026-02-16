@@ -1,0 +1,25 @@
+{
+  "name": "composio",
+  "displayName": "Composio",
+  "description": "Connect your agents to 100+ apps and services through Composio's unified platform",
+  "icon": "plug-zap",
+  "category": "automation",
+  "actionCreator": "createComposioActions",
+  "actionsFile": "composio.actions.ts",
+  "requiredApiKeys": [
+    {
+      "key": "composio_api_key",
+      "label": "API Key",
+      "type": "secret",
+      "placeholder": "your-composio-api-key",
+      "description": "Your Composio API key from app.composio.dev"
+    },
+    {
+      "key": "composio_external_user_id",
+      "label": "External User ID",
+      "type": "text",
+      "placeholder": "default",
+      "description": "The external user ID configured in your Composio account"
+    }
+  ]
+}

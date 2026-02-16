@@ -1,0 +1,12 @@
+{
+  "serviceName": "Composio",
+  "serviceDescription": "Connect your agents to 100+ apps and services through Composio's unified platform.",
+  "composioListTools": {
+    "actionTitle": "List Tools",
+    "description": "List available Composio tools and their parameter schemas"
+  },
+  "composioExecuteTool": {
+    "actionTitle": "Execute Tool",
+    "description": "Execute a specific Composio tool by name with provided arguments"
+  }
+}
