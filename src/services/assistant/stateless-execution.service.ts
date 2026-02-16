@@ -319,6 +319,9 @@ export const executeAssistantStateless = async (
     userId, // Pass userId
     assistantId: assistant._id.toString(),
     isStateless: true,
+    channel: metadata?.channel,
+    channelUserId: metadata?.channelUserId,
+    channelMetadata: metadata?.channelMetadata ? (typeof metadata.channelMetadata === 'string' ? JSON.parse(metadata.channelMetadata) : metadata.channelMetadata) : undefined,
     // getSession method removed from ActionContext
   };
   const cacheKey = `${assistant._id.toString()}-${JSON.stringify(

@@ -394,6 +394,9 @@ export const handleSessionMessage = async (
     companyId: session.companyId.toString(),
     userId: session.userId.toString(),
     assistantId: assistant._id.toString(),
+    channel: session.channel,
+    channelUserId: session.channelUserId,
+    channelMetadata: session.channelMetadata,
   };
 
   // Cache key MUST include sessionId because tools close over sessionId at creation time.
