@@ -70,6 +70,7 @@ export const getSessionContextData = async (
     channelMetadata: (session as any).channelMetadata || {},
     contactIdentifier:
       (session as any).channelMetadata?.telegramUserId ||
+      (session as any).channelMetadata?.clerkId ||
       (session as any).channelMetadata?.phone ||
       (session as any).channelMetadata?.email ||
       (session as any).channelUserId ||

@@ -388,7 +388,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
   // ── Customer Lookup ──────────────────────────────────────────
 
   lookupCustomerByChannel: {
-    description: 'Look up a TripOS customer by their contact identifier. Works across all channels: Telegram (by user ID), web (by email), WhatsApp (by phone), tripos-web (by visitor ID).',
+    description: 'Look up a TripOS customer by their contact identifier. Works across all channels: Telegram (by user ID), web (by email), WhatsApp (by phone), tripos-web (by Clerk ID).',
     strict: true,
     parameters: {
       type: 'object',
@@ -400,7 +400,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
         },
         channelId: {
           type: 'string',
-          description: 'The contact identifier (Telegram user ID, email, phone number, or TripOS visitor ID)',
+          description: 'The contact identifier (Telegram user ID, email, phone number, or Clerk ID)',
         },
       },
       required: ['channel', 'channelId'],
@@ -409,7 +409,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
     function: async (args: { channel: string; channelId: string }): Promise<StandardActionResult> => {
       if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
       if (!args.channelId) throw new ActionValidationError('channelId is required.');
-      const paramMap: Record<string, string> = { telegram: 'telegramId', web: 'email', whatsapp: 'phone', 'tripos-web': 'visitorId' };
+      const paramMap: Record<string, string> = { telegram: 'telegramId', web: 'email', whatsapp: 'phone', 'tripos-web': 'clerkId' };
       const paramKey = paramMap[args.channel];
       if (!paramKey) throw new ActionValidationError(`Unsupported channel: ${args.channel}`);
       return executeAction('lookupCustomerByChannel', async () => {
@@ -439,6 +439,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
         phone: { type: 'string', description: 'Phone number (optional)' },
         telegramId: { type: 'string', description: 'Telegram user ID to link this customer to their Telegram account' },
         visitorId: { type: 'string', description: 'TripOS web visitor ID to link this customer to their browser session' },
+        clerkId: { type: 'string', description: 'Clerk user ID to link this customer to their authenticated web account (used for tripos-web channel)' },
         preferredLanguage: { type: 'string', enum: ['he', 'en'], description: 'Preferred language (default: he)' },
       },
       required: ['firstName', 'lastName'],
@@ -453,6 +454,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
       phone?: string;
       telegramId?: string;
       visitorId?: string;
+      clerkId?: string;
       preferredLanguage?: string;
     }): Promise<StandardActionResult> => {
       if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
@@ -555,7 +557,11 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
         },
         visitorId: {
           type: 'string',
-          description: 'TripOS web visitor ID (from session context) to link the trip to the user',
+          description: 'TripOS web visitor ID (legacy anonymous sessions) to link the trip to the user',
+        },
+        clerkId: {
+          type: 'string',
+          description: 'Clerk user ID (from session context contactIdentifier for tripos-web channel) to link the trip to the authenticated user',
         },
         customerId: {
           type: 'string',
@@ -580,6 +586,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
     function: async (args: {
       prompt: string;
       visitorId?: string;
+      clerkId?: string;
       customerId?: string;
       destination?: string;
       startDate?: string;
@@ -589,7 +596,8 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
       if (!args.prompt) throw new ActionValidationError('prompt is required.');
       return executeAction('generateTrip', async () => {
         const body: Record<string, unknown> = { prompt: args.prompt };
-        if (args.visitorId) body.visitorId = args.visitorId;
+        if (args.clerkId) body.visitorId = args.clerkId; // clerkId maps to visitorId for trip ownership
+        else if (args.visitorId) body.visitorId = args.visitorId;
         if (args.customerId) body.customerId = args.customerId;
         if (args.destination) body.destination = args.destination;
         if (args.startDate) body.startDate = args.startDate;
