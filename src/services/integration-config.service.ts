@@ -6,7 +6,27 @@ import {
   IIntegrationApiKey,
 } from '../models/IntegrationConfig';
 import { encryptData, decryptData } from './encryption.service';
-import { getApiKey } from './api.key.service';
+import { getApiKey, invalidateApiKeyCache } from './api.key.service';
+
+/**
+ * Clear per-integration credential caches when config is updated.
+ * Uses dynamic imports to avoid circular dependencies.
+ */
+async function invalidateIntegrationCredentialsCaches(
+  companyId: string,
+  integrationId: string,
+): Promise<void> {
+  try {
+    if (integrationId === 'composio') {
+      const { clearComposioCaches } = await import(
+        '../integrations/composio/composio.service'
+      );
+      clearComposioCaches(companyId);
+    }
+  } catch {
+    // Integration module not available — ignore
+  }
+}
 
 // Cache with 15-minute TTL (same as api.key.service)
 const integrationConfigCache = new NodeCache({ stdTTL: 900 });
@@ -134,6 +154,14 @@ export async function saveIntegrationConfig(
 
   // Invalidate caches
   invalidateIntegrationConfigCache(companyId, integrationId);
+
+  // Also invalidate api.key.service cache for each key (used by getApiKey())
+  for (const key of apiKeys) {
+    invalidateApiKeyCache(companyId, key.key);
+  }
+
+  // Invalidate per-integration credential caches
+  invalidateIntegrationCredentialsCaches(companyId, integrationId);
 
   return config;
 }

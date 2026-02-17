@@ -10,6 +10,20 @@ const credentialsCache = new NodeCache({ stdTTL: 1800 });
 // Cache tool listings (5 min TTL)
 const toolsCache = new NodeCache({ stdTTL: 300 });
 
+/**
+ * Clear cached credentials and tools for a company.
+ * Called when integration config is updated.
+ */
+export function clearComposioCaches(companyId: string): void {
+  credentialsCache.del(`creds:${companyId}`);
+  // Clear all tool cache entries for this company
+  for (const key of toolsCache.keys()) {
+    if (key.startsWith(`tools:${companyId}:`)) {
+      toolsCache.del(key);
+    }
+  }
+}
+
 interface ComposioToolInfo {
   name: string;
   description: string;
