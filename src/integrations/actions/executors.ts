@@ -51,6 +51,7 @@ interface ActionResult {
   success: boolean;
   data?: any;
   error?: string;
+  costInfo?: import('./types').ToolCostInfo;
 }
 
 const prepareActionExecution = async (
@@ -199,6 +200,29 @@ export const executeFunctionCallWithContext = async (
       const result = (await functionFactory[functionName].function(
         processedArgs,
       )) as ActionResult;
+
+      // Capture tool cost if the action returned cost info
+      if (result.costInfo) {
+        try {
+          const { saveToolCostTracking } = await import(
+            '../../services/cost-tracking.service'
+          );
+          await saveToolCostTracking({
+            companyId: context.companyId,
+            assistantId: context.assistantId || 'unknown',
+            sessionId: context.sessionId,
+            userId: context.userId,
+            actionId: functionName,
+            costInfo: result.costInfo,
+            timestamp: new Date(),
+          });
+        } catch (costError) {
+          console.error(
+            '[TOOL_COST] Failed to save tool cost (non-blocking):',
+            costError,
+          );
+        }
+      }
 
       if (!result.success) {
         const errorDetails = extractErrorDetails(

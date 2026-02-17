@@ -12,12 +12,25 @@ export interface ActionContext {
   channelMetadata?: Record<string, any>;
 }
 
+// Optional cost info returned by tool actions that call paid external APIs
+export interface ToolCostInfo {
+  provider: string; // e.g., "perplexity", "elevenlabs", "openai"
+  service: string; // e.g., "search", "tts", "whisper"
+  model?: string; // model used, if applicable
+  cost: number; // USD cost for this invocation
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  units?: number; // quantity consumed (characters, seconds, etc.)
+  unitType?: string; // "tokens" | "characters" | "seconds" | "requests"
+}
+
 // New interface for a standardized successful action result
 export interface StandardActionResult<D = any> {
   success: true; // Explicitly true for successful outcomes
   message?: string; // Optional human-readable message for UI or logs
   data?: D; // The primary payload/data of the action
-  // uiHints?: Record<string, any>; // Example: Future extension for UI rendering hints
+  costInfo?: ToolCostInfo; // Optional cost info for paid external API calls
 }
 
 export interface FunctionDefinition<T = any, R = any> {

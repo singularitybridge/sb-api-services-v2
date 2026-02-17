@@ -193,6 +193,52 @@ export async function logCostTracking(info: CostTrackingInfo): Promise<void> {
   }
 }
 
+// Perplexity Sonar model pricing (USD per 1000 tokens)
+// Source: https://docs.perplexity.ai/docs/pricing
+const PERPLEXITY_PRICING: Record<string, ModelPricing> = {
+  sonar: { inputCost: 0.001, outputCost: 0.001 },
+  'sonar-pro': { inputCost: 0.003, outputCost: 0.015 },
+  'sonar-reasoning': { inputCost: 0.001, outputCost: 0.005 },
+  'sonar-reasoning-pro': { inputCost: 0.002, outputCost: 0.008 },
+  'sonar-deep-research': { inputCost: 0.002, outputCost: 0.008 },
+};
+
+export function calculatePerplexityCost(
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+): number {
+  const pricing = PERPLEXITY_PRICING[model] || PERPLEXITY_PRICING['sonar'];
+  const inputCost = (inputTokens / 1000) * pricing.inputCost;
+  const outputCost = (outputTokens / 1000) * pricing.outputCost;
+  return parseFloat((inputCost + outputCost).toFixed(6));
+}
+
+// Google Maps Platform pricing (USD per request)
+// Source: https://developers.google.com/maps/billing-and-pricing/pricing
+// Prices reflect standard (non-discounted) SKU rates
+const GOOGLE_MAPS_PRICING: Record<string, number> = {
+  'places-text-search': 0.032,        // Text Search
+  'place-details': 0.017,             // Place Details (Basic + Contact + Atmosphere)
+  'place-photos': 0.007,              // Place Photos
+  'nearby-search': 0.032,             // Nearby Search
+  'directions': 0.01,                 // Routes: Compute Routes
+  'geocoding': 0.005,                 // Geocoding
+  'reverse-geocoding': 0.005,         // Reverse Geocoding
+  'distance-matrix': 0.01,            // Distance Matrix (per element)
+  'timezone': 0.005,                  // Timezone
+  'static-map': 0.002,               // Static Maps
+  'street-view': 0.007,              // Street View Static
+};
+
+export function calculateGoogleMapsCost(
+  apiEndpoint: string,
+  units: number = 1,
+): number {
+  const baseCost = GOOGLE_MAPS_PRICING[apiEndpoint] || 0;
+  return parseFloat((baseCost * units).toFixed(6));
+}
+
 export function formatCostMessage(info: CostTrackingInfo): string {
   return `AI Usage - Model: ${info.model}, Input: ${
     info.inputTokens

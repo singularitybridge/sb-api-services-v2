@@ -68,15 +68,36 @@ export const updateSessionAssistant = async (
   assistantId: string,
   companyId: string,
 ): Promise<ISession | null> => {
+  // Look up the current session to get its channel info
+  const currentSession = await Session.findOne({
+    _id: sessionId,
+    companyId: companyId,
+  });
+
+  if (!currentSession) {
+    throw new NotFoundError('Session not found');
+  }
+
+  // Deactivate any existing active session with the target assistant
+  // for the same user/channel/channelUserId to avoid unique index conflict
+  await Session.updateMany(
+    {
+      companyId: currentSession.companyId,
+      userId: currentSession.userId,
+      channel: currentSession.channel || 'web',
+      channelUserId: currentSession.channelUserId,
+      assistantId: new mongoose.Types.ObjectId(assistantId),
+      active: true,
+      _id: { $ne: currentSession._id },
+    },
+    { $set: { active: false } },
+  );
+
   const session = await Session.findOneAndUpdate(
     { _id: sessionId, companyId: companyId },
     { assistantId },
     { new: true },
   );
-
-  if (!session) {
-    throw new NotFoundError('Session not found');
-  }
 
   return session;
 };
@@ -318,6 +339,7 @@ export interface EnrichedSession {
   messageCount: number;
   lastMessageAt: string | null;
   createdAt: string;
+  totalCost: number;
 }
 
 export async function listSessionsEnriched(
@@ -395,6 +417,26 @@ export async function listSessionsEnriched(
               as: '_messageStats',
             },
           },
+          // Join LLM costs
+          {
+            $lookup: {
+              from: 'costtrackings',
+              localField: '_id',
+              foreignField: 'sessionId',
+              pipeline: [{ $group: { _id: null, totalCost: { $sum: '$totalCost' } } }],
+              as: '_llmCosts',
+            },
+          },
+          // Join tool costs
+          {
+            $lookup: {
+              from: 'toolcosttrackings',
+              localField: '_id',
+              foreignField: 'sessionId',
+              pipeline: [{ $group: { _id: null, totalCost: { $sum: '$cost' } } }],
+              as: '_toolCosts',
+            },
+          },
           // Project final shape
           {
             $project: {
@@ -411,6 +453,14 @@ export async function listSessionsEnriched(
               },
               lastMessageAt: {
                 $arrayElemAt: ['$_messageStats.lastTimestamp', 0],
+              },
+              totalCost: {
+                $round: [{
+                  $add: [
+                    { $ifNull: [{ $arrayElemAt: ['$_llmCosts.totalCost', 0] }, 0] },
+                    { $ifNull: [{ $arrayElemAt: ['$_toolCosts.totalCost', 0] }, 0] },
+                  ],
+                }, 6],
               },
               createdAt: '$createdAt',
             },
@@ -431,6 +481,7 @@ export async function listSessionsEnriched(
     messageCount: s.messageCount,
     lastMessageAt: s.lastMessageAt ? new Date(s.lastMessageAt).toISOString() : null,
     createdAt: s.createdAt ? new Date(s.createdAt).toISOString() : new Date().toISOString(),
+    totalCost: s.totalCost || 0,
   }));
 
   return { sessions, total };

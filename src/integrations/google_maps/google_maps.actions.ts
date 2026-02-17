@@ -2,9 +2,11 @@ import {
   ActionContext,
   FunctionFactory,
   StandardActionResult,
+  ToolCostInfo,
 } from '../actions/types';
 import { executeAction } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
+import { calculateGoogleMapsCost } from '../../utils/cost-tracking';
 import {
   placesTextSearch,
   getPlaceDetails as getPlaceDetailsSvc,
@@ -22,6 +24,17 @@ import {
 } from './google_maps.service';
 
 export { validateConnection };
+
+/** Build costInfo for a Google Maps API call */
+function mapsCostInfo(service: string, units: number = 1): ToolCostInfo {
+  return {
+    provider: 'google_maps',
+    service,
+    cost: calculateGoogleMapsCost(service, units),
+    units,
+    unitType: 'requests',
+  };
+}
 
 // Lean field mask for search results — includes photos for auto-resolving first image URL per place
 const DEFAULT_SEARCH_FIELD_MASK = 'places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.priceLevel,places.types,places.websiteUri,places.nationalPhoneNumber,places.currentOpeningHours.openNow,places.location,places.photos';
@@ -216,7 +229,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
           }
         }));
 
-        return { success: true, data: places, description: `Found ${places.length} places` };
+        return { success: true, data: places, description: `Found ${places.length} places`, costInfo: mapsCostInfo('places-text-search') };
       }, { serviceName: 'googleMaps' });
     },
   },
@@ -255,7 +268,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
       return executeAction('getPlaceDetails', async () => {
         const fieldMask = args.fieldMask || 'id,displayName,formattedAddress,location,rating,userRatingCount,types,primaryType,editorialSummary,regularOpeningHours,currentOpeningHours,priceLevel,photos,websiteUri,googleMapsUri,internationalPhoneNumber,reviews,servesVegetarianFood,servesBeer,servesWine,dineIn,takeout,delivery,reservable';
         const data = await getPlaceDetailsSvc(context.companyId, args.placeId, fieldMask, args.language);
-        return { success: true, data: trimPlaceDetails(data) };
+        return { success: true, data: trimPlaceDetails(data), costInfo: mapsCostInfo('place-details') };
       }, { serviceName: 'googleMaps' });
     },
   },
@@ -309,7 +322,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
             };
           }),
         );
-        return { success: true, data: photoUrls, description: `Got ${photoUrls.length} photos` };
+        return { success: true, data: photoUrls, description: `Got ${photoUrls.length} photos`, costInfo: mapsCostInfo('place-photos', photoUrls.length) };
       }, { serviceName: 'googleMaps' });
     },
   },
@@ -390,7 +403,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
           }
         }));
 
-        return { success: true, data: places, description: `Found ${places.length} nearby places` };
+        return { success: true, data: places, description: `Found ${places.length} nearby places`, costInfo: mapsCostInfo('nearby-search') };
       }, { serviceName: 'googleMaps' });
     },
   },
@@ -451,6 +464,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
           description: route
             ? `Route: ${route.distanceMeters}m, ${route.duration}`
             : 'No route found',
+          costInfo: mapsCostInfo('directions'),
         };
       }, { serviceName: 'googleMaps' });
     },
@@ -477,8 +491,9 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
       if (!args.address) throw new ActionValidationError('address is required.');
       return executeAction('geocodeAddress', async () => {
         const data = await geocode(context.companyId, args.address);
+        const cost = mapsCostInfo('geocoding');
         if (data.status !== 'OK' || !data.results?.length) {
-          return { success: true, data: null, description: `Geocoding failed: ${data.status}` };
+          return { success: true, data: null, description: `Geocoding failed: ${data.status}`, costInfo: cost };
         }
         const result = data.results[0];
         return {
@@ -490,6 +505,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
             types: result.types,
           },
           description: `Geocoded to ${result.geometry.location.lat},${result.geometry.location.lng}`,
+          costInfo: cost,
         };
       }, { serviceName: 'googleMaps' });
     },
@@ -519,8 +535,9 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
       if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
       return executeAction('reverseGeocode', async () => {
         const data = await reverseGeocodeSvc(context.companyId, args.latitude, args.longitude);
+        const cost = mapsCostInfo('reverse-geocoding');
         if (data.status !== 'OK' || !data.results?.length) {
-          return { success: true, data: null, description: `Reverse geocoding failed: ${data.status}` };
+          return { success: true, data: null, description: `Reverse geocoding failed: ${data.status}`, costInfo: cost };
         }
         const result = data.results[0];
         return {
@@ -532,6 +549,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
             addressComponents: result.address_components,
           },
           description: result.formatted_address,
+          costInfo: cost,
         };
       }, { serviceName: 'googleMaps' });
     },
@@ -590,7 +608,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
           args.markers,
           args.mapType,
         );
-        return { success: true, data: { imageUrl: url }, description: 'Static map URL generated' };
+        return { success: true, data: { imageUrl: url }, description: 'Static map URL generated', costInfo: mapsCostInfo('static-map') };
       }, { serviceName: 'googleMaps' });
     },
   },
@@ -646,7 +664,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
           args.pitch,
           args.fov,
         );
-        return { success: true, data: { imageUrl: url }, description: 'Street View URL generated' };
+        return { success: true, data: { imageUrl: url }, description: 'Street View URL generated', costInfo: mapsCostInfo('street-view') };
       }, { serviceName: 'googleMaps' });
     },
   },
@@ -683,8 +701,9 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
       if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
       return executeAction('getTimezone', async () => {
         const data = await getTimezoneSvc(context.companyId, args.latitude, args.longitude, args.timestamp);
+        const cost = mapsCostInfo('timezone');
         if (data.status !== 'OK') {
-          return { success: true, data: null, description: `Timezone lookup failed: ${data.status}` };
+          return { success: true, data: null, description: `Timezone lookup failed: ${data.status}`, costInfo: cost };
         }
         return {
           success: true,
@@ -695,6 +714,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
             dstOffset: data.dstOffset,
           },
           description: `Timezone: ${data.timeZoneId} (${data.timeZoneName})`,
+          costInfo: cost,
         };
       }, { serviceName: 'googleMaps' });
     },
@@ -742,8 +762,10 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
           args.destinations,
           args.mode || 'driving',
         );
+        const elements = (args.origins?.length || 1) * (args.destinations?.length || 1);
+        const cost = mapsCostInfo('distance-matrix', elements);
         if (data.status !== 'OK') {
-          return { success: true, data: null, description: `Distance matrix failed: ${data.status}` };
+          return { success: true, data: null, description: `Distance matrix failed: ${data.status}`, costInfo: cost };
         }
         return {
           success: true,
@@ -753,6 +775,7 @@ export const createGoogleMapsActions = (context: ActionContext): FunctionFactory
             rows: data.rows,
           },
           description: `Matrix: ${data.origin_addresses.length} origins × ${data.destination_addresses.length} destinations`,
+          costInfo: cost,
         };
       }, { serviceName: 'googleMaps' });
     },

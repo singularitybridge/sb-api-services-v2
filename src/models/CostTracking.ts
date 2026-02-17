@@ -128,6 +128,7 @@ CostTrackingSchema.index({ companyId: 1, timestamp: -1 });
 CostTrackingSchema.index({ companyId: 1, assistantId: 1, timestamp: -1 });
 CostTrackingSchema.index({ companyId: 1, modelName: 1, timestamp: -1 });
 CostTrackingSchema.index({ companyId: 1, provider: 1, timestamp: -1 });
+CostTrackingSchema.index({ companyId: 1, sessionId: 1, timestamp: -1 });
 
 export const CostTracking = mongoose.model<ICostTracking>(
   'CostTracking',

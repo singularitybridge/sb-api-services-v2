@@ -1,6 +1,11 @@
 import { CostTracking, ICostTracking } from '../models/CostTracking';
+import {
+  ToolCostTracking,
+  IToolCostTracking,
+} from '../models/ToolCostTracking';
 import mongoose from 'mongoose';
 import { CostTrackingInfo } from '../utils/cost-tracking';
+import { ToolCostInfo } from '../integrations/actions/types';
 
 /**
  * Helper function to safely extract assistant ID and name from a record
@@ -81,6 +86,7 @@ export interface CostSummary {
 export interface CostQuery {
   companyId?: string;
   assistantId?: string;
+  sessionId?: string;
   userId?: string;
   provider?: string;
   model?: string;
@@ -161,6 +167,9 @@ export async function getCostRecords(
   if (query.assistantId) {
     filter.assistantId = new mongoose.Types.ObjectId(query.assistantId);
   }
+  if (query.sessionId) {
+    filter.sessionId = new mongoose.Types.ObjectId(query.sessionId);
+  }
   if (query.userId) {
     filter.userId = new mongoose.Types.ObjectId(query.userId);
   }
@@ -217,10 +226,15 @@ export async function getCostSummary(
   startDate?: Date,
   endDate?: Date,
   provider?: string,
+  sessionId?: string,
 ): Promise<CostSummary> {
   const filter: any = {
     companyId: new mongoose.Types.ObjectId(companyId),
   };
+
+  if (sessionId) {
+    filter.sessionId = new mongoose.Types.ObjectId(sessionId);
+  }
 
   if (startDate || endDate) {
     filter.timestamp = {};
@@ -327,6 +341,7 @@ export async function getDailyCosts(
   startDate?: Date,
   endDate?: Date,
   provider?: string,
+  sessionId?: string,
 ): Promise<
   Array<{ date: string; cost: number; requests: number; tokens: number }>
 > {
@@ -334,6 +349,10 @@ export async function getDailyCosts(
   const matchFilter: any = {
     companyId: new mongoose.Types.ObjectId(companyId),
   };
+
+  if (sessionId) {
+    matchFilter.sessionId = new mongoose.Types.ObjectId(sessionId);
+  }
 
   // Use provided dates or default to last N days
   if (startDate || endDate) {
@@ -401,4 +420,204 @@ export async function deleteOldCostRecords(
     `[COST_TRACKING_CLEANUP] Deleted ${result.deletedCount} old cost records`,
   );
   return result.deletedCount;
+}
+
+// ── Tool Cost Tracking ──────────────────────────────────────────────
+
+export interface ToolCostTrackingInput {
+  companyId: string;
+  assistantId: string;
+  sessionId?: string;
+  userId?: string;
+  actionId: string;
+  costInfo: ToolCostInfo;
+  timestamp: Date;
+}
+
+export async function saveToolCostTracking(
+  input: ToolCostTrackingInput,
+): Promise<IToolCostTracking> {
+  const record = new ToolCostTracking({
+    companyId: new mongoose.Types.ObjectId(input.companyId),
+    assistantId: mongoose.Types.ObjectId.isValid(input.assistantId)
+      ? new mongoose.Types.ObjectId(input.assistantId)
+      : undefined,
+    sessionId:
+      input.sessionId &&
+      input.sessionId !== 'stateless' &&
+      input.sessionId !== 'stateless_execution' &&
+      mongoose.Types.ObjectId.isValid(input.sessionId)
+        ? new mongoose.Types.ObjectId(input.sessionId)
+        : undefined,
+    userId: input.userId
+      ? new mongoose.Types.ObjectId(input.userId)
+      : undefined,
+    provider: input.costInfo.provider,
+    service: input.costInfo.service,
+    actionId: input.actionId,
+    modelName: input.costInfo.model,
+    cost: input.costInfo.cost,
+    inputTokens: input.costInfo.inputTokens,
+    outputTokens: input.costInfo.outputTokens,
+    totalTokens: input.costInfo.totalTokens,
+    units: input.costInfo.units,
+    unitType: input.costInfo.unitType,
+    timestamp: input.timestamp,
+  });
+
+  const saved = await record.save();
+  console.log(
+    `[TOOL_COST] ${input.costInfo.provider}/${input.costInfo.service}: $${input.costInfo.cost.toFixed(6)} (${input.actionId})`,
+  );
+  return saved;
+}
+
+export interface ToolCostSummary {
+  totalToolCost: number;
+  totalToolRequests: number;
+  byProvider: Record<
+    string,
+    { cost: number; requests: number; services: string[] }
+  >;
+  byAssistant: Array<{
+    assistantId: string;
+    assistantName?: string;
+    cost: number;
+    requests: number;
+  }>;
+}
+
+export async function getToolCostSummary(
+  companyId: string,
+  startDate?: Date,
+  endDate?: Date,
+  sessionId?: string,
+): Promise<ToolCostSummary> {
+  const filter: any = {
+    companyId: new mongoose.Types.ObjectId(companyId),
+  };
+
+  if (sessionId) {
+    filter.sessionId = new mongoose.Types.ObjectId(sessionId);
+  }
+
+  if (startDate || endDate) {
+    filter.timestamp = {};
+    if (startDate) filter.timestamp.$gte = startDate;
+    if (endDate) {
+      const endOfDay = new Date(endDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+      filter.timestamp.$lte = endOfDay;
+    }
+  }
+
+  const records = await ToolCostTracking.find(filter).populate(
+    'assistantId',
+    'name',
+  );
+
+  const summary: ToolCostSummary = {
+    totalToolCost: 0,
+    totalToolRequests: records.length,
+    byProvider: {},
+    byAssistant: [],
+  };
+
+  const assistantMap: Record<
+    string,
+    { cost: number; requests: number; name?: string }
+  > = {};
+
+  for (const record of records) {
+    summary.totalToolCost += record.cost;
+
+    // By provider
+    if (!summary.byProvider[record.provider]) {
+      summary.byProvider[record.provider] = {
+        cost: 0,
+        requests: 0,
+        services: [],
+      };
+    }
+    summary.byProvider[record.provider].cost += record.cost;
+    summary.byProvider[record.provider].requests += 1;
+    if (
+      !summary.byProvider[record.provider].services.includes(record.service)
+    ) {
+      summary.byProvider[record.provider].services.push(record.service);
+    }
+
+    // By assistant
+    const { id: assistantId, name: assistantName } = extractAssistantInfo(
+      record.assistantId,
+    );
+    if (!assistantMap[assistantId]) {
+      assistantMap[assistantId] = { cost: 0, requests: 0, name: assistantName };
+    }
+    assistantMap[assistantId].cost += record.cost;
+    assistantMap[assistantId].requests += 1;
+  }
+
+  summary.byAssistant = Object.entries(assistantMap)
+    .map(([id, data]) => ({
+      assistantId: id,
+      assistantName: data.name,
+      cost: data.cost,
+      requests: data.requests,
+    }))
+    .sort((a, b) => b.cost - a.cost);
+
+  return summary;
+}
+
+export async function getDailyToolCosts(
+  companyId: string,
+  days: number = 30,
+  startDate?: Date,
+  endDate?: Date,
+  sessionId?: string,
+): Promise<
+  Array<{ date: string; cost: number; requests: number }>
+> {
+  const matchFilter: any = {
+    companyId: new mongoose.Types.ObjectId(companyId),
+  };
+
+  if (sessionId) {
+    matchFilter.sessionId = new mongoose.Types.ObjectId(sessionId);
+  }
+
+  if (startDate || endDate) {
+    matchFilter.timestamp = {};
+    if (startDate) matchFilter.timestamp.$gte = startDate;
+    if (endDate) {
+      const endOfDay = new Date(endDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+      matchFilter.timestamp.$lte = endOfDay;
+    }
+  } else {
+    const defaultStartDate = new Date();
+    defaultStartDate.setDate(defaultStartDate.getDate() - days);
+    matchFilter.timestamp = { $gte: defaultStartDate };
+  }
+
+  const result = await ToolCostTracking.aggregate([
+    { $match: matchFilter },
+    {
+      $group: {
+        _id: {
+          $dateToString: { format: '%Y-%m-%d', date: '$timestamp' },
+        },
+        cost: { $sum: '$cost' },
+        requests: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  return result.map((item) => ({
+    date: item._id,
+    cost: item.cost,
+    requests: item.requests,
+  }));
 }

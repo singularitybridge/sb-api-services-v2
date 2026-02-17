@@ -62,7 +62,7 @@ export async function executeAction<
       ? options.dataExtractor(result)
       : (result.data as R); // Default to using result.data directly
 
-    return {
+    const actionResult: StandardActionResult<R> = {
       success: true,
       message:
         options?.successMessage ||
@@ -70,6 +70,13 @@ export async function executeAction<
         actionName + ' completed successfully.',
       data: extractedData,
     };
+
+    // Preserve costInfo if the service call returned it
+    if ((result as any).costInfo) {
+      actionResult.costInfo = (result as any).costInfo;
+    }
+
+    return actionResult;
   } catch (error) {
     if (options?.errorTransformer) {
       throw options.errorTransformer(error, actionName);

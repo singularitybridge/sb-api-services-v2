@@ -4,6 +4,8 @@ import {
   getCostRecords,
   getCostSummary,
   getDailyCosts,
+  getToolCostSummary,
+  getDailyToolCosts,
 } from '../services/cost-tracking.service';
 import { resolveAssistantIdentifier } from '../services/assistant/assistant-resolver.service';
 
@@ -19,6 +21,7 @@ costTrackingRouter.get(
     try {
       const {
         assistantId,
+        sessionId,
         userId,
         provider,
         model,
@@ -36,6 +39,7 @@ costTrackingRouter.get(
       const { records, totalCount } = await getCostRecords({
         companyId,
         assistantId: assistantId as string,
+        sessionId: sessionId as string,
         userId: userId as string,
         provider: provider as string,
         model: model as string,
@@ -65,23 +69,36 @@ costTrackingRouter.get(
   '/summary',
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      const { startDate, endDate, provider } = req.query;
+      const { startDate, endDate, provider, sessionId } = req.query;
 
       const companyId = req.company?._id?.toString();
       if (!companyId) {
         return res.status(400).json({ error: 'Company ID is required' });
       }
 
-      const summary = await getCostSummary(
-        companyId,
-        startDate ? new Date(startDate as string) : undefined,
-        endDate ? new Date(endDate as string) : undefined,
-        provider as string | undefined,
-      );
+      const [summary, toolSummary] = await Promise.all([
+        getCostSummary(
+          companyId,
+          startDate ? new Date(startDate as string) : undefined,
+          endDate ? new Date(endDate as string) : undefined,
+          provider as string | undefined,
+          sessionId as string | undefined,
+        ),
+        getToolCostSummary(
+          companyId,
+          startDate ? new Date(startDate as string) : undefined,
+          endDate ? new Date(endDate as string) : undefined,
+          sessionId as string | undefined,
+        ),
+      ]);
 
       res.json({
         success: true,
-        data: summary,
+        data: {
+          ...summary,
+          toolCosts: toolSummary,
+          totalCombinedCost: summary.totalCost + toolSummary.totalToolCost,
+        },
       });
     } catch (error) {
       next(error);
@@ -97,7 +114,7 @@ costTrackingRouter.get(
   '/daily',
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      const { days = '30', startDate, endDate, provider } = req.query;
+      const { days = '30', startDate, endDate, provider, sessionId } = req.query;
 
       const companyId = req.company?._id?.toString();
       if (!companyId) {
@@ -110,6 +127,7 @@ costTrackingRouter.get(
         startDate ? new Date(startDate as string) : undefined,
         endDate ? new Date(endDate as string) : undefined,
         provider as string | undefined,
+        sessionId as string | undefined,
       );
 
       res.json({
@@ -233,6 +251,69 @@ costTrackingRouter.get(
               result.records.length > 0 ? totalCost / result.records.length : 0,
           },
         },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * GET /api/costs/tools/summary
+ * Get tool-only cost summary
+ */
+costTrackingRouter.get(
+  '/tools/summary',
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { startDate, endDate } = req.query;
+
+      const companyId = req.company?._id?.toString();
+      if (!companyId) {
+        return res.status(400).json({ error: 'Company ID is required' });
+      }
+
+      const summary = await getToolCostSummary(
+        companyId,
+        startDate ? new Date(startDate as string) : undefined,
+        endDate ? new Date(endDate as string) : undefined,
+      );
+
+      res.json({
+        success: true,
+        data: summary,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * GET /api/costs/tools/daily
+ * Get daily tool cost breakdown
+ */
+costTrackingRouter.get(
+  '/tools/daily',
+  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { days = '30', startDate, endDate } = req.query;
+
+      const companyId = req.company?._id?.toString();
+      if (!companyId) {
+        return res.status(400).json({ error: 'Company ID is required' });
+      }
+
+      const dailyCosts = await getDailyToolCosts(
+        companyId,
+        parseInt(days as string, 10),
+        startDate ? new Date(startDate as string) : undefined,
+        endDate ? new Date(endDate as string) : undefined,
+      );
+
+      res.json({
+        success: true,
+        data: dailyCosts,
       });
     } catch (error) {
       next(error);

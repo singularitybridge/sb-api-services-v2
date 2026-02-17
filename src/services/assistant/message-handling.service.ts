@@ -60,6 +60,38 @@ function logParse(result: z.ZodSafeParseResult<any>, fnName: string, raw: any) {
   }
 }
 
+// Render {{templateVar}} placeholders in system prompts using session context.
+// Supports dot-notation for nested keys (e.g. {{channelMetadata.name}}).
+const renderPromptTemplate = (prompt: string, session: any): string => {
+  if (!prompt || !prompt.includes('{{')) return prompt;
+
+  const now = new Date();
+  const context: Record<string, any> = {
+    channel: session.channel || 'web',
+    channelUserId: session.channelUserId || '',
+    channelMetadata: session.channelMetadata || {},
+    contactIdentifier:
+      session.channelUserId ||
+      session.channelMetadata?.telegramUserId ||
+      session.channelMetadata?.phone ||
+      session.channelMetadata?.email ||
+      '',
+    currentDate: now.toISOString().split('T')[0],
+    currentTime: now.toISOString().split('T')[1].substring(0, 5),
+    currentDateTime: now.toISOString(),
+  };
+
+  return prompt.replace(/\{\{(\w+(?:\.\w+)*)\}\}/g, (_match, path) => {
+    const parts = path.split('.');
+    let value: any = context;
+    for (const part of parts) {
+      if (value === null || value === undefined) return '';
+      value = value[part];
+    }
+    return value !== null && value !== undefined ? String(value) : '';
+  });
+};
+
 const saveSystemMessage = async (
   sessionId: mongoose.Types.ObjectId,
   assistantId: mongoose.Types.ObjectId,
@@ -659,7 +691,21 @@ export const handleSessionMessage = async (
   // shouldStream = false; // DIAGNOSTIC: Force non-streaming // REVERTED
   // console.log(`Forced shouldStream: ${shouldStream}`);
 
-  const systemPrompt = assistant.llmPrompt;
+  let systemPrompt = renderPromptTemplate(assistant.llmPrompt, session);
+
+  // Auto-inject session context block (date, user name, channel)
+  const contextLines: string[] = [];
+  const now = new Date();
+  contextLines.push(`Current date: ${now.toISOString().split('T')[0]}`);
+  if (session.channelMetadata?.name) {
+    contextLines.push(`User: ${session.channelMetadata.name}`);
+  }
+  if (session.channel && session.channel !== 'web') {
+    contextLines.push(`Channel: ${session.channel}`);
+  }
+  if (contextLines.length > 0) {
+    systemPrompt += `\n\n---\nSession context:\n${contextLines.join('\n')}`;
+  }
 
   // Construct user message content for LLM
   // The userMessageForLlm will now use the userMessageContentParts array
@@ -986,6 +1032,20 @@ export const handleSessionMessage = async (
           const toolCalls = await streamResult.toolCalls;
           const toolResults = await streamResult.toolResults;
 
+          // Count tool calls across ALL steps (not just the last step)
+          let totalToolCallCount = toolCalls?.length || 0;
+          try {
+            const steps = await (streamResult as any).steps;
+            if (steps && Array.isArray(steps) && steps.length > 1) {
+              totalToolCallCount = 0;
+              for (const step of steps) {
+                totalToolCallCount += step.toolCalls?.length || 0;
+              }
+            }
+          } catch {
+            // steps not available, fall back to toolCalls from last step
+          }
+
           // Get usage data for cost tracking — use totalUsage to aggregate across all steps
           let usage: any;
           try {
@@ -1000,7 +1060,7 @@ export const handleSessionMessage = async (
           console.log(
             `[AI_STREAM_COMPLETE] Duration: ${streamDuration}ms | Response length: ${
               finalText.length
-            } chars | Tool calls: ${toolCalls?.length || 0}`,
+            } chars | Tool calls: ${totalToolCallCount}`,
           );
 
           // Log cost tracking information
@@ -1029,7 +1089,7 @@ export const handleSessionMessage = async (
               totalCost: costs.totalCost,
               timestamp: new Date(),
               duration,
-              toolCalls: toolCalls?.length || 0,
+              toolCalls: totalToolCallCount,
               cached: false, // Can be enhanced later if SDK provides cached token info
               requestType: 'streaming' as any,
             };
