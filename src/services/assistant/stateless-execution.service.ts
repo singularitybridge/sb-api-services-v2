@@ -1,4 +1,5 @@
 import { IAssistant } from '../../models/Assistant';
+import { Session } from '../../models/Session';
 import { createFunctionFactory } from '../../integrations/actions/loaders';
 import { getApiKey } from '../api.key.service';
 import { downloadFile } from '../file-downloader.service';
@@ -24,6 +25,38 @@ import { z, ZodType } from 'zod';
 import { trimToWindow } from '../../utils/tokenWindow';
 import { getProvider } from './provider.service';
 // import { getSessionOrStatelessContext } from '../session.service'; // This utility was merged into getSessionById
+
+// Render {{templateVar}} placeholders in prompts using session context.
+// Supports dot-notation for nested keys (e.g. {{channelMetadata.name}}).
+const renderPromptTemplate = (prompt: string, session: any): string => {
+  if (!prompt || !prompt.includes('{{')) return prompt;
+
+  const now = new Date();
+  const context: Record<string, any> = {
+    channel: session.channel || 'web',
+    channelUserId: session.channelUserId || '',
+    channelMetadata: session.channelMetadata || {},
+    contactIdentifier:
+      session.channelUserId ||
+      session.channelMetadata?.telegramUserId ||
+      session.channelMetadata?.phone ||
+      session.channelMetadata?.email ||
+      '',
+    currentDate: now.toISOString().split('T')[0],
+    currentTime: now.toISOString().split('T')[1].substring(0, 5),
+    currentDateTime: now.toISOString(),
+  };
+
+  return prompt.replace(/\{\{(\w+(?:\.\w+)*)\}\}/g, (_match, path) => {
+    const parts = path.split('.');
+    let value: any = context;
+    for (const part of parts) {
+      if (value === null || value === undefined) return '';
+      value = value[part];
+    }
+    return value !== null && value !== undefined ? String(value) : '';
+  });
+};
 
 // Helper function to clean action annotations from text
 const cleanActionAnnotations = (text: string): string => {
@@ -591,8 +624,20 @@ export const executeAssistantStateless = async (
       responseFormat.type === 'json_schema');
 
   // Use promptOverride if provided, otherwise use the assistant's default prompt.
-  const systemPrompt =
+  // Render {{template}} variables using session context when a sessionId is available.
+  let systemPrompt =
     promptOverride || assistant.llmPrompt || 'You are a helpful assistant.';
+  const sessionId = metadata?.sessionId;
+  if (sessionId && systemPrompt.includes('{{')) {
+    try {
+      const session = await Session.findById(sessionId).lean();
+      if (session) {
+        systemPrompt = renderPromptTemplate(systemPrompt, session);
+      }
+    } catch (e) {
+      // Non-critical — continue with unrendered prompt
+    }
+  }
 
   const userMessageForLlm: ModelMessage = {
     role: 'user',

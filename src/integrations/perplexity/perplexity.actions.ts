@@ -4,8 +4,9 @@ import {
   StandardActionResult,
 } from '../actions/types';
 import { performPerplexitySearch as performPerplexitySearchService } from './perplexity.service';
-import { executeAction, ExecuteActionOptions } from '../actions/executor';
+import { executeAction } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
+import { calculatePerplexityCost } from '../../utils/cost-tracking';
 import axios from 'axios';
 import { TestConnectionResult } from '../../services/integration-config.service';
 
@@ -217,10 +218,11 @@ export const createPerplexityActions = (
         );
       }
 
-      return executeAction<PerplexityResponseData, ServiceCallLambdaResponse>(
+      let usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | undefined;
+
+      const actionResult = await executeAction<PerplexityResponseData, ServiceCallLambdaResponse>(
         'perplexitySearch',
         async (): Promise<ServiceCallLambdaResponse> => {
-          // performPerplexitySearchService throws on error or returns the search result
           const result = await performPerplexitySearchService(
             context.companyId!,
             model,
@@ -230,13 +232,29 @@ export const createPerplexityActions = (
             reasoning_effort,
             return_images,
           );
+          usage = result.usage;
           return { success: true, data: result };
         },
         {
           serviceName: SERVICE_NAME,
-          // Default dataExtractor (res => res.data) will work
         },
       );
+
+      // Attach cost info from actual API usage
+      if (usage) {
+        actionResult.costInfo = {
+          provider: 'perplexity',
+          service: 'search',
+          model,
+          cost: calculatePerplexityCost(model, usage.prompt_tokens, usage.completion_tokens),
+          inputTokens: usage.prompt_tokens,
+          outputTokens: usage.completion_tokens,
+          totalTokens: usage.total_tokens,
+          unitType: 'tokens',
+        };
+      }
+
+      return actionResult;
     },
   },
 });

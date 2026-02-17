@@ -9,6 +9,12 @@ interface PerplexityImage {
   title?: string;
 }
 
+interface PerplexityUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
 interface PerplexityResponse {
   id: string;
   model: string;
@@ -25,6 +31,7 @@ interface PerplexityResponse {
       content: string;
     };
   }[];
+  usage?: PerplexityUsage;
   related_questions?: string[];
   images?: PerplexityImage[];
 }
@@ -87,7 +94,7 @@ export async function performPerplexitySearch(
   returnRelatedQuestions: boolean = false,
   reasoningEffort: 'low' | 'medium' | 'high' = 'medium',
   returnImages: boolean = false,
-): Promise<{ searchResult: string; relatedQuestions?: string[]; images?: PerplexityImage[]; imageMarkdown?: string }> {
+): Promise<{ searchResult: string; relatedQuestions?: string[]; images?: PerplexityImage[]; imageMarkdown?: string; usage?: PerplexityUsage }> {
   const apiKey = await getApiKey(companyId, 'perplexity_api_key');
   if (!apiKey) {
     throw new Error('Perplexity API key not found');
@@ -140,8 +147,9 @@ export async function performPerplexitySearch(
       cleanContent = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     }
 
-    const result: { searchResult: string; relatedQuestions?: string[]; images?: PerplexityImage[]; imageMarkdown?: string } = {
+    const result: { searchResult: string; relatedQuestions?: string[]; images?: PerplexityImage[]; imageMarkdown?: string; usage?: PerplexityUsage } = {
       searchResult: cleanContent,
+      usage: data.usage,
     };
 
     // Include related questions if they were requested and returned

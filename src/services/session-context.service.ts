@@ -69,11 +69,10 @@ export const getSessionContextData = async (
     channelUserId: (session as any).channelUserId || '',
     channelMetadata: (session as any).channelMetadata || {},
     contactIdentifier:
+      (session as any).channelUserId ||
       (session as any).channelMetadata?.telegramUserId ||
-      (session as any).channelMetadata?.clerkId ||
       (session as any).channelMetadata?.phone ||
       (session as any).channelMetadata?.email ||
-      (session as any).channelUserId ||
       '',
     currentDate: now.toISOString().split('T')[0],
     currentTime: now.toISOString().split('T')[1].substring(0, 5),

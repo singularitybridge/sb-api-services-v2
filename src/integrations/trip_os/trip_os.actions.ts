@@ -404,18 +404,30 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
           data: { found: false, message: 'Session does not have channel identity information' },
         };
       }
+      // tripos-web channelUserId is the customer MongoDB _id (direct lookup)
+      // Other channels use field-based query (heraldId, email, phone)
       const paramMap: Record<string, string> = {
-        telegram: 'telegramId',
+        herald: 'heraldId',
         web: 'email',
         whatsapp: 'phone',
-        'tripos-web': 'visitorId',
       };
       const paramKey = paramMap[context.channel];
       if (!paramKey) {
-        return {
-          success: true,
-          data: { found: false, channel: context.channel, channelUserId: context.channelUserId, message: `Unsupported channel: ${context.channel}` },
-        };
+        // tripos-web or unknown channel — try direct customer _id lookup
+        return executeAction('resolveCurrentCustomer', async () => {
+          try {
+            const data = await tripOsGet(context.companyId, `/api/data/customers/${context.channelUserId}`);
+            if (data) {
+              return { success: true, data: { found: true, customer: data }, description: `Found customer by ID: ${data.firstName} ${data.lastName}` };
+            }
+          } catch {
+            // Not a valid customer ID — fall through
+          }
+          return {
+            success: true,
+            data: { found: false, channel: context.channel, channelUserId: context.channelUserId, message: `No TripOS customer found for ${context.channel} user ${context.channelUserId}` },
+          };
+        }, { serviceName: 'tripOs' });
       }
       return executeAction('resolveCurrentCustomer', async () => {
         const data = await tripOsGet(context.companyId, '/api/data/customers', { [paramKey]: context.channelUserId });
@@ -432,19 +444,19 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
   },
 
   lookupCustomerByChannel: {
-    description: 'Look up a TripOS customer by their contact identifier. Works across all channels: Telegram (by user ID), web (by email), WhatsApp (by phone), tripos-web (by Clerk ID).',
+    description: 'Look up a TripOS customer by their contact identifier. Works across all channels: herald (by Herald ID), web (by email), WhatsApp (by phone), tripos-web (by Clerk ID).',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
         channel: {
           type: 'string',
-          enum: ['telegram', 'web', 'whatsapp', 'tripos-web'],
+          enum: ['herald', 'web', 'whatsapp', 'tripos-web'],
           description: 'The channel type',
         },
         channelId: {
           type: 'string',
-          description: 'The contact identifier (Telegram user ID, email, phone number, or Clerk ID)',
+          description: 'The contact identifier (Herald ID, email, phone number, or Clerk ID)',
         },
       },
       required: ['channel', 'channelId'],
@@ -453,7 +465,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
     function: async (args: { channel: string; channelId: string }): Promise<StandardActionResult> => {
       if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
       if (!args.channelId) throw new ActionValidationError('channelId is required.');
-      const paramMap: Record<string, string> = { telegram: 'telegramId', web: 'email', whatsapp: 'phone', 'tripos-web': 'clerkId' };
+      const paramMap: Record<string, string> = { herald: 'heraldId', web: 'email', whatsapp: 'phone', 'tripos-web': 'clerkId' };
       const paramKey = paramMap[args.channel];
       if (!paramKey) throw new ActionValidationError(`Unsupported channel: ${args.channel}`);
       return executeAction('lookupCustomerByChannel', async () => {
@@ -504,11 +516,11 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
           preferredLanguage: args.preferredLanguage || 'he',
         };
         // Auto-populate channel identifier
+        // tripos-web uses customer MongoDB _id as channelUserId — no field mapping needed
         const channelFieldMap: Record<string, string> = {
-          telegram: 'telegramId',
+          herald: 'heraldId',
           web: 'email',
           whatsapp: 'phone',
-          'tripos-web': 'visitorId',
         };
         const channelField = channelFieldMap[context.channel];
         if (channelField) {
@@ -542,8 +554,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
         lastNameHe: { type: 'string', description: 'Last name in Hebrew (if known)' },
         email: { type: 'string', description: 'Email address (optional)' },
         phone: { type: 'string', description: 'Phone number (optional)' },
-        telegramId: { type: 'string', description: 'Telegram user ID to link this customer to their Telegram account' },
-        visitorId: { type: 'string', description: 'TripOS web visitor ID to link this customer to their browser session' },
+        heraldId: { type: 'string', description: 'Agent Herald ID to link this customer to their Herald conversation' },
         clerkId: { type: 'string', description: 'Clerk user ID to link this customer to their authenticated web account (used for tripos-web channel)' },
         preferredLanguage: { type: 'string', enum: ['he', 'en'], description: 'Preferred language (default: he)' },
       },
@@ -557,8 +568,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
       lastNameHe?: string;
       email?: string;
       phone?: string;
-      telegramId?: string;
-      visitorId?: string;
+      heraldId?: string;
       clerkId?: string;
       preferredLanguage?: string;
     }): Promise<StandardActionResult> => {
@@ -691,10 +701,19 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
       if (!args.prompt) throw new ActionValidationError('prompt is required.');
       return executeAction('generateTripForCurrentUser', async () => {
         const body: Record<string, any> = { prompt: args.prompt };
-        // Auto-inject visitorId for tripos-web and web channels
-        if (context.channel === 'tripos-web' || context.channel === 'web') {
-          if (context.channelUserId) {
-            body.visitorId = context.channelUserId;
+        // Auto-inject channel identifier for trip ownership
+        // tripos-web channelUserId is the customer MongoDB _id
+        if (context.channelUserId) {
+          if (context.channel === 'tripos-web') {
+            body.customerId = context.channelUserId;
+          } else {
+            const channelFieldMap: Record<string, string> = {
+              herald: 'heraldId',
+            };
+            const field = channelFieldMap[context.channel];
+            if (field) {
+              body[field] = context.channelUserId;
+            }
           }
         }
         if (args.destination) body.destination = args.destination;
@@ -724,13 +743,13 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
           type: 'string',
           description: 'Detailed trip generation prompt including destination, dates, travelers, preferences, dietary needs, and any special requests. Write in Hebrew.',
         },
-        visitorId: {
-          type: 'string',
-          description: 'TripOS web visitor ID (legacy anonymous sessions) to link the trip to the user',
-        },
         clerkId: {
           type: 'string',
           description: 'Clerk user ID (from session context contactIdentifier for tripos-web channel) to link the trip to the authenticated user',
+        },
+        heraldId: {
+          type: 'string',
+          description: 'Agent Herald ID to link the trip to a Herald user',
         },
         customerId: {
           type: 'string',
@@ -754,8 +773,8 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
     },
     function: async (args: {
       prompt: string;
-      visitorId?: string;
       clerkId?: string;
+      heraldId?: string;
       customerId?: string;
       destination?: string;
       startDate?: string;
@@ -765,8 +784,8 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
       if (!args.prompt) throw new ActionValidationError('prompt is required.');
       return executeAction('generateTrip', async () => {
         const body: Record<string, unknown> = { prompt: args.prompt };
-        if (args.clerkId) body.visitorId = args.clerkId; // clerkId maps to visitorId for trip ownership
-        else if (args.visitorId) body.visitorId = args.visitorId;
+        if (args.clerkId) body.clerkId = args.clerkId;
+        else if (args.heraldId) body.heraldId = args.heraldId;
         if (args.customerId) body.customerId = args.customerId;
         if (args.destination) body.destination = args.destination;
         if (args.startDate) body.startDate = args.startDate;
