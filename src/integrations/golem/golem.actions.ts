@@ -15,9 +15,13 @@ import {
   deleteSession as deleteSessionService,
   cancelQuery as cancelQueryService,
   getStatus as getStatusService,
+  checkStatus as checkStatusService,
+  getAppStatus as getAppStatusService,
   GolemSession,
   GolemMessage,
   GolemStatus,
+  GolemRequestStatus,
+  GolemAppStatus,
 } from './golem.service';
 import { executeAction } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
@@ -81,6 +85,13 @@ interface CancelQueryArgs {
   sessionId: string;
 }
 
+interface CheckStatusArgs {
+  sandboxUrl?: string;
+  sessionId: string;
+  detail?: 'minimal' | 'summary' | 'full';
+  lastN?: number;
+}
+
 interface GetStatusArgs {
   sandboxUrl?: string;
 }
@@ -105,6 +116,14 @@ interface SessionsListResponseData {
 
 interface StatusResponseData {
   status: GolemStatus;
+}
+
+interface AppStatusResponseData {
+  appStatus: GolemAppStatus;
+}
+
+interface CheckStatusResponseData {
+  status: GolemRequestStatus;
 }
 
 interface CancelQueryResponseData {
@@ -213,7 +232,7 @@ export const createGolemActions = (
         },
         {
           serviceName: SERVICE_NAME,
-          successMessage: 'Prompt sent successfully. Use golemGetMessages to check the response.',
+          successMessage: 'Prompt sent successfully. Use golemCheckStatus to check progress. When complete, use golemGetMessages for full response.',
         },
       );
     },
@@ -415,7 +434,7 @@ export const createGolemActions = (
         },
         {
           serviceName: SERVICE_NAME,
-          successMessage: `Repository clone initiated. Use golemGetMessages to check progress.`,
+          successMessage: `Repository clone initiated. Use golemCheckStatus to check progress.`,
         },
       );
     },
@@ -478,7 +497,7 @@ export const createGolemActions = (
         },
         {
           serviceName: SERVICE_NAME,
-          successMessage: `App switch initiated. Use golemGetMessages to check the result.`,
+          successMessage: `App switch initiated. Use golemCheckStatus to check progress.`,
         },
       );
     },
@@ -576,6 +595,67 @@ export const createGolemActions = (
     },
   },
 
+  golemCheckStatus: {
+    description: 'Check the status of a running or completed request in a Golem session. Returns processing state, progress, cost, and optionally recent output. Use after golemSendPrompt to check if the AI is done and see what it did.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        sandboxUrl: {
+          type: 'string',
+          description: 'URL of the Golem sandbox. If not provided, uses the default configured URL.',
+        },
+        sessionId: {
+          type: 'string',
+          description: 'The Golem session ID',
+        },
+        detail: {
+          type: 'string',
+          enum: ['minimal', 'summary', 'full'],
+          description: 'Level of detail: "minimal" (just processing state), "summary" (state + output preview + tool calls, default), "full" (everything including messages)',
+        },
+        lastN: {
+          type: 'number',
+          description: 'When detail=full, limit to last N messages (0 = all). Useful to avoid large responses.',
+        },
+      },
+      required: ['sessionId'],
+      additionalProperties: false,
+    },
+    function: async (
+      args: CheckStatusArgs,
+    ): Promise<StandardActionResult<CheckStatusResponseData>> => {
+      const { sandboxUrl, sessionId, detail, lastN } = args;
+
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      if (!sessionId || typeof sessionId !== 'string' || sessionId.trim() === '') {
+        throw new ActionValidationError('sessionId must be a non-empty string.');
+      }
+
+      return executeAction<CheckStatusResponseData, ServiceCallResponse<GolemRequestStatus>>(
+        'golemCheckStatus',
+        async (): Promise<ServiceCallResponse<GolemRequestStatus>> => {
+          const status = await checkStatusService(
+            context.companyId!,
+            sessionId.trim(),
+            detail || 'summary',
+            lastN,
+            sandboxUrl,
+          );
+          return { success: true, data: status };
+        },
+        {
+          serviceName: SERVICE_NAME,
+          dataExtractor: (result) => ({ status: result.data }),
+          successMessage: 'Request status retrieved successfully.',
+        },
+      );
+    },
+  },
+
   golemGetStatus: {
     description: 'Get the status of a Golem sandbox including auth configuration, MCP servers, volume info, and configured API keys.',
     strict: true,
@@ -609,6 +689,44 @@ export const createGolemActions = (
           serviceName: SERVICE_NAME,
           dataExtractor: (result) => ({ status: result.data }),
           successMessage: `Sandbox status retrieved successfully${sandboxUrl ? ` from ${sandboxUrl}` : ''}.`,
+        },
+      );
+    },
+  },
+
+  golemGetAppStatus: {
+    description: 'Check if the user\'s app is running and healthy in the Golem sandbox. Returns HTTP reachability and PM2 process info (restarts, uptime).',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        sandboxUrl: {
+          type: 'string',
+          description: 'URL of the Golem sandbox. If not provided, uses the default configured URL.',
+        },
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    function: async (
+      args: GetStatusArgs = {},
+    ): Promise<StandardActionResult<AppStatusResponseData>> => {
+      const { sandboxUrl } = args;
+
+      if (!context.companyId) {
+        throw new ActionValidationError('Company ID is missing from context.');
+      }
+
+      return executeAction<AppStatusResponseData, ServiceCallResponse<GolemAppStatus>>(
+        'golemGetAppStatus',
+        async (): Promise<ServiceCallResponse<GolemAppStatus>> => {
+          const appStatus = await getAppStatusService(context.companyId!, sandboxUrl);
+          return { success: true, data: appStatus };
+        },
+        {
+          serviceName: SERVICE_NAME,
+          dataExtractor: (result) => ({ appStatus: result.data }),
+          successMessage: 'App status retrieved successfully.',
         },
       );
     },

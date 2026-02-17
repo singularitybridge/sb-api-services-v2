@@ -1,7 +1,7 @@
 {
   "name": "golem",
   "displayName": "Golem",
-  "description": "AI coding agent sandbox - create sessions, send prompts, clone repos, and manage applications deployed on Fly.io",
+  "description": "AI coding agent sandbox - create sessions, send prompts, check status, clone repos, and manage deployed applications",
   "icon": "code",
   "category": "development",
   "actionCreator": "createGolemActions",

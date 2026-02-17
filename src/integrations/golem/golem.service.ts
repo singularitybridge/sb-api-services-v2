@@ -6,9 +6,12 @@ export interface GolemSession {
   id: string;
   title?: string;
   stats?: {
-    messageCount?: number;
-    tokenCount?: number;
+    promptTokens: number;
+    completionTokens: number;
+    totalCost: number;
   };
+  model?: string;
+  isProcessing?: boolean;
   [key: string]: any;
 }
 
@@ -29,7 +32,7 @@ export interface GolemStatus {
     authMethod: string;
     claudeAuthConfigured: boolean;
     githubToken: boolean;
-    volumeMounted: boolean;
+    workspaceReady: boolean;
     workspaceFiles: number;
     mcpServers: string[];
     settingsConfigured: boolean;
@@ -40,6 +43,21 @@ export interface GolemStatus {
 export interface SendPromptResult {
   success: boolean;
   result: any;
+}
+
+export interface GolemRequestStatus {
+  sessionId: string;
+  isProcessing: boolean;
+  durationMs?: number;
+  turns: number;
+  stats?: { promptTokens: number; completionTokens: number; totalCost: number };
+  model?: string;
+  lastError?: { subtype: string; errors?: string[] } | null;
+  toolCalls?: string[];
+  outputTail?: string | null;
+  output?: string;
+  messageCount?: number;
+  messages?: GolemMessage[];
 }
 
 /**
@@ -148,6 +166,12 @@ Report what was cloned and whether the app started successfully.`;
     return { success: true, result: response.data };
   } catch (error: any) {
     console.error('Error cloning repository:', error.message);
+    if (error.response?.status === 409) {
+      throw new Error('Session is busy processing a previous prompt. Use golemCheckStatus to monitor progress, or golemCancelQuery to cancel.');
+    }
+    if (error.response?.status === 502) {
+      throw new Error('Golem server is waking up. Please retry in a few seconds.');
+    }
     throw new Error(
       error.response?.data?.error || error.message || 'Failed to clone repository'
     );
@@ -209,6 +233,9 @@ export async function sendPrompt(
     return { success: true, result: response.data };
   } catch (error: any) {
     console.error('Error sending prompt to Golem:', error.message);
+    if (error.response?.status === 409) {
+      throw new Error('Session is busy processing a previous prompt. Use golemCheckStatus to monitor progress, or golemCancelQuery to cancel.');
+    }
     if (error.response?.status === 502) {
       throw new Error('Golem server is waking up. Please retry in a few seconds.');
     }
@@ -344,6 +371,9 @@ Report the result.`;
     return { success: true, result: response.data };
   } catch (error: any) {
     console.error('Error running app:', error.message);
+    if (error.response?.status === 409) {
+      throw new Error('Session is busy processing a previous prompt. Use golemCheckStatus to monitor progress, or golemCancelQuery to cancel.');
+    }
     if (error.response?.status === 502) {
       throw new Error('Golem server is waking up. Please retry in a few seconds.');
     }
@@ -417,6 +447,40 @@ export async function cancelQuery(
   }
 }
 
+export interface GolemAppStatus {
+  app: { reachable: boolean; statusCode?: number; error?: string };
+  pm2?: { status: string; restarts?: number; uptime?: number };
+}
+
+/**
+ * Check if the user's app is running and healthy
+ */
+export async function getAppStatus(
+  companyId: string,
+  sandboxUrl?: string
+): Promise<GolemAppStatus> {
+  const { baseUrl, password } = await getCredentials(companyId, sandboxUrl);
+
+  try {
+    const response = await axios.get(
+      `${baseUrl}/session/app/status`,
+      {
+        auth: { username: 'golem', password },
+        timeout: 15000,
+      }
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error('Error checking Golem app status:', error.message);
+    if (error.response?.status === 502) {
+      throw new Error('Golem server is waking up. Please retry in a few seconds.');
+    }
+    throw new Error(
+      error.response?.data?.error || error.message || 'Failed to check app status'
+    );
+  }
+}
+
 /**
  * Get sandbox status (auth mode, MCP servers, volume info)
  */
@@ -442,6 +506,46 @@ export async function getStatus(
     }
     throw new Error(
       error.response?.data?.error || error.message || 'Failed to fetch status'
+    );
+  }
+}
+
+/**
+ * Check the status of a running request in a Golem session.
+ * Returns processing state, progress, cost, and optionally output/messages.
+ * @param detail - 'minimal' (just state), 'summary' (state + output tail), 'full' (everything)
+ * @param lastN - When detail='full', limit to last N messages (0 = all)
+ */
+export async function checkStatus(
+  companyId: string,
+  sessionId: string,
+  detail: 'minimal' | 'summary' | 'full' = 'summary',
+  lastN?: number,
+  sandboxUrl?: string
+): Promise<GolemRequestStatus> {
+  const { baseUrl, password } = await getCredentials(companyId, sandboxUrl);
+
+  const params = new URLSearchParams({ detail });
+  if (lastN && lastN > 0) {
+    params.set('lastN', String(lastN));
+  }
+
+  try {
+    const response = await axios.get(
+      `${baseUrl}/session/${sessionId}/status?${params.toString()}`,
+      {
+        auth: { username: 'golem', password },
+        timeout: 15000,
+      }
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error('Error checking Golem request status:', error.message);
+    if (error.response?.status === 502) {
+      throw new Error('Golem server is waking up. Please retry in a few seconds.');
+    }
+    throw new Error(
+      error.response?.data?.error || error.message || 'Failed to check request status'
     );
   }
 }
