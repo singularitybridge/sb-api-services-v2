@@ -835,4 +835,26 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
       }, { serviceName: 'tripOs' });
     },
   },
+
+  // ── Onboarding ────────────────────────────────────────────────
+
+  markOnboardingComplete: {
+    description: 'Mark a customer onboarding as complete. Call this after saving the customer bio during onboarding.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        customerId: { type: 'string', description: 'Customer MongoDB _id' },
+      },
+      required: ['customerId'],
+      additionalProperties: false,
+    },
+    function: async (args: { customerId: string }): Promise<StandardActionResult> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      return executeAction('markOnboardingComplete', async () => {
+        const data = await tripOsPatch(context.companyId, `/api/data/customers/${args.customerId}/onboarding`, {});
+        return { success: true, data, description: `Marked customer ${args.customerId} onboarding as complete` };
+      }, { serviceName: 'tripOs' });
+    },
+  },
 });
