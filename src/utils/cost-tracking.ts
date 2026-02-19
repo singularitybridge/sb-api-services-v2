@@ -6,7 +6,7 @@ export interface ModelPricing {
   outputCost: number; // Cost per 1000 output tokens
 }
 
-// Pricing last validated: 2026-02-13 (source: OpenRouter API + Perplexity research + official docs)
+// Pricing last validated: 2026-02-18 (source: OpenRouter API + Perplexity research + official docs)
 // To update: run pricing-validator agent or check CLAUDE.md "Monthly Task: Pricing Validation"
 export const MODEL_PRICING: Record<string, ModelPricing> = {
   // === OpenAI GPT-5.2 (Latest) ===
@@ -36,7 +36,11 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'gpt-4o': { inputCost: 0.0025, outputCost: 0.01 },
   'gpt-4o-mini': { inputCost: 0.00015, outputCost: 0.0006 },
 
-  // === Anthropic Claude 4.5 (Current) — both date-stamped and short names ===
+  // === Anthropic Claude 4.6 (Current) ===
+  'claude-opus-4-6': { inputCost: 0.005, outputCost: 0.025 },
+  'claude-sonnet-4-6': { inputCost: 0.003, outputCost: 0.015 },
+
+  // === Anthropic Claude 4.5 (Legacy) — both date-stamped and short names ===
   'claude-opus-4-5-20251101': { inputCost: 0.005, outputCost: 0.025 },
   'claude-opus-4-5': { inputCost: 0.005, outputCost: 0.025 },
   'claude-sonnet-4-5-20250929': { inputCost: 0.003, outputCost: 0.015 },
@@ -44,7 +48,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'claude-haiku-4-5-20251001': { inputCost: 0.001, outputCost: 0.005 },
   'claude-haiku-4-5': { inputCost: 0.001, outputCost: 0.005 },
 
-  // === Anthropic Claude 4 ===
+  // === Anthropic Claude 4 (Legacy) ===
   'claude-opus-4-1-20250514': { inputCost: 0.005, outputCost: 0.025 },
   'claude-opus-4-1': { inputCost: 0.005, outputCost: 0.025 },
   'claude-sonnet-4-20250514': { inputCost: 0.003, outputCost: 0.015 },

@@ -8,6 +8,11 @@
 import { z } from 'zod';
 import { resolveAssistantIdentifier } from '../../services/assistant/assistant-resolver.service';
 import promptHistoryService from '../../services/prompt-history.service';
+import {
+  isValidAssistantName,
+  getNameValidationError,
+  suggestValidName,
+} from '../../utils/assistant-name-validation';
 
 /**
  * Input schema for the update_agent tool
@@ -18,7 +23,7 @@ export const updateAgentSchema = z.object({
     .describe(
       'The ID or name of the agent to update (e.g., "681b41850f470a9a746f280e" or "workspace-agent")',
     ),
-  name: z.string().optional().describe('New name for the agent'),
+  name: z.string().optional().describe('New URL-safe name for the agent (lowercase letters, numbers, hyphens, underscores)'),
   description: z
     .string()
     .optional()
@@ -41,6 +46,14 @@ export const updateAgentSchema = z.object({
     .number()
     .optional()
     .describe('Maximum tokens for model output (default: 25000)'),
+  maxOutputTokens: z.coerce
+    .number()
+    .optional()
+    .describe('Cap on model output tokens per turn (limits response length). Set to 0 or omit to disable.'),
+  maxToolSteps: z.coerce
+    .number()
+    .optional()
+    .describe('Maximum tool call steps before stopping (default: 25). Lower values prevent runaway tool loops.'),
   sessionTtlHours: z.preprocess(
     (val) => (val === undefined ? undefined : val === null || val === 'null' || val === '' ? null : Number(val)),
     z.number().nullable().optional(),
@@ -78,6 +91,30 @@ export async function updateAgent(
       };
     }
 
+    // Validate name if being changed
+    if (input.name !== undefined && input.name !== agent.name) {
+      if (!isValidAssistantName(input.name)) {
+        const error = getNameValidationError(input.name);
+        const suggestion = suggestValidName(input.name);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  error: true,
+                  message: error,
+                  suggestion: suggestion ? `Try: ${suggestion}` : undefined,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
+    }
+
     // Track what fields are being updated
     const updates: string[] = [];
 
@@ -110,6 +147,16 @@ export async function updateAgent(
     if (input.maxTokens !== undefined) {
       agent.maxTokens = input.maxTokens;
       updates.push('maxTokens');
+    }
+
+    if (input.maxOutputTokens !== undefined) {
+      (agent as any).maxOutputTokens = input.maxOutputTokens || undefined;
+      updates.push('maxOutputTokens');
+    }
+
+    if (input.maxToolSteps !== undefined) {
+      (agent as any).maxToolSteps = input.maxToolSteps || undefined;
+      updates.push('maxToolSteps');
     }
 
     if (input.sessionTtlHours !== undefined) {
@@ -169,6 +216,8 @@ export async function updateAgent(
                 llmProvider: agent.llmProvider,
                 llmModel: agent.llmModel,
                 maxTokens: agent.maxTokens,
+                maxOutputTokens: (agent as any).maxOutputTokens || undefined,
+                maxToolSteps: (agent as any).maxToolSteps || undefined,
                 sessionTtlHours: agent.sessionTtlHours,
                 prompt: agent.llmPrompt,
               },

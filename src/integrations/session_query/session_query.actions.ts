@@ -575,4 +575,115 @@ export const createSessionQueryActions = (
       }
     },
   },
+
+  /**
+   * Get day-of-week and calendar info for any date
+   */
+  getDateInfo: {
+    description:
+      'Get day-of-week and calendar info for a specific date. Use this to validate dates mentioned by the user (e.g. confirm "March 11, 2026" is actually a Wednesday, not Thursday). Accepts dates in various formats: "2026-03-11", "11.3.2026", "11/3", "March 11". If year is omitted, assumes current or next occurrence. Returns day of week in Hebrew and English, plus Shabbat/Friday warnings.',
+    parameters: {
+      type: 'object',
+      properties: {
+        date: {
+          type: 'string',
+          description:
+            'Date string in any common format (e.g. "2026-03-11", "11.3", "11/3/2026", "March 11 2026")',
+        },
+      },
+      required: ['date'],
+    },
+    function: async ({ date }: any): Promise<StandardActionResult> => {
+      if (!date) throw new Error('date is required.');
+
+      const HE_DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+      const EN_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+      let parsed: Date | null = null;
+      const raw = String(date).trim();
+
+      // YYYY-MM-DD
+      if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(raw)) {
+        parsed = new Date(raw + 'T12:00:00');
+      }
+      // DD.MM.YYYY or DD/MM/YYYY
+      else if (/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/.test(raw)) {
+        const m = raw.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/)!;
+        parsed = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), 12);
+      }
+      // DD.MM or DD/MM (no year)
+      else if (/^(\d{1,2})[./](\d{1,2})$/.test(raw)) {
+        const m = raw.match(/^(\d{1,2})[./](\d{1,2})$/)!;
+        const now = new Date();
+        let year = now.getFullYear();
+        const candidate = new Date(year, Number(m[2]) - 1, Number(m[1]), 12);
+        if (candidate < now) year++;
+        parsed = new Date(year, Number(m[2]) - 1, Number(m[1]), 12);
+      }
+      // Fallback: Date.parse
+      else {
+        const attempt = new Date(raw);
+        if (!isNaN(attempt.getTime())) {
+          parsed = attempt;
+          if (!/\d{4}/.test(raw) && parsed < new Date()) {
+            parsed.setFullYear(parsed.getFullYear() + 1);
+          }
+        }
+      }
+
+      if (!parsed || isNaN(parsed.getTime())) {
+        throw new Error(`Could not parse date: "${raw}"`);
+      }
+
+      const dow = parsed.getDay();
+      const iso = parsed.toISOString().split('T')[0];
+      const isShabbat = dow === 6;
+      const isFriday = dow === 5;
+      const now = new Date();
+      const isPast = parsed < now;
+
+      // Build note — stack warnings
+      const notes: string[] = [];
+      let corrected: any = null;
+      if (isPast) {
+        const correctedDate = new Date(parsed);
+        correctedDate.setFullYear(parsed.getFullYear() + 1);
+        const cDow = correctedDate.getDay();
+        const cIso = correctedDate.toISOString().split('T')[0];
+        corrected = {
+          date: cIso,
+          dayOfWeek: EN_DAYS[cDow],
+          dayOfWeekHe: HE_DAYS[cDow],
+          dayNumber: cDow,
+          isShabbat: cDow === 6,
+          isFriday: cDow === 5,
+          isWeekend: cDow === 5 || cDow === 6,
+        };
+        notes.push(`⚠️ This date is in the PAST (today is ${now.toISOString().split('T')[0]}). If you meant ${cIso}, that's a ${EN_DAYS[cDow]} (יום ${HE_DAYS[cDow]})`);
+      }
+      if (isShabbat) notes.push('שבת — most businesses and attractions are closed');
+      if (isFriday) notes.push('שישי — many places close early (by 14:00-15:00)');
+
+      logger.info(`Date info: ${iso} is ${EN_DAYS[dow]}${isPast ? ` (PAST → ${corrected?.date} = ${corrected?.dayOfWeek})` : ''}`);
+
+      return {
+        success: true,
+        message: isPast
+          ? `${iso} is in the PAST. Did you mean ${corrected.date}? That's ${corrected.dayOfWeek} (יום ${corrected.dayOfWeekHe})`
+          : `${iso} is ${EN_DAYS[dow]} (יום ${HE_DAYS[dow]})`,
+        data: {
+          date: iso,
+          dayOfWeek: EN_DAYS[dow],
+          dayOfWeekHe: HE_DAYS[dow],
+          dayNumber: dow,
+          isShabbat,
+          isFriday,
+          isWeekend: isFriday || isShabbat,
+          isPast,
+          ...(corrected ? { corrected } : {}),
+          note: notes.length > 0 ? notes.join('. ') : null,
+        },
+      };
+    },
+  },
 });

@@ -94,7 +94,7 @@ export const createAnthropicActions = (
 ): FunctionFactory => ({
   claudeGenerateText: {
     description:
-      'Generate text using Anthropic Claude models. Supports Claude 4.5 Sonnet, Haiku, and Opus.',
+      'Generate text using Anthropic Claude models. Supports Claude 4.6 Sonnet, Opus, and Haiku 4.5.',
     strict: true,
     parameters: {
       type: 'object',
@@ -110,13 +110,13 @@ export const createAnthropicActions = (
         model: {
           type: 'string',
           enum: [
-            'claude-sonnet-4-5-20250929',
+            'claude-sonnet-4-6',
+            'claude-opus-4-6',
             'claude-haiku-4-5-20251001',
-            'claude-sonnet-4-20250514',
           ],
           description:
-            'The Claude model to use (default: claude-sonnet-4-5-20250929)',
-          default: 'claude-sonnet-4-5-20250929',
+            'The Claude model to use (default: claude-sonnet-4-6)',
+          default: 'claude-sonnet-4-6',
         },
         temperature: {
           type: 'number',
@@ -131,7 +131,7 @@ export const createAnthropicActions = (
     function: async ({
       prompt,
       systemPrompt,
-      model = 'claude-sonnet-4-5-20250929',
+      model = 'claude-sonnet-4-6',
       temperature = 0.7,
     }: GenerateTextArgs) => {
       const actionName = 'claudeGenerateText';
@@ -193,10 +193,10 @@ export const createAnthropicActions = (
         },
         model: {
           type: 'string',
-          enum: ['claude-sonnet-4-5-20250929', 'claude-sonnet-4-20250514'],
+          enum: ['claude-sonnet-4-6', 'claude-opus-4-6'],
           description:
-            'The Claude model to use for vision (default: claude-sonnet-4-5-20250929)',
-          default: 'claude-sonnet-4-5-20250929',
+            'The Claude model to use for vision (default: claude-sonnet-4-6)',
+          default: 'claude-sonnet-4-6',
         },
       },
       required: ['imageUrl'],
@@ -205,7 +205,7 @@ export const createAnthropicActions = (
     function: async ({
       imageUrl,
       prompt = 'Describe this image in detail',
-      model = 'claude-sonnet-4-5-20250929',
+      model = 'claude-sonnet-4-6',
     }: AnalyzeImageArgs) => {
       const actionName = 'claudeAnalyzeImage';
       const apiKey = await getApiKey(context.companyId, 'anthropic_api_key');
@@ -280,13 +280,13 @@ export const createAnthropicActions = (
         model: {
           type: 'string',
           enum: [
-            'claude-sonnet-4-5-20250929',
+            'claude-sonnet-4-6',
+            'claude-opus-4-6',
             'claude-haiku-4-5-20251001',
-            'claude-sonnet-4-20250514',
           ],
           description:
-            'The Claude model to use (default: claude-sonnet-4-5-20250929)',
-          default: 'claude-sonnet-4-5-20250929',
+            'The Claude model to use (default: claude-sonnet-4-6)',
+          default: 'claude-sonnet-4-6',
         },
         temperature: {
           type: 'number',
@@ -301,7 +301,7 @@ export const createAnthropicActions = (
     function: async ({
       messages,
       systemPrompt,
-      model = 'claude-sonnet-4-5-20250929',
+      model = 'claude-sonnet-4-6',
       temperature = 0.7,
     }: ChatArgs) => {
       const actionName = 'claudeChat';
@@ -376,9 +376,9 @@ export const createAnthropicActions = (
         model: {
           type: 'string',
           enum: [
-            'claude-sonnet-4-5-20250929',
+            'claude-sonnet-4-6',
+            'claude-opus-4-6',
             'claude-haiku-4-5-20251001',
-            'claude-sonnet-4-20250514',
           ],
           description:
             'The Claude model to use (default: claude-haiku-4-5-20251001 for speed)',

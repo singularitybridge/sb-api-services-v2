@@ -340,6 +340,7 @@ export interface EnrichedSession {
   lastMessageAt: string | null;
   createdAt: string;
   totalCost: number;
+  llmModel: string | null;
 }
 
 export async function listSessionsEnriched(
@@ -386,7 +387,39 @@ export async function listSessionsEnriched(
       $facet: {
         metadata: [{ $count: 'total' }],
         sessions: [
-          { $sort: { createdAt: -1 } },
+          // Join message stats early so we can sort by last activity
+          {
+            $lookup: {
+              from: 'messages',
+              localField: '_id',
+              foreignField: 'sessionId',
+              pipeline: [
+                {
+                  $group: {
+                    _id: null,
+                    totalCount: { $sum: 1 },
+                    // Only count user-visible messages (user + assistant)
+                    visibleCount: {
+                      $sum: {
+                        $cond: [{ $in: ['$sender', ['user', 'assistant']] }, 1, 0],
+                      },
+                    },
+                    lastTimestamp: { $max: '$timestamp' },
+                  },
+                },
+              ],
+              as: '_messageStats',
+            },
+          },
+          // Sort by last message time (falling back to createdAt for sessions with no messages)
+          {
+            $addFields: {
+              _sortDate: {
+                $ifNull: [{ $arrayElemAt: ['$_messageStats.lastTimestamp', 0] }, '$createdAt'],
+              },
+            },
+          },
+          { $sort: { _sortDate: -1 } },
           { $skip: offset },
           { $limit: limit },
           // Join assistant name
@@ -399,31 +432,22 @@ export async function listSessionsEnriched(
               as: '_assistant',
             },
           },
-          // Join message stats (count + last message timestamp)
-          {
-            $lookup: {
-              from: 'messages',
-              localField: '_id',
-              foreignField: 'sessionId',
-              pipeline: [
-                {
-                  $group: {
-                    _id: null,
-                    count: { $sum: 1 },
-                    lastTimestamp: { $max: '$timestamp' },
-                  },
-                },
-              ],
-              as: '_messageStats',
-            },
-          },
-          // Join LLM costs
+          // Join LLM costs and get the most-used model for this session
           {
             $lookup: {
               from: 'costtrackings',
               localField: '_id',
               foreignField: 'sessionId',
-              pipeline: [{ $group: { _id: null, totalCost: { $sum: '$totalCost' } } }],
+              pipeline: [
+                {
+                  $group: {
+                    _id: '$modelName',
+                    totalCost: { $sum: '$totalCost' },
+                    count: { $sum: 1 },
+                  },
+                },
+                { $sort: { count: -1 } },
+              ],
               as: '_llmCosts',
             },
           },
@@ -449,15 +473,19 @@ export async function listSessionsEnriched(
               channel: { $ifNull: ['$channel', 'web'] },
               channelUserId: { $ifNull: ['$channelUserId', ''] },
               messageCount: {
-                $ifNull: [{ $arrayElemAt: ['$_messageStats.count', 0] }, 0],
+                $ifNull: [{ $arrayElemAt: ['$_messageStats.visibleCount', 0] }, 0],
               },
               lastMessageAt: {
                 $arrayElemAt: ['$_messageStats.lastTimestamp', 0],
               },
+              // Most-used model from cost tracking (actual model used, not current agent model)
+              llmModel: {
+                $ifNull: [{ $arrayElemAt: ['$_llmCosts._id', 0] }, null],
+              },
               totalCost: {
                 $round: [{
                   $add: [
-                    { $ifNull: [{ $arrayElemAt: ['$_llmCosts.totalCost', 0] }, 0] },
+                    { $ifNull: [{ $sum: '$_llmCosts.totalCost' }, 0] },
                     { $ifNull: [{ $arrayElemAt: ['$_toolCosts.totalCost', 0] }, 0] },
                   ],
                 }, 6],
@@ -482,6 +510,7 @@ export async function listSessionsEnriched(
     lastMessageAt: s.lastMessageAt ? new Date(s.lastMessageAt).toISOString() : null,
     createdAt: s.createdAt ? new Date(s.createdAt).toISOString() : new Date().toISOString(),
     totalCost: s.totalCost || 0,
+    llmModel: s.llmModel || null,
   }));
 
   return { sessions, total };

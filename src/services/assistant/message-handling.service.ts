@@ -30,6 +30,7 @@ import {
 } from 'ai';
 import { z, ZodType } from 'zod';
 import { trimToWindow } from '../../utils/tokenWindow';
+import { encode } from 'gpt-tokenizer';
 import { getProvider, MODEL_CONFIGS } from './provider.service';
 // import util from 'node:util'; // No longer needed after debug log removal
 
@@ -646,6 +647,30 @@ export const handleSessionMessage = async (
       toolsForSdk[funcName] = tool({
         description: funcDef.description,
         inputSchema: zodSchema as z.ZodType<any>,
+        // Strip Hebrew duplicate fields and MongoDB internals from tool output sent to model.
+        // Full data is still available to the application via toolResults.
+        toModelOutput: ({ output }: { toolCallId: string; input: any; output: any }) => {
+          if (output == null || typeof output === 'string') {
+            return { type: 'text' as const, value: String(output ?? '') };
+          }
+          try {
+            const stripHebrew = (item: any): any => {
+              if (!item || typeof item !== 'object') return item;
+              const out: Record<string, any> = {};
+              for (const [key, val] of Object.entries(item)) {
+                if (key.endsWith('He') && typeof val === 'string') continue;
+                if (key === '__v') continue;
+                if (key === '_id') { out.id = String(val); continue; }
+                out[key] = val;
+              }
+              return out;
+            };
+            const result = Array.isArray(output) ? output.map(stripHebrew) : stripHebrew(output);
+            return { type: 'json' as const, value: result };
+          } catch {
+            return { type: 'json' as const, value: output };
+          }
+        },
         execute: executeFunc,
       } as any);
     }
@@ -748,15 +773,22 @@ export const handleSessionMessage = async (
   // Use the assistant's configured maxTokens for input window
   const maxPromptTokens: number = assistant.maxTokens || 25000;
 
+  // Subtract system prompt + tool definitions from budget so trimToWindow
+  // only allocates remaining space for conversation messages.
+  const systemTokens = encode(systemPrompt).length;
+  const toolCount = assistant.allowedActions?.length || 0;
+  const toolTokenEstimate = toolCount * 150; // ~150 tokens per tool definition
+  const effectiveBudget = Math.max(maxPromptTokens - systemTokens - toolTokenEstimate, 2000);
+
   console.log(
-    `[TOKEN_WINDOW] Starting token window trimming. Max tokens: ${maxPromptTokens}, Messages: ${messagesForLlm.length}`,
+    `[TOKEN_WINDOW] Starting token window trimming. Max tokens: ${maxPromptTokens}, System: ${systemTokens}, Tools: ~${toolTokenEstimate} (${toolCount} tools), Effective budget: ${effectiveBudget}, Messages: ${messagesForLlm.length}`,
   );
   const trimStart = Date.now();
 
   const {
     trimmedMessages: baseTrimmedMessages,
     tokensInPrompt: actualTokensInPrompt,
-  } = trimToWindow(messagesForLlm, maxPromptTokens);
+  } = trimToWindow(messagesForLlm, effectiveBudget);
   let trimmedMessages = baseTrimmedMessages;
 
   console.log(
@@ -792,9 +824,17 @@ export const handleSessionMessage = async (
   // console.log(`Manual trim: Target tokens: ${maxPromptTokens}, Actual: ${actualTokensInPrompt}, Original msgs: ${messagesForLlm.length}, Trimmed msgs: ${trimmedMessages.length}`);
 
   if (providerKey === 'anthropic') {
-    // console.log('Anthropic provider: Prepending system prompt to messages array as well.');
+    // Prepend system prompt with cache control for Anthropic prompt caching.
+    // This allows the system prompt + tool definitions to be cached across turns,
+    // reducing input token costs by ~90% for cached content.
     trimmedMessages = [
-      { role: 'system', content: systemPrompt },
+      {
+        role: 'system' as const,
+        content: systemPrompt,
+        providerOptions: {
+          anthropic: { cacheControl: { type: 'ephemeral' } },
+        },
+      } as any,
       ...trimmedMessages.filter((m) => m.role !== 'system'),
     ];
   }
@@ -826,13 +866,22 @@ export const handleSessionMessage = async (
       `[TOOLS_AVAILABLE] ${toolNames.length} tools: ${toolNames.length > 0 ? toolNames.join(', ') : 'none'}`,
     );
 
+    // 5-minute abort signal to prevent runaway sessions
+    const abortSignal = AbortSignal.timeout(5 * 60 * 1000);
+
+    // Configurable step count and output token cap per assistant
+    const toolStepLimit = (assistant as any).maxToolSteps || 25;
+    const outputTokenCap = (assistant as any).maxOutputTokens || undefined;
+
     if (shouldStream) {
       const streamCallOptions: Parameters<typeof streamText>[0] = {
         model: llm,
         messages: trimmedMessages, // This now contains correctly formatted multimodal messages
         tools: relevantTools,
         maxRetries: 2,
-        stopWhen: stepCountIs(25), // Stop after 25 tool steps
+        stopWhen: stepCountIs(toolStepLimit),
+        abortSignal,
+        ...(outputTokenCap ? { maxOutputTokens: outputTokenCap } : {}),
       };
       if (systemPrompt !== undefined) {
         streamCallOptions.system = systemPrompt;
@@ -1323,7 +1372,9 @@ export const handleSessionMessage = async (
         messages: trimmedMessages, // This now contains correctly formatted multimodal messages
         tools: relevantTools,
         maxRetries: 2,
-        stopWhen: stepCountIs(25), // Stop after 25 tool steps
+        stopWhen: stepCountIs(toolStepLimit),
+        abortSignal,
+        ...(outputTokenCap ? { maxOutputTokens: outputTokenCap } : {}),
       };
       if (systemPrompt !== undefined) {
         generateCallOptions.system = systemPrompt;

@@ -6,12 +6,17 @@
 
 import { z } from 'zod';
 import { Assistant } from '../../models/Assistant';
+import {
+  isValidAssistantName,
+  getNameValidationError,
+  suggestValidName,
+} from '../../utils/assistant-name-validation';
 
 /**
  * Input schema for the create_agent tool
  */
 export const createAgentSchema = z.object({
-  name: z.string().describe('Name of the agent'),
+  name: z.string().describe('URL-safe name for the agent (lowercase letters, numbers, hyphens, underscores). E.g. "my-agent" or "sales_bot"'),
   description: z
     .string()
     .optional()
@@ -29,6 +34,14 @@ export const createAgentSchema = z.object({
     .number()
     .optional()
     .describe('Maximum tokens for the model (default: 25000)'),
+  maxOutputTokens: z
+    .number()
+    .optional()
+    .describe('Cap on model output tokens per turn (limits response length)'),
+  maxToolSteps: z
+    .number()
+    .optional()
+    .describe('Maximum tool call steps before stopping (default: 25)'),
   teamIds: z
     .array(z.string())
     .optional()
@@ -45,6 +58,28 @@ export async function createAgent(
   companyId: string,
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   try {
+    // Validate agent name
+    if (!isValidAssistantName(input.name)) {
+      const error = getNameValidationError(input.name);
+      const suggestion = suggestValidName(input.name);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                error: true,
+                message: error,
+                suggestion: suggestion ? `Try: ${suggestion}` : undefined,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+
     const agent = new Assistant({
       name: input.name,
       description: input.description || '',
@@ -52,6 +87,8 @@ export async function createAgent(
       llmModel: input.llmModel,
       llmPrompt: input.llmPrompt || '',
       maxTokens: input.maxTokens || 25000,
+      ...(input.maxOutputTokens ? { maxOutputTokens: input.maxOutputTokens } : {}),
+      ...(input.maxToolSteps ? { maxToolSteps: input.maxToolSteps } : {}),
       companyId,
       allowedActions: [],
       conversationStarters: [],

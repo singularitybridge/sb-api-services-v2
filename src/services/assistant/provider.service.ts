@@ -3,7 +3,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { ProviderKey } from '../../types/assistant.types';
 
-// Model configurations - Updated February 13, 2026
+// Model configurations - Updated February 18, 2026
 // Based on latest available models from OpenAI, Anthropic, Google, and OpenRouter
 // OpenRouter pricing verified against openrouter.ai/api/v1/models
 const MODEL_CONFIGS: Record<string, any> = {
@@ -52,7 +52,21 @@ const MODEL_CONFIGS: Record<string, any> = {
     baseModel: 'gemini-2.5-flash-lite',
   },
 
-  // === Anthropic Claude 4.5 (Latest - Current) ===
+  // === Anthropic Claude 4.6 (Latest - Current) ===
+  'claude-opus-4-6': {
+    provider: 'anthropic',
+    baseModel: 'claude-opus-4-6',
+  },
+  'claude-sonnet-4-6': {
+    provider: 'anthropic',
+    baseModel: 'claude-sonnet-4-6',
+  },
+  'claude-haiku-4-5': {
+    provider: 'anthropic',
+    baseModel: 'claude-haiku-4-5-20251001',
+  },
+
+  // === Anthropic Claude 4.5 (Legacy) ===
   'claude-opus-4-5': {
     provider: 'anthropic',
     baseModel: 'claude-opus-4-5-20251101',
@@ -61,12 +75,8 @@ const MODEL_CONFIGS: Record<string, any> = {
     provider: 'anthropic',
     baseModel: 'claude-sonnet-4-5-20250929',
   },
-  'claude-haiku-4-5': {
-    provider: 'anthropic',
-    baseModel: 'claude-haiku-4-5-20251001',
-  },
 
-  // === Anthropic Claude 4 ===
+  // === Anthropic Claude 4 (Legacy) ===
   'claude-opus-4-1': {
     provider: 'anthropic',
     baseModel: 'claude-opus-4-1-20250514',
@@ -239,14 +249,18 @@ export const MODEL_DESCRIPTIONS: Record<string, string> = {
   'gemini-2.5-flash': 'Gemini 2.5 Flash (Stable) - fast',
   'gemini-2.5-flash-lite': 'Gemini 2.5 Flash Lite - fastest',
 
-  // Anthropic Claude 4.5
-  'claude-opus-4-5': 'Claude Opus 4.5 - most capable',
-  'claude-sonnet-4-5': 'Claude Sonnet 4.5 - balanced',
+  // Anthropic Claude 4.6
+  'claude-opus-4-6': 'Claude Opus 4.6 - most intelligent, agents & coding',
+  'claude-sonnet-4-6': 'Claude Sonnet 4.6 - best speed/intelligence balance',
   'claude-haiku-4-5': 'Claude Haiku 4.5 - fast',
 
-  // Anthropic Claude 4
-  'claude-opus-4-1': 'Claude Opus 4.1 - powerful reasoning',
-  'claude-sonnet-4-0': 'Claude Sonnet 4.0 (Legacy, retiring May 2026)',
+  // Anthropic Claude 4.5 (Legacy)
+  'claude-opus-4-5': 'Claude Opus 4.5 (Legacy)',
+  'claude-sonnet-4-5': 'Claude Sonnet 4.5 (Legacy)',
+
+  // Anthropic Claude 4 (Legacy)
+  'claude-opus-4-1': 'Claude Opus 4.1 (Legacy)',
+  'claude-sonnet-4-0': 'Claude Sonnet 4.0 (Legacy)',
 
   // OpenRouter — Meta Llama 4
   'meta-llama/llama-4-maverick': 'Llama 4 Maverick - 400B MoE, 1M context',
@@ -280,7 +294,7 @@ export const MODEL_DESCRIPTIONS: Record<string, string> = {
 export const DEFAULT_MODELS: Record<string, string> = {
   openai: 'gpt-5.1',
   google: 'gemini-3-flash-preview',
-  anthropic: 'claude-sonnet-4-5',
+  anthropic: 'claude-sonnet-4-6',
   openrouter: 'meta-llama/llama-4-maverick',
 };
 
@@ -306,9 +320,11 @@ export const MODEL_LABELS: Record<string, string> = {
   'gemini-2.5-pro': 'Gemini 2.5 Pro',
   'gemini-2.5-flash': 'Gemini 2.5 Flash',
   'gemini-2.5-flash-lite': 'Gemini 2.5 Flash-Lite',
+  'claude-opus-4-6': 'Claude Opus 4.6',
+  'claude-sonnet-4-6': 'Claude Sonnet 4.6',
+  'claude-haiku-4-5': 'Claude Haiku 4.5',
   'claude-opus-4-5': 'Claude Opus 4.5',
   'claude-sonnet-4-5': 'Claude Sonnet 4.5',
-  'claude-haiku-4-5': 'Claude Haiku 4.5',
   'claude-opus-4-1': 'Claude Opus 4.1',
   'claude-sonnet-4-0': 'Claude Sonnet 4',
 
@@ -335,6 +351,9 @@ export const MODEL_LABELS: Record<string, string> = {
 export const LEGACY_MODELS = new Set([
   'gpt-4o',
   'gpt-4o-mini',
+  'claude-opus-4-5',
+  'claude-sonnet-4-5',
+  'claude-opus-4-1',
   'claude-sonnet-4-0',
   'deepseek/deepseek-chat-v3-0324',
   'deepseek/deepseek-r1',

@@ -216,14 +216,15 @@ export async function sendPrompt(
   companyId: string,
   sessionId: string,
   prompt: string,
-  sandboxUrl?: string
+  sandboxUrl?: string,
+  model?: string
 ): Promise<SendPromptResult> {
   const { baseUrl, password } = await getCredentials(companyId, sandboxUrl);
 
   try {
     const response = await axios.post(
       `${baseUrl}/session/${sessionId}/prompt_async`,
-      { parts: [{ type: 'text', text: prompt }] },
+      { parts: [{ type: 'text', text: prompt }], ...(model && { model }) },
       {
         auth: { username: 'golem', password },
         headers: { 'Content-Type': 'application/json' },

@@ -45,6 +45,7 @@ interface SendPromptArgs {
   sandboxUrl?: string;
   sessionId: string;
   prompt: string;
+  model?: string;
 }
 
 interface GetMessagesArgs {
@@ -198,6 +199,10 @@ export const createGolemActions = (
           type: 'string',
           description: 'The instruction/prompt to send to the AI coding agent (e.g., "Add a /cats endpoint with CRUD operations")',
         },
+        model: {
+          type: 'string',
+          description: 'Claude model to use for this prompt. Accepts aliases ("sonnet", "opus", "haiku") or full model IDs (e.g., "claude-sonnet-4-6"). If not provided, uses the sandbox default (Sonnet).',
+        },
       },
       required: ['sessionId', 'prompt'],
       additionalProperties: false,
@@ -205,7 +210,7 @@ export const createGolemActions = (
     function: async (
       args: SendPromptArgs,
     ): Promise<StandardActionResult<PromptResponseData>> => {
-      const { sandboxUrl, sessionId, prompt } = args;
+      const { sandboxUrl, sessionId, prompt, model } = args;
 
       if (!context.companyId) {
         throw new ActionValidationError('Company ID is missing from context.');
@@ -227,6 +232,7 @@ export const createGolemActions = (
             sessionId.trim(),
             prompt.trim(),
             sandboxUrl,
+            model?.trim(),
           );
           return { success: true, data: result };
         },

@@ -62,6 +62,8 @@ export async function getAgentInfo(
               llmProvider: agent.llmProvider,
               llmModel: agent.llmModel,
               maxTokens: agent.maxTokens,
+              maxOutputTokens: (agent as any).maxOutputTokens || undefined,
+              maxToolSteps: (agent as any).maxToolSteps || undefined,
               sessionTtlHours: agent.sessionTtlHours || null,
               teams: agent.teams?.map((t) => t.toString()) || [],
               allowedActions: agent.allowedActions || [],

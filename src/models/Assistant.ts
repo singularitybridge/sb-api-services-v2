@@ -19,6 +19,8 @@ export interface IAssistant extends Document {
   llmPrompt: string;
   llmProvider: 'openai' | 'google' | 'anthropic' | 'openrouter';
   maxTokens?: number; // Token limit for input/prompt window
+  maxOutputTokens?: number; // Cap on model output tokens per turn
+  maxToolSteps?: number; // Max tool call steps before stopping (default: 25)
   companyId: string;
   allowedActions: string[];
   avatarImage?: string;
@@ -46,6 +48,8 @@ const AssistantSchema: Schema = new Schema({
     required: true,
   },
   maxTokens: { type: Number, required: false, default: 25000 }, // Default to 25k tokens
+  maxOutputTokens: { type: Number, required: false }, // Cap on model output tokens per turn
+  maxToolSteps: { type: Number, required: false }, // Max tool call steps (default: 25)
   companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
   allowedActions: [{ type: String, required: false }],
   avatarImage: { type: String, required: false, default: 'default-avatar' },
@@ -56,8 +60,9 @@ const AssistantSchema: Schema = new Schema({
   sessionTtlHours: { type: Number, required: false },
 });
 
-// Note: maxOutputTokens was renamed to maxTokens
-// Virtual properties removed to avoid TypeScript compilation issues
+// maxTokens = input/prompt window budget
+// maxOutputTokens = cap on model output tokens per turn (SDK field name)
+// maxToolSteps = max tool call steps before stopping
 
 export const Assistant = mongoose.model<IAssistant>(
   'Assistant',

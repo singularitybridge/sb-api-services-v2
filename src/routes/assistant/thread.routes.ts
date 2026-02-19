@@ -51,7 +51,7 @@ threadRouter.get(
 threadRouter.post(
   '/user-input',
   async (req: AuthenticatedRequest, res) => {
-    const { userInput, attachments, sessionId } = req.body;
+    const { userInput, attachments, sessionId, channel, channelUserId } = req.body;
     // const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string; // apiKey is likely handled within handleSessionMessage or streamText
 
     // Determine clientWantsSSE before the try block for wider scope
@@ -86,7 +86,8 @@ threadRouter.post(
         }
         activeSessionId = sessionData._id.toString();
       } else {
-        const created = await getSessionOrCreate(userId, companyId);
+        const channelInfo = channel ? { channel, channelUserId: channelUserId || userId } : undefined;
+        const created = await getSessionOrCreate(userId, companyId, undefined, channelInfo);
         if (!created || !created._id) {
           return res
             .status(404)

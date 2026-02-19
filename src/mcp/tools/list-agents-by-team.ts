@@ -66,7 +66,7 @@ export async function listAgentsByTeam(
       teams: new mongoose.Types.ObjectId(input.teamId),
     })
       .select(
-        '_id assistantId name description llmProvider llmModel maxTokens teams lastAccessedAt',
+        '_id assistantId name description llmProvider llmModel maxTokens maxOutputTokens maxToolSteps teams lastAccessedAt',
       )
       .limit(limit)
       .skip(offset)
@@ -97,6 +97,8 @@ export async function listAgentsByTeam(
                 llmProvider: agent.llmProvider,
                 llmModel: agent.llmModel,
                 maxTokens: agent.maxTokens,
+                maxOutputTokens: (agent as any).maxOutputTokens || undefined,
+                maxToolSteps: (agent as any).maxToolSteps || undefined,
                 teams: agent.teams?.map((t) => t.toString()) || [],
                 lastAccessedAt: agent.lastAccessedAt,
               })),

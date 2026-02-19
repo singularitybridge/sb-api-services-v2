@@ -5,7 +5,7 @@ import {
 } from '../actions/types';
 import { executeAction } from '../actions/executor';
 import { ActionValidationError } from '../../utils/actionErrors';
-import { tripOsGet, tripOsPost, tripOsPatch, validateConnection, getBaseUrl } from './trip_os.service';
+import { tripOsGet, tripOsPost, tripOsPatch, validateConnection } from './trip_os.service';
 
 export { validateConnection };
 
@@ -630,7 +630,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
   // ── Customer Bio ─────────────────────────────────────────────
 
   updateCustomerBio: {
-    description: 'Update a customer\'s bio — a single free-text field containing all personal info, family members, preferences, dietary needs, and travel style. Write it as natural language.',
+    description: 'Update a customer\'s PERSONAL PROFILE bio — persistent info about WHO they are. Only include: family members (names, ages, gender), dietary needs, travel pace/style, interests, personality traits, memorable travel stories. NEVER include trip-specific details: dates, destinations, events, who\'s joining a specific trip, itinerary items, or logistics. Those belong in the trip, not the profile.',
     strict: true,
     parameters: {
       type: 'object',
@@ -638,7 +638,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
         customerId: { type: 'string', description: 'Customer MongoDB _id' },
         bio: {
           type: 'string',
-          description: 'Free-text bio with all customer info: family members (names, ages), dietary needs, travel pace, interests, special notes. Write as natural prose.',
+          description: 'Personal profile bio ONLY. Include: family (names, ages), dietary needs, travel pace, interests, personality. Do NOT include trip-specific data (dates, destinations, events, guests joining a trip, logistics).',
         },
       },
       required: ['customerId', 'bio'],
@@ -658,147 +658,200 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
     },
   },
 
-  // ── Trip Generation ─────────────────────────────────────────
+  // ── Trip (Active Trip Model) ─────────────────────────────────
+  // Only one trip can be active per customer. Trips are created by the UI,
+  // not by agents. Agents read/write the active trip only.
 
-  generateTripForCurrentUser: {
-    description: 'Generate a trip plan for the current user. Automatically links the trip to the user\'s session (tripos-web or web channel users). Takes a detailed prompt with trip preferences, plus optional destination and dates. Returns tripId and tripUrl for the user to view their trip.',
+  getActiveTrip: {
+    description: 'Get the current user\'s active trip. Returns the trip with status "created", "planning", or "active" (most recent). This is the trip the user is currently working on. Returns null if no active trip exists — the user needs to create one from the app UI.',
     strict: true,
     parameters: {
       type: 'object',
-      properties: {
-        prompt: {
-          type: 'string',
-          description: 'Detailed trip generation prompt including destination, dates, travelers, preferences, dietary needs, and any special requests. Write in Hebrew.',
-        },
-        destination: {
-          type: 'string',
-          description: 'Destination name (e.g. "rome", "paris", "new-york")',
-        },
-        startDate: {
-          type: 'string',
-          description: 'Trip start date (YYYY-MM-DD)',
-        },
-        endDate: {
-          type: 'string',
-          description: 'Trip end date (YYYY-MM-DD)',
-        },
-        travelers: {
-          type: 'string',
-          description: 'Number and composition of travelers (e.g. "2 adults, 1 child")',
-        },
-      },
-      required: ['prompt'],
+      properties: {},
+      required: [],
       additionalProperties: false,
     },
-    function: async (args: {
-      prompt: string;
-      destination?: string;
-      startDate?: string;
-      endDate?: string;
-      travelers?: string;
-    }): Promise<StandardActionResult> => {
+    function: async (): Promise<StandardActionResult> => {
       if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
-      if (!args.prompt) throw new ActionValidationError('prompt is required.');
-      return executeAction('generateTripForCurrentUser', async () => {
-        const body: Record<string, any> = { prompt: args.prompt };
-        // Auto-inject channel identifier for trip ownership
-        // tripos-web channelUserId is the customer MongoDB _id
-        if (context.channelUserId) {
-          if (context.channel === 'tripos-web') {
-            body.customerId = context.channelUserId;
-          } else {
-            const channelFieldMap: Record<string, string> = {
-              herald: 'heraldId',
-            };
-            const field = channelFieldMap[context.channel];
-            if (field) {
-              body[field] = context.channelUserId;
-            }
-          }
-        }
-        if (args.destination) body.destination = args.destination;
-        if (args.startDate) body.startDate = args.startDate;
-        if (args.endDate) body.endDate = args.endDate;
-        if (args.travelers) body.travelers = args.travelers;
-        const data = await tripOsPost(context.companyId, '/api/trips/generate', body);
-        const tripId = data.tripId;
-        const baseUrl = await getBaseUrl(context.companyId);
-        const tripUrl = `${baseUrl}/trips/${tripId}`;
+      if (!context.channel || !context.channelUserId) {
         return {
           success: true,
-          data: { tripId, tripUrl },
-          description: `Trip generation started. Trip ID: ${tripId}. Share this link: ${tripUrl}`,
+          data: { found: false, message: 'No session identity — cannot resolve active trip' },
         };
+      }
+      return executeAction('getActiveTrip', async () => {
+        // tripos-web channelUserId is the customer MongoDB _id
+        const customerIdParam = context.channel === 'tripos-web' ? context.channelUserId : undefined;
+        if (!customerIdParam) {
+          return { success: true, data: { found: false, message: `Channel ${context.channel} not supported for trip lookup` } };
+        }
+        // Find most recent planning or active trip
+        const data = await tripOsGet(context.companyId, '/api/data/trips', {
+          customerId: customerIdParam,
+          limit: '5',
+        });
+        const trip = (data.results || []).find((t: any) => t.status === 'created' || t.status === 'planning' || t.status === 'active');
+        if (!trip) {
+          return { success: true, data: { found: false, message: 'No active trip. The user needs to create a new trip from the app.' } };
+        }
+        return { success: true, data: { found: true, tripId: trip._id, trip }, description: `Active trip: ${trip._id} (${trip.destination || 'no destination'})` };
       }, { serviceName: 'tripOs' });
     },
   },
 
-  generateTrip: {
-    description: 'Generate a detailed trip plan asynchronously. Creates a trip with "generating" status and triggers background AI generation. Returns tripId and tripUrl so the user can view the trip immediately (it will show a loading state until generation completes). Use this after collecting destination, dates, travelers, and preferences from the user.',
+  getTrip: {
+    description: 'Get full details of a specific trip by its ID. Use getActiveTrip instead when you want the current trip.',
     strict: true,
     parameters: {
       type: 'object',
       properties: {
-        prompt: {
-          type: 'string',
-          description: 'Detailed trip generation prompt including destination, dates, travelers, preferences, dietary needs, and any special requests. Write in Hebrew.',
+        tripId: { type: 'string', description: 'The trip MongoDB _id' },
+      },
+      required: ['tripId'],
+      additionalProperties: false,
+    },
+    function: async (args: { tripId: string }): Promise<StandardActionResult> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      if (!args.tripId) throw new ActionValidationError('tripId is required.');
+      return executeAction('getTrip', async () => {
+        const data = await tripOsGet(context.companyId, `/api/data/trips/${args.tripId}`);
+        return { success: true, data };
+      }, { serviceName: 'tripOs' });
+    },
+  },
+
+  updateTrip: {
+    description: 'Update the active trip. Supports two modes:\n1. **Structured update**: Pass specific fields (destination, dates, travelers, etc.) to apply directly.\n2. **Instruction mode**: Pass an `instruction` string to delegate complex work (research, planning, itinerary building) to the trip-manager agent. The instruction is processed asynchronously — the trip will update in the background.\n\nIf no tripId is provided, automatically finds and updates the user\'s active trip.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        tripId: { type: 'string', description: 'The trip MongoDB _id. Optional — if omitted, uses the active trip.' },
+        instruction: { type: 'string', description: 'Natural language instruction for the trip-manager agent (e.g. "Build a 3-day itinerary for family with kids, kosher meals, focus on beaches"). Processed asynchronously.' },
+        destination: { type: 'string', description: 'Destination name in Hebrew (e.g. "רומא")' },
+        title: { type: 'string', description: 'Trip title in Hebrew (e.g. "חופשה ברומא")' },
+        startDate: { type: 'string', description: 'Trip start date (YYYY-MM-DD)' },
+        endDate: { type: 'string', description: 'Trip end date (YYYY-MM-DD)' },
+        travelers: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Traveler name' },
+              age: { type: 'number', description: 'Traveler age' },
+            },
+            required: ['name', 'age'],
+            additionalProperties: false,
+          },
+          description: 'List of travelers with name and age',
         },
-        clerkId: {
-          type: 'string',
-          description: 'Clerk user ID (from session context contactIdentifier for tripos-web channel) to link the trip to the authenticated user',
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Trip tags (e.g. ["כשר", "משפחה", "תרבות"])',
         },
-        heraldId: {
-          type: 'string',
-          description: 'Agent Herald ID to link the trip to a Herald user',
+        heroImage: { type: 'string', description: 'URL for trip hero image' },
+        days: {
+          type: 'array',
+          description: 'Full array of trip days — replaces existing days.',
+          items: {
+            type: 'object',
+            properties: {
+              dayNum: { type: 'number', description: 'Day number (1, 2, 3, ...)' },
+              date: { type: 'string', description: 'Date in YYYY-MM-DD format' },
+              titleHe: { type: 'string', description: 'Day title in Hebrew (e.g. "יום 1 — מרכז רומא ההיסטורי")' },
+              brief: { type: 'string', description: 'Brief day description in Hebrew (1 sentence)' },
+              stops: {
+                type: 'array',
+                description: 'Ordered list of stops for the day (5-8 stops, including meals)',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', description: 'Unique stop ID (e.g. "d1-s1" for day 1 stop 1)' },
+                    time: { type: 'string', description: 'Time in HH:MM format (e.g. "09:00")' },
+                    title: { type: 'string', description: 'Stop name in Hebrew' },
+                    icon: { type: 'string', description: 'One of: landmark, food, coffee, camera, activity, shopping, nature, church, swords' },
+                    description: { type: 'string', description: 'Brief description in Hebrew (1-2 sentences)' },
+                    duration: { type: 'string', description: 'Duration in Hebrew (e.g. "2 שעות")' },
+                    image: { type: 'string', description: 'Photo URL from searchPlaces results' },
+                    address: { type: 'string', description: 'Full street address' },
+                    rating: { type: 'number', description: 'Rating 1.0-5.0' },
+                    price: { type: 'string', description: 'Price: "חינם", "$", "$$", "$$$"' },
+                    hours: { type: 'string', description: 'Opening hours (e.g. "09:00-18:00")' },
+                    tip: { type: 'string', description: 'Practical tip in Hebrew' },
+                    about: { type: 'string', description: 'Background about the place in Hebrew (2-3 sentences)' },
+                    kosher: { type: 'boolean', description: 'Whether kosher (food stops)' },
+                    personalNote: { type: 'string', description: 'Personal note for the travelers in Hebrew' },
+                    walkAfter: { type: 'number', description: 'Walking minutes to next stop (0 if driving/last)' },
+                  },
+                  required: ['id', 'time', 'title', 'icon', 'description', 'duration'],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ['dayNum', 'date', 'titleHe', 'brief', 'stops'],
+            additionalProperties: false,
+          },
         },
-        customerId: {
+        status: {
           type: 'string',
-          description: 'TripOS customer MongoDB _id if the user is a known customer',
-        },
-        destination: {
-          type: 'string',
-          description: 'Destination name (e.g. "rome", "paris", "new-york")',
-        },
-        startDate: {
-          type: 'string',
-          description: 'Trip start date (YYYY-MM-DD)',
-        },
-        endDate: {
-          type: 'string',
-          description: 'Trip end date (YYYY-MM-DD)',
+          enum: ['planning', 'draft', 'active', 'completed'],
+          description: 'Trip status. Set to "active" when the plan is complete.',
         },
       },
-      required: ['prompt'],
+      required: [],
       additionalProperties: false,
     },
     function: async (args: {
-      prompt: string;
-      clerkId?: string;
-      heraldId?: string;
-      customerId?: string;
+      tripId?: string;
+      instruction?: string;
       destination?: string;
+      title?: string;
       startDate?: string;
       endDate?: string;
+      travelers?: { name: string; age: number }[];
+      tags?: string[];
+      heroImage?: string;
+      days?: Record<string, unknown>[];
+      status?: string;
     }): Promise<StandardActionResult> => {
       if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
-      if (!args.prompt) throw new ActionValidationError('prompt is required.');
-      return executeAction('generateTrip', async () => {
-        const body: Record<string, unknown> = { prompt: args.prompt };
-        if (args.clerkId) body.clerkId = args.clerkId;
-        else if (args.heraldId) body.heraldId = args.heraldId;
-        if (args.customerId) body.customerId = args.customerId;
-        if (args.destination) body.destination = args.destination;
-        if (args.startDate) body.startDate = args.startDate;
-        if (args.endDate) body.endDate = args.endDate;
-        const data = await tripOsPost(context.companyId, '/api/trips/generate', body as Record<string, any>);
-        const tripId = data.tripId;
-        // Build trip URL from the API base URL
-        const baseUrl = await getBaseUrl(context.companyId);
-        const tripUrl = `${baseUrl}/trips/${tripId}`;
+      return executeAction('updateTrip', async () => {
+        let tripId = args.tripId;
+
+        // Auto-resolve active trip if no tripId provided
+        if (!tripId) {
+          if (!context.channel || !context.channelUserId) {
+            throw new ActionValidationError('No tripId provided and no session identity to resolve active trip.');
+          }
+          if (context.channel === 'tripos-web') {
+            const data = await tripOsGet(context.companyId, '/api/data/trips', {
+              customerId: context.channelUserId,
+              limit: '5',
+            });
+            const active = (data.results || []).find((t: any) => t.status === 'created' || t.status === 'planning' || t.status === 'active');
+            if (!active) {
+              return { success: false, description: 'No active trip found. The user needs to create a new trip from the app.' };
+            }
+            tripId = active._id;
+          } else {
+            throw new ActionValidationError(`Channel ${context.channel} not supported for auto trip resolution.`);
+          }
+        }
+
+        const { tripId: _, ...updates } = args;
+        const body: Record<string, any> = {};
+        for (const [key, value] of Object.entries(updates)) {
+          if (value !== undefined) body[key] = value;
+        }
+        const data = await tripOsPatch(context.companyId, `/api/data/trips/${tripId}`, body);
+        const isAsync = !!args.instruction;
         return {
           success: true,
-          data: { tripId, tripUrl },
-          description: `Trip generation started. Trip ID: ${tripId}. The trip is being generated in the background — share this link with the user: ${tripUrl}`,
+          data: { ...data, processing: isAsync },
+          description: isAsync
+            ? `Instruction sent to trip-manager for trip ${tripId}. The trip will update in the background.`
+            : `Updated trip ${tripId}`,
         };
       }, { serviceName: 'tripOs' });
     },

@@ -678,8 +678,8 @@ export const executeAssistantStateless = async (
     const llm = getProvider(providerKey, modelIdentifier, llmApiKey as string);
     const relevantTools = toolsForSdk; // For stateless, all tools of the assistant are relevant
 
-    // Use higher step count for agents with many tools (e.g., trip generators that need multiple API calls)
-    const maxToolSteps = Object.keys(toolsForSdk).length > 5 ? 8 : 5;
+    // Use agent's configured maxToolSteps, or dynamic default based on tool count
+    const maxToolSteps = assistant.maxToolSteps || (Object.keys(toolsForSdk).length > 5 ? 8 : 5);
 
     if (shouldStream) {
       const streamCallOptions: Parameters<typeof streamText>[0] = {
