@@ -784,7 +784,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
                     personalNote: { type: 'string', description: 'Personal note for the travelers in Hebrew' },
                     walkAfter: { type: 'number', description: 'Walking minutes to next stop (0 if driving/last)' },
                   },
-                  required: ['id', 'time', 'title', 'icon', 'description', 'duration'],
+                  required: ['id', 'time', 'title', 'icon', 'description', 'duration', 'address', 'about'],
                   additionalProperties: false,
                 },
               },
