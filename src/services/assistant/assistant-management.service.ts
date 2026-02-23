@@ -1,4 +1,8 @@
 import { Assistant, IAssistant } from '../../models/Assistant';
+import { Session } from '../../models/Session';
+import { Message } from '../../models/Message';
+import { CostTracking } from '../../models/CostTracking';
+import PromptHistory from '../../models/PromptHistory';
 import mongoose from 'mongoose';
 // OpenAI Assistant API calls removed as it's deprecated in favor of Vercel AI
 
@@ -65,10 +69,28 @@ export async function deleteAssistant(
       throw new Error('Assistant not found in local database');
     }
 
+    console.log(`Cascade deleting assistant ${id} and all related data...`);
+
+    // 1. Delete all messages for this assistant
+    const messageResult = await Message.deleteMany({ assistantId: id });
+    console.log(`  Deleted ${messageResult.deletedCount} messages`);
+
+    // 2. Delete all sessions for this assistant
+    const sessionResult = await Session.deleteMany({ assistantId: id });
+    console.log(`  Deleted ${sessionResult.deletedCount} sessions`);
+
+    // 3. Delete prompt history for this assistant
+    const promptResult = await PromptHistory.deleteMany({ assistantId: id });
+    console.log(`  Deleted ${promptResult.deletedCount} prompt history records`);
+
+    // 4. Delete cost tracking records for this assistant
+    const costResult = await CostTracking.deleteMany({ assistantId: id });
+    console.log(`  Deleted ${costResult.deletedCount} cost tracking records`);
+
+    // 5. Delete the assistant itself
     await Assistant.findByIdAndDelete(id);
 
-    // OpenAI deletion removed as it's deprecated in favor of Vercel AI
-    console.log(`Successfully deleted assistant ${id} from MongoDB only.`);
+    console.log(`Successfully deleted assistant ${id} and all related data.`);
   } catch (error) {
     console.error('Error in deleteAssistant:', error);
     throw error;

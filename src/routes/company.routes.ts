@@ -2,7 +2,6 @@
 import express from 'express';
 import {
   createCompany,
-  deleteCompany,
   getCompany,
   updateCompany,
 } from '../services/company.service';
@@ -10,7 +9,6 @@ import {
   verifyAccess,
   AuthenticatedRequest,
 } from '../middleware/auth.middleware';
-import { teardownCompany } from '../services/teardown.service';
 
 const companyRouter = express.Router();
 
@@ -43,19 +41,10 @@ companyRouter.delete(
   '/:id',
   verifyAccess(true),
   async (req: AuthenticatedRequest, res) => {
-    const { id } = req.params;
-
-    try {
-      await teardownCompany(id);
-      res
-        .status(200)
-        .send({ message: 'Company and related data deleted successfully' });
-    } catch (error) {
-      console.error('Error deleting company:', error);
-      res
-        .status(500)
-        .send({ message: 'Failed to delete company and related data' });
-    }
+    return res.status(403).json({
+      message:
+        'Company deletion is disabled on this endpoint. Use Komissar admin tool for company deletion.',
+    });
   },
 );
 

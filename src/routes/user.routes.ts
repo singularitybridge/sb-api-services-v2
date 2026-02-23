@@ -1,6 +1,8 @@
 // File: src/routes/user.routes.ts
 import express from 'express';
 import { User } from '../models/User';
+import { Session } from '../models/Session';
+import { CostTracking } from '../models/CostTracking';
 import {
   verifyAccess,
   AuthenticatedRequest,
@@ -115,6 +117,21 @@ userRouter.delete(
           message: 'Access denied: Cannot delete users from other companies',
         });
       }
+
+      // Deactivate all active sessions for this user
+      const sessionResult = await Session.updateMany(
+        { userId: id, active: true },
+        { $set: { active: false } },
+      );
+      console.log(
+        `Deactivated ${sessionResult.modifiedCount} sessions for user ${id}`,
+      );
+
+      // Delete cost tracking records for this user
+      const costResult = await CostTracking.deleteMany({ userId: id });
+      console.log(
+        `Deleted ${costResult.deletedCount} cost tracking records for user ${id}`,
+      );
 
       await User.findByIdAndDelete(id);
       res.send({ message: 'User deleted successfully' });

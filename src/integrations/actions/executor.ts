@@ -90,10 +90,20 @@ export async function executeAction<
     }
 
     // Wrap other errors in ActionExecutionError for consistent handling
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : 'An unexpected error occurred in ' + actionName + '.';
+    // For HTTP errors (axios), include the response body so AI models
+    // get actionable context (e.g. 409 "trip is processing" messages)
+    let errorMessage: string;
+    const axiosResponse = (error as any)?.response;
+    if (axiosResponse?.status && axiosResponse?.data) {
+      const body = typeof axiosResponse.data === 'string'
+        ? axiosResponse.data
+        : JSON.stringify(axiosResponse.data);
+      errorMessage = `HTTP ${axiosResponse.status}: ${body}`;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    } else {
+      errorMessage = 'An unexpected error occurred in ' + actionName + '.';
+    }
     throw new ActionExecutionError(errorMessage, {
       actionName,
       originalError: error,
