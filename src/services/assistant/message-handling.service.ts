@@ -1021,7 +1021,10 @@ export const handleSessionMessage = async (
 
         // Check error type and provide appropriate message
         const errorMessage = streamError.message?.toLowerCase() || '';
+        const statusCode = streamError.status || streamError.statusCode || (streamError.response?.status);
+
         const isApiKeyError =
+          statusCode === 401 ||
           errorMessage.includes('invalid api key') ||
           errorMessage.includes('api key not valid') ||
           errorMessage.includes('incorrect api key') ||
@@ -1039,22 +1042,57 @@ export const handleSessionMessage = async (
           errorMessage.includes('prompt is too long');
 
         const isRateLimitError =
+          statusCode === 429 ||
           errorMessage.includes('rate limit') ||
           errorMessage.includes('rate_limit') ||
           errorMessage.includes('429') ||
           errorMessage.includes('too many requests');
 
+        const isOverloadedError =
+          statusCode === 529 ||
+          errorMessage.includes('overloaded') ||
+          errorMessage.includes('529');
+
+        const isServerError =
+          statusCode === 500 || statusCode === 503 ||
+          errorMessage.includes('internal server error') ||
+          errorMessage.includes('service unavailable') ||
+          errorMessage.includes('500') ||
+          errorMessage.includes('503');
+
+        const isBillingError =
+          statusCode === 403 ||
+          errorMessage.includes('billing') ||
+          errorMessage.includes('credit') ||
+          errorMessage.includes('insufficient') ||
+          errorMessage.includes('payment') ||
+          errorMessage.includes('quota');
+
         streamErrorOccurred = true;
 
+        let errorTag: string;
         if (isApiKeyError) {
           streamErrorMessage = `Invalid ${providerKey} API key. Please check your API key configuration.`;
+          errorTag = 'invalid_api_key';
         } else if (isContextLengthError) {
           streamErrorMessage = `The conversation or content is too long for the model to process. Please start a new conversation or reduce the content size.`;
+          errorTag = 'context_length_exceeded';
         } else if (isRateLimitError) {
-          streamErrorMessage = `Rate limit exceeded. Please wait a moment and try again.`;
+          streamErrorMessage = `Rate limit exceeded for ${providerKey}. Please wait a moment and try again.`;
+          errorTag = 'rate_limit';
+        } else if (isOverloadedError) {
+          streamErrorMessage = `The ${providerKey} service is temporarily overloaded. Please try again in a few moments.`;
+          errorTag = 'overloaded';
+        } else if (isServerError) {
+          streamErrorMessage = `The ${providerKey} service is experiencing temporary issues (server error). Please try again shortly.`;
+          errorTag = 'server_error';
+        } else if (isBillingError) {
+          streamErrorMessage = `The ${providerKey} API key may have billing or quota issues. Please check your account's credit balance and plan limits.`;
+          errorTag = 'billing_error';
         } else {
           // Pass through the actual error message for debugging
           streamErrorMessage = `Error from ${providerKey}: ${streamError.message}`;
+          errorTag = 'api_error';
         }
 
         // Save a user-friendly error message
@@ -1065,9 +1103,10 @@ export const handleSessionMessage = async (
           streamErrorMessage,
           'error',
           {
-            error: isApiKeyError ? 'invalid_api_key' : isContextLengthError ? 'context_length_exceeded' : isRateLimitError ? 'rate_limit' : 'api_error',
+            error: errorTag,
             provider: providerKey,
             originalError: streamError.message,
+            ...(statusCode && { statusCode }),
           },
         );
 
@@ -1305,23 +1344,16 @@ export const handleSessionMessage = async (
             );
             // Attach error indicator to stream result
             (streamResult as any).hasEmptyResponse = true;
-            const providerDisplayName =
-              providerKey === 'google'
-                ? 'Google'
-                : providerKey === 'openai'
-                  ? 'OpenAI'
-                  : providerKey === 'anthropic'
-                    ? 'Anthropic'
-                    : providerKey;
-            (streamResult as any).errorMessage =
-              `Failed to generate response. Please check your ${providerDisplayName} API key configuration.`;
+            const emptyResponseMsg =
+              `Failed to generate a response. This could be due to a temporary service issue or the AI model returning an empty reply. Please try again.`;
+            (streamResult as any).errorMessage = emptyResponseMsg;
 
             // Save error message asynchronously
             saveSystemMessage(
               new mongoose.Types.ObjectId(String(session._id)),
               new mongoose.Types.ObjectId(String(assistant._id)),
               new mongoose.Types.ObjectId(String(session.userId)),
-              `Failed to generate response. Please check your ${providerKey} API key configuration.`,
+              emptyResponseMsg,
               'error',
               { error: 'empty_response', provider: providerKey },
             ).catch((err) =>
@@ -1516,7 +1548,7 @@ export const handleSessionMessage = async (
         );
 
         // Save an error message to inform the user
-        const errorMsg = 'Failed to generate response. This could be due to invalid API key, content too large, or service issues.';
+        const errorMsg = 'Failed to generate a response. This could be due to a temporary service issue or the AI model returning an empty reply. Please try again.';
         await saveSystemMessage(
           new mongoose.Types.ObjectId(String(session._id)),
           new mongoose.Types.ObjectId(String(assistant._id)),
