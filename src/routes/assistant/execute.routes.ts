@@ -46,6 +46,7 @@ export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
     }
 
     // Resolve assistant by ID or name
+    const t0 = Date.now();
     console.log(
       `[Execute Route] Looking for assistant with identifier: ${assistantId}`,
     );
@@ -55,6 +56,7 @@ export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
       assistantId,
       req.company._id.toString(),
     );
+    console.log(`[Execute Route] Assistant resolved in ${Date.now() - t0}ms`);
 
     if (!assistant) {
       console.log(`[Execute Route] Assistant not found or access denied`);
@@ -64,8 +66,10 @@ export const executeHandler = async (req: AuthenticatedRequest, res: any) => {
     }
 
     // Update last accessed time
+    const t1 = Date.now();
     assistant.lastAccessedAt = new Date();
     await assistant.save();
+    console.log(`[Execute Route] lastAccessedAt saved in ${Date.now() - t1}ms`);
 
     // Execute assistant message without session
     const companyId = req.company._id.toString();

@@ -212,8 +212,9 @@ export const executeAssistantStateless = async (
     >
   | Record<string, any>
 > => {
+  const _execStart = Date.now();
   console.log(
-    `Executing stateless assistant ${assistant.name} (ID: ${assistant._id}) for company ${companyId}`,
+    `[Stateless] START ${assistant.name} (ID: ${assistant._id}) for company ${companyId}`,
   );
 
   const providerKey = assistant.llmProvider;
@@ -362,8 +363,10 @@ export const executeAssistantStateless = async (
   )}`;
   let toolsForSdk: Record<string, Tool<any, any>>;
 
+  const _toolStart = Date.now();
   if (toolsCache.has(cacheKey)) {
     toolsForSdk = toolsCache.get(cacheKey)!;
+    console.log(`[Stateless] Tools loaded from cache in ${Date.now() - _toolStart}ms (${Object.keys(toolsForSdk).length} tools)`);
   } else {
     toolsForSdk = {};
     const functionFactory = await createFunctionFactory(
@@ -600,10 +603,13 @@ export const executeAssistantStateless = async (
       });
     }
     toolsCache.set(cacheKey, toolsForSdk);
+    console.log(`[Stateless] Tools built (cache miss) in ${Date.now() - _toolStart}ms (${Object.keys(toolsForSdk).length} tools)`);
   }
 
   let modelIdentifier = assistant.llmModel || 'gpt-4.1-mini';
+  const _apiKeyStart = Date.now();
   const llmApiKey = await getApiKey(companyId, `${providerKey}_api_key`);
+  console.log(`[Stateless] API key fetched in ${Date.now() - _apiKeyStart}ms`);
   if (!llmApiKey)
     throw new Error(`${providerKey} API key not found for company.`);
 
@@ -753,7 +759,7 @@ export const executeAssistantStateless = async (
         // Anthropic typically uses tool calling for structured JSON, which `generateObject` handles.
         // Google's Gemini can be instructed via prompt or might have a responseMimeType config.
 
-        console.log(`[Stateless JSON] Starting generateText for ${assistant.name || assistant._id} (${providerKey}/${modelIdentifier}) maxSteps=${maxToolSteps}`);
+        console.log(`[Stateless JSON] Starting generateText for ${assistant.name || assistant._id} (${providerKey}/${modelIdentifier}) maxSteps=${maxToolSteps} prepTime=${Date.now() - _execStart}ms`);
         const startTime = Date.now();
         const result = await generateText(generateTextOptions);
         const duration = Date.now() - startTime;
