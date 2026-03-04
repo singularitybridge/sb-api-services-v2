@@ -59,7 +59,7 @@ export interface CreateBatchInput {
 }
 
 export async function createTaskBatch(input: CreateBatchInput): Promise<ITask[]> {
-  const docs = input.tasks.map((t) => ({
+  const docs = input.tasks.map((t, i) => ({
     groupId: input.groupId,
     creatorAgentId: input.creatorAgentId,
     handlerAgentId: t.handlerAgentId,
@@ -68,7 +68,8 @@ export async function createTaskBatch(input: CreateBatchInput): Promise<ITask[]>
     status: 'pending' as TaskStatus,
     retryCount: 0,
     maxRetries: input.maxRetries ?? 2,
-    onGroupComplete: input.onGroupComplete,
+    // Store callback only on first task to avoid duplication
+    ...(i === 0 && input.onGroupComplete ? { onGroupComplete: input.onGroupComplete } : {}),
     metadata: t.metadata,
   }));
   const tasks = await Task.insertMany(docs);

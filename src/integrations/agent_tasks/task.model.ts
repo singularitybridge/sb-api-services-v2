@@ -26,6 +26,7 @@ export interface ITask extends Document {
   error?: string;
   onGroupComplete?: ITaskCallback;
   metadata?: Record<string, any>;
+  retryAfter?: Date;
   createdAt: Date;
   startedAt?: Date;
   completedAt?: Date;
@@ -63,6 +64,7 @@ const TaskSchema: Schema = new Schema({
   error: { type: String },
   onGroupComplete: { type: TaskCallbackSchema },
   metadata: { type: Schema.Types.Mixed },
+  retryAfter: { type: Date },
   createdAt: { type: Date, default: Date.now },
   startedAt: { type: Date },
   completedAt: { type: Date },

@@ -12,6 +12,7 @@
  * - Stale task recovery: marks tasks stuck in "running" as failed
  */
 
+import mongoose from 'mongoose';
 import { Task, ITask, ITaskCallback } from './task.model';
 import { Assistant } from '../../models/Assistant';
 import { executeAssistantStateless } from '../../services/assistant/stateless-execution.service';
@@ -75,13 +76,15 @@ async function pollAndExecute(): Promise<void> {
 
     // Atomic claim: findOneAndUpdate prevents double-pickup
     const tasks: ITask[] = [];
+    const now = new Date();
     for (let i = 0; i < slots; i++) {
       const task = await Task.findOneAndUpdate(
         {
           status: 'pending',
           $or: [
-            { retryCount: 0 },
-            { startedAt: { $lt: new Date(Date.now() - BACKOFF_BASE_MS) } },
+            { retryAfter: { $exists: false } },  // New task, no backoff
+            { retryAfter: null },
+            { retryAfter: { $lte: now } },        // Backoff period elapsed
           ],
         },
         {
@@ -118,9 +121,16 @@ async function executeTask(task: ITask): Promise<void> {
   const taskId = String(task._id);
 
   try {
+    if (!mongoose.Types.ObjectId.isValid(task.handlerAgentId)) {
+      await markTaskFailed(taskId, `Invalid handler agent ID: ${task.handlerAgentId}`);
+      await checkGroupCompletion(task.groupId, task.companyId);
+      return;
+    }
+
     const assistant = await Assistant.findById(task.handlerAgentId);
     if (!assistant) {
       await markTaskFailed(taskId, `Handler agent ${task.handlerAgentId} not found`);
+      await checkGroupCompletion(task.groupId, task.companyId);
       return;
     }
 
@@ -172,9 +182,11 @@ async function executeTask(task: ITask): Promise<void> {
 
     const currentRetry = (task.retryCount || 0) + 1;
     if (currentRetry <= task.maxRetries) {
-      console.log(`[task-runner] Task ${taskId} retry ${currentRetry}/${task.maxRetries}`);
+      const backoffMs = BACKOFF_BASE_MS * Math.pow(2, currentRetry - 1); // 5s, 10s, 20s...
+      const retryAfter = new Date(Date.now() + backoffMs);
+      console.log(`[task-runner] Task ${taskId} retry ${currentRetry}/${task.maxRetries} (backoff ${backoffMs}ms)`);
       await Task.findByIdAndUpdate(taskId, {
-        $set: { status: 'pending', error: errorMsg },
+        $set: { status: 'pending', error: errorMsg, retryAfter },
         $inc: { retryCount: 1 },
       });
     } else {
@@ -195,13 +207,14 @@ async function checkGroupCompletion(groupId: string, companyId: string): Promise
 
   if (remaining > 0) return;
 
-  const taskWithCallback = await Task.findOne({
-    groupId,
-    companyId,
-    onGroupComplete: { $exists: true, $ne: null },
-  }).lean();
+  // Atomic claim: $unset the callback so only one concurrent caller wins
+  const claimed = await Task.findOneAndUpdate(
+    { groupId, companyId, onGroupComplete: { $exists: true, $ne: null } },
+    { $unset: { onGroupComplete: 1 } },
+    { new: false },  // return the doc BEFORE the unset so we get the callback data
+  ).lean();
 
-  if (!taskWithCallback?.onGroupComplete) return;
+  if (!claimed?.onGroupComplete) return;
 
   console.log(`[task-runner] Group "${groupId}" complete — firing callback`);
 
@@ -214,7 +227,7 @@ async function checkGroupCompletion(groupId: string, companyId: string): Promise
   }));
 
   try {
-    await fireCallback(taskWithCallback.onGroupComplete, results, companyId);
+    await fireCallback(claimed.onGroupComplete, results, companyId);
   } catch (err: any) {
     console.error(`[task-runner] Group "${groupId}" callback failed:`, err?.message || err);
   }
