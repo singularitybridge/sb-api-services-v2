@@ -1,0 +1,10 @@
+{
+  "name": "agent_tasks",
+  "displayName": "Agent Tasks",
+  "description": "Create and manage background tasks executed by other agents. Enables multi-step workflows where an agent decomposes work into parallel tasks, each handled by a specialized agent in stateless mode.",
+  "icon": "list-checks",
+  "category": "internal",
+  "actionCreator": "createAgentTasksActions",
+  "actionsFile": "agent_tasks.actions.ts",
+  "requiredApiKeys": []
+}

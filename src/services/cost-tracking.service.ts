@@ -112,7 +112,9 @@ export async function saveCostTracking(
         costInfo.sessionId !== 'stateless-json'
           ? new mongoose.Types.ObjectId(costInfo.sessionId)
           : undefined,
-      userId: new mongoose.Types.ObjectId(costInfo.userId),
+      userId: mongoose.Types.ObjectId.isValid(costInfo.userId)
+        ? new mongoose.Types.ObjectId(costInfo.userId)
+        : undefined,
       provider: costInfo.provider,
       modelName: costInfo.model,
       inputTokens: costInfo.inputTokens,

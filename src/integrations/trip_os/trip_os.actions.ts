@@ -857,6 +857,76 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
     },
   },
 
+  // ── Per-Day Update ─────────────────────────────────────────────
+
+  updateTripDay: {
+    description: 'Update a single day in a trip. Used by day-planner agents to save their planned day directly. Concurrent-safe — multiple days can be written in parallel. The day is inserted if it doesn\'t exist, or replaced if it does.',
+    strict: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        tripId: { type: 'string', description: 'The trip MongoDB _id' },
+        dayNum: { type: 'number', description: 'Day number (1, 2, 3, ...)' },
+        date: { type: 'string', description: 'Date in YYYY-MM-DD format' },
+        titleHe: { type: 'string', description: 'Day title in Hebrew' },
+        brief: { type: 'string', description: 'Brief day description in Hebrew (1 sentence)' },
+        heroCandidate: { type: 'string', description: 'URL of the most iconic photo from this day (for hero image selection)' },
+        stops: {
+          type: 'array',
+          description: 'Ordered list of stops for the day',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'Unique stop ID (e.g. "d1-s1")' },
+              time: { type: 'string', description: 'Time in HH:MM format' },
+              title: { type: 'string', description: 'Stop name in Hebrew' },
+              icon: { type: 'string', description: 'One of: landmark, food, coffee, camera, activity, shopping, nature, church, swords' },
+              description: { type: 'string', description: 'Brief description in Hebrew' },
+              duration: { type: 'string', description: 'Duration in Hebrew' },
+              image: { type: 'string', description: 'Photo URL from searchPlaces' },
+              address: { type: 'string', description: 'Full street address' },
+              rating: { type: 'number', description: 'Rating 1.0-5.0' },
+              price: { type: 'string', description: 'Price indicator' },
+              hours: { type: 'string', description: 'Opening hours' },
+              tip: { type: 'string', description: 'Practical tip in Hebrew' },
+              about: { type: 'string', description: 'Background in Hebrew (2-3 sentences)' },
+              kosher: { type: 'boolean', description: 'Whether kosher (food stops)' },
+              personalNote: { type: 'string', description: 'Personal note for travelers in Hebrew' },
+              walkAfter: { type: 'number', description: 'Walking minutes to next stop' },
+            },
+            required: ['id', 'time', 'title', 'icon', 'description', 'duration', 'address', 'about'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['tripId', 'dayNum', 'date', 'titleHe', 'brief', 'stops'],
+      additionalProperties: false,
+    },
+    function: async (args: {
+      tripId: string;
+      dayNum: number;
+      date: string;
+      titleHe: string;
+      brief: string;
+      heroCandidate?: string;
+      stops: Record<string, unknown>[];
+    }): Promise<StandardActionResult> => {
+      if (!context.companyId) throw new ActionValidationError('Company ID is missing.');
+      if (!args.tripId) throw new ActionValidationError('tripId is required.');
+      if (!args.dayNum || args.dayNum < 1) throw new ActionValidationError('dayNum must be a positive integer.');
+
+      return executeAction('updateTripDay', async () => {
+        const { tripId, dayNum, ...dayData } = args;
+        const data = await tripOsPatch(context.companyId, `/api/data/trips/${tripId}/days/${dayNum}`, dayData);
+        return {
+          success: true,
+          data: { tripId, dayNum, action: data.action },
+          description: `Saved day ${dayNum} to trip ${tripId}`,
+        };
+      }, { serviceName: 'tripOs' });
+    },
+  },
+
   // ── Recommendations ───────────────────────────────────────────
 
   updateRecommendations: {

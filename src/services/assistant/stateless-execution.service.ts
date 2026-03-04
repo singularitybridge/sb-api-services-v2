@@ -744,7 +744,7 @@ export const executeAssistantStateless = async (
           stopWhen: stepCountIs(maxToolSteps),
           maxRetries: 2,
           system: providerKey !== 'anthropic' ? systemPrompt : undefined,
-          abortSignal: AbortSignal.timeout(5 * 60 * 1000), // 5-minute total timeout (provider-agnostic)
+          abortSignal: AbortSignal.timeout(10 * 60 * 1000), // 10-minute total timeout (provider-agnostic)
           onStepFinish: ({ toolCalls, finishReason, usage }) => {
             console.log(`[Stateless JSON Step] reason=${finishReason} tools=${toolCalls?.length || 0} tokens=${usage?.totalTokens || 0} assistant=${assistant.name || assistant._id}`);
           },
@@ -870,7 +870,7 @@ export const executeAssistantStateless = async (
         tools: relevantTools,
         stopWhen: stepCountIs(maxToolSteps),
         maxRetries: 2,
-        abortSignal: AbortSignal.timeout(5 * 60 * 1000), // 5-minute total timeout (provider-agnostic)
+        abortSignal: AbortSignal.timeout(10 * 60 * 1000), // 10-minute total timeout (provider-agnostic)
         onStepFinish: ({ toolCalls, finishReason, usage }) => {
           console.log(`[Stateless Text Step] reason=${finishReason} tools=${toolCalls?.length || 0} tokens=${usage?.totalTokens || 0} assistant=${assistant.name || assistant._id}`);
         },
