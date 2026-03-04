@@ -6,10 +6,10 @@ export interface ModelPricing {
   outputCost: number; // Cost per 1000 output tokens
 }
 
-// Pricing last validated: 2026-02-18 (source: OpenRouter API + Perplexity research + official docs)
+// Pricing last validated: 2026-03-04 (source: OpenRouter API + Perplexity research + official docs)
 // To update: run pricing-validator agent or check CLAUDE.md "Monthly Task: Pricing Validation"
 export const MODEL_PRICING: Record<string, ModelPricing> = {
-  // === OpenAI GPT-5.2 (Latest) ===
+  // === OpenAI GPT-5.2 (Latest API model) ===
   'gpt-5.2': { inputCost: 0.00175, outputCost: 0.014 },
   'gpt-5.2-pro': { inputCost: 0.021, outputCost: 0.168 },
 
@@ -53,6 +53,12 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'claude-opus-4-1': { inputCost: 0.005, outputCost: 0.025 },
   'claude-sonnet-4-20250514': { inputCost: 0.003, outputCost: 0.015 },
   'claude-sonnet-4': { inputCost: 0.003, outputCost: 0.015 },
+
+  // === Google Gemini 3.1 (Preview - Feb/Mar 2026) — both plain and models/-prefixed ===
+  'gemini-3.1-pro-preview': { inputCost: 0.002, outputCost: 0.012 },
+  'models/gemini-3.1-pro-preview': { inputCost: 0.002, outputCost: 0.012 },
+  'gemini-3.1-flash-lite-preview': { inputCost: 0.00025, outputCost: 0.0015 },
+  'models/gemini-3.1-flash-lite-preview': { inputCost: 0.00025, outputCost: 0.0015 },
 
   // === Google Gemini 3 (Preview) — both plain and models/-prefixed ===
   'gemini-3-pro-preview': { inputCost: 0.00125, outputCost: 0.01 },

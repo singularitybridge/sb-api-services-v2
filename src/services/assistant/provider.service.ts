@@ -3,11 +3,11 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { ProviderKey } from '../../types/assistant.types';
 
-// Model configurations - Updated February 18, 2026
+// Model configurations - Updated March 4, 2026
 // Based on latest available models from OpenAI, Anthropic, Google, and OpenRouter
 // OpenRouter pricing verified against openrouter.ai/api/v1/models
 const MODEL_CONFIGS: Record<string, any> = {
-  // === OpenAI GPT-5.2 (Latest - Late 2025) ===
+  // === OpenAI GPT-5.2 (Latest API model - Late 2025) ===
   'gpt-5.2': { provider: 'openai', baseModel: 'gpt-5.2' },
   'gpt-5.2-pro': { provider: 'openai', baseModel: 'gpt-5.2-pro' },
 
@@ -34,7 +34,17 @@ const MODEL_CONFIGS: Record<string, any> = {
   'gpt-4o': { provider: 'openai', baseModel: 'gpt-4o' },
   'gpt-4o-mini': { provider: 'openai', baseModel: 'gpt-4o-mini' },
 
-  // === Google Gemini 3 (Latest - Preview) ===
+  // === Google Gemini 3.1 (Latest - Preview, Feb/Mar 2026) ===
+  'gemini-3.1-pro-preview': {
+    provider: 'google',
+    baseModel: 'gemini-3.1-pro-preview',
+  },
+  'gemini-3.1-flash-lite-preview': {
+    provider: 'google',
+    baseModel: 'gemini-3.1-flash-lite-preview',
+  },
+
+  // === Google Gemini 3 (Preview) ===
   'gemini-3-pro-preview': {
     provider: 'google',
     baseModel: 'gemini-3-pro-preview',
@@ -214,11 +224,11 @@ export function getProvider(pk: ProviderKey, model: string, key: string) {
 // Model descriptions for API/UI display
 export const MODEL_DESCRIPTIONS: Record<string, string> = {
   // OpenAI GPT-5.2
-  'gpt-5.2': 'Latest GPT-5.2 model (Late 2025)',
+  'gpt-5.2': 'GPT-5.2 - latest API flagship',
   'gpt-5.2-pro': 'GPT-5.2 Pro - enhanced capabilities',
 
   // OpenAI GPT-5.1
-  'gpt-5.1': 'GPT-5.1 model',
+  'gpt-5.1': 'GPT-5.1 model (retiring Mar 11, 2026)',
 
   // OpenAI GPT-5
   'gpt-5': 'GPT-5 base model',
@@ -240,8 +250,12 @@ export const MODEL_DESCRIPTIONS: Record<string, string> = {
   'gpt-4o': 'GPT-4o (legacy, still supported)',
   'gpt-4o-mini': 'GPT-4o Mini (legacy, still supported)',
 
+  // Google Gemini 3.1
+  'gemini-3.1-pro-preview': 'Gemini 3.1 Pro (Preview) - latest reasoning',
+  'gemini-3.1-flash-lite-preview': 'Gemini 3.1 Flash Lite (Preview) - efficient',
+
   // Google Gemini 3
-  'gemini-3-pro-preview': 'Gemini 3 Pro (Preview)',
+  'gemini-3-pro-preview': 'Gemini 3 Pro (deprecated Mar 9, 2026)',
   'gemini-3-flash-preview': 'Gemini 3 Flash (Preview) - fast',
 
   // Google Gemini 2.5
@@ -292,8 +306,8 @@ export const MODEL_DESCRIPTIONS: Record<string, string> = {
 
 // Default model per provider
 export const DEFAULT_MODELS: Record<string, string> = {
-  openai: 'gpt-5.1',
-  google: 'gemini-3-flash-preview',
+  openai: 'gpt-5.2',
+  google: 'gemini-3.1-pro-preview',
   anthropic: 'claude-sonnet-4-6',
   openrouter: 'meta-llama/llama-4-maverick',
 };
@@ -315,7 +329,9 @@ export const MODEL_LABELS: Record<string, string> = {
   'gpt-4.1-nano': 'GPT-4.1 Nano',
   'gpt-4o': 'GPT-4o',
   'gpt-4o-mini': 'GPT-4o Mini',
-  'gemini-3-pro-preview': 'Gemini 3 Pro (preview)',
+  'gemini-3.1-pro-preview': 'Gemini 3.1 Pro (preview)',
+  'gemini-3.1-flash-lite-preview': 'Gemini 3.1 Flash Lite (preview)',
+  'gemini-3-pro-preview': 'Gemini 3 Pro (deprecated)',
   'gemini-3-flash-preview': 'Gemini 3 Flash (preview)',
   'gemini-2.5-pro': 'Gemini 2.5 Pro',
   'gemini-2.5-flash': 'Gemini 2.5 Flash',
@@ -349,8 +365,10 @@ export const MODEL_LABELS: Record<string, string> = {
 // Models kept in MODEL_CONFIGS for backward compatibility (existing assistants)
 // but excluded from the /api/models listing and UI dropdowns.
 export const LEGACY_MODELS = new Set([
+  'gpt-5.1',
   'gpt-4o',
   'gpt-4o-mini',
+  'gemini-3-pro-preview',
   'claude-opus-4-5',
   'claude-sonnet-4-5',
   'claude-opus-4-1',
