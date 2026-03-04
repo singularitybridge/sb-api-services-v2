@@ -690,7 +690,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
           customerId: customerIdParam,
           limit: '5',
         });
-        const trip = (data.results || []).find((t: any) => t.status === 'created' || t.status === 'planning' || t.status === 'active');
+        const trip = (data.results || []).find((t: any) => t.status === 'created' || t.status === 'planning' || t.status === 'processing' || t.status === 'active');
         if (!trip) {
           return { success: true, data: { found: false, message: 'No active trip. The user needs to create a new trip from the app.' } };
         }
@@ -829,7 +829,7 @@ export const createTripOsActions = (context: ActionContext): FunctionFactory => 
               customerId: context.channelUserId,
               limit: '5',
             });
-            const active = (data.results || []).find((t: any) => t.status === 'created' || t.status === 'planning' || t.status === 'active');
+            const active = (data.results || []).find((t: any) => t.status === 'created' || t.status === 'planning' || t.status === 'processing' || t.status === 'active');
             if (!active) {
               return { success: false, description: 'No active trip found. The user needs to create a new trip from the app.' };
             }
