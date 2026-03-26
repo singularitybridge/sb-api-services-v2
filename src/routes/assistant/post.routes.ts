@@ -1,8 +1,5 @@
 import { Router } from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
-import {
-  refreshApiKeyCache,
-} from '../../services/api.key.service';
 import { Assistant } from '../../models/Assistant';
 // OpenAI Assistant API calls removed as it's deprecated in favor of Vercel AI
 import { createDefaultAssistant } from '../../services/assistant.service';
@@ -21,8 +18,6 @@ router.post(
   '/',
   async (req: AuthenticatedRequest, res) => {
     try {
-      await refreshApiKeyCache(req.company._id.toString());
-
       // Validate assistant name
       if (req.body.name && !isValidAssistantName(req.body.name)) {
         const error = getNameValidationError(req.body.name);
@@ -38,7 +33,6 @@ router.post(
         companyId: req.user?.companyId,
       };
       const newAssistant = new Assistant(assistantData);
-      // const apiKey = (await getApiKey(req.company._id, 'openai_api_key')) as string; // Not needed
 
       // Generate a unique ID for assistantId instead of getting it from OpenAI
       newAssistant.assistantId = new mongoose.Types.ObjectId().toString();

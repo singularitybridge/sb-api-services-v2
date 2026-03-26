@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
-// validateApiKeys and getApiKey removed — no longer needed
 import { Assistant } from '../../models/Assistant';
 import { updateAllowedActions } from '../../services/allowed-actions.service';
 import { validateObjectId } from '../../utils/validation';

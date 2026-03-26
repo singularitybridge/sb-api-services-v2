@@ -1,9 +1,8 @@
-import { IUser, User } from '../models/User';
 import { Company, ICompany, OnboardingStatus } from '../models/Company';
-import { Document } from 'mongoose';
 import { NotFoundError } from '../utils/errors';
+import { getConfiguredIntegrationIds } from './integration-config.service';
 
-const DEFAULT_ENCRYPTED_OPENAI_API_KEY = '91ac2fa32515511b3f1bb19e5e9980553115';
+const LLM_INTEGRATION_IDS = ['openai', 'gemini', 'anthropic'];
 
 export const updateOnboardingStatus = async (
   companyId: string,
@@ -14,13 +13,12 @@ export const updateOnboardingStatus = async (
       throw new NotFoundError('Company not found');
     }
 
-    if (
-      !company.api_keys.some(
-        (key) =>
-          key.key === 'openai_api_key' &&
-          key.value !== DEFAULT_ENCRYPTED_OPENAI_API_KEY,
-      )
-    ) {
+    const configuredIds = await getConfiguredIntegrationIds(companyId);
+    const hasAnyLlmKey = LLM_INTEGRATION_IDS.some((id) =>
+      configuredIds.includes(id),
+    );
+
+    if (!hasAnyLlmKey) {
       company.onboardingStatus = OnboardingStatus.API_KEY_REQUIRED;
     } else {
       // If OpenAI API key is present, set status to READY_FOR_ASSISTANTS

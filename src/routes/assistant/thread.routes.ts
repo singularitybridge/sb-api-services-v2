@@ -1,6 +1,5 @@
 import express from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
-// validateApiKeys removed — no longer needed
 // import { createNewThread, deleteThread, getMessages } from '../../services/oai.thread.service'; // Removed, OpenAI specific
 import { Session } from '../../models/Session';
 import { Message } from '../../models/Message'; // Added for Step 5

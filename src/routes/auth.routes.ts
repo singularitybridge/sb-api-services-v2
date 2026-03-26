@@ -3,7 +3,6 @@ import express from 'express';
 import { extractTokenFromHeader, verifyToken } from '../services/token.service';
 import { googleLogin } from '../services/googleAuth.service';
 import { clerkLogin } from '../services/clerkAuth.service';
-import { refreshApiKeyCache } from '../services/api.key.service';
 import { ApiKeyService } from '../services/apiKey.service';
 
 const authRouter = express.Router();
@@ -32,21 +31,13 @@ authRouter.post('/verify-token', async (req, res) => {
 
     // Otherwise, it's a JWT token
     const token = extractTokenFromHeader(authHeader);
-    const { user, company, decryptedApiKey } = await verifyToken(token);
+    const { user, company } = await verifyToken(token);
 
-    const response: any = {
+    res.json({
       message: 'Token is valid',
       user,
       company,
-    };
-
-    if (decryptedApiKey) {
-      response.decryptedApiKey = decryptedApiKey;
-    } else {
-      response.message += ', but API key is not set';
-    }
-
-    res.json(response);
+    });
   } catch (error) {
     console.error('Token verification failed:', error);
     res
@@ -58,7 +49,6 @@ authRouter.post('/verify-token', async (req, res) => {
 authRouter.post('/google/login', async (req, res) => {
   try {
     const { user, company, sessionToken } = await googleLogin(req.body.token);
-    await refreshApiKeyCache(company._id.toString());
     res.json({ user, company, sessionToken });
   } catch (error: any) {
     console.error('Google login failed:', error.message);
@@ -71,7 +61,6 @@ authRouter.post('/google/login', async (req, res) => {
 authRouter.post('/clerk/login', async (req, res) => {
   try {
     const { user, company, sessionToken } = await clerkLogin(req.body.token);
-    await refreshApiKeyCache(company._id.toString());
     res.json({ user, company, sessionToken });
   } catch (error: any) {
     console.error('Clerk login failed:', error.message);

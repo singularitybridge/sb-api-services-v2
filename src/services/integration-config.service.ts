@@ -6,7 +6,7 @@ import {
   IIntegrationApiKey,
 } from '../models/IntegrationConfig';
 import { encryptData, decryptData } from './encryption.service';
-import { getApiKey, invalidateApiKeyCache } from './api.key.service';
+import { invalidateApiKeyCache } from './api.key.service';
 
 /**
  * Clear per-integration credential caches when config is updated.
@@ -28,8 +28,8 @@ async function invalidateIntegrationCredentialsCaches(
   }
 }
 
-// Cache with 15-minute TTL (same as api.key.service)
-const integrationConfigCache = new NodeCache({ stdTTL: 900 });
+// Cache with 2-minute TTL (same as api.key.service)
+const integrationConfigCache = new NodeCache({ stdTTL: 120 });
 
 /**
  * Key format for caching integration configs
@@ -223,25 +223,6 @@ export async function getIntegrationApiKey(
 }
 
 /**
- * Get API key with fallback to legacy Company.api_keys
- * This ensures backwards compatibility during migration
- */
-export async function getApiKeyWithFallback(
-  companyId: string,
-  integrationId: string,
-  keyName: string,
-): Promise<string | null> {
-  // 1. Check new IntegrationConfig first
-  const newKey = await getIntegrationApiKey(companyId, integrationId, keyName);
-  if (newKey) {
-    return newKey;
-  }
-
-  // 2. Fall back to legacy Company.api_keys
-  return getApiKey(companyId, keyName);
-}
-
-/**
  * Check if an integration is configured (has at least one API key set)
  */
 export async function isIntegrationConfigured(
@@ -279,7 +260,7 @@ function invalidateIntegrationConfigCache(
 
   // Delete all API key caches for this integration
   // Note: We can't easily enumerate all keys, so we use a pattern
-  // In practice, the 15-minute TTL will handle cleanup
+  // In practice, the 2-minute TTL will handle cleanup
   const keys = integrationConfigCache.keys();
   for (const key of keys) {
     if (key.startsWith(`apikey:${companyId}:${integrationId}:`)) {

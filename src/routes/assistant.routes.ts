@@ -4,7 +4,6 @@ import { assistantRouter } from './assistant/assistant.routes';
 import { completionRouter } from './assistant/completion.routes';
 import { executeHandler } from './assistant/execute.routes'; // Import the handler function
 import workspaceExecuteRouter from './assistant/workspace-execute.routes'; // Import workspace execute router
-// validateApiKeys removed — no longer needed
 import { validateObjectId } from '../utils/validation';
 
 const router = express.Router();

@@ -9,9 +9,9 @@ import {
 import { encryptData, decryptData } from './encryption.service';
 import { updateOnboardingStatus } from './onboarding.service';
 import { User } from '../models/User';
-import { refreshApiKeyCache } from './api.key.service';
 
 const encryptCompanyData = (companyData: ICompany) => {
+  if (!companyData.api_keys) return;
   companyData.api_keys.forEach((apiKey: IApiKey) => {
     const encryptedData = encryptData(apiKey.value);
     apiKey.value = encryptedData.value;
@@ -21,6 +21,7 @@ const encryptCompanyData = (companyData: ICompany) => {
 };
 
 const decryptCompanyData = (companyData: any) => {
+  if (!companyData.api_keys?.length) return;
   companyData.api_keys = companyData.api_keys.map((apiKey: IApiKey) => {
     return {
       key: apiKey.key,
@@ -37,43 +38,14 @@ export const createCompany = async (
   companyData: Partial<ICompany>,
 ): Promise<ICompany> => {
   try {
-    companyData.api_keys = companyData.api_keys || [];
-
-    const defaultKeys = [
-      { key: 'openai_api_key', value: 'default_openai_key' },
-      { key: 'labs11_api_key', value: 'default_labs11_key' },
-      { key: 'google_api_key', value: 'default_google_key' },
-      { key: 'anthropic_api_key', value: 'default_anthropic_key' },
-      { key: 'perplexity_api_key', value: 'default_perplexity_key' },
-      { key: 'sendgrid_api_key', value: 'default_sendgrid_key' },
-      { key: 'linear_api_key', value: 'default_linear_key' },
-    ];
-
-    defaultKeys.forEach((defaultKey) => {
-      if (!companyData.api_keys!.some((key) => key.key === defaultKey.key)) {
-        companyData.api_keys!.push(defaultKey);
-      }
-    });
-
+    companyData.api_keys = [];
     companyData.onboardingStatus = OnboardingStatus.CREATED;
     companyData.onboardedModules = [];
 
-    encryptCompanyData(companyData as ICompany);
-
     const company = new Company(companyData);
-
     await company.save();
 
-    const createdCompany = company.toObject();
-    decryptCompanyData(createdCompany);
-
-    // Refresh API key cache for the new company
-    await refreshApiKeyCache(createdCompany._id.toString());
-    console.log(
-      `API key cache refreshed for new company: ${createdCompany._id}`,
-    );
-
-    return createdCompany as unknown as ICompany;
+    return company.toObject() as unknown as ICompany;
   } catch (error) {
     console.error('Error creating company:', error);
     throw error;
@@ -133,10 +105,6 @@ export const updateCompany = async (id: string, data: Partial<ICompany>) => {
     const updatedCompanyData = updatedCompany.toObject();
     decryptCompanyData(updatedCompanyData);
 
-    // Refresh API key cache for the updated company
-    await refreshApiKeyCache(id);
-    console.log(`API key cache refreshed for updated company: ${id}`);
-
     return updatedCompanyData as unknown as ICompany;
   } catch (error) {
     console.error('Error updating company:', error);
@@ -185,12 +153,6 @@ export const updateCompanyOnboarding = async (
 
     const updatedCompanyData = company.toObject();
     decryptCompanyData(updatedCompanyData);
-
-    // Refresh API key cache for the updated company
-    await refreshApiKeyCache(id);
-    console.log(
-      `API key cache refreshed for company after onboarding update: ${id}`,
-    );
 
     return updatedCompanyData as unknown as ICompany;
   } catch (error) {

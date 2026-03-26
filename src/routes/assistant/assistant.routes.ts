@@ -1,6 +1,5 @@
 import express from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth.middleware';
-// validateApiKeys and getApiKey removed — no longer needed
 import { Assistant } from '../../models/Assistant';
 import { deleteAssistant } from '../../services/assistant.service';
 import { updateAllowedActions } from '../../services/allowed-actions.service';

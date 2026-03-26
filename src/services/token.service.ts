@@ -2,12 +2,11 @@
 import jwt from 'jsonwebtoken';
 import { Company } from '../models/Company';
 import { User, IUser } from '../models/User';
-import { decryptData } from './encryption.service';
 import { AuthenticationError } from '../utils/errors';
 
 export const verifyToken = async (
   token: string,
-): Promise<{ user: IUser; company: any; decryptedApiKey: string }> => {
+): Promise<{ user: IUser; company: any }> => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
       userId: string;
@@ -25,17 +24,7 @@ export const verifyToken = async (
       throw new AuthenticationError('Company not found');
     }
 
-    let decryptedApiKey = 'not set';
-    const apiKey = company.api_keys.find((key) => key.key === 'openai_api_key');
-    if (apiKey) {
-      decryptedApiKey = decryptData({
-        value: apiKey.value,
-        iv: apiKey.iv,
-        tag: apiKey.tag,
-      });
-    }
-
-    return { user, company, decryptedApiKey };
+    return { user, company };
   } catch (error) {
     // Check if it's a JWT-specific error
     if (error instanceof jwt.TokenExpiredError) {
