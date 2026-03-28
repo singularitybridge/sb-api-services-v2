@@ -17,6 +17,26 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import { getBaseUrl } from '../services/oauth-mcp.service';
 
+// Default timeout for MCP tool calls (30 seconds)
+// Prevents hanging when database connection is stale or unresponsive
+const MCP_TOOL_TIMEOUT_MS = 30_000;
+
+/**
+ * Wrap a promise with a timeout. If the promise doesn't resolve within the
+ * given time, reject with a descriptive error instead of hanging forever.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, toolName: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Tool '${toolName}' timed out after ${ms / 1000}s. The database may be unreachable.`));
+    }, ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
 import {
   executeTool,
   executeSchema,
@@ -1139,7 +1159,13 @@ export class MCPHttpServer {
         const toolName = jsonRpcRequest.params?.name;
         const toolArgs = jsonRpcRequest.params?.arguments;
 
+        // Use a longer timeout for execute (which runs an AI assistant)
+        const timeoutMs = toolName === 'execute' ? 120_000 : MCP_TOOL_TIMEOUT_MS;
+
         try {
+          // dispatchTool contains the switch; wrapping its result in withTimeout
+          // prevents hanging when the database connection is stale/unreachable.
+          const dispatchTool = async (): Promise<any> => {
           let result;
 
           switch (toolName) {
@@ -1751,16 +1777,13 @@ export class MCPHttpServer {
             }
 
             default:
-              res.status(400).json({
-                jsonrpc: '2.0',
-                error: {
-                  code: -32601,
-                  message: `Unknown tool: ${toolName}`,
-                },
-                id: jsonRpcRequest.id,
-              });
-              return;
+              throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${toolName}`);
           }
+
+          return result;
+          }; // end dispatchTool
+
+          const result = await withTimeout(dispatchTool(), timeoutMs, toolName || 'unknown');
 
           res.json({
             jsonrpc: '2.0',
@@ -1769,10 +1792,13 @@ export class MCPHttpServer {
           });
           return;
         } catch (toolError: any) {
-          res.status(400).json({
+          // McpError for unknown tools → -32601, other errors → -32602
+          const code = toolError instanceof McpError ? toolError.code : -32602;
+          const status = toolError instanceof McpError ? 400 : 400;
+          res.status(status).json({
             jsonrpc: '2.0',
             error: {
-              code: -32602,
+              code,
               message: toolError.message || 'Tool execution failed',
             },
             id: jsonRpcRequest.id,
